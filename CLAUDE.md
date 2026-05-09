@@ -1,5 +1,3 @@
-TERAX.md
-
 # Nexum — CLAUDE.md
 **AI Developer Guidelines & Project Reference**
 
@@ -16,23 +14,30 @@ Before working on any area, read the relevant context file:
 - **Product Requirements** → [`prd.md`](./prd.md) — Feature requirements, UX philosophy, out-of-scope items
 - **Implementation Plan** → [`plan-overview.md`](./plan-overview.md) — All phases with detailed work instructions
 - **SSH/SFTP Architecture** → [`sftp_ssh_context.md`](./sftp_ssh_context.md) — Connection lifecycle, PTY, transfer manager IPC contracts
-- **UI Layout Blueprint** → [`layout_context.md`](./layout_context.md) — Window structure, TitleBar, component hierarchy, UX rules
-- **Data Models** → [`database.md`](./database.md) — SQLite schema, settings.json, theme JSON structure
-- **Project Init Guide** → [`project-init.md`](./project-init.md) — Folder structure, dependency list, milestone order
+- **Host Manager UI** → [`hosts_manager_context.md`](./hosts_manager_context.md) — Master-Detail layout, TitleBar dropdown, Inspector pane, Zustand store shape
 
 ## Architecture Summary
 ```
 Nexum (Tauri v2)
-├── Frontend: React 18 + TypeScript + Vite
-│   ├── Tailwind CSS + shadcn/ui (Radix UI)
-│   ├── Zustand (global state: tabs, transfers)
-│   └── xterm.js + WebGL addon (terminal)
+├── Frontend: React 19 + TypeScript + Vite
+│   ├── Tailwind CSS v4 + shadcn/ui (config in src/styles/globals.css, NO tailwind.config.ts)
+│   ├── Zustand (global state: tabs, transfers, hosts)
+│   ├── xterm.js + WebGL addon (terminal)
+│   └── @tanstack/react-virtual (SFTP file lists)
 └── Backend: Rust (Tokio async)
-    ├── rusqlite → host/group storage (SQLite)
-    ├── keyring → passwords in macOS Keychain
+    ├── portable-pty → local terminal sessions
+    ├── rusqlite (bundled) → host/group storage (SQLite at app_local_data_dir)
+    ├── keyring → passwords in macOS Keychain (NEVER store passwords in SQLite)
     ├── ssh2 → SSH + SFTP protocol
-    └── tokio → background transfer queue
+    └── tokio mpsc → background transfer queue worker
 ```
+
+## New Module Locations
+- `src/modules/hosts/` — Home Dashboard, HostInspector, Zustand hostsStore
+- `src/modules/sftp/` — SftpPane, VirtualizedFileList, transferStore
+- `src-tauri/src/modules/hosts/` — SQLite CRUD commands
+- `src-tauri/src/modules/ssh/` — SSH connect, PTY, SFTP backend
+- `src-tauri/src/modules/sftp/` — Transfer worker
 
 ## Critical Rules (NEVER Violate)
 1. **No Node.js in frontend** — All system calls via `invoke()` / Tauri events only
@@ -51,8 +56,10 @@ All implementation tasks live in [`tasks/`](./tasks/). Each task file contains:
 - Files to create/modify
 - Expected outcome
 
-**Current Phase: 1 — Project Setup & Core Infrastructure**
-Start with: [`tasks/TASK_01_1_scaffolding.md`](./tasks/TASK_01_1_scaffolding.md)
+**Current Phase: 2 — Database & Host Management**
+Next task: [`tasks/TASK_02_1_sqlite_backend.md`](./tasks/TASK_02_1_sqlite_backend.md)
+
+Full task registry: [`tasks/README.md`](./tasks/README.md)
 
 ## Session End Protocol
 At the end of every session you MUST:
@@ -79,15 +86,17 @@ If you encounter a build error, unexpected behavior, or have to debug something 
 → Include: what failed, why it failed, how it was fixed
 
 ## IPC Contract Quick Reference
-See [`sftp_ssh_context.md`](./sftp_ssh_context.md) Section 5 for the full list.
-Key commands: `list_local_dir`, `list_remote_dir`, `enqueue_transfer`, `cancel_transfer`, `fs_delete`, `fs_rename`, `fs_chmod`
-Key events: `transfer_progress`, `file_conflict`, `pty_output`, `auth_required`, `session_established`, `known_hosts_warning`
+See [`sftp_ssh_context.md`](./sftp_ssh_context.md) Section 6 for the full list.
+
+**Key Rust commands:** `hosts_get_all`, `hosts_create`, `hosts_update`, `hosts_delete`, `groups_get_all`, `groups_create`, `groups_delete`, `ssh_connect`, `ssh_disconnect`, `ssh_pty_write`, `ssh_pty_resize`, `sftp_read_dir`, `sftp_rename`, `sftp_delete`, `sftp_mkdir`, `sftp_chmod`, `enqueue_transfer`, `cancel_transfer`, `resolve_conflict`, `prepare_remote_edit`, `save_remote_edit`
+
+**Key Tauri events (Rust → React):** `transfer_progress`, `file_conflict`, `ssh_pty_output` `{tab_id, data}`, `auth_required` `{tab_id, prompt_message, is_2fa}`, `session_established` `{tab_id}`, `known_hosts_warning` `{tab_id, fingerprint, host, is_mismatch}`
 
 ## Project
 
-**Terax** — open-source AI-native terminal emulator. Tauri 2 + Rust (`portable-pty`) backend, React 19 + TypeScript + xterm.js (webgl) client, BYOK AI via Vercel AI SDK.
+**Nexum** — macOS-native remote workspace (hard-fork of "Terax"). Tauri 2 + Rust backend, React 19 + TypeScript + xterm.js (webgl) client, BYOK AI via Vercel AI SDK.
 
-Bundle id: `app.crynta.terax`. Package manager: **pnpm**.
+Bundle id: `com.nexum.app`. Package manager: **pnpm**.
 
 Type-check the frontend without bundling: `pnpm exec tsc --noEmit`.
 Rust checks: `cd src-tauri && cargo check` / `cargo clippy`.
@@ -113,7 +122,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 - **terminal/** — `TerminalStack` keeps one mounted xterm instance per tab (via `useTerminalSession` + `pty-bridge`). `osc-handlers.ts` parses shell-integration OSC codes (cwd updates, etc.). Tabs are not unmounted on switch — they're hidden via `invisible pointer-events-none` so PTYs keep streaming in the background.
 - **editor/** — CodeMirror 6 stack (`EditorStack` mirrors `TerminalStack`). `extensions.ts` and `languageResolver.ts` configure language modes + themes.
 - **explorer/** — file tree (Material Icons via `material-icon-theme` resolved in `iconResolver.ts`), context actions, inline rename input.
-- **tabs/** — `useTabs` is the source of truth for tab list + active id. Tabs are tagged-union `{ kind: "terminal" | "editor", … }`. `useWorkspaceCwd` derives the explorer root and inherited cwd for new tabs.
+- **tabs/** — `useTabs` is the source of truth for tab list + active id. Tabs are tagged-union `{ kind: "terminal" | "editor" | "preview" | "ai-diff" | "home" | "ssh-terminal" | "sftp", … }`. `useWorkspaceCwd` derives the explorer root and inherited cwd for new tabs.
 - **header/** — top bar + inline search (`SearchInline` adapts to terminal vs editor via `SearchTarget`).
 - **statusbar/** — bottom bar, cwd breadcrumb, AI tools indicator.
 - **shortcuts/** — keymap registry (`shortcuts.ts`) + `useGlobalShortcuts` hook. Handlers live in `App.tsx` and are passed in by id (`tab.new`, `ai.toggle`, …).
@@ -124,7 +133,7 @@ Each module is self-contained, exports a thin barrel via `index.ts`, and owns it
 
 BYOK. Currently OpenAI-only via `@ai-sdk/openai`; default model in `config.ts` (`DEFAULT_MODEL_ID`). When adding providers, branch in `lib/agent.ts` and keep the `Agent` / `DirectChatTransport` shape — the rest of the system depends on AI SDK v6 chat semantics.
 
-- **Key storage**: OS keychain via `keyring`. Service/account constants in `config.ts` (`KEYRING_SERVICE = "terax-ai"`). Never persist keys to disk, settings store, or `localStorage`.
+- **Key storage**: OS keychain via `keyring`. Service/account constants in `config.ts` (`KEYRING_SERVICE = "nexum-ai"`). Never persist keys to disk, settings store, or `localStorage`.
 - **Agent**: `lib/agent.ts` builds a `Experimental_Agent` with `stopWhen: stepCountIs(MAX_AGENT_STEPS)` and the system prompt from `config.ts`.
 - **Sessions** (`lib/sessions.ts` + `store/chatStore.ts`): conversations are organized into named sessions, persisted via `tauri-plugin-store` at `terax-ai-sessions.json` (list + `activeId` + per-session `messages:<id>` keys). `chatStore.ts` keeps a module-scoped `Map<sessionId, Chat<UIMessage>>`; `getOrCreateChat(apiKey, sessionId)` lazily constructs a `Chat`, seeded with persisted messages from a hydration map populated by `hydrateSessions()` (called once from `App.tsx`). `AgentRunBridge` mirrors the active session's messages back to disk on every change and auto-derives the title from the first user message. Switching the API key wipes the chat map; sessions persist. Session UI (switch / new / delete) lives in `AiMiniWindow`'s header.
 - **Composer** (`lib/composer.tsx`): a React context providing the shared input state (text, attachments, voice) for both the docked `AiInputBar` and any other surface. Attachments include image, text-file, and `selection` kinds — selections come from `useChatStore.attachSelection(text, source)` (drained into chips, not pasted into the textarea) and are wrapped as `<selection source="terminal|editor">…</selection>` blocks at submit. Composer doesn't run `useChat` itself — it derives `isBusy` from `agentMeta.status` so it can mount safely before sessions hydrate.
