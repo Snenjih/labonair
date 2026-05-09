@@ -3,40 +3,23 @@
 ## Last Session: 2026-05-09
 
 ### What Was Done
-- Completed **TASK_01_1 — Rebranding & Project Configuration**
-  - Renamed all `terax` → `nexum` references across frontend and backend
-  - Updated `package.json`, `index.html`, `settings.html`
-  - Updated `tauri.conf.json`: productName, identifier, window title, longDescription
-  - Updated `Cargo.toml`: package name → `nexum`, lib name → `nexum_lib`
-  - Updated `main.rs`: entry call → `nexum_lib::run()`
-  - Updated `AboutSection.tsx`: name, bundle ID, repo/website URLs
-  - Updated `ai/config.ts`: KEYRING_SERVICE → `nexum-ai`, SYSTEM_PROMPT persona
-  - Updated `ThemeProvider.tsx`, `index.html`, `settings.html`: localStorage key → `nexum-ui-theme-shadow`
-  - Updated `composer.tsx` + `App.tsx`: custom event → `nexum:ai-attach-file`
-  - `cargo check` ✅ | `tsc --noEmit` ✅
-
-- Completed **TASK_01_2 — Tab System Extension & Home View Setup**
-  - Extended Tab union with `HomeTab`, `SshTerminalTab`, `SftpTab`
-  - App boots into "Home" tab by default
-  - TabBar renders correct icons for new tab kinds
-  - App.tsx has placeholder stacks for home/ssh/sftp with `invisible pointer-events-none` pattern
-
-- **Project Planning & Architecture Setup**
-  - Created complete task registry for Phases 2-6 (9 new task files)
-  - Updated `tasks/README.md` with all phases (TASK_02_1 through TASK_06_1)
-  - Updated `CLAUDE.md`: corrected bundle ID, React version, module locations, IPC contracts, current phase pointer
+- Completed **TASK_02_1 — SQLite Integration (Backend)**
+  - Added `rusqlite = { version = "0.32", features = ["bundled"] }` + `uuid = { version = "1", features = ["v4"] }` to `Cargo.toml`
+  - Created `src-tauri/src/modules/hosts/mod.rs` with `Host`, `Group`, `HostsDb` structs
+  - Created `src-tauri/src/modules/hosts/db.rs` with `initialize_db` + 7 Tauri commands: `hosts_get_all`, `hosts_create`, `hosts_update`, `hosts_delete`, `groups_get_all`, `groups_create`, `groups_delete`
+  - Registered `pub mod hosts` in `modules/mod.rs`
+  - Wired `HostsDb` managed state via `.setup()` and registered all 7 commands in `lib.rs`
+  - `cargo check` ✅
 
 ### Current State
-- **Phase 1 complete** — both TASK_01_1 and TASK_01_2 done, `tsc --noEmit` clean.
-- **Full task plan in place** — 9 tasks across Phases 2-6 created in `tasks/`
-- App boots to "Home" tab with placeholder. Tab union ready for new views.
+- **Phase 2, Task 02.1 complete.** SQLite backend layer fully operational.
+- **TASK_02_2 is next** — Host Manager UI (Home Dashboard): React frontend for listing/creating/editing/deleting hosts and groups.
 
 ### What's Next
-- **TASK_02_1** — SQLite Integration (Backend)
-  - Add `rusqlite` + `uuid` to Cargo.toml
-  - Create `src-tauri/src/modules/hosts/` with db.rs + mod.rs
-  - Implement CRUD Tauri commands + register in lib.rs
-  - Passwords stored in keychain via keyring, NEVER in SQLite
+- **TASK_02_2** — Host Manager UI (Home Dashboard)
+  - `src/modules/hosts/` — hostsStore (Zustand), HostList, HostInspector, GroupSidebar
+  - Master-Detail layout for the Home tab
+  - IPC calls to the 7 new Rust commands
 
 ### Blockers
 None.

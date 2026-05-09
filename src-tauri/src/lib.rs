@@ -1,6 +1,9 @@
 mod modules;
 
-use modules::{fs, pty, secrets, shell};
+use modules::{
+    fs, pty, secrets, shell,
+    hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, groups_get_all, groups_create, groups_delete}},
+};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[tauri::command]
@@ -65,6 +68,14 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let data_dir = app.path().app_local_data_dir()
+                .expect("failed to resolve app local data dir");
+            let conn = initialize_db(data_dir)
+                .expect("failed to initialize database");
+            app.manage(HostsDb(std::sync::Mutex::new(conn)));
+            Ok(())
+        })
         .manage(pty::PtyState::default())
         .manage(shell::ShellState::default())
         .manage(secrets::SecretsState::default())
@@ -98,6 +109,13 @@ pub fn run() {
             secrets::secrets_set,
             secrets::secrets_delete,
             secrets::secrets_get_all,
+            hosts_get_all,
+            hosts_create,
+            hosts_update,
+            hosts_delete,
+            groups_get_all,
+            groups_create,
+            groups_delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

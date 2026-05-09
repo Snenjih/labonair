@@ -11,8 +11,8 @@
 
 | Task | Title | Status |
 |------|-------|--------|
-| TASK_02_1 | SQLite Integration (Backend) | not_started |
-| TASK_02_2 | Host Manager UI (Home Dashboard) | not_started |
+| TASK_02_1 | SQLite Integration (Backend) | completed |
+| TASK_02_2 | Host Manager UI (Home Dashboard) | in_progress |
 
 ## Phase 3 — Interactive SSH Terminal
 
