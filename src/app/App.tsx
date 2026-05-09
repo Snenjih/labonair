@@ -25,6 +25,7 @@ import {
   type EditorPaneHandle,
 } from "@/modules/editor";
 import { FileExplorer } from "@/modules/explorer";
+import { HomeDashboard } from "@/modules/hosts";
 import {
   Header,
   type SearchInlineHandle,
@@ -688,9 +689,7 @@ export default function App() {
                       )}
                       aria-hidden={!isHomeTab}
                     >
-                      <div className="flex h-full items-center justify-center text-muted-foreground">
-                        Home Dashboard Placeholder
-                      </div>
+                      <HomeDashboard />
                     </div>
                     <div
                       className={cn(

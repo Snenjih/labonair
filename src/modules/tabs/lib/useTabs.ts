@@ -254,6 +254,20 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     [tabs],
   );
 
+  const newSshTab = useCallback((hostId: string, title: string) => {
+    const id = nextIdRef.current++;
+    setTabs((t) => [...t, { id, kind: "ssh-terminal", title, hostId }]);
+    setActiveId(id);
+    return id;
+  }, []);
+
+  const newSftpTab = useCallback((hostId: string, title: string) => {
+    const id = nextIdRef.current++;
+    setTabs((t) => [...t, { id, kind: "sftp", title, hostId }]);
+    setActiveId(id);
+    return id;
+  }, []);
+
   return {
     tabs,
     activeId,
@@ -267,5 +281,7 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     closeTab,
     updateTab,
     selectByIndex,
+    newSshTab,
+    newSftpTab,
   };
 }

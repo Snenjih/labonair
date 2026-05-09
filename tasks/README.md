@@ -12,13 +12,13 @@
 | Task | Title | Status |
 |------|-------|--------|
 | TASK_02_1 | SQLite Integration (Backend) | completed |
-| TASK_02_2 | Host Manager UI (Home Dashboard) | in_progress |
+| TASK_02_2 | Host Manager UI (Home Dashboard) | completed |
 
 ## Phase 3 — Interactive SSH Terminal
 
 | Task | Title | Status |
 |------|-------|--------|
-| TASK_03_1 | SSH Connection & known_hosts Validation | not_started |
+| TASK_03_1 | SSH Connection & known_hosts Validation | in_progress |
 | TASK_03_2 | SSH PTY & Interactive Terminal | not_started |
 
 ## Phase 4 — SFTP File Manager
