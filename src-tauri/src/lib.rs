@@ -3,6 +3,7 @@ mod modules;
 use modules::{
     fs, pty, secrets, shell,
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, groups_get_all, groups_create, groups_delete}},
+    ssh::{SshState, client::{ssh_connect, ssh_disconnect}},
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -74,6 +75,7 @@ pub fn run() {
             let conn = initialize_db(data_dir)
                 .expect("failed to initialize database");
             app.manage(HostsDb(std::sync::Mutex::new(conn)));
+            app.manage(SshState::default());
             Ok(())
         })
         .manage(pty::PtyState::default())
@@ -116,6 +118,8 @@ pub fn run() {
             groups_get_all,
             groups_create,
             groups_delete,
+            ssh_connect,
+            ssh_disconnect,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

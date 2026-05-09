@@ -36,6 +36,8 @@ tauri-plugin-store = "2"
 tauri-plugin-process = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
+ssh2 = "0.9"
+dirs = "5"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3.6", default-features = false, features = [

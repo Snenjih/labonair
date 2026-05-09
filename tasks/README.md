@@ -18,8 +18,8 @@
 
 | Task | Title | Status |
 |------|-------|--------|
-| TASK_03_1 | SSH Connection & known_hosts Validation | in_progress |
-| TASK_03_2 | SSH PTY & Interactive Terminal | not_started |
+| TASK_03_1 | SSH Connection & known_hosts Validation | completed |
+| TASK_03_2 | SSH PTY & Interactive Terminal | in_progress |
 
 ## Phase 4 — SFTP File Manager
 
