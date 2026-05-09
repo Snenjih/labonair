@@ -19,13 +19,13 @@
 | Task | Title | Status |
 |------|-------|--------|
 | TASK_03_1 | SSH Connection & known_hosts Validation | completed |
-| TASK_03_2 | SSH PTY & Interactive Terminal | in_progress |
+| TASK_03_2 | SSH PTY & Interactive Terminal | completed |
 
 ## Phase 4 — SFTP File Manager
 
 | Task | Title | Status |
 |------|-------|--------|
-| TASK_04_1 | Virtualized Split-Pane SFTP UI | not_started |
+| TASK_04_1 | Virtualized Split-Pane SFTP UI | in_progress |
 | TASK_04_2 | SFTP Backend Commands & Context Menus | not_started |
 
 ## Phase 5 — Global Transfer Manager

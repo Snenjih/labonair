@@ -41,8 +41,8 @@ import {
   type ShortcutHandlers,
 } from "@/modules/shortcuts";
 import { StatusBar } from "@/modules/statusbar";
-import { useTabs, useWorkspaceCwd } from "@/modules/tabs";
-import { TerminalStack, type TerminalPaneHandle } from "@/modules/terminal";
+import { useTabs, useWorkspaceCwd, type SshTerminalTab } from "@/modules/tabs";
+import { SshTerminalPane, TerminalStack, type TerminalPaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
 import { homeDir } from "@tauri-apps/api/path";
@@ -162,7 +162,7 @@ export default function App() {
   const isPreviewTab = activeTab?.kind === "preview";
   const isAiDiffTab = activeTab?.kind === "ai-diff";
   const isHomeTab = activeTab?.kind === "home";
-  const isSshTab = activeTab?.kind === "ssh-terminal";
+  // isSshTab not needed — SSH tabs rendered per-instance below
   const isSftpTab = activeTab?.kind === "sftp";
 
   // When an AI diff is approved (write_file applied to disk), reload any
@@ -691,17 +691,21 @@ export default function App() {
                     >
                       <HomeDashboard />
                     </div>
-                    <div
-                      className={cn(
-                        "absolute inset-0",
-                        !isSshTab && "invisible pointer-events-none",
-                      )}
-                      aria-hidden={!isSshTab}
-                    >
-                      <div className="flex h-full items-center justify-center text-muted-foreground">
-                        SSH Terminal Placeholder
+                    {tabs.filter((t) => t.kind === "ssh-terminal").map((t) => (
+                      <div
+                        key={t.id}
+                        className={cn(
+                          "absolute inset-0",
+                          activeId !== t.id && "invisible pointer-events-none",
+                        )}
+                        aria-hidden={activeId !== t.id}
+                      >
+                        <SshTerminalPane
+                          tab={t as SshTerminalTab}
+                          isActive={activeId === t.id}
+                        />
                       </div>
-                    </div>
+                    ))}
                     <div
                       className={cn(
                         "absolute inset-0",

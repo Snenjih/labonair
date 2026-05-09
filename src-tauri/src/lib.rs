@@ -3,7 +3,7 @@ mod modules;
 use modules::{
     fs, pty, secrets, shell,
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, groups_get_all, groups_create, groups_delete}},
-    ssh::{SshState, client::{ssh_connect, ssh_disconnect}},
+    ssh::{SshState, client::{ssh_connect, ssh_disconnect}, pty::{ssh_pty_write, ssh_pty_resize}},
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -120,6 +120,8 @@ pub fn run() {
             groups_delete,
             ssh_connect,
             ssh_disconnect,
+            ssh_pty_write,
+            ssh_pty_resize,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

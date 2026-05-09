@@ -1,8 +1,8 @@
 pub mod client;
-pub mod pty; // implemented in Task 03.2
+pub mod pty;
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub struct SshSession {
     pub session: ssh2::Session,
@@ -13,10 +13,12 @@ pub struct SshSession {
 unsafe impl Send for SshSession {}
 unsafe impl Sync for SshSession {}
 
-pub struct SshState(pub Mutex<HashMap<String, SshSession>>);
+/// Global map of tab_id → SshSession, cloneable so the reader thread can hold a reference.
+#[derive(Clone)]
+pub struct SshState(pub Arc<Mutex<HashMap<String, SshSession>>>);
 
 impl Default for SshState {
     fn default() -> Self {
-        SshState(Mutex::new(HashMap::new()))
+        SshState(Arc::new(Mutex::new(HashMap::new())))
     }
 }

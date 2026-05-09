@@ -145,14 +145,22 @@ pub fn ssh_connect(
         return Err("not authenticated".to_string());
     }
 
-    // Step 7: Store session and emit session_established
+    // Step 7: Open PTY shell channel
+    let channel = super::pty::open_shell_channel(
+        &mut session,
+        &tab_id,
+        &app,
+        state.inner().clone(),
+    )?;
+
+    // Step 8: Store session (with channel) and emit session_established
     {
         let mut map = state.0.lock().map_err(|e| e.to_string())?;
         map.insert(
             tab_id.clone(),
             super::SshSession {
                 session,
-                channel: None,
+                channel: Some(channel),
             },
         );
     }
