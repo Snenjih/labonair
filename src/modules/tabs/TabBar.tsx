@@ -10,11 +10,13 @@ import { cn } from "@/lib/utils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
   Cancel01Icon,
+  CloudServerIcon,
   ComputerTerminal02Icon,
   Folder01Icon,
   Folder02Icon,
   GitCompareIcon,
   Globe02Icon,
+  Home03Icon,
   PencilEdit02Icon,
   PlusSignIcon,
 } from "@hugeicons/core-free-icons";
@@ -192,6 +194,36 @@ function TabIcon({ tab, active }: { tab: Tab; active: boolean }) {
       />
     );
   }
+  if (tab.kind === "home") {
+    return (
+      <HugeiconsIcon
+        icon={Home03Icon}
+        size={14}
+        strokeWidth={1.75}
+        className="shrink-0"
+      />
+    );
+  }
+  if (tab.kind === "sftp") {
+    return (
+      <HugeiconsIcon
+        icon={CloudServerIcon}
+        size={14}
+        strokeWidth={1.75}
+        className="shrink-0"
+      />
+    );
+  }
+  if (tab.kind === "ssh-terminal") {
+    return (
+      <HugeiconsIcon
+        icon={ComputerTerminal02Icon}
+        size={14}
+        strokeWidth={1.75}
+        className="shrink-0"
+      />
+    );
+  }
   return (
     <HugeiconsIcon
       icon={active ? Folder02Icon : Folder01Icon}
@@ -206,6 +238,9 @@ function labelFor(t: Tab): string {
   if (t.kind === "editor") return t.title;
   if (t.kind === "preview") return t.title;
   if (t.kind === "ai-diff") return t.title;
+  if (t.kind === "home") return t.title;
+  if (t.kind === "sftp") return t.title;
+  if (t.kind === "ssh-terminal") return t.title;
   if (!t.cwd) return t.title;
   const parts = t.cwd.split("/").filter(Boolean);
   return parts.length ? parts[parts.length - 1] : "/";

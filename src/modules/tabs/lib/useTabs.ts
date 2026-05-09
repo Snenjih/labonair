@@ -38,7 +38,28 @@ export type AiDiffTab = {
   isNewFile: boolean;
 };
 
-export type Tab = TerminalTab | EditorTab | PreviewTab | AiDiffTab;
+export type HomeTab = {
+  id: number;
+  kind: "home";
+  title: string;
+};
+
+export type SftpTab = {
+  id: number;
+  kind: "sftp";
+  title: string;
+  hostId: string;
+};
+
+export type SshTerminalTab = {
+  id: number;
+  kind: "ssh-terminal";
+  title: string;
+  hostId: string;
+  cwd?: string;
+};
+
+export type Tab = TerminalTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | SshTerminalTab;
 
 export type TabPatch = Partial<{
   title: string;
@@ -62,14 +83,9 @@ function titleFromUrl(url: string): string {
   }
 }
 
-export function useTabs(initial?: Partial<TerminalTab>) {
+export function useTabs(_initial?: Partial<TerminalTab>) {
   const [tabs, setTabs] = useState<Tab[]>([
-    {
-      id: 1,
-      kind: "terminal",
-      title: initial?.title ?? "shell",
-      cwd: initial?.cwd,
-    },
+    { id: 1, kind: "home", title: "Home" },
   ]);
   const [activeId, setActiveId] = useState(1);
   const nextIdRef = useRef(2);
@@ -79,6 +95,21 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     setTabs((t) => [...t, { id, kind: "terminal", title: "shell", cwd }]);
     setActiveId(id);
     return id;
+  }, []);
+
+  const openHomeTab = useCallback(() => {
+    let targetId: number | null = null;
+    setTabs((curr) => {
+      const existing = curr.find((t) => t.kind === "home");
+      if (existing) {
+        targetId = existing.id;
+        return curr;
+      }
+      const id = nextIdRef.current++;
+      targetId = id;
+      return [...curr, { id, kind: "home", title: "Home" }];
+    });
+    if (targetId !== null) setActiveId(targetId);
   }, []);
 
   const openFileTab = useCallback((path: string) => {
@@ -228,6 +259,7 @@ export function useTabs(initial?: Partial<TerminalTab>) {
     activeId,
     setActiveId,
     newTab,
+    openHomeTab,
     openFileTab,
     newPreviewTab,
     openAiDiffTab,

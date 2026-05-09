@@ -160,6 +160,9 @@ export default function App() {
   const isEditorTab = activeTab?.kind === "editor";
   const isPreviewTab = activeTab?.kind === "preview";
   const isAiDiffTab = activeTab?.kind === "ai-diff";
+  const isHomeTab = activeTab?.kind === "home";
+  const isSshTab = activeTab?.kind === "ssh-terminal";
+  const isSftpTab = activeTab?.kind === "sftp";
 
   // When an AI diff is approved (write_file applied to disk), reload any
   // open editor tabs for that path so the user sees the new content. We
@@ -677,6 +680,39 @@ export default function App() {
                         onAccept={(id) => respondToApproval(id, true)}
                         onReject={(id) => respondToApproval(id, false)}
                       />
+                    </div>
+                    <div
+                      className={cn(
+                        "absolute inset-0",
+                        !isHomeTab && "invisible pointer-events-none",
+                      )}
+                      aria-hidden={!isHomeTab}
+                    >
+                      <div className="flex h-full items-center justify-center text-muted-foreground">
+                        Home Dashboard Placeholder
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "absolute inset-0",
+                        !isSshTab && "invisible pointer-events-none",
+                      )}
+                      aria-hidden={!isSshTab}
+                    >
+                      <div className="flex h-full items-center justify-center text-muted-foreground">
+                        SSH Terminal Placeholder
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        "absolute inset-0",
+                        !isSftpTab && "invisible pointer-events-none",
+                      )}
+                      aria-hidden={!isSftpTab}
+                    >
+                      <div className="flex h-full items-center justify-center text-muted-foreground">
+                        SFTP Manager Placeholder
+                      </div>
                     </div>
                   </div>
 

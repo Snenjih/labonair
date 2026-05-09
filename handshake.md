@@ -16,11 +16,11 @@
   - `cargo check` ✅ | `tsc --noEmit` ✅
 
 ### Current State
-- **Active Task**: TASK_01_2 — Tab System Extension & Home View Setup (in_progress)
-- All Phase 1 foundation files renamed and compiling cleanly.
+- **Phase 1 complete** — both TASK_01_1 and TASK_01_2 done.
+- App boots into "Home" tab, Tab union extended, `tsc --noEmit` clean.
 
 ### What's Next
-- Implement TASK_01_2: extend Tab union type with `home`, `sftp`, `ssh-terminal`, add helpers, update TabBar icons, add placeholder views in App.tsx.
+- No further tasks defined yet. Next task to be created for Phase 2 (Host Manager / SQLite).
 
 ### Blockers
 None.
