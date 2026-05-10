@@ -15,6 +15,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { useTabs } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 
@@ -41,6 +42,7 @@ export function SftpContextMenu({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [chmodOpen, setChmodOpen] = useState(false);
   const [chmodValue, setChmodValue] = useState("755");
+  const { openRemoteEditorTab } = useTabs();
 
   const count = selectedPaths.size;
   const singlePath = count === 1 ? [...selectedPaths][0] : null;
@@ -115,8 +117,16 @@ export function SftpContextMenu({
               <ContextMenuItem onClick={() => { setChmodValue("755"); setChmodOpen(true); }}>
                 Permissions…
               </ContextMenuItem>
-              {/* Task 06.1: remote file editing */}
-              <ContextMenuItem disabled>
+              <ContextMenuItem
+                onClick={async () => {
+                  if (!singlePath) return;
+                  try {
+                    await openRemoteEditorTab(tabId, singlePath);
+                  } catch (e) {
+                    alert(String(e));
+                  }
+                }}
+              >
                 Edit Remote File
               </ContextMenuItem>
             </>

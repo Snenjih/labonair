@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef, useState } from "react";
 
 export type TerminalTab = {
@@ -13,6 +14,8 @@ export type EditorTab = {
   title: string;
   path: string;
   dirty: boolean;
+  remoteHostTabId?: string;
+  remotePath?: string;
 };
 
 export type PreviewTab = {
@@ -268,6 +271,31 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     return id;
   }, []);
 
+  const openRemoteEditorTab = useCallback(
+    async (sftpTabId: string, remotePath: string) => {
+      const localTempPath = await invoke<string>("prepare_remote_edit", {
+        tab_id: sftpTabId,
+        remote_path: remotePath,
+      });
+      const fileName = remotePath.split("/").pop() ?? "remote-file";
+      const id = nextIdRef.current++;
+      setTabs((t) => [
+        ...t,
+        {
+          id,
+          kind: "editor",
+          title: `✦ ${fileName}`,
+          path: localTempPath,
+          dirty: false,
+          remoteHostTabId: sftpTabId,
+          remotePath,
+        },
+      ]);
+      setActiveId(id);
+    },
+    [],
+  );
+
   return {
     tabs,
     activeId,
@@ -283,5 +311,6 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     selectByIndex,
     newSshTab,
     newSftpTab,
+    openRemoteEditorTab,
   };
 }

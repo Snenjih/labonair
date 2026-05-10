@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { EditorTab, Tab } from "@/modules/tabs";
+import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
 
@@ -42,6 +43,7 @@ export function EditorStack({
   );
   const dirtyCallbacks = useRef(new Map<number, (dirty: boolean) => void>());
   const closeCallbacks = useRef(new Map<number, () => void>());
+  const savedCallbacks = useRef(new Map<number, (() => void) | undefined>());
 
   const getRefCallback = (id: number) => {
     let cb = refCallbacks.current.get(id);
@@ -68,6 +70,26 @@ export function EditorStack({
     return cb;
   };
 
+  const getSavedCallback = (t: EditorTab) => {
+    if (!t.remoteHostTabId || !t.remotePath) return undefined;
+    let cb = savedCallbacks.current.get(t.id);
+    if (!cb) {
+      cb = () => {
+        void invoke("save_remote_edit", {
+          tab_id: t.remoteHostTabId,
+          remote_path: t.remotePath,
+          local_temp_path: t.path,
+        }).then(() => {
+          console.info(`Saved ${t.remotePath} to remote server.`);
+        }).catch((e: unknown) => {
+          console.error("Failed to save to remote:", e);
+        });
+      };
+      savedCallbacks.current.set(t.id, cb);
+    }
+    return cb;
+  };
+
   // Drop callback entries for closed tabs to avoid unbounded growth.
   useEffect(() => {
     const live = new Set(editors.map((t) => t.id));
@@ -79,6 +101,9 @@ export function EditorStack({
     }
     for (const id of closeCallbacks.current.keys()) {
       if (!live.has(id)) closeCallbacks.current.delete(id);
+    }
+    for (const id of savedCallbacks.current.keys()) {
+      if (!live.has(id)) savedCallbacks.current.delete(id);
     }
   }, [editors]);
 
@@ -102,6 +127,7 @@ export function EditorStack({
                 path={t.path}
                 onDirtyChange={getDirtyCallback(t.id)}
                 onClose={getCloseCallback(t.id)}
+                onSaved={getSavedCallback(t)}
               />
             </div>
           </div>

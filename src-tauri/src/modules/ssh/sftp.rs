@@ -1,4 +1,5 @@
 use crate::modules::ssh::SshState;
+use std::io::{Read as _, Write as _};
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FileNode {
@@ -142,4 +143,52 @@ pub fn sftp_chmod(
     stat.perm = Some(permissions);
     sftp.setstat(std::path::Path::new(&path), stat)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn prepare_remote_edit(
+    tab_id: String,
+    remote_path: String,
+    state: tauri::State<'_, SshState>,
+) -> Result<String, String> {
+    let file_data = {
+        let map = state.0.lock().map_err(|e| e.to_string())?;
+        let sess = map.get(&tab_id).ok_or("no session for tab")?;
+        let sftp = sess.session.sftp().map_err(|e| e.to_string())?;
+        let stat = sftp.stat(std::path::Path::new(&remote_path)).map_err(|e| e.to_string())?;
+        let size = stat.size.unwrap_or(0);
+        if size > 5 * 1024 * 1024 {
+            return Err(format!("File is too large for in-app editing ({size} bytes). Max 5 MB."));
+        }
+        let mut remote_file = sftp.open(std::path::Path::new(&remote_path)).map_err(|e| e.to_string())?;
+        let mut buf = Vec::with_capacity(size as usize);
+        remote_file.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+        buf
+    };
+
+    let temp_dir = std::env::temp_dir().join("nexum_remote_edits");
+    std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+    let file_name = std::path::Path::new(&remote_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "file".to_string());
+    let unique_id = uuid::Uuid::new_v4().to_string();
+    let temp_path = temp_dir.join(format!("{}_{}", unique_id, file_name));
+    std::fs::write(&temp_path, &file_data).map_err(|e| e.to_string())?;
+    Ok(temp_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn save_remote_edit(
+    tab_id: String,
+    remote_path: String,
+    local_temp_path: String,
+    state: tauri::State<'_, SshState>,
+) -> Result<(), String> {
+    let data = std::fs::read(&local_temp_path).map_err(|e| e.to_string())?;
+    let map = state.0.lock().map_err(|e| e.to_string())?;
+    let sess = map.get(&tab_id).ok_or("no session for tab")?;
+    let sftp = sess.session.sftp().map_err(|e| e.to_string())?;
+    let mut remote_file = sftp.create(std::path::Path::new(&remote_path)).map_err(|e| e.to_string())?;
+    remote_file.write_all(&data).map_err(|e| e.to_string())
 }
