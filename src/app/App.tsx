@@ -74,6 +74,7 @@ export default function App() {
     closeTab,
     updateTab,
     selectByIndex,
+    openHomeTab,
   } = useTabs();
 
   const searchAddons = useRef<Map<number, SearchAddon>>(new Map());
@@ -372,6 +373,10 @@ export default function App() {
     newTab(inheritedCwdForNewTab());
   }, [newTab, inheritedCwdForNewTab]);
 
+  const onOpenHostManager = useCallback(() => {
+    openHomeTab();
+  }, [openHomeTab]);
+
   const sendCd = useCallback(
     (path: string) => {
       const term = terminalRefs.current.get(activeId);
@@ -590,6 +595,7 @@ export default function App() {
             onToggleSidebar={toggleSidebar}
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onOpenSettings={() => void openSettingsWindow()}
+            onOpenHostManager={onOpenHostManager}
             searchTarget={searchTarget}
             searchRef={searchInlineRef}
           />

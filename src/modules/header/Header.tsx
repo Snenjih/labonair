@@ -1,4 +1,10 @@
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { Tab } from "@/modules/tabs";
@@ -7,6 +13,7 @@ import {
   KeyboardIcon,
   Settings01Icon,
   SidebarLeftIcon,
+  Menu01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState, type RefObject } from "react";
@@ -27,6 +34,7 @@ type Props = {
   onToggleSidebar: () => void;
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
+  onOpenHostManager: () => void;
   searchTarget: SearchTarget;
   searchRef: RefObject<SearchInlineHandle | null>;
 };
@@ -44,6 +52,7 @@ export function Header({
   onToggleSidebar,
   onOpenShortcuts,
   onOpenSettings,
+  onOpenHostManager,
   searchTarget,
   searchRef,
 }: Props) {
@@ -62,26 +71,35 @@ export function Header({
   }, []);
 
   const sideButtons = (
-    <>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-        onClick={onOpenShortcuts}
-        title="Keyboard shortcuts (⌘K)"
-      >
-        <HugeiconsIcon icon={KeyboardIcon} size={16} strokeWidth={1.75} />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-        onClick={onOpenSettings}
-        title="Settings"
-      >
-        <HugeiconsIcon icon={Settings01Icon} size={15} strokeWidth={1.75} />
-      </Button>
-    </>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          title="Menu"
+        >
+          <HugeiconsIcon icon={Menu01Icon} size={16} strokeWidth={1.75} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={onOpenSettings}>
+          <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.75} />
+          <span>Settings</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onOpenShortcuts}>
+          <HugeiconsIcon icon={KeyboardIcon} size={16} strokeWidth={1.75} />
+          <span>Keyboard Shortcuts</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <span>Themes...</span>
+          {/* TODO: Implement theme switcher */}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onOpenHostManager}>
+          <span>Host Manager</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 
   return (
