@@ -14,6 +14,7 @@ import {
   Settings01Icon,
   SidebarLeftIcon,
   Menu01Icon,
+  Globe02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState, type RefObject } from "react";
@@ -96,6 +97,7 @@ export function Header({
           {/* TODO: Implement theme switcher */}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenHostManager}>
+          <HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.75} />
           <span>Host Manager</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
