@@ -42,6 +42,7 @@ import {
 } from "@/modules/shortcuts";
 import { StatusBar } from "@/modules/statusbar";
 import { SftpPane } from "@/modules/sftp";
+import { bootstrapTransferListeners } from "@/modules/sftp/store/transferStore";
 import { useTabs, useWorkspaceCwd, type SftpTab, type SshTerminalTab } from "@/modules/tabs";
 import { SshTerminalPane, TerminalStack, type TerminalPaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
@@ -159,6 +160,10 @@ export default function App() {
     void useAgentsStore.getState().hydrate();
     void useSnippetsStore.getState().hydrate();
   }, [hydrateSessions]);
+
+  useEffect(() => {
+    void bootstrapTransferListeners();
+  }, []);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const isTerminalTab = activeTab?.kind === "terminal";

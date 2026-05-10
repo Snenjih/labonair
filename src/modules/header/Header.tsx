@@ -23,6 +23,7 @@ import {
   type SearchInlineHandle,
   type SearchTarget,
 } from "./SearchInline";
+import { TransferDropdown } from "./components/TransferDropdown";
 
 type Props = {
   tabs: Tab[];
@@ -149,6 +150,7 @@ export function Header({
       </div>
 
       <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
+      <TransferDropdown />
 
       {IS_MAC && sideButtons}
 

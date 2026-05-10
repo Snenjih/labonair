@@ -4,6 +4,7 @@ use modules::{
     fs, pty, secrets, shell,
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete}},
     ssh::{SshState, client::{ssh_connect, ssh_disconnect}, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_rename, sftp_delete, sftp_mkdir, sftp_chmod}},
+    sftp::{TransferWorkerState, commands::{enqueue_transfer, cancel_transfer, resolve_conflict}, worker::run_worker},
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -75,7 +76,20 @@ pub fn run() {
             let conn = initialize_db(data_dir)
                 .expect("failed to initialize database");
             app.manage(HostsDb(std::sync::Mutex::new(conn)));
-            app.manage(SshState::default());
+
+            let ssh_state = SshState::default();
+            let ssh_state_for_worker = ssh_state.clone();
+            app.manage(ssh_state);
+
+            let (tx, rx) = tokio::sync::mpsc::channel(100);
+            let conflicts = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
+            let conflicts_for_worker = conflicts.clone();
+            let app_handle = app.handle().clone();
+            tokio::spawn(async move {
+                run_worker(rx, std::sync::Arc::new(ssh_state_for_worker), app_handle, conflicts_for_worker).await;
+            });
+            app.manage(TransferWorkerState { sender: tx, conflicts });
+
             Ok(())
         })
         .manage(pty::PtyState::default())
@@ -129,6 +143,9 @@ pub fn run() {
             sftp_delete,
             sftp_mkdir,
             sftp_chmod,
+            enqueue_transfer,
+            cancel_transfer,
+            resolve_conflict,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

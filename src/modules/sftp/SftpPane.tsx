@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/modules/hosts";
 import type { SftpTab } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SftpContextMenu } from "./components/SftpContextMenu";
 import { SftpToolbar } from "./components/SftpToolbar";
 import { VirtualizedFileList } from "./components/VirtualizedFileList";
@@ -34,6 +34,9 @@ export function SftpPane({ tab }: SftpPaneProps) {
   const hosts = useHostsStore((s) => s.hosts);
   const host = hosts.find((h) => h.id === tab.hostId);
   const hostLabel = host?.name ?? tab.title;
+
+  // Track drag source pane ("local" | "remote" | null)
+  const dragSourceRef = useRef<"local" | "remote" | null>(null);
 
   // Inline rename state
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
@@ -103,6 +106,37 @@ export function SftpPane({ tab }: SftpPaneProps) {
       console.error("Rename failed:", e);
     }
     setRenamingPath(null);
+  }
+
+  async function handleLocalDrop(_targetPath: string, remotePaths: string[]) {
+    if (dragSourceRef.current !== "remote") return;
+    const localBase = tabState?.localPath ?? "~";
+    for (const remotePath of remotePaths) {
+      const fileName = remotePath.split("/").pop() ?? "file";
+      const destPath = `${localBase}/${fileName}`;
+      await invoke("enqueue_transfer", {
+        host_id: tab.hostId,
+        src_path: remotePath,
+        dest_path: destPath,
+        direction: "download",
+      });
+    }
+  }
+
+  async function handleRemoteDrop(_targetPath: string, localPaths: string[]) {
+    if (dragSourceRef.current !== "local") return;
+    const remoteBase = tabState?.remotePath ?? "/";
+    for (const localPath of localPaths) {
+      const fileName = localPath.split(/[\\/]/).pop() ?? "file";
+      const sep = remoteBase.endsWith("/") ? "" : "/";
+      const destPath = `${remoteBase}${sep}${fileName}`;
+      await invoke("enqueue_transfer", {
+        host_id: tab.hostId,
+        src_path: localPath,
+        dest_path: destPath,
+        direction: "upload",
+      });
+    }
   }
 
   async function commitNewFolder(side: "local" | "remote") {
@@ -178,6 +212,9 @@ export function SftpPane({ tab }: SftpPaneProps) {
                     onSelect={handleLocalSelect}
                     onDoubleClick={handleLocalDoubleClick}
                     isLoading={tabState?.isLoadingLocal}
+                    draggable
+                    onDragStart={() => { dragSourceRef.current = "local"; }}
+                    onDrop={handleLocalDrop}
                     renamingPath={renamingPath}
                     renameValue={renameValue}
                     onRenameChange={setRenameValue}
@@ -231,6 +268,9 @@ export function SftpPane({ tab }: SftpPaneProps) {
                     onSelect={handleRemoteSelect}
                     onDoubleClick={handleRemoteDoubleClick}
                     isLoading={tabState?.isLoadingRemote}
+                    draggable
+                    onDragStart={() => { dragSourceRef.current = "remote"; }}
+                    onDrop={handleRemoteDrop}
                     renamingPath={renamingPath}
                     renameValue={renameValue}
                     onRenameChange={setRenameValue}

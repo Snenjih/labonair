@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { FileNode } from "../types";
 
 interface VirtualizedFileListProps {
@@ -25,6 +25,9 @@ export function VirtualizedFileList({
   onSelect,
   onDoubleClick,
   isLoading = false,
+  draggable,
+  onDragStart,
+  onDrop,
   renamingPath,
   renameValue,
   onRenameChange,
@@ -32,6 +35,7 @@ export function VirtualizedFileList({
   onRenameCancel,
 }: VirtualizedFileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const virtualizer = useVirtualizer({
     count: files.length,
@@ -40,8 +44,47 @@ export function VirtualizedFileList({
     overscan: 10,
   });
 
+  function handleDragOver(e: React.DragEvent) {
+    if (!onDrop) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setIsDragOver(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (!onDrop) return;
+    try {
+      const paths = JSON.parse(e.dataTransfer.getData("text/plain")) as string[];
+      // Use the path of the item under cursor, or the current dir
+      const targetEl = (e.target as HTMLElement).closest("[data-file-path]");
+      const targetPath = targetEl?.getAttribute("data-file-path") ?? "";
+      onDrop(targetPath, paths);
+    } catch {
+      // ignore malformed drag data
+    }
+  }
+
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div
+      className={cn(
+        "flex flex-col h-full min-h-0 overflow-hidden relative",
+        isDragOver && "ring-2 ring-inset ring-primary/40"
+      )}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragOver && (
+        <div className="absolute inset-0 bg-primary/10 z-10 pointer-events-none rounded-sm" />
+      )}
       {/* Sticky column header */}
       <div className="flex items-center h-7 px-2 border-b border-border bg-card shrink-0 select-none">
         <span className="w-5 shrink-0" />
@@ -95,6 +138,9 @@ export function VirtualizedFileList({
                   file={file}
                   isSelected={isSelected}
                   isEven={isEven}
+                  draggable={draggable}
+                  onDragStart={onDragStart ? (paths) => onDragStart(paths) : undefined}
+                  selectedPaths={selectedPaths}
                   style={{
                     position: "absolute",
                     top: 0,
@@ -126,6 +172,9 @@ interface FileRowProps {
   style: React.CSSProperties;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
+  draggable?: boolean;
+  onDragStart?: (paths: string[]) => void;
+  selectedPaths?: Set<string>;
   isRenaming?: boolean;
   renameValue?: string;
   onRenameChange?: (v: string) => void;
@@ -140,6 +189,9 @@ function FileRow({
   style,
   onClick,
   onDoubleClick,
+  draggable,
+  onDragStart,
+  selectedPaths,
   isRenaming,
   renameValue,
   onRenameChange,
@@ -148,15 +200,28 @@ function FileRow({
 }: FileRowProps) {
   const icon = file.is_symlink ? "🔗" : file.is_dir ? "📁" : "📄";
 
+  function handleDragStart(e: React.DragEvent) {
+    const paths = selectedPaths && selectedPaths.size > 0
+      ? [...selectedPaths]
+      : [file.path];
+    e.dataTransfer.setData("text/plain", JSON.stringify(paths));
+    e.dataTransfer.effectAllowed = "copy";
+    onDragStart?.(paths);
+  }
+
   return (
     <div
       style={style}
+      data-file-path={file.path}
+      draggable={draggable}
+      onDragStart={draggable ? handleDragStart : undefined}
       className={cn(
         "h-7 flex items-center px-2 gap-1 cursor-default select-none transition-colors duration-75",
         isEven && !isSelected && "bg-muted/10",
         isSelected
           ? "bg-primary/20 ring-1 ring-inset ring-primary/40"
           : "hover:bg-accent/20",
+        draggable && "cursor-grab active:cursor-grabbing",
       )}
       onClick={isRenaming ? undefined : onClick}
       onDoubleClick={isRenaming ? undefined : onDoubleClick}

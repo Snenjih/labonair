@@ -32,11 +32,11 @@
 
 | Task | Title | Status |
 |------|-------|--------|
-| TASK_05_1 | Background Transfer Worker (Rust) | in_progress |
-| TASK_05_2 | Transfer UI & Drag and Drop | not_started |
+| TASK_05_1 | Background Transfer Worker (Rust) | completed |
+| TASK_05_2 | Transfer UI & Drag and Drop | completed |
 
 ## Phase 6 — Remote In-App Editing
 
 | Task | Title | Status |
 |------|-------|--------|
-| TASK_06_1 | Remote In-App Editing (CodeMirror Synergy) | not_started |
+| TASK_06_1 | Remote In-App Editing (CodeMirror Synergy) | in_progress |
