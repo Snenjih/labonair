@@ -381,6 +381,10 @@ function autoresize(el: HTMLTextAreaElement | null) {
 export type AiInputBarProps = { tabId: number };
 
 export function AiInputBarConnect({ onAdd }: { onAdd: () => void }) {
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed) return null;
+
   return (
     <div className="shrink-0 border-t border-border/60 bg-card/40 px-3 py-2">
       <div className="flex h-10 items-center justify-between gap-3 rounded-lg px-3 text-xs">
@@ -388,10 +392,20 @@ export function AiInputBarConnect({ onAdd }: { onAdd: () => void }) {
           Connect any AI provider (or use local models) - your key stays in your
           OS keychain.
         </span>
-        <Button size="xs" onClick={onAdd}>
-          <HugeiconsIcon icon={Key01Icon} />
-          Add API key
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="xs" onClick={onAdd}>
+            <HugeiconsIcon icon={Key01Icon} />
+            Add API key
+          </Button>
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Dismiss"
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} />
+          </button>
+        </div>
       </div>
     </div>
   );
