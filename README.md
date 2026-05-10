@@ -1,101 +1,136 @@
 <div align="center">
-  <img src="public/logo.png" width="144" height="144" alt="Terax" />
-  <h1>Terax</h1>
+  <img src="public/logo.png" width="144" height="144" alt="Nexum" />
+  <h1>Nexum</h1>
 
-  <p><strong>Open-source lightweight cross-platform AI-native terminal (ADE)</strong></p>
+  <p><strong>macOS-native remote workspace — SSH · SFTP · Terminal · Editor · AI</strong></p>
 
   <p>
-    <img src="https://img.shields.io/badge/version-0.5.9-blue" alt="version" />
+    <img src="https://img.shields.io/badge/version-0.6.0-blue" alt="version" />
     <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="license" />
-    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows%20(soon)-lightgrey" alt="platform" />
-
+    <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="platform" />
+    <img src="https://img.shields.io/badge/built%20with-Tauri%202-orange" alt="tauri" />
   </p>
 </div>
 
 ---
 
-Terax is a fast, lightweight AI terminal (ADE) built on Tauri 2 + Rust and React 19. It pairs a native PTY backend with a modern UI — multi-tab terminals, an integrated code editor, a file explorer, and a first-class AI side-panel that works with your own API keys (or fully local models via LM Studio). Under 10 MB on disk, no telemetry, keys stored in the OS keychain.
-
-## Screenshots
-
-<table>
-  <tr>
-    <td align="center"><img src="docs/terminal.png" alt="Terminal" /><br/><sub>Multi-tab terminal with WebGL rendering</sub></td>
-    <td align="center"><img src="docs/web-preview.png" alt="Web preview" /><br/><sub>Web preview of local dev servers</sub></td>
-  </tr>
-  <tr>
-    <td colspan="2" align="center"><img src="docs/ai-workflow.png" alt="AI window" /><br/><sub>AI agentic workflow with edit diffs in the code editor</sub></td>
-  </tr>
-</table>
+Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. It combines SSH terminal sessions, a full-featured SFTP file manager, an integrated code editor with remote editing support, and a first-class AI side-panel — all in a single lightweight app. API keys live in the OS keychain, no telemetry, no account required.
 
 ## Features
 
-**Terminal**
+**SSH Terminal**
+- Native PTY backend via `ssh2` + `portable-pty` — one tab per connection
 - xterm.js + WebGL renderer, multi-tab with background streaming
-- Native PTY backend via `portable-pty` (zsh, bash, pwsh, …)
 - Shell integration (cwd reporting, prompt markers) via injected init scripts
-- Inline search, link detection, true-color
+- Inline search, link detection, true-color, 2FA / keyboard-interactive auth
+- Known-host fingerprint verification with in-app warning flow
 
-**Editor**
+**SFTP File Manager**
+- Virtualized split-pane browser (local ↔ remote) powered by `@tanstack/react-virtual`
+- Background transfer queue with progress tracking and conflict resolution
+- Context menus: rename, delete, mkdir, chmod, download, upload
+- Drag-and-drop transfers between panes
+
+**Remote Editor**
+- Open remote files directly in the editor via SFTP (`prepare_remote_edit` / `save_remote_edit`)
 - CodeMirror 6 with language support for TS/JS, Rust, Python, HTML/CSS, JSON, Markdown
 - Inline AI autocomplete and AI edit diffs
-- Vim mode
-- Prebuilt themes: Tokyo Night, Nord, GitHub, Atom One, Aura, Copilot, Xcode
+- Vim mode + prebuilt themes (Tokyo Night, Nord, GitHub, Atom One, Aura, Copilot, Xcode)
 
-**File Explorer**
-- Catppuccin icon theme (Material Icon Theme resolver)
-- Fuzzy search, keyboard navigation, inline rename, context actions
+**Host Manager**
+- Master-detail host list with group organisation and drag-and-drop reorder
+- Hosts stored in SQLite (`rusqlite`); passwords in macOS Keychain — never on disk
+- Inspector pane: connection details, SFTP/tunnel config, notes
+- Multi-select, context menus, inline group creation
 
-**Web Preview**
-- Auto-detects local dev servers and opens them in a preview tab
+**Local Terminal**
+- Native PTY sessions for local shells (zsh, bash, …)
+- Auto-detects local dev servers and opens them in a web preview tab
 
 **AI (BYOK)**
 - Providers: OpenAI, Anthropic, Google, Groq, xAI, Cerebras, OpenAI-compatible
 - Local / offline models via LM Studio
 - Voice input, edit diffs, multi-agent and sub-agents
 - Snippets / skills, customizable system prompt
-- `TERAX.md` for project memory and configuration
-- Tasks, plans, search, file read/write tools with approval flow
+- `NEXUM.md` for project-level AI memory and configuration
+- Tasks, plans, search, file read/write tools with in-app approval flow
 
 **Quality**
-- Lightweight and fast (~7 MB bundle)
-- API keys stored in the OS keychain 
+- Lightweight (~7 MB bundle), fast startup
+- API keys stored in macOS Keychain via `keyring`
 - No telemetry, no account required
+
+## Host Setup
+
+1. Open the **Host Manager** (sidebar icon or `⌘H`).
+2. Click **+** to add a host — fill in hostname, port, username, and authentication method (password or private key).
+3. Hosts are organised into groups; drag rows to reorder.
+4. Connect via the **Connect** button or double-click — opens an SSH terminal tab.
+5. Switch to the **SFTP** tab in the header to browse and transfer files.
 
 ## Configure AI
 
 1. Open **Settings → AI**.
-2. Pick a provider and paste your API key. For local inference, point Terax at your LM Studio endpoint.
-3. Keys are written to the OS keychain via `keyring` — they never touch disk or `localStorage`.
+2. Pick a provider and paste your API key. For local inference, point Nexum at your LM Studio endpoint.
+3. Keys are written to the macOS Keychain — they never touch disk or `localStorage`.
 
 ## Build from source
 
 **Prerequisites**
 - Rust (stable) — https://rustup.rs
 - Node 20+ and [pnpm](https://pnpm.io)
-- Platform-specific Tauri prerequisites — https://tauri.app/start/prerequisites/
+- macOS with Xcode Command Line Tools
+- Tauri prerequisites — https://tauri.app/start/prerequisites/
 
 **Run**
 ```bash
 pnpm install
-pnpm tauri dev          # development
-pnpm tauri build        # production bundle
+pnpm tauri dev        # development
+pnpm tauri build      # production bundle (.app / .dmg)
 ```
 
 **Checks**
 ```bash
 pnpm exec tsc --noEmit          # frontend type-check
+cd src-tauri && cargo check     # Rust check
 cd src-tauri && cargo clippy    # Rust lint
 ```
 
 ## Tech stack
 
-Tauri 2 · Rust · `portable-pty` · React 19 · TypeScript · xterm.js · CodeMirror 6 · Vercel AI SDK v6 · Tailwind v4 · shadcn/ui · Zustand
+| Layer | Libraries |
+|---|---|
+| Desktop shell | Tauri 2 |
+| Backend | Rust · Tokio · `ssh2` · `portable-pty` · `rusqlite` · `keyring` |
+| Frontend | React 19 · TypeScript · Vite |
+| Terminal | xterm.js + WebGL addon |
+| Editor | CodeMirror 6 |
+| AI | Vercel AI SDK v6 |
+| UI | Tailwind v4 · shadcn/ui · Zustand · `@tanstack/react-virtual` |
+
+## Architecture
+
+```
+Nexum (Tauri v2)
+├── Frontend: React 19 + TypeScript + Vite
+│   ├── Tailwind CSS v4 + shadcn/ui
+│   ├── Zustand (tabs, transfers, hosts)
+│   ├── xterm.js + WebGL (terminal rendering)
+│   └── @tanstack/react-virtual (SFTP file lists)
+└── Backend: Rust (Tokio async)
+    ├── portable-pty → local terminal sessions
+    ├── ssh2 → SSH terminal + SFTP protocol
+    ├── rusqlite (bundled) → host/group storage (SQLite)
+    ├── keyring → passwords in macOS Keychain
+    └── tokio mpsc → background transfer queue worker
+```
+
+All OS access lives in the Rust backend. The frontend communicates exclusively via Tauri `invoke()` calls and events — no direct filesystem, process, or network access from the webview.
 
 ## Contributing
 
-Issues and PRs are welcome! Feel free to open issues, suggest features, or submit pull requests. See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-Terax is licensed under the Apache-2.0 License. For more information on our dependencies, see [Apache License 2.0](LICENSE).
+Nexum is licensed under the Apache-2.0 License. See [LICENSE](LICENSE) for details.

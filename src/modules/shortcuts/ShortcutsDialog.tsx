@@ -20,7 +20,7 @@ export function ShortcutsDialog({ open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
-            Quick reference for Terax controls.
+            Quick reference for Nexum controls.
           </DialogDescription>
         </DialogHeader>
 

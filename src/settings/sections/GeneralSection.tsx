@@ -154,7 +154,7 @@ export function GeneralSection() {
         <div className="flex flex-col gap-2">
           <SettingRow
             title="Launch at login"
-            description="Open Terax automatically when you sign in."
+            description="Open Nexum automatically when you sign in."
           >
             <Switch
               checked={autostart}

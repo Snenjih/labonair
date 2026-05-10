@@ -214,7 +214,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
       return;
 
     // Slash-command interception. `/plan` toggles plan mode; `/init` rewrites
-    // the prompt to the TERAX.md scan template before sending.
+    // the prompt to the NEXUM.md scan template before sending.
     let effectiveText = trimmed;
     let commandMarker: string | null = null;
     let commandSource = trimmed;
@@ -231,7 +231,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
       if (outcome.kind === "send-prompt") {
         effectiveText = outcome.prompt;
         if (outcome.commandName) {
-          commandMarker = `<terax-command name="${outcome.commandName}" />`;
+          commandMarker = `<nexum-command name="${outcome.commandName}" />`;
         }
       }
     }

@@ -50,7 +50,7 @@ export type Preferences = {
   vimMode: boolean;
 };
 
-const STORE_PATH = "terax-settings.json";
+const STORE_PATH = "nexum-settings.json";
 const KEY_THEME = "theme";
 const KEY_DEFAULT_MODEL = "defaultModelId";
 const KEY_EDITOR_THEME = "editorTheme";
@@ -198,7 +198,7 @@ export function onPreferencesChange(
 
 // API key changes are stored in OS keychain (not the prefs store),
 // so we broadcast via a Tauri event for cross-window listeners.
-const KEYS_CHANGED_EVENT = "terax://ai-keys-changed";
+const KEYS_CHANGED_EVENT = "nexum://ai-keys-changed";
 
 export async function emitKeysChanged(): Promise<void> {
   await emit(KEYS_CHANGED_EVENT);
