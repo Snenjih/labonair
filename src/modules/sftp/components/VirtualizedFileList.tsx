@@ -12,6 +12,11 @@ interface VirtualizedFileListProps {
   draggable?: boolean;
   onDragStart?: (paths: string[]) => void;
   onDrop?: (targetPath: string, paths: string[]) => void;
+  renamingPath?: string | null;
+  renameValue?: string;
+  onRenameChange?: (v: string) => void;
+  onRenameCommit?: () => void;
+  onRenameCancel?: () => void;
 }
 
 export function VirtualizedFileList({
@@ -20,6 +25,11 @@ export function VirtualizedFileList({
   onSelect,
   onDoubleClick,
   isLoading = false,
+  renamingPath,
+  renameValue,
+  onRenameChange,
+  onRenameCommit,
+  onRenameCancel,
 }: VirtualizedFileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -94,6 +104,11 @@ export function VirtualizedFileList({
                   }}
                   onClick={(e) => onSelect(file.path, e.metaKey || e.ctrlKey)}
                   onDoubleClick={() => onDoubleClick(file)}
+                  isRenaming={renamingPath === file.path}
+                  renameValue={renameValue ?? ""}
+                  onRenameChange={onRenameChange}
+                  onRenameCommit={onRenameCommit}
+                  onRenameCancel={onRenameCancel}
                 />
               );
             })}
@@ -111,9 +126,26 @@ interface FileRowProps {
   style: React.CSSProperties;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
+  isRenaming?: boolean;
+  renameValue?: string;
+  onRenameChange?: (v: string) => void;
+  onRenameCommit?: () => void;
+  onRenameCancel?: () => void;
 }
 
-function FileRow({ file, isSelected, isEven, style, onClick, onDoubleClick }: FileRowProps) {
+function FileRow({
+  file,
+  isSelected,
+  isEven,
+  style,
+  onClick,
+  onDoubleClick,
+  isRenaming,
+  renameValue,
+  onRenameChange,
+  onRenameCommit,
+  onRenameCancel,
+}: FileRowProps) {
   const icon = file.is_symlink ? "🔗" : file.is_dir ? "📁" : "📄";
 
   return (
@@ -126,19 +158,34 @@ function FileRow({ file, isSelected, isEven, style, onClick, onDoubleClick }: Fi
           ? "bg-primary/20 ring-1 ring-inset ring-primary/40"
           : "hover:bg-accent/20",
       )}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onClick={isRenaming ? undefined : onClick}
+      onDoubleClick={isRenaming ? undefined : onDoubleClick}
     >
       <span className="w-5 shrink-0 text-[13px] leading-none">{icon}</span>
-      <span
-        className={cn(
-          "flex-1 text-sm truncate min-w-0",
-          file.is_symlink && "italic text-muted-foreground",
-          file.is_dir && "font-medium",
-        )}
-      >
-        {file.name}
-      </span>
+      {isRenaming ? (
+        <input
+          autoFocus
+          value={renameValue}
+          onChange={(e) => onRenameChange?.(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onRenameCommit?.();
+            if (e.key === "Escape") onRenameCancel?.();
+          }}
+          onBlur={onRenameCancel}
+          className="flex-1 h-5 text-sm bg-background border border-primary/60 rounded px-1 outline-none text-foreground"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span
+          className={cn(
+            "flex-1 text-sm truncate min-w-0",
+            file.is_symlink && "italic text-muted-foreground",
+            file.is_dir && "font-medium",
+          )}
+        >
+          {file.name}
+        </span>
+      )}
       <span className="w-24 text-right text-xs text-muted-foreground tabular-nums pr-1 shrink-0">
         {file.is_dir ? "" : formatBytes(file.size)}
       </span>

@@ -26,13 +26,13 @@
 | Task | Title | Status |
 |------|-------|--------|
 | TASK_04_1 | Virtualized Split-Pane SFTP UI | completed |
-| TASK_04_2 | SFTP Backend Commands & Context Menus | in_progress |
+| TASK_04_2 | SFTP Backend Commands & Context Menus | completed |
 
 ## Phase 5 — Global Transfer Manager
 
 | Task | Title | Status |
 |------|-------|--------|
-| TASK_05_1 | Background Transfer Worker (Rust) | not_started |
+| TASK_05_1 | Background Transfer Worker (Rust) | in_progress |
 | TASK_05_2 | Transfer UI & Drag and Drop | not_started |
 
 ## Phase 6 — Remote In-App Editing

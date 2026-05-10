@@ -32,6 +32,7 @@ pub struct Group {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReorderItem {
     pub id: String,
     pub sort_order: i64,

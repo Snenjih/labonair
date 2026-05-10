@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTabs } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHostsStore } from "../store/hostsStore";
@@ -23,6 +22,8 @@ interface Props {
   /** If null, panel is in "add new" mode */
   hostId: string | null;
   onClose: () => void;
+  newSshTab: (hostId: string, title: string) => void;
+  newSftpTab: (hostId: string, title: string) => void;
 }
 
 type AuthMethod = "password" | "key" | "none";
@@ -79,7 +80,7 @@ const DEFAULT_FORM: FormState = {
   default_path_sftp: "",
 };
 
-export function HostFormPanel({ hostId, onClose }: Props) {
+export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props) {
   const isNew = hostId === "__new__" || hostId === null;
 
   const host = useHostsStore((s) => (isNew ? null : s.hosts.find((h) => h.id === hostId) ?? null));
@@ -88,13 +89,13 @@ export function HostFormPanel({ hostId, onClose }: Props) {
   const updateHost = useHostsStore((s) => s.updateHost);
   const deleteHost = useHostsStore((s) => s.deleteHost);
   const setSelectedHost = useHostsStore((s) => s.setSelectedHost);
-  const { newSshTab, newSftpTab } = useTabs();
 
   const [form, setForm] = useState<FormState>(isNew ? DEFAULT_FORM : (host ? hostToForm(host) : DEFAULT_FORM));
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -109,23 +110,24 @@ export function HostFormPanel({ hostId, onClose }: Props) {
     saveTimeoutRef.current = setTimeout(async () => {
       setSaving(true);
       try {
-        await updateHost({
+        const payload: Record<string, unknown> = {
           id: host.id,
           name: form.name,
           host_address: form.host_address,
           port: parseInt(form.port, 10) || 22,
           username: form.username,
           auth_method: form.auth_method,
-          private_key_path: form.private_key_path || undefined,
-          group_id: form.group_id || undefined,
           pin_to_top: form.pin_to_top,
-          default_path_ssh: form.default_path_ssh || undefined,
-          default_path_sftp: form.default_path_sftp || undefined,
-          keep_alive_interval: form.keep_alive_interval ? parseInt(form.keep_alive_interval, 10) : undefined,
-          keep_alive_tries: form.keep_alive_tries ? parseInt(form.keep_alive_tries, 10) : undefined,
-          password: password || undefined,
-          sudo_password: form.sudo_password || undefined,
-        });
+        };
+        if (form.private_key_path) payload.private_key_path = form.private_key_path;
+        if (form.group_id) payload.group_id = form.group_id;
+        if (password) payload.password = password;
+        if (form.sudo_password) payload.sudo_password = form.sudo_password;
+        if (form.default_path_ssh) payload.default_path_ssh = form.default_path_ssh;
+        if (form.default_path_sftp) payload.default_path_sftp = form.default_path_sftp;
+        if (form.keep_alive_interval) payload.keep_alive_interval = parseInt(form.keep_alive_interval, 10);
+        if (form.keep_alive_tries) payload.keep_alive_tries = parseInt(form.keep_alive_tries, 10);
+        await updateHost(payload as unknown as import("../types").UpdateHostPayload);
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
       } finally {
@@ -135,27 +137,31 @@ export function HostFormPanel({ hostId, onClose }: Props) {
   }, [isNew, host, form, password, updateHost]);
 
   const handleCreate = async () => {
-    if (!form.name || !form.host_address || !form.username) return;
+    if (!form.name.trim() || !form.host_address.trim() || !form.username.trim()) return;
     setSubmitting(true);
+    setError(null);
     try {
-      const payload: CreateHostPayload = {
-        name: form.name,
-        host_address: form.host_address,
+      const payload: Record<string, unknown> = {
+        name: form.name.trim(),
+        host_address: form.host_address.trim(),
         port: parseInt(form.port, 10) || 22,
-        username: form.username,
+        username: form.username.trim(),
         auth_method: form.auth_method,
-        private_key_path: form.private_key_path || undefined,
-        group_id: form.group_id || undefined,
         pin_to_top: form.pin_to_top,
-        default_path_ssh: form.default_path_ssh || undefined,
-        default_path_sftp: form.default_path_sftp || undefined,
-        keep_alive_interval: form.keep_alive_interval ? parseInt(form.keep_alive_interval, 10) : undefined,
-        keep_alive_tries: form.keep_alive_tries ? parseInt(form.keep_alive_tries, 10) : undefined,
-        password: password || undefined,
-        sudo_password: form.sudo_password || undefined,
       };
-      const newHost = await createHost(payload);
+      if (form.private_key_path) payload.private_key_path = form.private_key_path;
+      if (form.group_id) payload.group_id = form.group_id;
+      if (password) payload.password = password;
+      if (form.sudo_password) payload.sudo_password = form.sudo_password;
+      if (form.default_path_ssh) payload.default_path_ssh = form.default_path_ssh;
+      if (form.default_path_sftp) payload.default_path_sftp = form.default_path_sftp;
+      if (form.keep_alive_interval) payload.keep_alive_interval = parseInt(form.keep_alive_interval, 10);
+      if (form.keep_alive_tries) payload.keep_alive_tries = parseInt(form.keep_alive_tries, 10);
+
+      const newHost = await createHost(payload as unknown as CreateHostPayload);
       setSelectedHost(newHost.id);
+    } catch (e) {
+      setError(String(e));
     } finally {
       setSubmitting(false);
     }
@@ -347,14 +353,21 @@ export function HostFormPanel({ hostId, onClose }: Props) {
 
           {/* Add button (new mode) or Delete button (edit mode) */}
           {isNew ? (
-            <Button
-              size="sm"
-              className="w-full h-9"
-              onClick={handleCreate}
-              disabled={submitting || !canSave}
-            >
-              {submitting ? "Adding…" : "Add Host"}
-            </Button>
+            <div className="space-y-2">
+              {error && (
+                <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {error}
+                </p>
+              )}
+              <Button
+                size="sm"
+                className="w-full h-9"
+                onClick={handleCreate}
+                disabled={submitting || !canSave}
+              >
+                {submitting ? "Adding…" : "Add Host"}
+              </Button>
+            </div>
           ) : (
             <AlertDialog>
               <AlertDialogTrigger asChild>
@@ -472,7 +485,7 @@ export function HostFormPanel({ hostId, onClose }: Props) {
 /** Utility to fetch sudo password via Tauri for SSH session autofill */
 export async function getSudoPassword(hostId: string): Promise<string | null> {
   try {
-    return await invoke<string | null>("get_sudo_password", { hostId });
+    return await invoke<string | null>("get_sudo_password", { hostId: hostId });
   } catch {
     return null;
   }

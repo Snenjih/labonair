@@ -6,7 +6,9 @@ import {
 import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/modules/hosts";
 import type { SftpTab } from "@/modules/tabs";
-import { useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useState } from "react";
+import { SftpContextMenu } from "./components/SftpContextMenu";
 import { SftpToolbar } from "./components/SftpToolbar";
 import { VirtualizedFileList } from "./components/VirtualizedFileList";
 import { useSftpStore } from "./store/sftpStore";
@@ -18,13 +20,28 @@ interface SftpPaneProps {
 
 export function SftpPane({ tab }: SftpPaneProps) {
   const tabId = String(tab.id);
-  const { initTab, destroyTab, loadLocalDir, loadRemoteDir, setSelectedLocal, setSelectedRemote, tabs } =
-    useSftpStore();
+  const {
+    initTab,
+    destroyTab,
+    loadLocalDir,
+    loadRemoteDir,
+    setSelectedLocal,
+    setSelectedRemote,
+    tabs,
+  } = useSftpStore();
   const tabState = tabs[tabId];
 
   const hosts = useHostsStore((s) => s.hosts);
   const host = hosts.find((h) => h.id === tab.hostId);
   const hostLabel = host?.name ?? tab.title;
+
+  // Inline rename state
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  // Inline new folder state (separate for local/remote)
+  const [creatingFolderSide, setCreatingFolderSide] = useState<"local" | "remote" | null>(null);
+  const [newFolderName, setNewFolderName] = useState("");
 
   useEffect(() => {
     initTab(tabId, host?.default_path_sftp ?? "/");
@@ -38,11 +55,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
     const current = tabState?.selectedLocalPaths ?? new Set<string>();
     if (multi) {
       const next = new Set(current);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
+      next.has(path) ? next.delete(path) : next.add(path);
       setSelectedLocal(tabId, next);
     } else {
       setSelectedLocal(tabId, new Set([path]));
@@ -53,11 +66,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
     const current = tabState?.selectedRemotePaths ?? new Set<string>();
     if (multi) {
       const next = new Set(current);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
+      next.has(path) ? next.delete(path) : next.add(path);
       setSelectedRemote(tabId, next);
     } else {
       setSelectedRemote(tabId, new Set([path]));
@@ -70,6 +79,52 @@ export function SftpPane({ tab }: SftpPaneProps) {
 
   function handleRemoteDoubleClick(file: FileNode) {
     if (file.is_dir) loadRemoteDir(tabId, file.path);
+  }
+
+  function startRename(path: string) {
+    const name = path.split("/").pop() ?? path;
+    setRenamingPath(path);
+    setRenameValue(name);
+  }
+
+  async function commitRename(side: "local" | "remote") {
+    if (!renamingPath || !renameValue.trim()) { setRenamingPath(null); return; }
+    const dir = renamingPath.substring(0, renamingPath.lastIndexOf("/"));
+    const newPath = `${dir}/${renameValue.trim()}`;
+    try {
+      if (side === "remote") {
+        await invoke("sftp_rename", { tab_id: tabId, old_path: renamingPath, new_path: newPath });
+        loadRemoteDir(tabId, tabState?.remotePath ?? "/");
+      } else {
+        await invoke("fs_rename", { old_path: renamingPath, new_path: newPath });
+        loadLocalDir(tabId, tabState?.localPath ?? "~");
+      }
+    } catch (e) {
+      console.error("Rename failed:", e);
+    }
+    setRenamingPath(null);
+  }
+
+  async function commitNewFolder(side: "local" | "remote") {
+    if (!newFolderName.trim()) { setCreatingFolderSide(null); return; }
+    const basePath = side === "remote"
+      ? (tabState?.remotePath ?? "/")
+      : (tabState?.localPath ?? "~");
+    const sep = basePath.endsWith("/") ? "" : "/";
+    const newPath = `${basePath}${sep}${newFolderName.trim()}`;
+    try {
+      if (side === "remote") {
+        await invoke("sftp_mkdir", { tab_id: tabId, path: newPath });
+        loadRemoteDir(tabId, basePath);
+      } else {
+        await invoke("fs_create_dir", { path: newPath });
+        loadLocalDir(tabId, basePath);
+      }
+    } catch (e) {
+      console.error("New folder failed:", e);
+    }
+    setCreatingFolderSide(null);
+    setNewFolderName("");
   }
 
   return (
@@ -85,7 +140,6 @@ export function SftpPane({ tab }: SftpPaneProps) {
         </span>
       </div>
 
-      {/* Split panes */}
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
         {/* LOCAL */}
         <ResizablePanel defaultSize={50} minSize={20}>
@@ -99,14 +153,39 @@ export function SftpPane({ tab }: SftpPaneProps) {
               path={tabState?.localPath ?? "~"}
               onNavigate={(p) => loadLocalDir(tabId, p)}
             />
-            <div className="flex-1 min-h-0">
-              <VirtualizedFileList
-                files={tabState?.localFiles ?? []}
-                selectedPaths={tabState?.selectedLocalPaths ?? new Set()}
-                onSelect={handleLocalSelect}
-                onDoubleClick={handleLocalDoubleClick}
-                isLoading={tabState?.isLoadingLocal}
+            {creatingFolderSide === "local" && (
+              <NewFolderInput
+                value={newFolderName}
+                onChange={setNewFolderName}
+                onCommit={() => commitNewFolder("local")}
+                onCancel={() => { setCreatingFolderSide(null); setNewFolderName(""); }}
               />
+            )}
+            <div className="flex-1 min-h-0">
+              <SftpContextMenu
+                tabId={tabId}
+                side="local"
+                selectedPaths={tabState?.selectedLocalPaths ?? new Set()}
+                currentPath={tabState?.localPath ?? "~"}
+                onRefresh={() => loadLocalDir(tabId, tabState?.localPath ?? "~")}
+                onStartRename={startRename}
+                onStartNewFolder={() => { setCreatingFolderSide("local"); setNewFolderName(""); }}
+              >
+                <div className="h-full">
+                  <VirtualizedFileList
+                    files={tabState?.localFiles ?? []}
+                    selectedPaths={tabState?.selectedLocalPaths ?? new Set()}
+                    onSelect={handleLocalSelect}
+                    onDoubleClick={handleLocalDoubleClick}
+                    isLoading={tabState?.isLoadingLocal}
+                    renamingPath={renamingPath}
+                    renameValue={renameValue}
+                    onRenameChange={setRenameValue}
+                    onRenameCommit={() => commitRename("local")}
+                    onRenameCancel={() => setRenamingPath(null)}
+                  />
+                </div>
+              </SftpContextMenu>
             </div>
           </div>
         </ResizablePanel>
@@ -125,22 +204,46 @@ export function SftpPane({ tab }: SftpPaneProps) {
               path={tabState?.remotePath ?? "/"}
               onNavigate={(p) => loadRemoteDir(tabId, p)}
               showOpenTerminal
-              onOpenTerminal={() => {/* Task 04.2: open SSH terminal at path */}}
+              onOpenTerminal={() => {/* Task 05+: open SSH terminal at path */}}
             />
-            <div className="flex-1 min-h-0">
-              <VirtualizedFileList
-                files={tabState?.remoteFiles ?? []}
-                selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
-                onSelect={handleRemoteSelect}
-                onDoubleClick={handleRemoteDoubleClick}
-                isLoading={tabState?.isLoadingRemote}
+            {creatingFolderSide === "remote" && (
+              <NewFolderInput
+                value={newFolderName}
+                onChange={setNewFolderName}
+                onCommit={() => commitNewFolder("remote")}
+                onCancel={() => { setCreatingFolderSide(null); setNewFolderName(""); }}
               />
+            )}
+            <div className="flex-1 min-h-0">
+              <SftpContextMenu
+                tabId={tabId}
+                side="remote"
+                selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
+                currentPath={tabState?.remotePath ?? "/"}
+                onRefresh={() => loadRemoteDir(tabId, tabState?.remotePath ?? "/")}
+                onStartRename={startRename}
+                onStartNewFolder={() => { setCreatingFolderSide("remote"); setNewFolderName(""); }}
+              >
+                <div className="h-full">
+                  <VirtualizedFileList
+                    files={tabState?.remoteFiles ?? []}
+                    selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
+                    onSelect={handleRemoteSelect}
+                    onDoubleClick={handleRemoteDoubleClick}
+                    isLoading={tabState?.isLoadingRemote}
+                    renamingPath={renamingPath}
+                    renameValue={renameValue}
+                    onRenameChange={setRenameValue}
+                    onRenameCommit={() => commitRename("remote")}
+                    onRenameCancel={() => setRenamingPath(null)}
+                  />
+                </div>
+              </SftpContextMenu>
             </div>
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
 
-      {/* Status bar */}
       {tabState?.error && (
         <div className="h-6 shrink-0 border-t border-destructive/40 bg-destructive/10 flex items-center px-3">
           <span className="text-[11px] text-destructive truncate">{tabState.error}</span>
@@ -163,15 +266,38 @@ function PaneLabel({ label, count, selected }: PaneLabelProps) {
         {label}
       </span>
       {count !== undefined && (
-        <span
-          className={cn(
-            "text-[10px] text-muted-foreground/60 tabular-nums select-none",
-          )}
-        >
+        <span className="text-[10px] text-muted-foreground/60 tabular-nums select-none">
           {count} item{count !== 1 ? "s" : ""}
           {selected ? ` · ${selected} selected` : ""}
         </span>
       )}
+    </div>
+  );
+}
+
+interface NewFolderInputProps {
+  value: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}
+
+function NewFolderInput({ value, onChange, onCommit, onCancel }: NewFolderInputProps) {
+  return (
+    <div className={cn("flex items-center gap-1 px-2 h-7 border-b border-border bg-muted/10 shrink-0")}>
+      <span className="text-[13px]">📁</span>
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onCommit();
+          if (e.key === "Escape") onCancel();
+        }}
+        onBlur={onCancel}
+        placeholder="New folder name"
+        className="flex-1 h-5 text-xs bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/40"
+      />
     </div>
   );
 }

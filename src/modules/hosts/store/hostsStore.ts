@@ -51,13 +51,48 @@ export const useHostsStore = create<HostsState>((set, get) => ({
   },
 
   createHost: async (payload) => {
-    const host = await invoke<Host>("hosts_create", payload as unknown as Record<string, unknown>);
+    const host = await invoke<Host>("hosts_create", {
+      name: payload.name,
+      hostAddress: payload.host_address,
+      port: payload.port,
+      username: payload.username,
+      authMethod: payload.auth_method,
+      ...(payload.private_key_path !== undefined && { privateKeyPath: payload.private_key_path }),
+      ...(payload.group_id !== undefined && { groupId: payload.group_id }),
+      ...(payload.tags !== undefined && { tags: payload.tags }),
+      ...(payload.password !== undefined && { password: payload.password }),
+      ...(payload.sudo_password !== undefined && { sudoPassword: payload.sudo_password }),
+      ...(payload.default_path_ssh !== undefined && { defaultPathSsh: payload.default_path_ssh }),
+      ...(payload.default_path_sftp !== undefined && { defaultPathSftp: payload.default_path_sftp }),
+      pinToTop: payload.pin_to_top ?? false,
+      ...(payload.keep_alive_interval !== undefined && { keepAliveInterval: payload.keep_alive_interval }),
+      ...(payload.keep_alive_tries !== undefined && { keepAliveTries: payload.keep_alive_tries }),
+      ...(payload.sort_order !== undefined && { sortOrder: payload.sort_order }),
+    });
     set((s) => ({ hosts: [...s.hosts, host] }));
     return host;
   },
 
   updateHost: async (payload) => {
-    const host = await invoke<Host>("hosts_update", payload as unknown as Record<string, unknown>);
+    const host = await invoke<Host>("hosts_update", {
+      id: payload.id,
+      ...(payload.name !== undefined && { name: payload.name }),
+      ...(payload.host_address !== undefined && { hostAddress: payload.host_address }),
+      ...(payload.port !== undefined && { port: payload.port }),
+      ...(payload.username !== undefined && { username: payload.username }),
+      ...(payload.auth_method !== undefined && { authMethod: payload.auth_method }),
+      ...(payload.private_key_path !== undefined && { privateKeyPath: payload.private_key_path }),
+      ...(payload.group_id !== undefined && { groupId: payload.group_id }),
+      ...(payload.tags !== undefined && { tags: payload.tags }),
+      ...(payload.password !== undefined && { password: payload.password }),
+      ...(payload.sudo_password !== undefined && { sudoPassword: payload.sudo_password }),
+      ...(payload.default_path_ssh !== undefined && { defaultPathSsh: payload.default_path_ssh }),
+      ...(payload.default_path_sftp !== undefined && { defaultPathSftp: payload.default_path_sftp }),
+      ...(payload.pin_to_top !== undefined && { pinToTop: payload.pin_to_top }),
+      ...(payload.keep_alive_interval !== undefined && { keepAliveInterval: payload.keep_alive_interval }),
+      ...(payload.keep_alive_tries !== undefined && { keepAliveTries: payload.keep_alive_tries }),
+      ...(payload.sort_order !== undefined && { sortOrder: payload.sort_order }),
+    });
     set((s) => ({
       hosts: s.hosts.map((h) => (h.id === host.id ? host : h)),
     }));
@@ -108,7 +143,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
   },
 
   reorderHosts: async (items) => {
-    await invoke("hosts_reorder", { items });
+    await invoke("hosts_reorder", { items: items.map((i) => ({ id: i.id, sortOrder: i.sort_order })) });
     set((s) => {
       const orderMap = new Map(items.map((i) => [i.id, i.sort_order]));
       const hosts = s.hosts.map((h) =>

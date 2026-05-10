@@ -34,6 +34,9 @@ pub fn initialize_db(
 
     // Idempotent migrations — ignore errors if column already exists
     for sql in &[
+        "ALTER TABLE hosts ADD COLUMN tags TEXT",
+        "ALTER TABLE hosts ADD COLUMN private_key_path TEXT",
+        "ALTER TABLE hosts ADD COLUMN last_connected_at INTEGER",
         "ALTER TABLE hosts ADD COLUMN default_path_ssh TEXT",
         "ALTER TABLE hosts ADD COLUMN default_path_sftp TEXT",
         "ALTER TABLE hosts ADD COLUMN pin_to_top INTEGER NOT NULL DEFAULT 0",

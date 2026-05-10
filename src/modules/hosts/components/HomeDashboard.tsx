@@ -64,6 +64,8 @@ function EmptyState({ onNew }: { onNew: () => void }) {
   );
 }
 
+type ConnectFn = (hostId: string, title: string) => void;
+
 interface SortableHostCardProps {
   host: Host;
   isSelected: boolean;
@@ -71,9 +73,11 @@ interface SortableHostCardProps {
   onSelect: (e: React.MouseEvent) => void;
   onEdit: () => void;
   group?: import("../types").Group;
+  newSshTab: ConnectFn;
+  newSftpTab: ConnectFn;
 }
 
-function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group }: SortableHostCardProps) {
+function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab }: SortableHostCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: host.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -90,12 +94,14 @@ function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit,
         onEdit={onEdit}
         group={group}
         dragHandleProps={{ ...attributes, ...listeners }}
+        newSshTab={newSshTab}
+        newSftpTab={newSftpTab}
       />
     </div>
   );
 }
 
-export function HomeDashboard() {
+export function HomeDashboard({ newSshTab, newSftpTab }: { newSshTab: ConnectFn; newSftpTab: ConnectFn }) {
   const hosts = useHostsStore((s) => s.hosts);
   const groups = useHostsStore((s) => s.groups);
   const selectedHostId = useHostsStore((s) => s.selectedHostId);
@@ -269,6 +275,8 @@ export function HomeDashboard() {
                       onSelect={handleCardSelect(host)}
                       onEdit={() => setSelectedHost(host.id)}
                       group={groups.find((g) => g.id === host.group_id)}
+                      newSshTab={newSshTab}
+                      newSftpTab={newSftpTab}
                     />
                   ))}
                 </div>
@@ -292,6 +300,8 @@ export function HomeDashboard() {
             <HostFormPanel
               hostId={panelHostId}
               onClose={() => setSelectedHost(null)}
+              newSshTab={newSshTab}
+              newSftpTab={newSftpTab}
             />
           </motion.div>
         )}

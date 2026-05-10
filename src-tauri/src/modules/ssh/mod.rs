@@ -1,5 +1,6 @@
 pub mod client;
 pub mod pty;
+pub mod sftp;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
