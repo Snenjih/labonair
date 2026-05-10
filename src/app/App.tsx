@@ -41,7 +41,8 @@ import {
   type ShortcutHandlers,
 } from "@/modules/shortcuts";
 import { StatusBar } from "@/modules/statusbar";
-import { useTabs, useWorkspaceCwd, type SshTerminalTab } from "@/modules/tabs";
+import { SftpPane } from "@/modules/sftp";
+import { useTabs, useWorkspaceCwd, type SftpTab, type SshTerminalTab } from "@/modules/tabs";
 import { SshTerminalPane, TerminalStack, type TerminalPaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
 import { UpdaterDialog } from "@/modules/updater";
@@ -75,6 +76,8 @@ export default function App() {
     updateTab,
     selectByIndex,
     openHomeTab,
+    newSshTab,
+    newSftpTab,
   } = useTabs();
 
   const searchAddons = useRef<Map<number, SearchAddon>>(new Map());
@@ -164,7 +167,7 @@ export default function App() {
   const isAiDiffTab = activeTab?.kind === "ai-diff";
   const isHomeTab = activeTab?.kind === "home";
   // isSshTab not needed — SSH tabs rendered per-instance below
-  const isSftpTab = activeTab?.kind === "sftp";
+
 
   // When an AI diff is approved (write_file applied to disk), reload any
   // open editor tabs for that path so the user sees the new content. We
@@ -695,7 +698,7 @@ export default function App() {
                       )}
                       aria-hidden={!isHomeTab}
                     >
-                      <HomeDashboard />
+                      <HomeDashboard newSshTab={newSshTab} newSftpTab={newSftpTab} />
                     </div>
                     {tabs.filter((t) => t.kind === "ssh-terminal").map((t) => (
                       <div
@@ -712,17 +715,18 @@ export default function App() {
                         />
                       </div>
                     ))}
-                    <div
-                      className={cn(
-                        "absolute inset-0",
-                        !isSftpTab && "invisible pointer-events-none",
-                      )}
-                      aria-hidden={!isSftpTab}
-                    >
-                      <div className="flex h-full items-center justify-center text-muted-foreground">
-                        SFTP Manager Placeholder
+                    {tabs.filter((t) => t.kind === "sftp").map((t) => (
+                      <div
+                        key={t.id}
+                        className={cn(
+                          "absolute inset-0",
+                          activeId !== t.id && "invisible pointer-events-none",
+                        )}
+                        aria-hidden={activeId !== t.id}
+                      >
+                        <SftpPane tab={t as SftpTab} />
                       </div>
-                    </div>
+                    ))}
                   </div>
 
                   {keysLoaded ? (

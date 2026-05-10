@@ -1,6 +1,6 @@
 # Task 04.1 — Virtualized Split-Pane SFTP UI
 **Phase:** 4 — SFTP File Manager
-**Status:** not_started
+**Status:** completed
 **Priority:** High
 **Dependencies:** TASK_03_1
 

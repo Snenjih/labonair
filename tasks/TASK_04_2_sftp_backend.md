@@ -1,6 +1,6 @@
 # Task 04.2 — SFTP Backend Commands & Context Menus
 **Phase:** 4 — SFTP File Manager
-**Status:** not_started
+**Status:** in_progress
 **Priority:** High
 **Dependencies:** TASK_03_1, TASK_04_1
 
