@@ -59,9 +59,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNCQUJGRDhBQjYwRTM0NjkKUldScE5BNjJpdjJyT3dIN0dqbUpHaDA4QW1GaDVmTTllRXdZVk96dFNTRUZ3Y2hiVGszYjFqRloK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJFNjc1QzhDMTNFRUU3NzIKUldSeTUrNFRqRnhudmpmNHFURGZhK0Z0V3dVRkp1U2pvMCt4a3JidXhIQzl1Q1RNSDBuOUZaRmcK",
       "endpoints": [
-        "https://github.com/crynta/terax-ai/releases/latest/download/latest.json"
+        "https://github.com/Snenjih/nexum/releases/latest/download/latest.json"
       ]
     }
   }

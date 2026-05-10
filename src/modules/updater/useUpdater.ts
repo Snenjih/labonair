@@ -2,7 +2,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { useCallback, useEffect, useState } from "react";
 
-const LAST_CHECK_KEY = "terax:updater:last-check";
+const LAST_CHECK_KEY = "nexum:updater:last-check";
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 export type UpdaterStatus =
