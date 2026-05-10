@@ -15,6 +15,7 @@ Before working on any area, read the relevant context file:
 - **Implementation Plan** → [`plan-overview.md`](./plan-overview.md) — All phases with detailed work instructions
 - **SSH/SFTP Architecture** → [`sftp_ssh_context.md`](./sftp_ssh_context.md) — Connection lifecycle, PTY, transfer manager IPC contracts
 - **Host Manager UI** → [`hosts_manager_context.md`](./hosts_manager_context.md) — Master-Detail layout, TitleBar dropdown, Inspector pane, Zustand store shape
+- **Host Manager Overhaul** → [`host_manager_overhaul_context.md`](./host_manager_overhaul_context.md) — Full implementation reference: new data model, IPC contracts, HostFormPanel tabs, dnd-kit reorder, multi-select, context menu, loading fix, future work
 
 ## Architecture Summary
 ```
