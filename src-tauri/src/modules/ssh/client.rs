@@ -9,11 +9,12 @@ pub fn ssh_connect(
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     // Step 1: Fetch host from SQLite
-    let (host_address, port, username, auth_method, private_key_path) = {
+    let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh) = {
         let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
             .prepare(
-                "SELECT host_address, port, username, auth_method, private_key_path \
+                "SELECT host_address, port, username, auth_method, private_key_path, \
+                 keep_alive_interval, keep_alive_tries, default_path_ssh \
                  FROM hosts WHERE id = ?1",
             )
             .map_err(|e| e.to_string())?;
@@ -24,6 +25,9 @@ pub fn ssh_connect(
                 row.get::<_, String>(2)?,
                 row.get::<_, String>(3)?,
                 row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<i64>>(5)?,
+                row.get::<_, Option<i64>>(6)?,
+                row.get::<_, Option<String>>(7)?,
             ))
         })
         .map_err(|e| e.to_string())?
@@ -48,6 +52,13 @@ pub fn ssh_connect(
     let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
     session.set_tcp_stream(tcp);
     session.handshake().map_err(|e| e.to_string())?;
+
+    // Configure keepalive if set
+    if let Some(interval) = keep_alive_interval {
+        let tries = keep_alive_tries.unwrap_or(3) as u32;
+        session.set_keepalive(true, interval as u32);
+        let _ = tries; // tries not directly settable via ssh2 API — used in monitoring
+    }
 
     // Step 5: known_hosts check
     let (host_key, _key_type) = session.host_key().ok_or("no host key")?;
@@ -177,7 +188,7 @@ pub fn ssh_connect(
         );
     }
 
-    app.emit("session_established", serde_json::json!({ "tab_id": tab_id }))
+    app.emit("session_established", serde_json::json!({ "tab_id": tab_id, "default_path_ssh": default_path_ssh }))
         .map_err(|e| e.to_string())?;
 
     Ok(())

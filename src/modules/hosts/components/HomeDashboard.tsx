@@ -1,21 +1,27 @@
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GroupCard } from "./GroupCard";
 import { HostCard } from "./HostCard";
-import { HostInspector } from "./HostInspector";
+import { HostFormPanel } from "./HostFormPanel";
 import { useHostsStore } from "../store/hostsStore";
-import type { CreateHostPayload } from "../types";
+import type { Host } from "../types";
 
 function SkeletonCard() {
   return (
@@ -46,45 +52,72 @@ function EmptyState({ onNew }: { onNew: () => void }) {
         🖥️
       </div>
       <div className="space-y-1">
-        <h3 className="text-base font-semibold text-foreground">No servers yet</h3>
+        <h3 className="text-base font-semibold text-foreground">No hosts yet</h3>
         <p className="text-sm text-muted-foreground max-w-xs">
-          Add your first SSH server to get started. Your hosts are stored locally and passwords in your Keychain.
+          Add your first SSH host to get started. Credentials are stored securely in your Keychain.
         </p>
       </div>
       <Button size="sm" onClick={onNew} className="mt-2">
-        Add your first server
+        Add First Host
       </Button>
     </motion.div>
   );
 }
 
-const DEFAULT_FORM: CreateHostPayload = {
-  name: "",
-  host_address: "",
-  port: 22,
-  username: "",
-  auth_method: "password",
-};
+interface SortableHostCardProps {
+  host: Host;
+  isSelected: boolean;
+  isMultiSelected: boolean;
+  onSelect: (e: React.MouseEvent) => void;
+  onEdit: () => void;
+  group?: import("../types").Group;
+}
+
+function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group }: SortableHostCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: host.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <HostCard
+        host={host}
+        isSelected={isSelected}
+        isMultiSelected={isMultiSelected}
+        onSelect={onSelect}
+        onEdit={onEdit}
+        group={group}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+}
 
 export function HomeDashboard() {
   const hosts = useHostsStore((s) => s.hosts);
   const groups = useHostsStore((s) => s.groups);
   const selectedHostId = useHostsStore((s) => s.selectedHostId);
+  const selectedHostIds = useHostsStore((s) => s.selectedHostIds);
   const isLoading = useHostsStore((s) => s.isLoading);
+  const hasFetched = useHostsStore((s) => s.hasFetched);
   const fetchData = useHostsStore((s) => s.fetchData);
-  const createHost = useHostsStore((s) => s.createHost);
   const createGroup = useHostsStore((s) => s.createGroup);
   const setSelectedHost = useHostsStore((s) => s.setSelectedHost);
+  const selectHost = useHostsStore((s) => s.selectHost);
+  const reorderHosts = useHostsStore((s) => s.reorderHosts);
 
   const [search, setSearch] = useState("");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
-  const [newHostOpen, setNewHostOpen] = useState(false);
-  const [form, setForm] = useState<CreateHostPayload>(DEFAULT_FORM);
-  const [submitting, setSubmitting] = useState(false);
 
   const [addingGroup, setAddingGroup] = useState(false);
   const [groupName, setGroupName] = useState("");
   const groupInputRef = useRef<HTMLInputElement>(null);
+
+  // Local ordered list for dnd (mirrors store but allows optimistic reorder)
+  const [localHosts, setLocalHosts] = useState<Host[]>([]);
+  useEffect(() => { setLocalHosts(hosts); }, [hosts]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
@@ -93,7 +126,7 @@ export function HomeDashboard() {
   }, [addingGroup]);
 
   const filteredHosts = useMemo(() => {
-    let list = hosts;
+    let list = localHosts;
     if (activeGroupId) list = list.filter((h) => h.group_id === activeGroupId);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -105,20 +138,7 @@ export function HomeDashboard() {
       );
     }
     return list;
-  }, [hosts, activeGroupId, search]);
-
-  const handleCreateHost = async () => {
-    if (!form.name || !form.host_address || !form.username) return;
-    setSubmitting(true);
-    try {
-      const host = await createHost(form);
-      setNewHostOpen(false);
-      setForm(DEFAULT_FORM);
-      setSelectedHost(host.id);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  }, [localHosts, activeGroupId, search]);
 
   const handleGroupKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && groupName.trim()) {
@@ -132,19 +152,44 @@ export function HomeDashboard() {
     }
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localHosts.findIndex((h) => h.id === active.id);
+    const newIndex = localHosts.findIndex((h) => h.id === over.id);
+    const reordered = arrayMove(localHosts, oldIndex, newIndex);
+    setLocalHosts(reordered);
+    const items = reordered.map((h, i) => ({ id: h.id, sort_order: i }));
+    await reorderHosts(items);
+  };
+
+  const panelHostId = selectedHostId; // null or a real id or "__new__"
+  const showPanel = panelHostId !== null;
+
+  const handleCardSelect = (host: Host) => (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey) {
+      selectHost(host.id, "toggle");
+    } else if (e.shiftKey) {
+      selectHost(host.id, "range");
+    } else {
+      setSelectedHost(selectedHostId === host.id ? null : host.id);
+    }
+  };
+
   return (
     <div className="flex h-full w-full overflow-hidden">
       {/* LEFT MASTER PANE */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         {/* Toolbar */}
         <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
           <div className="relative flex-1">
             <svg
               className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              width="13"
-              height="13"
-              viewBox="0 0 13 13"
-              fill="none"
+              width="13" height="13" viewBox="0 0 13 13" fill="none"
             >
               <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2" />
               <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -156,67 +201,13 @@ export function HomeDashboard() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Dialog open={newHostOpen} onOpenChange={setNewHostOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="h-7 px-3 text-xs shrink-0">
-                + New Host
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-sm">
-              <DialogHeader>
-                <DialogTitle>Add Server</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-3 py-2">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Display Name</Label>
-                  <Input
-                    placeholder="My Server"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className="h-8"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <div className="flex-1 space-y-1.5">
-                    <Label className="text-xs">Host / IP</Label>
-                    <Input
-                      placeholder="192.168.1.1"
-                      value={form.host_address}
-                      onChange={(e) => setForm((f) => ({ ...f, host_address: e.target.value }))}
-                      className="h-8"
-                    />
-                  </div>
-                  <div className="w-20 space-y-1.5">
-                    <Label className="text-xs">Port</Label>
-                    <Input
-                      type="number"
-                      value={form.port}
-                      onChange={(e) => setForm((f) => ({ ...f, port: parseInt(e.target.value, 10) || 22 }))}
-                      className="h-8"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Username</Label>
-                  <Input
-                    placeholder="root"
-                    value={form.username}
-                    onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-                    className="h-8"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  size="sm"
-                  onClick={handleCreateHost}
-                  disabled={submitting || !form.name || !form.host_address || !form.username}
-                >
-                  {submitting ? "Adding…" : "Add Server"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Button
+            size="sm"
+            className="h-7 px-3 text-xs shrink-0"
+            onClick={() => setSelectedHost("__new__")}
+          >
+            + New Host
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -255,62 +246,51 @@ export function HomeDashboard() {
 
         {/* Host grid */}
         <div className="flex-1 overflow-y-auto p-4">
-          {isLoading ? (
+          {!hasFetched || isLoading ? (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
               {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : filteredHosts.length === 0 && !search && !activeGroupId ? (
-            <EmptyState onNew={() => setNewHostOpen(true)} />
+            <EmptyState onNew={() => setSelectedHost("__new__")} />
           ) : filteredHosts.length === 0 ? (
             <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
               No hosts match your search
             </div>
           ) : (
-            <motion.div
-              className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3"
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: {},
-                visible: { transition: { staggerChildren: 0.04 } },
-              }}
-            >
-              {filteredHosts.map((host) => (
-                <motion.div
-                  key={host.id}
-                  variants={{
-                    hidden: { opacity: 0, y: 6 },
-                    visible: { opacity: 1, y: 0 },
-                  }}
-                >
-                  <HostCard
-                    host={host}
-                    isSelected={selectedHostId === host.id}
-                    onClick={() =>
-                      setSelectedHost(selectedHostId === host.id ? null : host.id)
-                    }
-                    group={groups.find((g) => g.id === host.group_id)}
-                  />
-                </motion.div>
-              ))}
-            </motion.div>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={filteredHosts.map((h) => h.id)} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredHosts.map((host) => (
+                    <SortableHostCard
+                      key={host.id}
+                      host={host}
+                      isSelected={selectedHostId === host.id}
+                      isMultiSelected={selectedHostIds.has(host.id)}
+                      onSelect={handleCardSelect(host)}
+                      onEdit={() => setSelectedHost(host.id)}
+                      group={groups.find((g) => g.id === host.group_id)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       </div>
 
-      {/* RIGHT INSPECTOR PANE */}
+      {/* RIGHT PANEL (Form / Inspector) */}
       <AnimatePresence>
-        {selectedHostId && (
+        {showPanel && (
           <motion.div
-            key={selectedHostId}
+            key={panelHostId ?? "__new__"}
             initial={{ x: 340, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 340, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="w-[340px] shrink-0 border-l border-border overflow-y-auto bg-background"
+            className="w-[340px] shrink-0 border-l border-border overflow-hidden bg-background flex flex-col"
           >
-            <HostInspector
-              hostId={selectedHostId}
+            <HostFormPanel
+              hostId={panelHostId}
               onClose={() => setSelectedHost(null)}
             />
           </motion.div>

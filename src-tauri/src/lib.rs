@@ -2,7 +2,7 @@ mod modules;
 
 use modules::{
     fs, pty, secrets, shell,
-    hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, groups_get_all, groups_create, groups_delete}},
+    hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete}},
     ssh::{SshState, client::{ssh_connect, ssh_disconnect}, pty::{ssh_pty_write, ssh_pty_resize}},
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -115,6 +115,8 @@ pub fn run() {
             hosts_create,
             hosts_update,
             hosts_delete,
+            hosts_reorder,
+            get_sudo_password,
             groups_get_all,
             groups_create,
             groups_delete,

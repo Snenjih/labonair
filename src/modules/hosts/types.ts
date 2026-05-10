@@ -4,12 +4,20 @@ export interface Host {
   host_address: string;
   port: number;
   username: string;
-  auth_method: "password" | "key";
+  auth_method: "password" | "key" | "none";
   private_key_path?: string;
   group_id?: string;
   tags?: string;
   created_at: number;
   last_connected_at?: number;
+  // New fields
+  default_path_ssh?: string;
+  default_path_sftp?: string;
+  pin_to_top: boolean;
+  sudo_password_set: boolean;
+  keep_alive_interval?: number;
+  keep_alive_tries?: number;
+  sort_order: number;
 }
 
 export interface Group {
@@ -25,13 +33,25 @@ export interface CreateHostPayload {
   host_address: string;
   port: number;
   username: string;
-  auth_method: "password" | "key";
+  auth_method: "password" | "key" | "none";
   private_key_path?: string;
   group_id?: string;
   tags?: string;
   password?: string;
+  sudo_password?: string;
+  default_path_ssh?: string;
+  default_path_sftp?: string;
+  pin_to_top?: boolean;
+  keep_alive_interval?: number;
+  keep_alive_tries?: number;
+  sort_order?: number;
 }
 
 export interface UpdateHostPayload extends Partial<CreateHostPayload> {
   id: string;
+}
+
+export interface ReorderItem {
+  id: string;
+  sort_order: number;
 }
