@@ -51,7 +51,7 @@ export function SftpContextMenu({
     if (count === 0) return;
     try {
       if (side === "remote") {
-        await invoke("sftp_delete", { tab_id: tabId, paths: [...selectedPaths] });
+        await invoke("sftp_delete", { tabId, paths: [...selectedPaths] });
       } else {
         // Local deletion: use Tauri fs commands (not implemented here — placeholder)
         console.warn("Local delete not yet implemented");
@@ -67,7 +67,7 @@ export function SftpContextMenu({
     const octal = parseInt(chmodValue, 8);
     if (isNaN(octal)) return;
     try {
-      await invoke("sftp_chmod", { tab_id: tabId, path: singlePath, permissions: octal });
+      await invoke("sftp_chmod", { tabId, path: singlePath, permissions: octal });
       onRefresh();
     } catch (e) {
       console.error("Chmod failed:", e);

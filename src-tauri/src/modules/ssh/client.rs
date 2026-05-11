@@ -42,10 +42,20 @@ pub fn ssh_connect(
         None
     };
 
-    // Step 3: TCP connect
+    // Step 3: TCP connect (10 s timeout so the UI doesn't hang on unreachable hosts)
     let tcp = {
         let addr = format!("{}:{}", host_address, port);
-        std::net::TcpStream::connect(&addr).map_err(|e| e.to_string())?
+        let socket_addr = addr.parse::<std::net::SocketAddr>()
+            .or_else(|_| {
+                use std::net::ToSocketAddrs;
+                addr.to_socket_addrs()
+                    .map_err(|e| e.to_string())?
+                    .next()
+                    .ok_or_else(|| "could not resolve host".to_string())
+            })
+            .map_err(|e: String| e)?;
+        std::net::TcpStream::connect_timeout(&socket_addr, std::time::Duration::from_secs(10))
+            .map_err(|e| e.to_string())?
     };
 
     // Step 4: SSH handshake

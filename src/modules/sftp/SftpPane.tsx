@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/modules/hosts";
+import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
 import type { SftpTab } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +36,9 @@ export function SftpPane({ tab }: SftpPaneProps) {
   const host = hosts.find((h) => h.id === tab.hostId);
   const hostLabel = host?.name ?? tab.title;
 
+  const [isConnected, setIsConnected] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
   // Track drag source pane ("local" | "remote" | null)
   const dragSourceRef = useRef<"local" | "remote" | null>(null);
 
@@ -47,12 +51,13 @@ export function SftpPane({ tab }: SftpPaneProps) {
   const [newFolderName, setNewFolderName] = useState("");
 
   useEffect(() => {
+    if (!isConnected) return;
     initTab(tabId, host?.default_path_sftp ?? "/");
     loadLocalDir(tabId, "~");
     loadRemoteDir(tabId, host?.default_path_sftp ?? "/");
     return () => destroyTab(tabId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabId]);
+  }, [tabId, isConnected]);
 
   function handleLocalSelect(path: string, multi: boolean) {
     const current = tabState?.selectedLocalPaths ?? new Set<string>();
@@ -96,7 +101,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
     const newPath = `${dir}/${renameValue.trim()}`;
     try {
       if (side === "remote") {
-        await invoke("sftp_rename", { tab_id: tabId, old_path: renamingPath, new_path: newPath });
+        await invoke("sftp_rename", { tabId, oldPath: renamingPath, newPath });
         loadRemoteDir(tabId, tabState?.remotePath ?? "/");
       } else {
         await invoke("fs_rename", { old_path: renamingPath, new_path: newPath });
@@ -148,7 +153,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
     const newPath = `${basePath}${sep}${newFolderName.trim()}`;
     try {
       if (side === "remote") {
-        await invoke("sftp_mkdir", { tab_id: tabId, path: newPath });
+        await invoke("sftp_mkdir", { tabId, path: newPath });
         loadRemoteDir(tabId, basePath);
       } else {
         await invoke("fs_create_dir", { path: newPath });
@@ -159,6 +164,25 @@ export function SftpPane({ tab }: SftpPaneProps) {
     }
     setCreatingFolderSide(null);
     setNewFolderName("");
+  }
+
+  if (!isConnected && !hasError) {
+    return (
+      <SshLoadingScreen
+        tabId={tabId}
+        hostId={tab.hostId}
+        onConnected={() => setIsConnected(true)}
+        onError={() => setHasError(true)}
+      />
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
+        Connection closed.
+      </div>
+    );
   }
 
   return (
