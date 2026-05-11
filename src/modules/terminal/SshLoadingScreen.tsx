@@ -28,11 +28,13 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
     setStatus("connecting");
     invoke("ssh_connect", { tabId, hostId })
       .then(() => {
-        // session_established event will call onConnected
+        console.log("[ssh] ssh_connect resolved for tab", tabId);
       })
-      .catch((err: string) => {
-        if (err.includes("mismatch")) return; // handled by known_hosts_warning event
-        setErrorMessage(err);
+      .catch((err: unknown) => {
+        const msg = String(err);
+        console.error("[ssh] ssh_connect error for tab", tabId, msg);
+        if (msg.includes("mismatch")) return; // handled by known_hosts_warning event
+        setErrorMessage(msg);
         setStatus("error");
       })
       .finally(() => {
@@ -63,6 +65,7 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
     ).then((unlisten) => cleanups.push(unlisten));
 
     listen<{ tab_id: string }>("session_established", (event) => {
+      console.log("[ssh] session_established event", event.payload, "tabId=", tabId);
       if (event.payload.tab_id !== tabId) return;
       onConnected();
     }).then((unlisten) => cleanups.push(unlisten));

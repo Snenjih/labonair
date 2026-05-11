@@ -58,8 +58,9 @@ pub fn ssh_connect(
             .map_err(|e| e.to_string())?
     };
 
-    // Step 4: SSH handshake
+    // Step 4: SSH handshake (15 s timeout covers handshake + auth)
     let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
+    session.set_timeout(15_000);
     session.set_tcp_stream(tcp);
     session.handshake().map_err(|e| e.to_string())?;
 
