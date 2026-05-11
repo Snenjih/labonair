@@ -1,8 +1,10 @@
-<div align="center">
-  <img src="public/logo.png" width="144" height="144" alt="Nexum" />
-  <h1>Nexum</h1>
+## Nexum Terminal and SSH, SFTP
+<img src="public/icon_512x512@2.png" align="left" width="200"/>
 
-  <p><strong>macOS-native remote workspace — SSH · SFTP · Terminal · Editor · AI</strong></p>
+### `Nexum`
+<p><strong>macOS-native remote workspace — SSH · SFTP · Terminal · Editor · AI</strong></p>
+
+Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. It combines SSH terminal sessions, a full-featured SFTP file manager, an integrated code editor with remote editing support, and a first-class AI side-panel — all in a single lightweight app. API keys live in the OS keychain, no telemetry, no account required.
 
   <p>
     <img src="https://img.shields.io/badge/version-0.6.0-blue" alt="version" />
@@ -10,11 +12,9 @@
     <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="platform" />
     <img src="https://img.shields.io/badge/built%20with-Tauri%202-orange" alt="tauri" />
   </p>
-</div>
 
 ---
 
-Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. It combines SSH terminal sessions, a full-featured SFTP file manager, an integrated code editor with remote editing support, and a first-class AI side-panel — all in a single lightweight app. API keys live in the OS keychain, no telemetry, no account required.
 
 ## Features
 
