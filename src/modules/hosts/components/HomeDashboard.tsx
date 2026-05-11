@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import type { Tab } from "@/modules/tabs";
 import {
   DndContext,
   DragEndEvent,
@@ -75,9 +76,10 @@ interface SortableHostCardProps {
   group?: import("../types").Group;
   newSshTab: ConnectFn;
   newSftpTab: ConnectFn;
+  tabs: Tab[];
 }
 
-function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab }: SortableHostCardProps) {
+function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, tabs }: SortableHostCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: host.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -96,12 +98,13 @@ function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit,
         dragHandleProps={{ ...attributes, ...listeners }}
         newSshTab={newSshTab}
         newSftpTab={newSftpTab}
+        tabs={tabs}
       />
     </div>
   );
 }
 
-export function HomeDashboard({ newSshTab, newSftpTab }: { newSshTab: ConnectFn; newSftpTab: ConnectFn }) {
+export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: ConnectFn; newSftpTab: ConnectFn; tabs: Tab[] }) {
   const hosts = useHostsStore((s) => s.hosts);
   const groups = useHostsStore((s) => s.groups);
   const selectedHostId = useHostsStore((s) => s.selectedHostId);
@@ -253,7 +256,7 @@ export function HomeDashboard({ newSshTab, newSftpTab }: { newSshTab: ConnectFn;
         {/* Host grid */}
         <div className="flex-1 overflow-y-auto p-4">
           {!hasFetched || isLoading ? (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : filteredHosts.length === 0 && !search && !activeGroupId ? (
@@ -265,7 +268,7 @@ export function HomeDashboard({ newSshTab, newSftpTab }: { newSshTab: ConnectFn;
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={filteredHosts.map((h) => h.id)} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {filteredHosts.map((host) => (
                     <SortableHostCard
                       key={host.id}
@@ -277,6 +280,7 @@ export function HomeDashboard({ newSshTab, newSftpTab }: { newSshTab: ConnectFn;
                       group={groups.find((g) => g.id === host.group_id)}
                       newSshTab={newSshTab}
                       newSftpTab={newSftpTab}
+                      tabs={tabs}
                     />
                   ))}
                 </div>

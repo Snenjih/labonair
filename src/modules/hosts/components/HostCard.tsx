@@ -1,4 +1,13 @@
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -16,10 +25,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { motion } from "motion/react";
 import { useState } from "react";
 import type { Group, Host } from "../types";
 import { useHostsStore } from "../store/hostsStore";
+import type { Tab } from "@/modules/tabs";
 
 interface HostCardProps {
   host: Host;
@@ -31,6 +40,7 @@ interface HostCardProps {
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
   newSshTab: (hostId: string, title: string) => void;
   newSftpTab: (hostId: string, title: string) => void;
+  tabs: Tab[];
 }
 
 function relativeTime(ms: number): string {
@@ -52,35 +62,18 @@ function initials(name: string): string {
     .join("");
 }
 
-// SSH icon
-function SshIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
-      <rect x="1" y="3" width="12" height="8" rx="1.5" />
-      <path d="M4 7l1.5 1.5L4 10M8 9.5h2" />
-    </svg>
-  );
-}
-
-// SFTP / folder icon
-function SftpIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 4.5V11a1 1 0 001 1h10a1 1 0 001-1V5.5a1 1 0 00-1-1H7L5.5 3H2a1 1 0 00-1 1.5z" />
-    </svg>
-  );
-}
-
-// Edit / pencil icon
-function EditIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" />
-    </svg>
-  );
-}
-
-export function HostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, dragHandleProps, newSshTab, newSftpTab }: HostCardProps) {
+export function HostCard({
+  host,
+  isSelected,
+  isMultiSelected,
+  onSelect,
+  onEdit,
+  group,
+  dragHandleProps,
+  newSshTab,
+  newSftpTab,
+  tabs,
+}: HostCardProps) {
   const selectedHostIds = useHostsStore((s) => s.selectedHostIds);
   const hosts = useHostsStore((s) => s.hosts);
   const deleteHost = useHostsStore((s) => s.deleteHost);
@@ -94,8 +87,14 @@ export function HostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, 
 
   const isBulk = selectedHostIds.size > 1 && selectedHostIds.has(host.id);
   const bulkIds = Array.from(selectedHostIds);
-
   const highlighted = isSelected || isMultiSelected;
+
+  const hasActiveSshTab = tabs.some(
+    (t) => t.kind === "ssh-terminal" && (t as { hostId: string }).hostId === host.id,
+  );
+  const hasActiveSftpTab = tabs.some(
+    (t) => t.kind === "sftp" && (t as { hostId: string }).hostId === host.id,
+  );
 
   const connectSsh = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -105,11 +104,6 @@ export function HostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, 
   const connectSftp = (e: React.MouseEvent) => {
     e.stopPropagation();
     newSftpTab(host.id, host.name);
-  };
-
-  const handleEdit = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onEdit();
   };
 
   const connectSshBulk = () => {
@@ -130,24 +124,20 @@ export function HostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, 
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={onSelect}
+          <div
             className={cn(
-              "group flex cursor-pointer flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-all select-none",
+              "group relative flex flex-col justify-between rounded-xl border transition-all select-none",
               highlighted
-                ? "ring-2 ring-primary bg-accent/40 border-primary/30"
-                : "hover:bg-accent/20",
+                ? "border-accent ring-1 ring-accent bg-card/60 shadow-sm"
+                : "border-border/60 bg-card/40 hover:border-foreground/30 hover:bg-card",
             )}
           >
-            {/* Top row: drag handle + avatar + name + action buttons */}
-            <div className="flex items-start gap-3">
-              {/* Drag handle */}
+            {/* Drag handle */}
+            {dragHandleProps && (
               <div
                 {...dragHandleProps}
                 onClick={(e) => e.stopPropagation()}
-                className="shrink-0 cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground mt-1 touch-none"
+                className="absolute right-2 top-2 z-10 cursor-grab active:cursor-grabbing text-muted-foreground/20 hover:text-muted-foreground/50 touch-none"
               >
                 <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
                   <circle cx="3" cy="2" r="1.2" />
@@ -158,77 +148,115 @@ export function HostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, 
                   <circle cx="7" cy="10" r="1.2" />
                 </svg>
               </div>
+            )}
 
-              {/* Avatar */}
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold text-muted-foreground">
+            {/* ZONE A: Info Body */}
+            <button
+              onClick={onSelect}
+              onDoubleClick={(e) => { e.stopPropagation(); newSshTab(host.id, host.name); }}
+              className="flex flex-1 items-start gap-3 p-3.5 text-left outline-none"
+            >
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40 text-sm font-semibold text-muted-foreground shadow-sm">
+                {host.pin_to_top ? (
+                  <span className="text-[10px] text-primary">★</span>
+                ) : null}
                 {initials(host.name) || "?"}
               </div>
-
-              {/* Name + address */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  {host.pin_to_top && (
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" className="text-primary shrink-0">
-                      <path d="M5 1l1.2 3h3l-2.4 1.8.9 3L5 7.2 2.3 8.8l.9-3L.8 4H3.8z"/>
-                    </svg>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[13px] font-semibold tracking-tight text-foreground">
+                    {host.name}
+                  </span>
+                  {group && (
+                    <Badge
+                      variant="secondary"
+                      className="shrink-0 h-[18px] px-1.5 text-[9px] uppercase tracking-wider opacity-80"
+                    >
+                      {group.icon ?? ""} {group.name}
+                    </Badge>
                   )}
-                  <p className="truncate font-semibold text-foreground leading-tight">{host.name}</p>
                 </div>
-                <p className="truncate text-xs text-muted-foreground mt-0.5">
-                  {host.username}@{host.host_address}
-                </p>
-              </div>
-
-              {/* Action icon buttons — visible on hover */}
-              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={connectSsh}
-                  title="Connect SSH"
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                >
-                  <SshIcon />
-                </button>
-                <button
-                  onClick={connectSftp}
-                  title="Open SFTP"
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                >
-                  <SftpIcon />
-                </button>
-                <button
-                  onClick={handleEdit}
-                  title="Edit"
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-                >
-                  <EditIcon />
-                </button>
-              </div>
-            </div>
-
-            {/* Tags row */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-mono text-muted-foreground">
-                :{host.port}
-              </span>
-              {group && (
-                <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                  <span>{group.icon ?? "📁"}</span>
-                  <span>{group.name}</span>
+                <span className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+                  {host.auth_method === "key" ? "🔑" : "ssh"} • {host.username}@{host.host_address}
                 </span>
-              )}
-              {host.auth_method === "key" && (
-                <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">key</span>
-              )}
-              {host.auth_method === "none" && (
-                <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">no auth</span>
-              )}
-              {host.last_connected_at && (
-                <span className="ml-auto text-[11px] text-muted-foreground/60">
-                  {relativeTime(host.last_connected_at)}
+                <span className="mt-1.5 text-[10px] text-muted-foreground/70">
+                  {host.last_connected_at
+                    ? `Last seen: ${relativeTime(host.last_connected_at)}`
+                    : "Never connected"}
                 </span>
+              </div>
+            </button>
+
+            {/* ZONE B: Action Footer */}
+            <div
+              className={cn(
+                "flex items-center gap-1 border-t px-2 py-1.5 transition-colors",
+                highlighted
+                  ? "border-border/80 bg-muted/20"
+                  : "border-border/40 bg-muted/10 group-hover:bg-muted/20",
               )}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={connectSsh}
+                className="h-7 flex-1 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-background/50"
+              >
+                {hasActiveSshTab && (
+                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                )}
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                  <rect x="1" y="3" width="12" height="8" rx="1.5" />
+                  <path d="M4 7l1.5 1.5L4 10M8 9.5h2" />
+                </svg>
+                Terminal
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={connectSftp}
+                className="h-7 flex-1 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-background/50"
+              >
+                {hasActiveSftpTab && (
+                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                )}
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 4.5V11a1 1 0 001 1h10a1 1 0 001-1V5.5a1 1 0 00-1-1H7L5.5 3H2a1 1 0 00-1 1.5z" />
+                </svg>
+                SFTP
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-foreground hover:bg-background/50"
+                  >
+                    ⋮
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => onEdit()}>
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => duplicateHost(host.id)}>
+                    Duplicate
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => togglePin(host.id)}>
+                    {host.pin_to_top ? "Unpin" : "Pin to Top"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    Delete…
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-          </motion.div>
+          </div>
         </ContextMenuTrigger>
 
         <ContextMenuContent className="w-52">
@@ -261,9 +289,7 @@ export function HostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, 
                 Open SFTP
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem onClick={onEdit}>
-                Edit
-              </ContextMenuItem>
+              <ContextMenuItem onClick={onEdit}>Edit</ContextMenuItem>
               <ContextMenuItem onClick={() => duplicateHost(host.id)}>
                 Duplicate
               </ContextMenuItem>
@@ -282,7 +308,6 @@ export function HostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, 
         </ContextMenuContent>
       </ContextMenu>
 
-      {/* Single delete confirm */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -303,7 +328,6 @@ export function HostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, 
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk delete confirm */}
       <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -703,7 +703,7 @@ export default function App() {
                       )}
                       aria-hidden={!isHomeTab}
                     >
-                      <HomeDashboard newSshTab={newSshTab} newSftpTab={newSftpTab} />
+                      <HomeDashboard newSshTab={newSshTab} newSftpTab={newSftpTab} tabs={tabs} />
                     </div>
                     {tabs.filter((t) => t.kind === "ssh-terminal").map((t) => (
                       <div
