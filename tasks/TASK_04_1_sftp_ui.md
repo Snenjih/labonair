@@ -107,7 +107,7 @@ export const useSftpStore = create<SftpStore>((set, get) => ({
       tabs: { ...s.tabs, [tabId]: { ...s.tabs[tabId], isLoadingLocal: true, error: null } },
     }));
     try {
-      // Reuse existing fs commands from the original Terax fs module
+      // Reuse existing fs commands from the original Nexum fs module
       // The command returns an array of entries. Map to FileNode shape.
       // Check what the existing fs_list (or equivalent) returns and adapt.
       // Fallback: use invoke("list_local_dir", { path })
