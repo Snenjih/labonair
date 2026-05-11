@@ -1,5 +1,14 @@
 use tauri::Emitter;
 
+macro_rules! log_step {
+    ($app:expr, $tab_id:expr, $msg:expr) => {
+        let _ = $app.emit(
+            "ssh_connect_log",
+            serde_json::json!({ "tab_id": $tab_id, "message": $msg }),
+        );
+    };
+}
+
 #[tauri::command]
 pub fn ssh_connect(
     tab_id: String,
@@ -9,6 +18,7 @@ pub fn ssh_connect(
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     // Step 1: Fetch host from SQLite
+    log_step!(app, tab_id, "Reading host configuration…");
     let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh) = {
         let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
@@ -35,6 +45,7 @@ pub fn ssh_connect(
 
     // Step 2: Fetch password from keychain
     let password: Option<String> = if auth_method == "password" {
+        log_step!(app, tab_id, "Retrieving credentials from keychain…");
         keyring::Entry::new("nexum-app", &host_id)
             .ok()
             .and_then(|e| e.get_password().ok())
@@ -42,10 +53,16 @@ pub fn ssh_connect(
         None
     };
 
-    // Step 3: TCP connect (10 s timeout so the UI doesn't hang on unreachable hosts)
+    // Step 3: TCP connect
+    log_step!(
+        app,
+        tab_id,
+        format!("TCP connecting to {}:{}…", host_address, port)
+    );
     let tcp = {
         let addr = format!("{}:{}", host_address, port);
-        let socket_addr = addr.parse::<std::net::SocketAddr>()
+        let socket_addr = addr
+            .parse::<std::net::SocketAddr>()
             .or_else(|_| {
                 use std::net::ToSocketAddrs;
                 addr.to_socket_addrs()
@@ -57,21 +74,25 @@ pub fn ssh_connect(
         std::net::TcpStream::connect_timeout(&socket_addr, std::time::Duration::from_secs(10))
             .map_err(|e| e.to_string())?
     };
+    log_step!(app, tab_id, "TCP connection established.");
 
     // Step 4: SSH handshake (15 s timeout covers handshake + auth)
+    log_step!(app, tab_id, "Starting SSH handshake…");
     let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
     session.set_timeout(15_000);
     session.set_tcp_stream(tcp);
     session.handshake().map_err(|e| e.to_string())?;
+    log_step!(app, tab_id, "SSH handshake complete.");
 
     // Configure keepalive if set
     if let Some(interval) = keep_alive_interval {
         let tries = keep_alive_tries.unwrap_or(3) as u32;
         session.set_keepalive(true, interval as u32);
-        let _ = tries; // tries not directly settable via ssh2 API — used in monitoring
+        let _ = tries;
     }
 
     // Step 5: known_hosts check
+    log_step!(app, tab_id, "Verifying host fingerprint…");
     let (host_key, _key_type) = session.host_key().ok_or("no host key")?;
     let fingerprint = session
         .host_key_hash(ssh2::HashType::Md5)
@@ -96,8 +117,15 @@ pub fn ssh_connect(
     };
 
     match known_host_status {
-        ssh2::CheckResult::Match => {}
+        ssh2::CheckResult::Match => {
+            log_step!(app, tab_id, "Host fingerprint verified ✓");
+        }
         ssh2::CheckResult::Mismatch => {
+            log_step!(
+                app,
+                tab_id,
+                format!("Host key mismatch! Fingerprint: {}", fingerprint)
+            );
             app.emit(
                 "known_hosts_warning",
                 serde_json::json!({
@@ -111,6 +139,11 @@ pub fn ssh_connect(
             return Err("known_hosts mismatch".to_string());
         }
         ssh2::CheckResult::NotFound | ssh2::CheckResult::Failure => {
+            log_step!(
+                app,
+                tab_id,
+                format!("Unknown host — fingerprint: {}", fingerprint)
+            );
             app.emit(
                 "known_hosts_warning",
                 serde_json::json!({
@@ -121,11 +154,17 @@ pub fn ssh_connect(
                 }),
             )
             .map_err(|e| e.to_string())?;
-            // MVP: proceed without user confirmation for unknown hosts
         }
     }
 
     // Step 6: Authentication
+    let auth_label = if auth_method == "key" {
+        "Authenticating with public key…"
+    } else {
+        "Authenticating with password…"
+    };
+    log_step!(app, tab_id, auth_label);
+
     let auth_result = if auth_method == "key" {
         let key_path = private_key_path
             .as_deref()
@@ -142,6 +181,7 @@ pub fn ssh_connect(
     };
 
     if let Err(err) = auth_result {
+        log_step!(app, tab_id, format!("Authentication failed: {}", err));
         app.emit(
             "auth_required",
             serde_json::json!({
@@ -155,6 +195,7 @@ pub fn ssh_connect(
     }
 
     if !session.authenticated() {
+        log_step!(app, tab_id, "Authentication failed.");
         app.emit(
             "auth_required",
             serde_json::json!({
@@ -167,15 +208,19 @@ pub fn ssh_connect(
         return Err("not authenticated".to_string());
     }
 
+    log_step!(app, tab_id, "Authenticated ✓");
+
     // Step 7: Open PTY shell channel
+    log_step!(app, tab_id, "Opening PTY shell channel…");
     let channel = super::pty::open_shell_channel(
         &mut session,
         &tab_id,
         &app,
         state.inner().clone(),
     )?;
+    log_step!(app, tab_id, "Shell channel open ✓");
 
-    // Step 8: Store session (with channel) and emit session_established
+    // Step 8: Store session and emit session_established
     {
         let mut map = state.0.lock().map_err(|e| e.to_string())?;
         map.insert(
@@ -199,8 +244,12 @@ pub fn ssh_connect(
         );
     }
 
-    app.emit("session_established", serde_json::json!({ "tab_id": tab_id, "default_path_ssh": default_path_ssh }))
-        .map_err(|e| e.to_string())?;
+    log_step!(app, tab_id, "Session established ✓");
+    app.emit(
+        "session_established",
+        serde_json::json!({ "tab_id": tab_id, "default_path_ssh": default_path_ssh }),
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }

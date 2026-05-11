@@ -20,12 +20,18 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
   const [host, setHost] = useState("");
   const [promptMessage, setPromptMessage] = useState("");
   const [password, setPassword] = useState("");
+  const [logs, setLogs] = useState<string[]>([]);
   const connectingRef = useRef(false);
+  const logEndRef = useRef<HTMLDivElement>(null);
+
+  const pushLog = (msg: string) =>
+    setLogs((prev) => [...prev, msg]);
 
   const doConnect = () => {
     if (connectingRef.current) return;
     connectingRef.current = true;
     setStatus("connecting");
+    setLogs([]);
     invoke("ssh_connect", { tabId, hostId })
       .then(() => {
         console.log("[ssh] ssh_connect resolved for tab", tabId);
@@ -33,7 +39,7 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
       .catch((err: unknown) => {
         const msg = String(err);
         console.error("[ssh] ssh_connect error for tab", tabId, msg);
-        if (msg.includes("mismatch")) return; // handled by known_hosts_warning event
+        if (msg.includes("mismatch")) return;
         setErrorMessage(msg);
         setStatus("error");
       })
@@ -43,7 +49,16 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
   };
 
   useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
+  useEffect(() => {
     const cleanups: Array<() => void> = [];
+
+    listen<{ tab_id: string; message: string }>("ssh_connect_log", (event) => {
+      if (event.payload.tab_id !== tabId) return;
+      pushLog(event.payload.message);
+    }).then((u) => cleanups.push(u));
 
     listen<{ tab_id: string; fingerprint: string; host: string; is_mismatch: boolean }>(
       "known_hosts_warning",
@@ -53,7 +68,7 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
         setHost(event.payload.host);
         setStatus("waiting_trust");
       },
-    ).then((unlisten) => cleanups.push(unlisten));
+    ).then((u) => cleanups.push(u));
 
     listen<{ tab_id: string; prompt_message: string; is_2fa: boolean }>(
       "auth_required",
@@ -62,13 +77,13 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
         setPromptMessage(event.payload.prompt_message);
         setStatus("waiting_auth");
       },
-    ).then((unlisten) => cleanups.push(unlisten));
+    ).then((u) => cleanups.push(u));
 
     listen<{ tab_id: string }>("session_established", (event) => {
       console.log("[ssh] session_established event", event.payload, "tabId=", tabId);
       if (event.payload.tab_id !== tabId) return;
       onConnected();
-    }).then((unlisten) => cleanups.push(unlisten));
+    }).then((u) => cleanups.push(u));
 
     doConnect();
 
@@ -77,7 +92,7 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
   }, [tabId, hostId]);
 
   return (
-    <div className="flex h-full w-full items-center justify-center bg-background">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-background">
       <AnimatePresence mode="wait">
         {status === "connecting" && (
           <motion.div
@@ -208,6 +223,31 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Connection log — always shown while connecting or after error */}
+      {logs.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-[480px] rounded-lg border border-border bg-muted/30 overflow-hidden"
+        >
+          <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary/60 animate-pulse" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground select-none">
+              Connection Log
+            </span>
+          </div>
+          <div className="max-h-36 overflow-y-auto px-3 py-2 space-y-0.5">
+            {logs.map((line, i) => (
+              <p key={i} className="font-mono text-[11px] text-foreground/70 leading-relaxed">
+                <span className="text-muted-foreground/40 mr-2 select-none">›</span>
+                {line}
+              </p>
+            ))}
+            <div ref={logEndRef} />
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
