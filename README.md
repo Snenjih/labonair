@@ -1,5 +1,5 @@
 ## Nexum Terminal and SSH, SFTP
-<img src="public/icon_512x512@2.png" align="left" width="200"/>
+<img src="public/icon_512x512@2x.png" align="left" width="200"/>
 
 ### `Nexum`
 <p><strong>macOS-native remote workspace — SSH · SFTP · Terminal · Editor · AI</strong></p>
