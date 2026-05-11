@@ -85,7 +85,7 @@ pub fn run() {
             let conflicts = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
             let conflicts_for_worker = conflicts.clone();
             let app_handle = app.handle().clone();
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 run_worker(rx, std::sync::Arc::new(ssh_state_for_worker), app_handle, conflicts_for_worker).await;
             });
             app.manage(TransferWorkerState { sender: tx, conflicts });
