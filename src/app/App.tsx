@@ -46,6 +46,7 @@ import { bootstrapTransferListeners } from "@/modules/sftp/store/transferStore";
 import { useTabs, useWorkspaceCwd, type SftpTab, type SshTerminalTab } from "@/modules/tabs";
 import { SshTerminalPane, TerminalStack, type TerminalPaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
+import { useThemeEngine } from "@/lib/useThemeEngine";
 import { UpdaterDialog } from "@/modules/updater";
 import { homeDir } from "@tauri-apps/api/path";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -149,6 +150,7 @@ export default function App() {
   useEffect(() => {
     void initPrefs();
   }, [initPrefs]);
+  useThemeEngine();
   useEffect(() => {
     if (!prefsHydrated) return;
     setSelectedModelId(prefDefaultModel);
