@@ -1,4 +1,6 @@
 import { buildTerminalTheme } from "@/styles/terminalTheme";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTheme } from "@/modules/theme";
 import type { SshTerminalTab } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -10,8 +12,11 @@ import { Terminal } from "@xterm/xterm";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SshLoadingScreen } from "./SshLoadingScreen";
 
-const FONT_FAMILY = '"JetBrains Mono", SFMono-Regular, Menlo, monospace';
-const FONT_SIZE = 14;
+const FONT_WEIGHT_MAP: Record<string, string | number> = {
+  normal: "normal",
+  medium: 500,
+  bold: "bold",
+};
 
 interface Props {
   tab: SshTerminalTab;
@@ -21,10 +26,56 @@ interface Props {
 export function SshTerminalPane({ tab, isActive }: Props) {
   const [isConnected, setIsConnected] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const { resolvedTheme } = useTheme();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+
+  // Apply live preference changes to the xterm instance (mirrors useTerminalSession).
+  useEffect(() => {
+    const unsub = usePreferencesStore.subscribe((state, prev) => {
+      const term = termRef.current;
+      const fit = fitRef.current;
+      if (!term) return;
+
+      if (state.terminalCursorBlink !== prev.terminalCursorBlink)
+        term.options.cursorBlink = state.terminalCursorBlink;
+      if (state.terminalCursorStyle !== prev.terminalCursorStyle)
+        term.options.cursorStyle = state.terminalCursorStyle;
+      if (state.terminalFontFamily !== prev.terminalFontFamily) {
+        term.options.fontFamily = state.terminalFontFamily;
+        fit?.fit();
+      }
+      if (state.terminalFontSize !== prev.terminalFontSize) {
+        term.options.fontSize = state.terminalFontSize;
+        fit?.fit();
+      }
+      if (state.terminalLetterSpacing !== prev.terminalLetterSpacing) {
+        term.options.letterSpacing = state.terminalLetterSpacing;
+        fit?.fit();
+      }
+      if (state.terminalLineHeight !== prev.terminalLineHeight) {
+        term.options.lineHeight = state.terminalLineHeight;
+        fit?.fit();
+      }
+      if (state.terminalFontWeight !== prev.terminalFontWeight) {
+        term.options.fontWeight = FONT_WEIGHT_MAP[state.terminalFontWeight] as
+          | "normal" | "bold" | "100" | "200" | "300" | "400"
+          | "500" | "600" | "700" | "800" | "900" | undefined;
+      }
+    });
+    return unsub;
+  }, []);
+
+  // Re-apply theme when app theme (dark/light) changes.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      const term = termRef.current;
+      if (term) term.options.theme = buildTerminalTheme();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [resolvedTheme]);
 
   // Initialize xterm.js once connected
   useEffect(() => {
@@ -49,18 +100,24 @@ export function SshTerminalPane({ tab, isActive }: Props) {
     }).then((unlisten) => cleanups.push(unlisten));
 
     (async () => {
-      await document.fonts.load(`${FONT_SIZE}px "JetBrains Mono"`);
+      const prefs = usePreferencesStore.getState();
+
+      await document.fonts.load(`${prefs.terminalFontSize}px "JetBrains Mono"`);
       if (disposed || !containerRef.current) return;
 
       const t = new Terminal({
-        fontFamily: FONT_FAMILY,
-        fontSize: FONT_SIZE,
-        lineHeight: 1.05,
+        fontFamily: prefs.terminalFontFamily,
+        fontSize: prefs.terminalFontSize,
+        lineHeight: prefs.terminalLineHeight,
+        letterSpacing: prefs.terminalLetterSpacing,
         theme: buildTerminalTheme(),
-        cursorBlink: true,
-        cursorStyle: "bar",
+        cursorBlink: prefs.terminalCursorBlink,
+        cursorStyle: prefs.terminalCursorStyle,
         cursorInactiveStyle: "outline",
-        scrollback: 5_000,
+        scrollback: prefs.terminalScrollback,
+        fontWeight: FONT_WEIGHT_MAP[prefs.terminalFontWeight] as
+          | "normal" | "bold" | "100" | "200" | "300" | "400"
+          | "500" | "600" | "700" | "800" | "900" | undefined,
         allowProposedApi: true,
       });
       term = t;
