@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setAppTheme } from "@/modules/settings/store";
 
 export type ThemeColors = Record<string, string>;
 
@@ -8,16 +9,51 @@ export type ThemeMeta = {
   id: string;
   name: string;
   author: string;
-  type: string;
+  type: "dark" | "light" | string;
   colors: ThemeColors;
   builtin: boolean;
 };
 
+/** Maps JSON theme color keys to their CSS custom property names. */
+const COLOR_VAR_MAP: Record<string, string> = {
+  // Core shadcn/ui
+  background: "--background",
+  foreground: "--foreground",
+  card: "--card",
+  "card-foreground": "--card-foreground",
+  popover: "--popover",
+  "popover-foreground": "--popover-foreground",
+  primary: "--primary",
+  "primary-foreground": "--primary-foreground",
+  secondary: "--secondary",
+  "secondary-foreground": "--secondary-foreground",
+  muted: "--muted",
+  "muted-foreground": "--muted-foreground",
+  accent: "--accent",
+  "accent-foreground": "--accent-foreground",
+  destructive: "--destructive",
+  border: "--border",
+  input: "--input",
+  ring: "--ring",
+  // Sidebar
+  sidebar: "--sidebar",
+  "sidebar-foreground": "--sidebar-foreground",
+  "sidebar-primary": "--sidebar-primary",
+  "sidebar-primary-foreground": "--sidebar-primary-foreground",
+  "sidebar-accent": "--sidebar-accent",
+  "sidebar-accent-foreground": "--sidebar-accent-foreground",
+  "sidebar-border": "--sidebar-border",
+  "sidebar-ring": "--sidebar-ring",
+};
+
+/** All CSS vars we inject — used to clean them up when reverting. */
+const ALL_VARS = Object.values(COLOR_VAR_MAP);
+
 /**
- * Convert a HEX color string to the raw "H S% L%" format Tailwind v4 / shadcn
- * CSS variables expect (no `hsl()` wrapper, just the three numbers).
+ * Convert a HEX color to a full `hsl(H S% L%)` CSS value.
+ * Using the full hsl() wrapper ensures the value is a valid CSS <color>.
  */
-export function hexToHslRaw(hex: string): string {
+export function hexToHslCss(hex: string): string {
   const clean = hex.replace(/^#/, "");
   const full =
     clean.length === 3
@@ -41,59 +77,47 @@ export function hexToHslRaw(hex: string): string {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     switch (max) {
-      case r:
-        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-        break;
-      case g:
-        h = ((b - r) / d + 2) / 6;
-        break;
-      case b:
-        h = ((r - g) / d + 4) / 6;
-        break;
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
     }
   }
 
-  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+  const hDeg = Math.round(h * 360);
+  const sPct = Math.round(s * 100);
+  const lPct = Math.round(l * 100);
+  return `hsl(${hDeg}deg ${sPct}% ${lPct}%)`;
 }
 
-const COLOR_VAR_MAP: Record<string, string> = {
-  background: "--background",
-  foreground: "--foreground",
-  card: "--card",
-  card_foreground: "--card-foreground",
-  popover: "--popover",
-  popover_foreground: "--popover-foreground",
-  primary: "--primary",
-  primary_foreground: "--primary-foreground",
-  secondary: "--secondary",
-  secondary_foreground: "--secondary-foreground",
-  muted: "--muted",
-  muted_foreground: "--muted-foreground",
-  accent: "--accent",
-  accent_foreground: "--accent-foreground",
-  destructive: "--destructive",
-  destructive_foreground: "--destructive-foreground",
-  border: "--border",
-  input: "--input",
-  ring: "--ring",
-};
-
+/**
+ * Apply a loaded theme's colors to a DOM element (default: :root).
+ * Also sets the `.dark` / `.light` root class based on the theme's type.
+ */
 export function applyThemeColors(
-  colors: ThemeColors,
+  meta: ThemeMeta,
   target: HTMLElement = document.documentElement,
 ): void {
   for (const [key, cssVar] of Object.entries(COLOR_VAR_MAP)) {
-    const hex = colors[key];
+    const hex = meta.colors[key];
     if (hex) {
-      target.style.setProperty(cssVar, hexToHslRaw(hex));
+      target.style.setProperty(cssVar, hexToHslCss(hex));
     }
+  }
+  // Override dark/light class to match the JSON theme's declared type.
+  target.classList.remove("dark", "light");
+  if (meta.type === "dark" || meta.type === "light") {
+    target.classList.add(meta.type);
   }
 }
 
+/**
+ * Remove all inline CSS vars set by a JSON theme, reverting to globals.css.
+ * The dark/light class management is left entirely to ThemeProvider.
+ */
 export function revertThemeColors(
   target: HTMLElement = document.documentElement,
 ): void {
-  for (const cssVar of Object.values(COLOR_VAR_MAP)) {
+  for (const cssVar of ALL_VARS) {
     target.style.removeProperty(cssVar);
   }
 }
@@ -107,13 +131,29 @@ export async function loadThemeMeta(id: string): Promise<ThemeMeta | null> {
   }
 }
 
-/** Boot-time hook: applies the active theme from preferences to the DOM. */
+/**
+ * Boot-time hook.
+ * - "default" → clears all injected vars, ThemeProvider's dark/light class takes over.
+ * - Any other id → loads the JSON theme and injects its colors + sets the class.
+ * Falls back to "default" if the theme cannot be loaded.
+ */
 export function useThemeEngine(): void {
   const appTheme = usePreferencesStore((s) => s.appTheme);
 
   useEffect(() => {
+    if (appTheme === "default") {
+      revertThemeColors();
+      return;
+    }
+
     void loadThemeMeta(appTheme).then((meta) => {
-      if (meta) applyThemeColors(meta.colors);
+      if (meta) {
+        applyThemeColors(meta);
+      } else {
+        // Theme was deleted or cannot be found — fall back gracefully.
+        revertThemeColors();
+        void setAppTheme("default");
+      }
     });
   }, [appTheme]);
 }

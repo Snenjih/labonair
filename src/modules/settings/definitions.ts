@@ -163,24 +163,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Editor ---
   {
-    id: "editorTheme",
-    label: "Editor color theme",
-    description: "Syntax highlighting theme for the code editor.",
-    category: "Editor",
-    controlType: "Select",
-    options: [
-      { value: "atomone", label: "Atom One" },
-      { value: "aura", label: "Aura" },
-      { value: "copilot", label: "Copilot" },
-      { value: "github-dark", label: "GitHub Dark" },
-      { value: "github-light", label: "GitHub Light" },
-      { value: "nord", label: "Nord" },
-      { value: "tokyo-night", label: "Tokyo Night" },
-      { value: "xcode-dark", label: "Xcode Dark" },
-      { value: "xcode-light", label: "Xcode Light" },
-    ],
-  },
-  {
     id: "editorAutoSave",
     label: "Auto save",
     description: "Automatically save files when idle or on focus change.",

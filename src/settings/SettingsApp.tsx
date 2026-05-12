@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { type ThemeMeta } from "@/lib/useThemeEngine";
+import { type ThemeMeta, useThemeEngine } from "@/lib/useThemeEngine";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -77,6 +77,7 @@ export function SettingsApp() {
   useEffect(() => {
     void init();
   }, [init]);
+  useThemeEngine();
 
   useEffect(() => {
     void invoke<ThemeMeta[]>("themes_get_all").then(setThemes).catch(console.error);

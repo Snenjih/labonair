@@ -120,7 +120,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   lmstudioBaseURL: LMSTUDIO_DEFAULT_BASE_URL,
   vimMode: false,
 
-  appTheme: "default-dark",
+  appTheme: "default",
   appFontFamily: "system-ui",
   appFontSize: 13,
   appLineHeight: 1.5,

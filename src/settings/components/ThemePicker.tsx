@@ -24,33 +24,47 @@ type Props = {
   onRefresh: () => void;
 };
 
+const DEFAULT_ENTRY_ID = "default";
+
 export function ThemePicker({ themes, onRefresh }: Props) {
   const activeId = usePreferencesStore((s) => s.appTheme);
   const [open_, setOpen] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const activeTheme = themes.find((t) => t.id === activeId);
+  const activeLabel =
+    activeId === DEFAULT_ENTRY_ID
+      ? "Default (System)"
+      : (themes.find((t) => t.id === activeId)?.name ?? activeId);
 
   const handleSelect = async (id: string) => {
     await setAppTheme(id);
-    const meta = themes.find((t) => t.id === id);
-    if (meta) applyThemeColors(meta.colors);
+    if (id === DEFAULT_ENTRY_ID) {
+      revertThemeColors();
+    } else {
+      const meta = themes.find((t) => t.id === id);
+      if (meta) applyThemeColors(meta);
+    }
     setOpen(false);
   };
 
-  const handleHoverIn = (meta: ThemeMeta) => {
+  const handleHoverIn = (meta: ThemeMeta | null) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => {
-      applyThemeColors(meta.colors);
+      if (meta) applyThemeColors(meta);
+      else revertThemeColors();
     }, 80);
   };
 
   const handleHoverOut = () => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    // Restore the currently active theme
-    const current = themes.find((t) => t.id === activeId);
-    if (current) applyThemeColors(current.colors);
-    else revertThemeColors();
+    // Restore the actively selected theme
+    if (activeId === DEFAULT_ENTRY_ID) {
+      revertThemeColors();
+    } else {
+      const current = themes.find((t) => t.id === activeId);
+      if (current) applyThemeColors(current);
+      else revertThemeColors();
+    }
   };
 
   const handleImport = async () => {
@@ -85,9 +99,8 @@ export function ThemePicker({ themes, onRefresh }: Props) {
     try {
       await invoke("theme_delete", { id });
       if (activeId === id) {
-        await setAppTheme("default-dark");
-        const def = themes.find((t) => t.id === "default-dark");
-        if (def) applyThemeColors(def.colors);
+        await setAppTheme(DEFAULT_ENTRY_ID);
+        revertThemeColors();
       }
       onRefresh();
     } catch (e) {
@@ -102,11 +115,15 @@ export function ThemePicker({ themes, onRefresh }: Props) {
           variant="outline"
           className="h-9 justify-between gap-2 px-2.5 text-[12px]"
         >
-          <span>{activeTheme?.name ?? activeId}</span>
+          <span>{activeLabel}</span>
           <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="opacity-70" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-1.5" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <PopoverContent
+        align="start"
+        className="w-72 p-1.5"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <div className="mb-1.5 flex items-center justify-between px-1">
           <span className="text-[10.5px] font-medium text-muted-foreground">Themes</span>
           <Button
@@ -119,7 +136,27 @@ export function ThemePicker({ themes, onRefresh }: Props) {
             Import
           </Button>
         </div>
+
         <div className="flex flex-col gap-0.5">
+          {/* Hard-coded Default entry */}
+          <div
+            onMouseEnter={() => handleHoverIn(null)}
+            onMouseLeave={handleHoverOut}
+            className={cn(
+              "group flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-[12px] transition-colors",
+              activeId === DEFAULT_ENTRY_ID
+                ? "bg-accent/60 text-accent-foreground"
+                : "hover:bg-accent/40",
+            )}
+            onClick={() => void handleSelect(DEFAULT_ENTRY_ID)}
+          >
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="font-medium">Default (System)</span>
+              <span className="text-[10px] text-muted-foreground">Uses the built-in globals.css theme</span>
+            </div>
+          </div>
+
+          {/* JSON themes from Rust */}
           {themes.map((t) => (
             <div
               key={t.id}
