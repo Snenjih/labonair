@@ -32,12 +32,27 @@ export function SshTerminalPane({ tab, isActive }: Props) {
 
     let disposed = false;
     const cleanups: Array<() => void> = [];
+    const tabIdStr = tab.id.toString();
+
+    // Buffer output that arrives before xterm is ready so we don't miss
+    // the initial shell prompt / MOTD.
+    const earlyBuffer: string[] = [];
+    let term: Terminal | null = null;
+
+    listen<{ tab_id: string; data: string }>("ssh_pty_output", (event) => {
+      if (event.payload.tab_id !== tabIdStr) return;
+      if (term) {
+        term.write(event.payload.data);
+      } else {
+        earlyBuffer.push(event.payload.data);
+      }
+    }).then((unlisten) => cleanups.push(unlisten));
 
     (async () => {
       await document.fonts.load(`${FONT_SIZE}px "JetBrains Mono"`);
       if (disposed || !containerRef.current) return;
 
-      const term = new Terminal({
+      const t = new Terminal({
         fontFamily: FONT_FAMILY,
         fontSize: FONT_SIZE,
         lineHeight: 1.05,
@@ -48,44 +63,38 @@ export function SshTerminalPane({ tab, isActive }: Props) {
         scrollback: 5_000,
         allowProposedApi: true,
       });
-      termRef.current = term;
+      term = t;
+      termRef.current = t;
 
       const fit = new FitAddon();
       fitRef.current = fit;
-      term.loadAddon(fit);
-      term.loadAddon(new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)));
-      term.open(containerRef.current);
+      t.loadAddon(fit);
+      t.loadAddon(new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)));
+      t.open(containerRef.current);
       fit.fit();
 
       try {
         const webgl = new WebglAddon();
         webgl.onContextLoss(() => webgl.dispose());
-        term.loadAddon(webgl);
+        t.loadAddon(webgl);
       } catch (e) {
         console.warn("WebGL unavailable:", e);
       }
 
+      // Flush buffered output that arrived before xterm was ready
+      for (const chunk of earlyBuffer) t.write(chunk);
+      earlyBuffer.length = 0;
+
       // Send keystrokes to the SSH channel
-      const tabIdStr = tab.id.toString();
-      term.onData((data) => {
+      t.onData((data) => {
         invoke("ssh_pty_write", { tabId: tabIdStr, data }).catch(console.error);
       });
-
-      // Receive output from the SSH channel
-      const unlisten = await listen<{ tab_id: string; data: string }>(
-        "ssh_pty_output",
-        (event) => {
-          if (event.payload.tab_id !== tabIdStr) return;
-          term.write(event.payload.data);
-        },
-      );
-      cleanups.push(unlisten);
 
       // Resize handling
       const FIT_DEBOUNCE_MS = 8;
       const PTY_RESIZE_DEBOUNCE_MS = 256;
-      let lastSentCols = term.cols;
-      let lastSentRows = term.rows;
+      let lastSentCols = t.cols;
+      let lastSentRows = t.rows;
       let lastW = containerRef.current.clientWidth;
       let lastH = containerRef.current.clientHeight;
       let fitTimer: ReturnType<typeof setTimeout> | null = null;
@@ -96,13 +105,13 @@ export function SshTerminalPane({ tab, isActive }: Props) {
       const flushPtyResize = () => {
         ptyTimer = null;
         if (disposed) return;
-        if (term.cols === lastSentCols && term.rows === lastSentRows) return;
-        lastSentCols = term.cols;
-        lastSentRows = term.rows;
+        if (t.cols === lastSentCols && t.rows === lastSentRows) return;
+        lastSentCols = t.cols;
+        lastSentRows = t.rows;
         invoke("ssh_pty_resize", {
           tabId: tabIdStr,
-          cols: term.cols,
-          rows: term.rows,
+          cols: t.cols,
+          rows: t.rows,
         }).catch(console.error);
       };
 
@@ -128,7 +137,7 @@ export function SshTerminalPane({ tab, isActive }: Props) {
         if (ptyTimer) clearTimeout(ptyTimer);
       });
 
-      if (isActive) term.focus();
+      if (isActive) t.focus();
     })();
 
     return () => {

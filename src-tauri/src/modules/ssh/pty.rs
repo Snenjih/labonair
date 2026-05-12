@@ -52,15 +52,26 @@ pub fn open_shell_channel(
     let app_clone = app.clone();
     let tab_id_clone = tab_id.to_string();
 
-    std::thread::spawn(move || loop {
+    std::thread::spawn(move || {
+        // The session is inserted into SshState shortly after this thread is
+        // spawned. Retry briefly before giving up.
+        let mut not_found_retries = 200usize;
+        loop {
         let data = {
             let mut map = match state.0.lock() {
                 Ok(m) => m,
                 Err(_) => break,
             };
             let Some(sess) = map.get_mut(&tab_id_clone) else {
+                if not_found_retries > 0 {
+                    not_found_retries -= 1;
+                    drop(map);
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                    continue;
+                }
                 break;
             };
+            not_found_retries = 200; // reset once the session is live
             let Some(ch) = sess.channel.as_mut() else { break };
 
             if ch.eof() {
@@ -87,6 +98,7 @@ pub fn open_shell_channel(
         } else {
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
+        } // end loop
     });
 
     Ok(channel)

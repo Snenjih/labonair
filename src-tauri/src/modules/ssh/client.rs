@@ -65,7 +65,7 @@ pub fn ssh_connect(
         None
     };
 
-    // Step 3: TCP connect
+    // Step 3: TCP connect (DNS resolution + connect, with a 15-second total timeout)
     log_step!(
         app,
         tab_id,
@@ -73,18 +73,39 @@ pub fn ssh_connect(
     );
     let tcp = {
         let addr = format!("{}:{}", host_address, port);
-        let socket_addr = addr
-            .parse::<std::net::SocketAddr>()
-            .or_else(|_| {
+        let (tx, rx) = std::sync::mpsc::channel::<Result<std::net::TcpStream, String>>();
+        std::thread::spawn(move || {
+            let result = (|| {
                 use std::net::ToSocketAddrs;
-                addr.to_socket_addrs()
-                    .map_err(|e| e.to_string())?
-                    .next()
-                    .ok_or_else(|| "could not resolve host".to_string())
-            })
-            .map_err(|e: String| e)?;
-        std::net::TcpStream::connect_timeout(&socket_addr, std::time::Duration::from_secs(10))
-            .map_err(|e| e.to_string())?
+                let addrs: Vec<std::net::SocketAddr> = addr
+                    .parse::<std::net::SocketAddr>()
+                    .map(|a| vec![a])
+                    .unwrap_or_else(|_| {
+                        addr.to_socket_addrs()
+                            .map(|it| it.collect())
+                            .unwrap_or_default()
+                    });
+                if addrs.is_empty() {
+                    return Err("could not resolve host".to_string());
+                }
+                // Try each resolved address (IPv4 + IPv6), return first that connects.
+                let mut last_err = String::new();
+                for socket_addr in &addrs {
+                    match std::net::TcpStream::connect_timeout(
+                        socket_addr,
+                        std::time::Duration::from_secs(10),
+                    ) {
+                        Ok(stream) => return Ok(stream),
+                        Err(e) => last_err = e.to_string(),
+                    }
+                }
+                Err(last_err)
+            })();
+            let _ = tx.send(result);
+        });
+        rx.recv_timeout(std::time::Duration::from_secs(15))
+            .map_err(|_| format!("TCP connect to {}:{} timed out after 15s", host_address, port))?
+            .map_err(|e| e)?
     };
     log_step!(app, tab_id, "TCP connection established.");
 

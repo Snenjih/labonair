@@ -55,46 +55,49 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
 
   useEffect(() => {
     const cleanups: Array<() => void> = [];
+    let cancelled = false;
 
-    listen<{ tab_id: string; message: string }>("ssh_connect_log", (event) => {
-      if (event.payload.tab_id !== tabId) return;
-      pushLog(event.payload.message);
-    }).then((u) => cleanups.push(u));
-
-    listen<{ tab_id: string; fingerprint: string; host: string; is_mismatch: boolean }>(
-      "known_hosts_warning",
-      (event) => {
+    Promise.all([
+      listen<{ tab_id: string; message: string }>("ssh_connect_log", (event) => {
         if (event.payload.tab_id !== tabId) return;
-        setFingerprint(event.payload.fingerprint);
-        setHost(event.payload.host);
-        setStatus("waiting_trust");
-      },
-    ).then((u) => cleanups.push(u));
-
-    listen<{ tab_id: string; prompt_message: string; is_2fa: boolean }>(
-      "auth_required",
-      (event) => {
+        pushLog(event.payload.message);
+      }),
+      listen<{ tab_id: string; fingerprint: string; host: string; is_mismatch: boolean }>(
+        "known_hosts_warning",
+        (event) => {
+          if (event.payload.tab_id !== tabId) return;
+          setFingerprint(event.payload.fingerprint);
+          setHost(event.payload.host);
+          setStatus("waiting_trust");
+        },
+      ),
+      listen<{ tab_id: string; prompt_message: string; is_2fa: boolean }>(
+        "auth_required",
+        (event) => {
+          if (event.payload.tab_id !== tabId) return;
+          setPromptMessage(event.payload.prompt_message);
+          setStatus("waiting_auth");
+        },
+      ),
+      listen<{ tab_id: string }>("passphrase_required", (event) => {
         if (event.payload.tab_id !== tabId) return;
-        setPromptMessage(event.payload.prompt_message);
-        setStatus("waiting_auth");
-      },
-    ).then((u) => cleanups.push(u));
+        setPassphrase("");
+        setStatus("waiting_passphrase");
+      }),
+      listen<{ tab_id: string }>("session_established", (event) => {
+        console.log("[ssh] session_established event", event.payload, "tabId=", tabId);
+        if (event.payload.tab_id !== tabId) return;
+        onConnected();
+      }),
+    ]).then((unlisteners) => {
+      unlisteners.forEach((u) => cleanups.push(u));
+      if (!cancelled) doConnect();
+    });
 
-    listen<{ tab_id: string }>("passphrase_required", (event) => {
-      if (event.payload.tab_id !== tabId) return;
-      setPassphrase("");
-      setStatus("waiting_passphrase");
-    }).then((u) => cleanups.push(u));
-
-    listen<{ tab_id: string }>("session_established", (event) => {
-      console.log("[ssh] session_established event", event.payload, "tabId=", tabId);
-      if (event.payload.tab_id !== tabId) return;
-      onConnected();
-    }).then((u) => cleanups.push(u));
-
-    doConnect();
-
-    return () => cleanups.forEach((fn) => fn());
+    return () => {
+      cancelled = true;
+      cleanups.forEach((fn) => fn());
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, hostId]);
 
