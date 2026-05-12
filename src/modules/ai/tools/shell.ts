@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { invoke } from "@tauri-apps/api/core";
 import { native } from "../lib/native";
 import { checkShellCommand } from "../lib/security";
 import type { ToolContext } from "./context";
@@ -35,6 +36,27 @@ export function buildShellTools(ctx: ToolContext) {
       execute: async ({ command, timeout_secs }) => {
         const safety = checkShellCommand(command);
         if (!safety.ok) return { error: safety.reason };
+
+        // Route through the active SSH session when user is in a remote tab.
+        const sshTabId = ctx.getActiveSshTabId();
+        if (sshTabId) {
+          try {
+            const r = await invoke<{ stdout: string; stderr: string; exit_code: number }>(
+              "ssh_exec_command",
+              { tabId: sshTabId, command },
+            );
+            return {
+              command,
+              stdout: r.stdout,
+              stderr: r.stderr,
+              exit_code: r.exit_code,
+              remote: true,
+            };
+          } catch (e) {
+            return { error: String(e) };
+          }
+        }
+
         const sid = ctx.getSessionId();
         if (!sid) return { error: "no active chat session" };
         try {

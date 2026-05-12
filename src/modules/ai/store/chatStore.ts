@@ -37,6 +37,8 @@ type Live = {
   getWorkspaceRoot: () => string | null;
   getActiveFile: () => string | null;
   openPreview: (url: string) => boolean;
+  getActiveTabKind: () => string | null;
+  getActiveSshTabId: () => string | null;
 };
 
 export type AgentRunStatus =
@@ -138,6 +140,8 @@ const NOOP_LIVE: Live = {
   getWorkspaceRoot: () => null,
   getActiveFile: () => null,
   openPreview: () => false,
+  getActiveTabKind: () => null,
+  getActiveSshTabId: () => null,
 };
 
 // Per-session Chat instances. Transport reads the keys map lazily, so a key
@@ -188,6 +192,8 @@ function makeChat(sessionId: string): Chat<UIMessage> {
     openPreview: (url) => useChatStore.getState().live.openPreview(url),
     readCache,
     getSessionId: () => sessionId,
+    getActiveTabKind: () => useChatStore.getState().live.getActiveTabKind(),
+    getActiveSshTabId: () => useChatStore.getState().live.getActiveSshTabId(),
   };
 
   const transport = createContextAwareTransport({

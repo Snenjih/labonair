@@ -3,7 +3,7 @@ mod modules;
 use modules::{
     fs, pty, secrets, shell,
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete}},
-    ssh::{SshState, client::{ssh_connect, ssh_disconnect}, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_rename, sftp_delete, sftp_mkdir, sftp_chmod, prepare_remote_edit, save_remote_edit}},
+    ssh::{SshState, client::{ssh_connect, ssh_disconnect}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_rename, sftp_delete, sftp_mkdir, sftp_chmod, prepare_remote_edit, save_remote_edit}},
     sftp::{TransferWorkerState, commands::{enqueue_transfer, cancel_transfer, resolve_conflict}, worker::run_worker},
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -136,6 +136,7 @@ pub fn run() {
             groups_delete,
             ssh_connect,
             ssh_disconnect,
+            ssh_exec_command,
             ssh_pty_write,
             ssh_pty_resize,
             sftp_read_dir,

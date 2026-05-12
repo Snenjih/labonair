@@ -20,6 +20,16 @@ export type ToolContext = {
   readCache: Set<string>;
   /** Active chat session id — used by tools that persist per-session state (todos). */
   getSessionId: () => string | null;
+  /**
+   * Kind of the currently active workspace tab. Used by tools to decide
+   * whether to route commands locally or over SSH.
+   */
+  getActiveTabKind: () => string | null;
+  /**
+   * Tab ID of the active SSH terminal tab, or null if the active tab is not
+   * an ssh-terminal. Passed to ssh_exec_command for remote routing.
+   */
+  getActiveSshTabId: () => string | null;
 };
 
 export function resolvePath(rawPath: string, cwd: string | null): string {

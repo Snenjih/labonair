@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
+import { useLocalExplorerStore } from "./useLocalExplorerStore";
 
 export type DirEntry = {
   name: string;
@@ -7,14 +8,6 @@ export type DirEntry = {
   size: number;
   mtime: number;
 };
-
-type ChildrenState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "loaded"; entries: DirEntry[] }
-  | { status: "error"; message: string };
-
-type TreeState = Record<string, ChildrenState>;
 
 export type PendingCreate = {
   parentPath: string;
@@ -38,74 +31,66 @@ type Options = {
 };
 
 export function useFileTree(rootPath: string | null, options?: Options) {
-  const [nodes, setNodes] = useState<TreeState>({});
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(
-    null,
-  );
+  const { nodes, expanded, setRootPath, setNode, toggleExpanded, addExpanded } =
+    useLocalExplorerStore();
+
+  // Ephemeral UI states — don't need to survive sidebar hide/show.
+  const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
 
-  const fetchChildren = useCallback(async (path: string) => {
-    setNodes((s) => ({ ...s, [path]: { status: "loading" } }));
-    try {
-      const entries = await invoke<DirEntry[]>("fs_read_dir", { path });
-      setNodes((s) => ({ ...s, [path]: { status: "loaded", entries } }));
-    } catch (e) {
-      setNodes((s) => ({
-        ...s,
-        [path]: { status: "error", message: String(e) },
-      }));
-    }
-  }, []);
+  const fetchChildren = useCallback(
+    async (path: string) => {
+      setNode(path, { status: "loading" });
+      try {
+        const entries = await invoke<DirEntry[]>("fs_read_dir", { path });
+        setNode(path, { status: "loaded", entries });
+      } catch (e) {
+        setNode(path, { status: "error", message: String(e) });
+      }
+    },
+    [setNode],
+  );
 
-  // Root change → reset state.
+  // Root change → reset persisted tree state and reload root.
   useEffect(() => {
     if (!rootPath) {
-      setNodes({});
-      setExpanded(new Set());
+      setRootPath(null);
       setPendingCreate(null);
       setRenaming(null);
       return;
     }
-    setPendingCreate(null);
-    setRenaming(null);
-    setExpanded(new Set());
-    setNodes({});
-    void fetchChildren(rootPath);
-  }, [rootPath, fetchChildren]);
+    // Only reset when root actually changes to avoid re-fetching on re-renders.
+    const current = useLocalExplorerStore.getState().rootPath;
+    if (current !== rootPath) {
+      setRootPath(rootPath);
+      setPendingCreate(null);
+      setRenaming(null);
+      void fetchChildren(rootPath);
+    } else if (!useLocalExplorerStore.getState().nodes[rootPath]) {
+      // Store is fresh (e.g. first mount after store reset) — still fetch root.
+      void fetchChildren(rootPath);
+    }
+  }, [rootPath, setRootPath, fetchChildren]);
 
   const toggle = useCallback(
     (path: string) => {
-      setExpanded((curr) => {
-        const next = new Set(curr);
-        if (next.has(path)) next.delete(path);
-        else next.add(path);
-        return next;
-      });
-      setNodes((curr) => {
-        if (!curr[path] || curr[path].status === "error") {
-          void fetchChildren(path);
-        }
-        return curr;
-      });
+      toggleExpanded(path);
+      const node = useLocalExplorerStore.getState().nodes[path];
+      if (!node || node.status === "error") {
+        void fetchChildren(path);
+      }
     },
-    [fetchChildren],
+    [toggleExpanded, fetchChildren],
   );
 
   const expand = useCallback(
     (path: string) => {
-      setExpanded((curr) => {
-        if (curr.has(path)) return curr;
-        const next = new Set(curr);
-        next.add(path);
-        return next;
-      });
-      setNodes((curr) => {
-        if (!curr[path]) void fetchChildren(path);
-        return curr;
-      });
+      addExpanded(path);
+      if (!useLocalExplorerStore.getState().nodes[path]) {
+        void fetchChildren(path);
+      }
     },
-    [fetchChildren],
+    [addExpanded, fetchChildren],
   );
 
   const refresh = useCallback(
@@ -121,21 +106,14 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     (parentPath: string, kind: "file" | "dir") => {
       setRenaming(null);
       setPendingCreate({ parentPath, kind });
-      // Ensure the parent is expanded so the input row is visible.
       if (rootPath && parentPath !== rootPath) {
-        setExpanded((curr) => {
-          if (curr.has(parentPath)) return curr;
-          const next = new Set(curr);
-          next.add(parentPath);
-          return next;
-        });
+        addExpanded(parentPath);
       }
-      setNodes((curr) => {
-        if (!curr[parentPath]) void fetchChildren(parentPath);
-        return curr;
-      });
+      if (!useLocalExplorerStore.getState().nodes[parentPath]) {
+        void fetchChildren(parentPath);
+      }
     },
-    [rootPath, fetchChildren],
+    [rootPath, addExpanded, fetchChildren],
   );
 
   const cancelCreate = useCallback(() => setPendingCreate(null), []);

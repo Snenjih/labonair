@@ -24,68 +24,72 @@ pub struct DirEntry {
 /// case-insensitively. Hidden (dot-prefix) entries are filtered — UI may add
 /// a "show hidden" toggle later.
 #[tauri::command]
-pub fn fs_read_dir(path: String) -> Result<Vec<DirEntry>, String> {
-    let root = PathBuf::from(&path);
-    let read = std::fs::read_dir(&root).map_err(|e| {
-        log::debug!("fs_read_dir({}) failed: {e}", root.display());
-        e.to_string()
-    })?;
+pub async fn fs_read_dir(path: String) -> Result<Vec<DirEntry>, String> {
+    tokio::task::spawn_blocking(move || {
+        let root = PathBuf::from(&path);
+        let read = std::fs::read_dir(&root).map_err(|e| {
+            log::debug!("fs_read_dir({}) failed: {e}", root.display());
+            e.to_string()
+        })?;
 
-    let mut entries: Vec<DirEntry> = read
-        .filter_map(Result::ok)
-        .filter_map(|entry| {
-            let name = entry.file_name().into_string().ok()?;
-            if name.starts_with('.') {
-                return None;
-            }
+        let mut entries: Vec<DirEntry> = read
+            .filter_map(Result::ok)
+            .filter_map(|entry| {
+                let name = entry.file_name().into_string().ok()?;
+                if name.starts_with('.') {
+                    return None;
+                }
 
-            // `metadata()` follows symlinks → it returns the target's stat in
-            // one syscall (file_type + size + mtime all derived from it). We
-            // fall back to `symlink_metadata` for broken symlinks so we don't
-            // silently drop them from the listing.
-            let (meta, was_symlink) = match std::fs::metadata(entry.path()) {
-                Ok(m) => (Some(m), false),
-                Err(_) => (entry.metadata().ok(), true),
-            };
-            let meta = meta?;
+                // `metadata()` follows symlinks → it returns the target's stat in
+                // one syscall (file_type + size + mtime all derived from it). We
+                // fall back to `symlink_metadata` for broken symlinks so we don't
+                // silently drop them from the listing.
+                let (meta, was_symlink) = match std::fs::metadata(entry.path()) {
+                    Ok(m) => (Some(m), false),
+                    Err(_) => (entry.metadata().ok(), true),
+                };
+                let meta = meta?;
 
-            let kind = if was_symlink {
-                EntryKind::Symlink
-            } else if meta.is_dir() {
-                EntryKind::Dir
-            } else {
-                EntryKind::File
-            };
+                let kind = if was_symlink {
+                    EntryKind::Symlink
+                } else if meta.is_dir() {
+                    EntryKind::Dir
+                } else {
+                    EntryKind::File
+                };
 
-            let size = meta.len();
-            let mtime = meta
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as u64)
-                .unwrap_or(0);
+                let size = meta.len();
+                let mtime = meta
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
 
-            Some(DirEntry {
-                name,
-                kind,
-                size,
-                mtime,
+                Some(DirEntry {
+                    name,
+                    kind,
+                    size,
+                    mtime,
+                })
             })
-        })
-        .collect();
+            .collect();
 
-    entries.sort_by(|a, b| {
-        let rank = |k: &EntryKind| match k {
-            EntryKind::Dir => 0,
-            EntryKind::Symlink => 1,
-            EntryKind::File => 2,
-        };
-        rank(&a.kind)
-            .cmp(&rank(&b.kind))
-            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-    });
+        entries.sort_by(|a, b| {
+            let rank = |k: &EntryKind| match k {
+                EntryKind::Dir => 0,
+                EntryKind::Symlink => 1,
+                EntryKind::File => 2,
+            };
+            rank(&a.kind)
+                .cmp(&rank(&b.kind))
+                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+        });
 
-    Ok(entries)
+        Ok(entries)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Lists immediate subdirectories of `path`. Kept for the CwdBreadcrumb.
@@ -93,26 +97,30 @@ pub fn fs_read_dir(path: String) -> Result<Vec<DirEntry>, String> {
 /// Symlinks to directories are included (matches shell `cd` semantics).
 /// Hidden entries are filtered by dot-prefix only.
 #[tauri::command]
-pub fn list_subdirs(path: String) -> Result<Vec<String>, String> {
-    let root = PathBuf::from(&path);
-    let read = std::fs::read_dir(&root).map_err(|e| {
-        log::debug!("list_subdirs({}) read_dir failed: {e}", root.display());
-        e.to_string()
-    })?;
+pub async fn list_subdirs(path: String) -> Result<Vec<String>, String> {
+    tokio::task::spawn_blocking(move || {
+        let root = PathBuf::from(&path);
+        let read = std::fs::read_dir(&root).map_err(|e| {
+            log::debug!("list_subdirs({}) read_dir failed: {e}", root.display());
+            e.to_string()
+        })?;
 
-    let mut dirs: Vec<String> = read
-        .filter_map(Result::ok)
-        .filter(|entry| match entry.file_type() {
-            Ok(t) if t.is_dir() => true,
-            Ok(t) if t.is_symlink() => std::fs::metadata(entry.path())
-                .map(|m| m.is_dir())
-                .unwrap_or(false),
-            _ => false,
-        })
-        .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| !name.starts_with('.'))
-        .collect();
+        let mut dirs: Vec<String> = read
+            .filter_map(Result::ok)
+            .filter(|entry| match entry.file_type() {
+                Ok(t) if t.is_dir() => true,
+                Ok(t) if t.is_symlink() => std::fs::metadata(entry.path())
+                    .map(|m| m.is_dir())
+                    .unwrap_or(false),
+                _ => false,
+            })
+            .filter_map(|entry| entry.file_name().into_string().ok())
+            .filter(|name| !name.starts_with('.'))
+            .collect();
 
-    dirs.sort_by_key(|a| a.to_lowercase());
-    Ok(dirs)
+        dirs.sort_by_key(|a| a.to_lowercase());
+        Ok(dirs)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }

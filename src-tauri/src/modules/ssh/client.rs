@@ -9,10 +9,22 @@ macro_rules! log_step {
     };
 }
 
+/// Returns true if the ssh2 error message indicates the private key is
+/// passphrase-protected and we attempted to load it without one.
+fn is_passphrase_error(msg: &str) -> bool {
+    let lower = msg.to_lowercase();
+    lower.contains("passphrase")
+        || lower.contains("bad passphrase")
+        || lower.contains("failed getting public key")
+        || lower.contains("unable to extract public key")
+        || lower.contains("wrong passphrase")
+}
+
 #[tauri::command]
 pub fn ssh_connect(
     tab_id: String,
     host_id: String,
+    passphrase: Option<String>,
     state: tauri::State<'_, super::SshState>,
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
     app: tauri::AppHandle,
@@ -158,43 +170,76 @@ pub fn ssh_connect(
     }
 
     // Step 6: Authentication
-    let auth_label = if auth_method == "key" {
-        "Authenticating with public key…"
-    } else {
-        "Authenticating with password…"
-    };
-    log_step!(app, tab_id, auth_label);
+    log_step!(app, tab_id, "Authenticating…");
 
-    let auth_result = if auth_method == "key" {
+    let authenticated = if auth_method == "key" {
         let key_path = private_key_path
             .as_deref()
             .map(std::path::Path::new)
             .ok_or("private_key_path not set for key auth")?;
-        session
-            .userauth_pubkey_file(&username, None, key_path, None)
-            .map_err(|e| e.to_string())
+
+        // 6a. Try ssh-agent first (works for keys loaded via `ssh-add`).
+        let agent_ok = try_agent_auth(&session, &username, &tab_id, &app);
+        if agent_ok {
+            true
+        } else {
+            // 6b. Direct key file auth — use provided passphrase if any.
+            log_step!(app, tab_id, "Authenticating with public key file…");
+            match session.userauth_pubkey_file(
+                &username,
+                None,
+                key_path,
+                passphrase.as_deref(),
+            ) {
+                Ok(_) => true,
+                Err(e) => {
+                    let msg = e.to_string();
+                    if passphrase.is_none() && is_passphrase_error(&msg) {
+                        // Key is encrypted — ask frontend for passphrase.
+                        log_step!(app, tab_id, "Key is passphrase-protected, prompting…");
+                        app.emit(
+                            "passphrase_required",
+                            serde_json::json!({ "tab_id": tab_id }),
+                        )
+                        .map_err(|e| e.to_string())?;
+                        return Err("passphrase_required".to_string());
+                    }
+                    log_step!(app, tab_id, format!("Key auth failed: {}", msg));
+                    app.emit(
+                        "auth_required",
+                        serde_json::json!({
+                            "tab_id": tab_id,
+                            "prompt_message": msg,
+                            "is_2fa": false
+                        }),
+                    )
+                    .map_err(|e| e.to_string())?;
+                    return Err(format!("authentication failed: {}", msg));
+                }
+            }
+        }
     } else {
         let pw = password.as_deref().unwrap_or("");
-        session
-            .userauth_password(&username, pw)
-            .map_err(|e| e.to_string())
+        match session.userauth_password(&username, pw) {
+            Ok(_) => true,
+            Err(e) => {
+                let msg = e.to_string();
+                log_step!(app, tab_id, format!("Password auth failed: {}", msg));
+                app.emit(
+                    "auth_required",
+                    serde_json::json!({
+                        "tab_id": tab_id,
+                        "prompt_message": msg,
+                        "is_2fa": false
+                    }),
+                )
+                .map_err(|e| e.to_string())?;
+                return Err(format!("authentication failed: {}", msg));
+            }
+        }
     };
 
-    if let Err(err) = auth_result {
-        log_step!(app, tab_id, format!("Authentication failed: {}", err));
-        app.emit(
-            "auth_required",
-            serde_json::json!({
-                "tab_id": tab_id,
-                "prompt_message": err,
-                "is_2fa": false
-            }),
-        )
-        .map_err(|e| e.to_string())?;
-        return Err(format!("authentication failed: {}", err));
-    }
-
-    if !session.authenticated() {
+    if !authenticated || !session.authenticated() {
         log_step!(app, tab_id, "Authentication failed.");
         app.emit(
             "auth_required",
@@ -252,6 +297,41 @@ pub fn ssh_connect(
     .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+/// Tries to authenticate via the running ssh-agent (SSH_AUTH_SOCK).
+/// Returns true if authentication succeeded, false if agent unavailable or all
+/// identities were rejected — never panics.
+fn try_agent_auth(
+    session: &ssh2::Session,
+    username: &str,
+    tab_id: &str,
+    app: &tauri::AppHandle,
+) -> bool {
+    if std::env::var("SSH_AUTH_SOCK").is_err() {
+        return false;
+    }
+    let mut agent = match session.agent() {
+        Ok(a) => a,
+        Err(_) => return false,
+    };
+    if agent.connect().is_err() {
+        return false;
+    }
+    if agent.list_identities().is_err() {
+        return false;
+    }
+    let identities = match agent.identities() {
+        Ok(ids) => ids,
+        Err(_) => return false,
+    };
+    for identity in identities {
+        if agent.userauth(username, &identity).is_ok() {
+            log_step!(app, tab_id, "Authenticated via ssh-agent ✓");
+            return true;
+        }
+    }
+    false
 }
 
 #[tauri::command]

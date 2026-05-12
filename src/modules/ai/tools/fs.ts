@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { invoke } from "@tauri-apps/api/core";
 import { native } from "../lib/native";
 import { checkReadable, checkWritable } from "../lib/security";
 import { newQueuedEditId, usePlanStore } from "../store/planStore";
@@ -18,6 +19,30 @@ export function buildFsTools(ctx: ToolContext) {
           .describe("Absolute path, or relative to the active terminal cwd."),
       }),
       execute: async ({ path }) => {
+        const sshTabId = ctx.getActiveSshTabId();
+
+        // Remote read via SSH: run `cat` on the server.
+        if (sshTabId) {
+          try {
+            const r = await invoke<{ stdout: string; stderr: string; exit_code: number }>(
+              "ssh_exec_command",
+              { tabId: sshTabId, command: `cat -- ${JSON.stringify(path)}` },
+            );
+            if (r.exit_code !== 0)
+              return { error: r.stderr || `cat exited ${r.exit_code}`, path };
+            const content = r.stdout.slice(0, AI_READ_CAP);
+            ctx.readCache.add(path);
+            return {
+              path,
+              content,
+              remote: true,
+              truncated: r.stdout.length > AI_READ_CAP,
+            };
+          } catch (e) {
+            return { error: String(e), path };
+          }
+        }
+
         const abs = resolvePath(path, ctx.getCwd());
         const safety = checkReadable(abs);
         if (!safety.ok) return { error: safety.reason, path: abs };
@@ -57,6 +82,23 @@ export function buildFsTools(ctx: ToolContext) {
           .describe("Absolute path, or relative to the active terminal cwd."),
       }),
       execute: async ({ path }) => {
+        const sshTabId = ctx.getActiveSshTabId();
+
+        // Remote listing via SSH: run `ls -la` on the server.
+        if (sshTabId) {
+          try {
+            const r = await invoke<{ stdout: string; stderr: string; exit_code: number }>(
+              "ssh_exec_command",
+              { tabId: sshTabId, command: `ls -la -- ${JSON.stringify(path)}` },
+            );
+            if (r.exit_code !== 0)
+              return { error: r.stderr || `ls exited ${r.exit_code}`, path };
+            return { path, listing: r.stdout, remote: true };
+          } catch (e) {
+            return { error: String(e), path };
+          }
+        }
+
         const abs = resolvePath(path, ctx.getCwd());
         const safety = checkReadable(abs);
         if (!safety.ok) return { error: safety.reason, path: abs };

@@ -585,6 +585,14 @@ export default function App() {
         openPreviewTab(url);
         return true;
       },
+      getActiveTabKind: () => {
+        const t = tabs.find((x) => x.id === activeId);
+        return t?.kind ?? null;
+      },
+      getActiveSshTabId: () => {
+        const t = tabs.find((x) => x.id === activeId);
+        return t?.kind === "ssh-terminal" ? String(t.id) : null;
+      },
     });
   }, [setLive, activeId, tabs, explorerRoot, home, openPreviewTab]);
 

@@ -104,6 +104,8 @@ function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit,
   );
 }
 
+const AUTO_REFRESH_MS = 30_000;
+
 export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: ConnectFn; newSftpTab: ConnectFn; tabs: Tab[] }) {
   const hosts = useHostsStore((s) => s.hosts);
   const groups = useHostsStore((s) => s.groups);
@@ -111,6 +113,7 @@ export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: Conn
   const selectedHostIds = useHostsStore((s) => s.selectedHostIds);
   const isLoading = useHostsStore((s) => s.isLoading);
   const hasFetched = useHostsStore((s) => s.hasFetched);
+  const fetchError = useHostsStore((s) => s.fetchError);
   const fetchData = useHostsStore((s) => s.fetchData);
   const createGroup = useHostsStore((s) => s.createGroup);
   const setSelectedHost = useHostsStore((s) => s.setSelectedHost);
@@ -128,7 +131,21 @@ export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: Conn
   const [localHosts, setLocalHosts] = useState<Host[]>([]);
   useEffect(() => { setLocalHosts(hosts); }, [hosts]);
 
+  // Initial load
   useEffect(() => { void fetchData(); }, [fetchData]);
+
+  // Auto-refresh every 30 s
+  useEffect(() => {
+    const id = setInterval(() => { void fetchData(); }, AUTO_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [fetchData]);
+
+  // Refresh when the window regains focus
+  useEffect(() => {
+    const onFocus = () => { void fetchData(); };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchData]);
 
   useEffect(() => {
     if (addingGroup) setTimeout(() => groupInputRef.current?.focus(), 50);
@@ -226,6 +243,26 @@ export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: Conn
             + Group
           </Button>
         </div>
+
+        {/* Error banner */}
+        {fetchError && (
+          <div className="flex items-center gap-2 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="shrink-0">
+              <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M6.5 4v3M6.5 8.5v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            <span className="flex-1 truncate">Failed to load hosts: {fetchError}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs border-destructive/40 text-destructive hover:bg-destructive/10 shrink-0"
+              onClick={() => void fetchData()}
+              disabled={isLoading}
+            >
+              {isLoading ? "Retrying…" : "Retry"}
+            </Button>
+          </div>
+        )}
 
         {/* Groups row */}
         {(groups.length > 0 || addingGroup) && (

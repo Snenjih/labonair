@@ -10,6 +10,7 @@ interface HostsState {
   lastSingleClickId: string | null;
   isLoading: boolean;
   hasFetched: boolean;
+  fetchError: string | null;
 
   fetchData: () => Promise<void>;
   createHost: (payload: CreateHostPayload) => Promise<Host>;
@@ -36,17 +37,19 @@ export const useHostsStore = create<HostsState>((set, get) => ({
   lastSingleClickId: null,
   isLoading: true,
   hasFetched: false,
+  fetchError: null,
 
   fetchData: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, fetchError: null });
     try {
       const [hosts, groups] = await Promise.all([
         invoke<Host[]>("hosts_get_all"),
         invoke<Group[]>("groups_get_all"),
       ]);
-      set({ hosts, groups, isLoading: false, hasFetched: true });
-    } catch {
-      set({ isLoading: false, hasFetched: true });
+      set({ hosts, groups, isLoading: false, hasFetched: true, fetchError: null });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      set({ isLoading: false, hasFetched: true, fetchError: msg });
     }
   },
 
