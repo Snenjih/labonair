@@ -47,6 +47,7 @@ pub fn initialize_db(
         // groups migrations
         "ALTER TABLE groups ADD COLUMN icon TEXT",
         "ALTER TABLE groups ADD COLUMN color TEXT",
+        "ALTER TABLE groups ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0",
     ] {
         let _ = conn.execute_batch(sql);
     }
