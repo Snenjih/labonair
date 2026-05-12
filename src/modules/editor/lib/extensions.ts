@@ -9,6 +9,9 @@ export const languageCompartment = new Compartment();
 export const readOnlyCompartment = new Compartment();
 export const wrapCompartment = new Compartment();
 export const vimCompartment = new Compartment();
+export const lineNumbersCompartment = new Compartment();
+export const bracketMatchingCompartment = new Compartment();
+export const tabSizeCompartment = new Compartment();
 
 // Only what basicSetup doesn't already cover, to avoid duplicate extensions.
 // basicSetup gives us line numbers, fold gutter, history, indentOnInput,

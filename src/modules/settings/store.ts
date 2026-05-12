@@ -37,6 +37,7 @@ export const EDITOR_THEME_LABELS: Record<EditorThemeId, string> = {
 };
 
 export type Preferences = {
+  // --- General ---
   theme: ThemePref;
   defaultModelId: ModelId;
   editorTheme: EditorThemeId;
@@ -48,6 +49,29 @@ export type Preferences = {
   autocompleteModelId: string;
   lmstudioBaseURL: string;
   vimMode: boolean;
+
+  // --- App Appearance ---
+  appTheme: string;
+  appFontFamily: string;
+  appFontSize: number;
+  appLineHeight: number;
+
+  // --- Terminal ---
+  terminalCursorBlink: boolean;
+  terminalCursorStyle: "block" | "underline" | "bar";
+  terminalFontFamily: string;
+  terminalFontSize: number;
+  terminalScrollback: number;
+  terminalLetterSpacing: number;
+  terminalLineHeight: number;
+  terminalFontWeight: "normal" | "medium" | "bold";
+
+  // --- Editor ---
+  editorAutoSave: "off" | "afterDelay" | "onFocusChange";
+  editorLineNumbers: boolean;
+  editorWordWrap: boolean;
+  editorTabSize: 2 | 4 | 8;
+  editorBracketMatching: boolean;
 };
 
 const STORE_PATH = "nexum-settings.json";
@@ -63,6 +87,26 @@ const KEY_AUTOCOMPLETE_MODEL = "autocompleteModelId";
 const KEY_LMSTUDIO_BASE_URL = "lmstudioBaseURL";
 const KEY_VIM_MODE = "vimMode";
 
+const KEY_APP_THEME = "appTheme";
+const KEY_APP_FONT_FAMILY = "appFontFamily";
+const KEY_APP_FONT_SIZE = "appFontSize";
+const KEY_APP_LINE_HEIGHT = "appLineHeight";
+
+const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
+const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
+const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
+const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
+const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
+const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
+const KEY_TERMINAL_LINE_HEIGHT = "terminalLineHeight";
+const KEY_TERMINAL_FONT_WEIGHT = "terminalFontWeight";
+
+const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
+const KEY_EDITOR_LINE_NUMBERS = "editorLineNumbers";
+const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
+const KEY_EDITOR_TAB_SIZE = "editorTabSize";
+const KEY_EDITOR_BRACKET_MATCHING = "editorBracketMatching";
+
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   defaultModelId: DEFAULT_MODEL_ID,
@@ -75,13 +119,31 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autocompleteModelId: DEFAULT_AUTOCOMPLETE_MODEL.cerebras,
   lmstudioBaseURL: LMSTUDIO_DEFAULT_BASE_URL,
   vimMode: false,
+
+  appTheme: "default-dark",
+  appFontFamily: "system-ui",
+  appFontSize: 13,
+  appLineHeight: 1.5,
+
+  terminalCursorBlink: true,
+  terminalCursorStyle: "bar",
+  terminalFontFamily: '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
+  terminalFontSize: 14,
+  terminalScrollback: 5000,
+  terminalLetterSpacing: 0,
+  terminalLineHeight: 1.05,
+  terminalFontWeight: "normal",
+
+  editorAutoSave: "off",
+  editorLineNumbers: true,
+  editorWordWrap: false,
+  editorTabSize: 2,
+  editorBracketMatching: true,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
 
 export async function loadPreferences(): Promise<Preferences> {
-  // Single IPC roundtrip — fetching keys individually fans out to one
-  // `plugin:store|get` per setting and is the dominant boot cost.
   const entries = await store.entries();
   const map = new Map<string, unknown>(entries);
   const get = <T>(k: string): T | undefined => map.get(k) as T | undefined;
@@ -111,6 +173,52 @@ export async function loadPreferences(): Promise<Preferences> {
       get<string>(KEY_LMSTUDIO_BASE_URL) ??
       DEFAULT_PREFERENCES.lmstudioBaseURL,
     vimMode: get<boolean>(KEY_VIM_MODE) ?? DEFAULT_PREFERENCES.vimMode,
+
+    appTheme: get<string>(KEY_APP_THEME) ?? DEFAULT_PREFERENCES.appTheme,
+    appFontFamily:
+      get<string>(KEY_APP_FONT_FAMILY) ?? DEFAULT_PREFERENCES.appFontFamily,
+    appFontSize:
+      get<number>(KEY_APP_FONT_SIZE) ?? DEFAULT_PREFERENCES.appFontSize,
+    appLineHeight:
+      get<number>(KEY_APP_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.appLineHeight,
+
+    terminalCursorBlink:
+      get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
+      DEFAULT_PREFERENCES.terminalCursorBlink,
+    terminalCursorStyle:
+      get<"block" | "underline" | "bar">(KEY_TERMINAL_CURSOR_STYLE) ??
+      DEFAULT_PREFERENCES.terminalCursorStyle,
+    terminalFontFamily:
+      get<string>(KEY_TERMINAL_FONT_FAMILY) ??
+      DEFAULT_PREFERENCES.terminalFontFamily,
+    terminalFontSize:
+      get<number>(KEY_TERMINAL_FONT_SIZE) ?? DEFAULT_PREFERENCES.terminalFontSize,
+    terminalScrollback:
+      get<number>(KEY_TERMINAL_SCROLLBACK) ??
+      DEFAULT_PREFERENCES.terminalScrollback,
+    terminalLetterSpacing:
+      get<number>(KEY_TERMINAL_LETTER_SPACING) ??
+      DEFAULT_PREFERENCES.terminalLetterSpacing,
+    terminalLineHeight:
+      get<number>(KEY_TERMINAL_LINE_HEIGHT) ??
+      DEFAULT_PREFERENCES.terminalLineHeight,
+    terminalFontWeight:
+      get<"normal" | "medium" | "bold">(KEY_TERMINAL_FONT_WEIGHT) ??
+      DEFAULT_PREFERENCES.terminalFontWeight,
+
+    editorAutoSave:
+      get<"off" | "afterDelay" | "onFocusChange">(KEY_EDITOR_AUTO_SAVE) ??
+      DEFAULT_PREFERENCES.editorAutoSave,
+    editorLineNumbers:
+      get<boolean>(KEY_EDITOR_LINE_NUMBERS) ??
+      DEFAULT_PREFERENCES.editorLineNumbers,
+    editorWordWrap:
+      get<boolean>(KEY_EDITOR_WORD_WRAP) ?? DEFAULT_PREFERENCES.editorWordWrap,
+    editorTabSize:
+      get<2 | 4 | 8>(KEY_EDITOR_TAB_SIZE) ?? DEFAULT_PREFERENCES.editorTabSize,
+    editorBracketMatching:
+      get<boolean>(KEY_EDITOR_BRACKET_MATCHING) ??
+      DEFAULT_PREFERENCES.editorBracketMatching,
   };
 }
 
@@ -171,6 +279,97 @@ export async function setVimMode(value: boolean): Promise<void> {
   await store.save();
 }
 
+export async function setAppTheme(value: string): Promise<void> {
+  await store.set(KEY_APP_THEME, value);
+  await store.save();
+}
+
+export async function setAppFontFamily(value: string): Promise<void> {
+  await store.set(KEY_APP_FONT_FAMILY, value);
+  await store.save();
+}
+
+export async function setAppFontSize(value: number): Promise<void> {
+  await store.set(KEY_APP_FONT_SIZE, value);
+  await store.save();
+}
+
+export async function setAppLineHeight(value: number): Promise<void> {
+  await store.set(KEY_APP_LINE_HEIGHT, value);
+  await store.save();
+}
+
+export async function setTerminalCursorBlink(value: boolean): Promise<void> {
+  await store.set(KEY_TERMINAL_CURSOR_BLINK, value);
+  await store.save();
+}
+
+export async function setTerminalCursorStyle(
+  value: "block" | "underline" | "bar",
+): Promise<void> {
+  await store.set(KEY_TERMINAL_CURSOR_STYLE, value);
+  await store.save();
+}
+
+export async function setTerminalFontFamily(value: string): Promise<void> {
+  await store.set(KEY_TERMINAL_FONT_FAMILY, value);
+  await store.save();
+}
+
+export async function setTerminalFontSize(value: number): Promise<void> {
+  await store.set(KEY_TERMINAL_FONT_SIZE, value);
+  await store.save();
+}
+
+export async function setTerminalScrollback(value: number): Promise<void> {
+  await store.set(KEY_TERMINAL_SCROLLBACK, value);
+  await store.save();
+}
+
+export async function setTerminalLetterSpacing(value: number): Promise<void> {
+  await store.set(KEY_TERMINAL_LETTER_SPACING, value);
+  await store.save();
+}
+
+export async function setTerminalLineHeight(value: number): Promise<void> {
+  await store.set(KEY_TERMINAL_LINE_HEIGHT, value);
+  await store.save();
+}
+
+export async function setTerminalFontWeight(
+  value: "normal" | "medium" | "bold",
+): Promise<void> {
+  await store.set(KEY_TERMINAL_FONT_WEIGHT, value);
+  await store.save();
+}
+
+export async function setEditorAutoSave(
+  value: "off" | "afterDelay" | "onFocusChange",
+): Promise<void> {
+  await store.set(KEY_EDITOR_AUTO_SAVE, value);
+  await store.save();
+}
+
+export async function setEditorLineNumbers(value: boolean): Promise<void> {
+  await store.set(KEY_EDITOR_LINE_NUMBERS, value);
+  await store.save();
+}
+
+export async function setEditorWordWrap(value: boolean): Promise<void> {
+  await store.set(KEY_EDITOR_WORD_WRAP, value);
+  await store.save();
+}
+
+export async function setEditorTabSize(value: 2 | 4 | 8): Promise<void> {
+  await store.set(KEY_EDITOR_TAB_SIZE, value);
+  await store.save();
+}
+
+export async function setEditorBracketMatching(value: boolean): Promise<void> {
+  await store.set(KEY_EDITOR_BRACKET_MATCHING, value);
+  await store.save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -189,6 +388,26 @@ export function onPreferencesChange(
     [KEY_AUTOCOMPLETE_MODEL]: "autocompleteModelId",
     [KEY_LMSTUDIO_BASE_URL]: "lmstudioBaseURL",
     [KEY_VIM_MODE]: "vimMode",
+
+    [KEY_APP_THEME]: "appTheme",
+    [KEY_APP_FONT_FAMILY]: "appFontFamily",
+    [KEY_APP_FONT_SIZE]: "appFontSize",
+    [KEY_APP_LINE_HEIGHT]: "appLineHeight",
+
+    [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
+    [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
+    [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
+    [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
+    [KEY_TERMINAL_SCROLLBACK]: "terminalScrollback",
+    [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
+    [KEY_TERMINAL_LINE_HEIGHT]: "terminalLineHeight",
+    [KEY_TERMINAL_FONT_WEIGHT]: "terminalFontWeight",
+
+    [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
+    [KEY_EDITOR_LINE_NUMBERS]: "editorLineNumbers",
+    [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
+    [KEY_EDITOR_TAB_SIZE]: "editorTabSize",
+    [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
   };
   return store.onChange<unknown>((key, value) => {
     const mapped = map[key];

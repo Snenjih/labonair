@@ -5,6 +5,7 @@ use modules::{
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete}},
     ssh::{SshState, client::{ssh_connect, ssh_disconnect}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_rename, sftp_delete, sftp_mkdir, sftp_chmod, prepare_remote_edit, save_remote_edit}},
     sftp::{TransferWorkerState, commands::{enqueue_transfer, cancel_transfer, resolve_conflict}, worker::run_worker},
+    themes::{themes_get_all, theme_import, theme_export, theme_delete},
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -27,10 +28,9 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 
     let builder = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App(url_path.into()))
         .title("Settings")
-        .inner_size(720.0, 520.0)
-        .min_inner_size(720.0, 520.0)
-        .max_inner_size(720.0, 520.0)
-        .resizable(false);
+        .inner_size(860.0, 580.0)
+        .min_inner_size(720.0, 480.0)
+        .resizable(true);
 
     #[cfg(target_os = "macos")]
     let builder = builder
@@ -69,6 +69,7 @@ pub fn run() {
                 .level(tauri_plugin_log::log::LevelFilter::Info)
                 .build(),
         )
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let data_dir = app.path().app_local_data_dir()
@@ -149,6 +150,10 @@ pub fn run() {
             resolve_conflict,
             prepare_remote_edit,
             save_remote_edit,
+            themes_get_all,
+            theme_import,
+            theme_export,
+            theme_delete,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

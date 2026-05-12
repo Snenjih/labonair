@@ -5,3 +5,4 @@ pub mod secrets;
 pub mod sftp;
 pub mod shell;
 pub mod ssh;
+pub mod themes;

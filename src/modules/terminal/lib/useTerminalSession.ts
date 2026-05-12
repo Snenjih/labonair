@@ -1,4 +1,5 @@
 import { buildTerminalTheme } from "@/styles/terminalTheme";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
@@ -8,9 +9,6 @@ import { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { registerCwdHandler, registerPromptTracker } from "./osc-handlers";
 import { openPty, type PtySession } from "./pty-bridge";
-
-const FONT_FAMILY = '"JetBrains Mono", SFMono-Regular, Menlo, monospace';
-const FONT_SIZE = 14;
 
 type Options = {
   container: React.RefObject<HTMLDivElement | null>;
@@ -26,6 +24,12 @@ type Options = {
 // on a word boundary so we don't catch substrings of longer paths.
 const LOCAL_URL_RE =
   /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d{1,5})?(?:\/[^\s\x1b]*)?/g;
+
+const FONT_WEIGHT_MAP: Record<string, string | number> = {
+  normal: "normal",
+  medium: 500,
+  bold: "bold",
+};
 
 export function useTerminalSession({
   container,
@@ -51,26 +55,89 @@ export function useTerminalSession({
   const fitRef = useRef<FitAddon | null>(null);
   const ptyRef = useRef<PtySession | null>(null);
 
+  // Apply terminal preference changes to the live xterm instance.
+  useEffect(() => {
+    const unsub = usePreferencesStore.subscribe((state, prev) => {
+      const term = termRef.current;
+      const fit = fitRef.current;
+      if (!term) return;
+
+      if (state.terminalCursorBlink !== prev.terminalCursorBlink) {
+        term.options.cursorBlink = state.terminalCursorBlink;
+      }
+      if (state.terminalCursorStyle !== prev.terminalCursorStyle) {
+        term.options.cursorStyle = state.terminalCursorStyle;
+      }
+      if (state.terminalFontFamily !== prev.terminalFontFamily) {
+        term.options.fontFamily = state.terminalFontFamily;
+        fit?.fit();
+      }
+      if (state.terminalFontSize !== prev.terminalFontSize) {
+        term.options.fontSize = state.terminalFontSize;
+        fit?.fit();
+      }
+      if (state.terminalLetterSpacing !== prev.terminalLetterSpacing) {
+        term.options.letterSpacing = state.terminalLetterSpacing;
+        fit?.fit();
+      }
+      if (state.terminalLineHeight !== prev.terminalLineHeight) {
+        term.options.lineHeight = state.terminalLineHeight;
+        fit?.fit();
+      }
+      if (state.terminalFontWeight !== prev.terminalFontWeight) {
+        term.options.fontWeight = FONT_WEIGHT_MAP[state.terminalFontWeight] as
+          | "normal"
+          | "bold"
+          | "100"
+          | "200"
+          | "300"
+          | "400"
+          | "500"
+          | "600"
+          | "700"
+          | "800"
+          | "900"
+          | undefined;
+      }
+    });
+    return unsub;
+  }, []);
+
   useEffect(() => {
     let disposed = false;
     const cleanups: Array<() => void> = [];
 
     (async () => {
-      await document.fonts.load(`${FONT_SIZE}px "JetBrains Mono"`);
+      const prefs = usePreferencesStore.getState();
+      const fontFamily = prefs.terminalFontFamily;
+      const fontSize = prefs.terminalFontSize;
+
+      await document.fonts.load(`${fontSize}px "JetBrains Mono"`);
       if (disposed || !container.current) return;
 
       const term = new Terminal({
-        fontFamily: FONT_FAMILY,
-        fontSize: FONT_SIZE,
-        lineHeight: 1.05,
+        fontFamily,
+        fontSize,
+        lineHeight: prefs.terminalLineHeight,
+        letterSpacing: prefs.terminalLetterSpacing,
         theme: buildTerminalTheme(),
-        cursorBlink: true,
-        cursorStyle: "bar",
+        cursorBlink: prefs.terminalCursorBlink,
+        cursorStyle: prefs.terminalCursorStyle,
         cursorInactiveStyle: "outline",
-        // 5k lines × 80 cols × ~16 B per cell ≈ 6 MB per tab. 10k doubled
-        // that for output almost no one scrolls back to. Keep this knob in
-        // mind if/when we add a "scrollback" preference.
-        scrollback: 5_000,
+        scrollback: prefs.terminalScrollback,
+        fontWeight: FONT_WEIGHT_MAP[prefs.terminalFontWeight] as
+          | "normal"
+          | "bold"
+          | "100"
+          | "200"
+          | "300"
+          | "400"
+          | "500"
+          | "600"
+          | "700"
+          | "800"
+          | "900"
+          | undefined,
         allowProposedApi: true,
       });
       termRef.current = term;

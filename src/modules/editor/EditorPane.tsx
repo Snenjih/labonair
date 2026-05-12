@@ -4,12 +4,16 @@ import {
   SearchQuery,
   setSearchQuery,
 } from "@codemirror/search";
-import { keymap } from "@codemirror/view";
+import { bracketMatching } from "@codemirror/language";
+import { lineNumbers } from "@codemirror/view";
+import { keymap, EditorView } from "@codemirror/view";
+import { EditorState } from "@codemirror/state";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { EDITOR_THEME_EXT } from "./lib/themes";
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -18,9 +22,13 @@ import {
 import { Prec } from "@codemirror/state";
 import { vim } from "@replit/codemirror-vim";
 import {
+  bracketMatchingCompartment,
   buildSharedExtensions,
   languageCompartment,
+  lineNumbersCompartment,
+  tabSizeCompartment,
   vimCompartment,
+  wrapCompartment,
 } from "./lib/extensions";
 import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
 
@@ -63,6 +71,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const cmRef = useRef<ReactCodeMirrorRef>(null);
     const editorThemeId = usePreferencesStore((s) => s.editorTheme);
     const vimMode = usePreferencesStore((s) => s.vimMode);
+    const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
+    const editorLineNumbers = usePreferencesStore((s) => s.editorLineNumbers);
+    const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
+    const editorTabSize = usePreferencesStore((s) => s.editorTabSize);
+    const editorBracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
     const languageRef = useRef<string | null>(null);
     const apiKeyRef = useRef<string | null>(null);
 
@@ -108,52 +121,128 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const pathRef = useRef(path);
     pathRef.current = path;
 
-    const extensions = useMemo(
-      () => [
-        // basicSetup is added before user extensions by @uiw/react-codemirror,
-        // so we must elevate vim's precedence to win the keymap.
-        vimCompartment.of(
-          usePreferencesStore.getState().vimMode ? Prec.highest(vim()) : [],
+    // Reconfigure line numbers compartment when pref changes.
+    useEffect(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: lineNumbersCompartment.reconfigure(
+          editorLineNumbers ? lineNumbers() : [],
         ),
-        vimHandlersExtension(() => ({
-          save: () => {
-            void (async () => {
-              await saveRef.current();
-              onSavedRef.current?.();
-            })();
-          },
-          close: () => onCloseRef.current?.(),
-        })),
-        ...buildSharedExtensions(),
-        languageCompartment.of([]),
-        inlineCompletion({
-          getPrefs: () => {
-            const s = usePreferencesStore.getState();
-            return {
-              enabled: s.autocompleteEnabled,
-              provider: s.autocompleteProvider,
-              modelId: s.autocompleteModelId,
-              apiKey: apiKeyRef.current,
-              lmstudioBaseURL: s.lmstudioBaseURL,
-            };
-          },
-          getPath: () => pathRef.current,
-          getLanguage: () => languageRef.current,
-        }),
-        keymap.of([
-          {
-            key: "Mod-s",
-            preventDefault: true,
-            run: () => {
+      });
+    }, [editorLineNumbers]);
+
+    // Reconfigure word wrap compartment when pref changes.
+    useEffect(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: wrapCompartment.reconfigure(
+          editorWordWrap ? EditorView.lineWrapping : [],
+        ),
+      });
+    }, [editorWordWrap]);
+
+    // Reconfigure tab size compartment when pref changes.
+    useEffect(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: tabSizeCompartment.reconfigure(
+          EditorState.tabSize.of(editorTabSize),
+        ),
+      });
+    }, [editorTabSize]);
+
+    // Reconfigure bracket matching compartment when pref changes.
+    useEffect(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: bracketMatchingCompartment.reconfigure(
+          editorBracketMatching ? bracketMatching() : [],
+        ),
+      });
+    }, [editorBracketMatching]);
+
+    // Auto-save: afterDelay — debounced 5 s after doc changes.
+    const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const docContentRef = useRef(doc.status === "ready" ? doc.content : "");
+    if (doc.status === "ready") docContentRef.current = doc.content;
+
+    useEffect(() => {
+      if (editorAutoSave !== "afterDelay") return;
+      if (doc.status !== "ready") return;
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = setTimeout(() => {
+        autoSaveTimerRef.current = null;
+        void saveRef.current().then(() => onSavedRef.current?.());
+      }, 5000);
+      return () => {
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      };
+    }, [editorAutoSave, doc]);
+
+    // Auto-save: onFocusChange — attach blur listener to CodeMirror's DOM.
+    const handleBlur = useCallback(() => {
+      if (editorAutoSave !== "onFocusChange") return;
+      void saveRef.current().then(() => onSavedRef.current?.());
+    }, [editorAutoSave]);
+
+    const extensions = useMemo(
+      () => {
+        const prefs = usePreferencesStore.getState();
+        return [
+          // basicSetup is added before user extensions by @uiw/react-codemirror,
+          // so we must elevate vim's precedence to win the keymap.
+          vimCompartment.of(
+            prefs.vimMode ? Prec.highest(vim()) : [],
+          ),
+          vimHandlersExtension(() => ({
+            save: () => {
               void (async () => {
                 await saveRef.current();
                 onSavedRef.current?.();
               })();
-              return true;
             },
-          },
-        ]),
-      ],
+            close: () => onCloseRef.current?.(),
+          })),
+          ...buildSharedExtensions(),
+          lineNumbersCompartment.of(prefs.editorLineNumbers ? lineNumbers() : []),
+          bracketMatchingCompartment.of(prefs.editorBracketMatching ? bracketMatching() : []),
+          tabSizeCompartment.of(EditorState.tabSize.of(prefs.editorTabSize)),
+          wrapCompartment.of(prefs.editorWordWrap ? EditorView.lineWrapping : []),
+          languageCompartment.of([]),
+          inlineCompletion({
+            getPrefs: () => {
+              const s = usePreferencesStore.getState();
+              return {
+                enabled: s.autocompleteEnabled,
+                provider: s.autocompleteProvider,
+                modelId: s.autocompleteModelId,
+                apiKey: apiKeyRef.current,
+                lmstudioBaseURL: s.lmstudioBaseURL,
+              };
+            },
+            getPath: () => pathRef.current,
+            getLanguage: () => languageRef.current,
+          }),
+          keymap.of([
+            {
+              key: "Mod-s",
+              preventDefault: true,
+              run: () => {
+                void (async () => {
+                  await saveRef.current();
+                  onSavedRef.current?.();
+                })();
+                return true;
+              },
+            },
+          ]),
+        ];
+      },
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       [],
     );
 
@@ -261,7 +350,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     }
 
     return (
-      <div className="flex h-full min-h-0 flex-col">
+      <div className="flex h-full min-h-0 flex-col" onBlur={handleBlur}>
         <CodeMirror
           ref={cmRef}
           value={doc.content}
@@ -271,10 +360,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           height="100%"
           className="flex-1 min-h-0 overflow-hidden"
           basicSetup={{
-            lineNumbers: true,
+            lineNumbers: false,
             highlightActiveLineGutter: true,
             foldGutter: true,
-            bracketMatching: true,
+            bracketMatching: false,
             closeBrackets: true,
             autocompletion: true,
             highlightActiveLine: true,
