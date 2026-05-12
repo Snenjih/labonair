@@ -44,6 +44,9 @@ pub fn initialize_db(
         "ALTER TABLE hosts ADD COLUMN keep_alive_interval INTEGER",
         "ALTER TABLE hosts ADD COLUMN keep_alive_tries INTEGER",
         "ALTER TABLE hosts ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
+        // groups migrations
+        "ALTER TABLE groups ADD COLUMN icon TEXT",
+        "ALTER TABLE groups ADD COLUMN color TEXT",
     ] {
         let _ = conn.execute_batch(sql);
     }
