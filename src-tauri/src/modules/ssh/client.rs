@@ -112,6 +112,7 @@ pub fn ssh_connect(
     // Step 4: SSH handshake (15 s timeout covers handshake + auth)
     log_step!(app, tab_id, "Starting SSH handshake…");
     let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
+    session.set_blocking(true);
     session.set_timeout(15_000);
     session.set_tcp_stream(tcp);
     session.handshake().map_err(|e| e.to_string())?;
@@ -275,6 +276,9 @@ pub fn ssh_connect(
     }
 
     log_step!(app, tab_id, "Authenticated ✓");
+
+    // Increase timeout for SFTP and other operations (30 seconds)
+    session.set_timeout(30_000);
 
     // Step 7: Open PTY shell channel
     log_step!(app, tab_id, "Opening PTY shell channel…");

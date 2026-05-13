@@ -1,6 +1,28 @@
 use crate::modules::ssh::SshState;
 use std::io::{Read as _, Write as _};
 
+// Helper function to get SFTP with retry logic
+fn get_sftp_with_retry(session: &ssh2::Session) -> Result<ssh2::Sftp, String> {
+    let mut last_err = String::new();
+    for attempt in 0..3 {
+        match session.sftp() {
+            Ok(sftp) => {
+                if attempt > 0 {
+                    log::debug!("SFTP subsystem initialized on attempt {}", attempt + 1);
+                }
+                return Ok(sftp);
+            }
+            Err(e) => {
+                last_err = e.to_string();
+                if attempt < 2 {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+            }
+        }
+    }
+    Err(format!("SFTP subsystem failed after 3 attempts: {}", last_err))
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FileNode {
     pub name: String,
@@ -38,7 +60,7 @@ pub async fn sftp_read_dir(
     tokio::task::spawn_blocking(move || {
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&tab_id_clone).ok_or("no session for tab")?;
-        let sftp = entry.session.sftp().map_err(|e| e.to_string())?;
+        let sftp = get_sftp_with_retry(&entry.session)?;
 
         let entries = sftp
             .readdir(std::path::Path::new(&path_clone))
@@ -89,7 +111,7 @@ pub async fn sftp_rename(
     tokio::task::spawn_blocking(move || {
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = entry.session.sftp().map_err(|e| e.to_string())?;
+        let sftp = get_sftp_with_retry(&entry.session)?;
         sftp.rename(
             std::path::Path::new(&old_path),
             std::path::Path::new(&new_path),
@@ -111,7 +133,7 @@ pub async fn sftp_delete(
     tokio::task::spawn_blocking(move || {
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = entry.session.sftp().map_err(|e| e.to_string())?;
+        let sftp = get_sftp_with_retry(&entry.session)?;
 
         for path in &paths {
             let p = std::path::Path::new(path);
@@ -142,7 +164,7 @@ pub async fn sftp_mkdir(
     tokio::task::spawn_blocking(move || {
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = entry.session.sftp().map_err(|e| e.to_string())?;
+        let sftp = get_sftp_with_retry(&entry.session)?;
         sftp.mkdir(std::path::Path::new(&path), 0o755)
             .map_err(|e| e.to_string())
     })
@@ -184,7 +206,7 @@ pub async fn prepare_remote_edit(
         let file_data = {
             let map = state_inner.0.lock().map_err(|e| e.to_string())?;
             let sess = map.get(&tab_id).ok_or("no session for tab")?;
-            let sftp = sess.session.sftp().map_err(|e| e.to_string())?;
+            let sftp = get_sftp_with_retry(&sess.session)?;
             let stat = sftp.stat(std::path::Path::new(&remote_path)).map_err(|e| e.to_string())?;
             let size = stat.size.unwrap_or(0);
             if size > 5 * 1024 * 1024 {
