@@ -71,45 +71,11 @@ pub fn ssh_connect(
         tab_id,
         format!("TCP connecting to {}:{}…", host_address, port)
     );
-    let tcp = {
-        let addr = format!("{}:{}", host_address, port);
-        let (tx, rx) = std::sync::mpsc::channel::<Result<std::net::TcpStream, String>>();
-        std::thread::spawn(move || {
-            let result = (|| {
-                use std::net::ToSocketAddrs;
-                let addrs: Vec<std::net::SocketAddr> = addr
-                    .parse::<std::net::SocketAddr>()
-                    .map(|a| vec![a])
-                    .unwrap_or_else(|_| {
-                        addr.to_socket_addrs()
-                            .map(|it| it.collect())
-                            .unwrap_or_default()
-                    });
-                if addrs.is_empty() {
-                    return Err("could not resolve host".to_string());
-                }
-                // Try each resolved address (IPv4 + IPv6), return first that connects.
-                let mut last_err = String::new();
-                for socket_addr in &addrs {
-                    match std::net::TcpStream::connect_timeout(
-                        socket_addr,
-                        std::time::Duration::from_secs(10),
-                    ) {
-                        Ok(stream) => return Ok(stream),
-                        Err(e) => last_err = e.to_string(),
-                    }
-                }
-                Err(last_err)
-            })();
-            let _ = tx.send(result);
-        });
-        rx.recv_timeout(std::time::Duration::from_secs(15))
-            .map_err(|_| format!("TCP connect to {}:{} timed out after 15s", host_address, port))?
-            .map_err(|e| e)?
-    };
+    let tcp = tcp_connect(&host_address, port)
+        .map_err(|e| format!("TCP connect to {}:{} failed: {}", host_address, port, e))?;
     log_step!(app, tab_id, "TCP connection established.");
 
-    // Step 4: SSH handshake (15 s timeout covers handshake + auth)
+    // Step 4: SSH handshake
     log_step!(app, tab_id, "Starting SSH handshake…");
     let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
     session.set_blocking(true);
@@ -277,10 +243,26 @@ pub fn ssh_connect(
 
     log_step!(app, tab_id, "Authenticated ✓");
 
-    // Increase timeout for SFTP and other operations (30 seconds)
-    session.set_timeout(30_000);
+    // Step 7: Dedicated SFTP session — second independent TCP+SSH connection so that
+    // blocking SFTP I/O never contends with the non-blocking PTY reader thread.
+    log_step!(app, tab_id, "Opening dedicated SFTP session…");
+    let sftp_session = build_sftp_session(
+        &host_address,
+        port,
+        &username,
+        &auth_method,
+        private_key_path.as_deref(),
+        password.as_deref(),
+        passphrase.as_deref(),
+    );
+    if sftp_session.is_ok() {
+        log_step!(app, tab_id, "SFTP session ready ✓");
+    } else if let Err(ref e) = sftp_session {
+        log_step!(app, tab_id, format!("SFTP session failed (non-fatal): {}", e));
+    }
+    let sftp_session = sftp_session.ok();
 
-    // Step 7: Open PTY shell channel
+    // Step 8: Open PTY shell channel — sets PTY session to non-blocking.
     log_step!(app, tab_id, "Opening PTY shell channel…");
     let channel = super::pty::open_shell_channel(
         &mut session,
@@ -290,7 +272,7 @@ pub fn ssh_connect(
     )?;
     log_step!(app, tab_id, "Shell channel open ✓");
 
-    // Step 8: Store session and emit session_established
+    // Step 9: Store sessions and emit session_established
     {
         let mut map = state.0.lock().map_err(|e| e.to_string())?;
         map.insert(
@@ -298,6 +280,7 @@ pub fn ssh_connect(
             super::SshSession {
                 session,
                 channel: Some(channel),
+                sftp_session,
             },
         );
     }
@@ -322,6 +305,95 @@ pub fn ssh_connect(
     .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+/// Opens a TCP connection to host:port with a 15-second timeout.
+fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
+    let addr = format!("{}:{}", host, port);
+    let (tx, rx) = std::sync::mpsc::channel::<Result<std::net::TcpStream, String>>();
+    let addr_clone = addr.clone();
+    std::thread::spawn(move || {
+        let result = (|| {
+            use std::net::ToSocketAddrs;
+            let addrs: Vec<std::net::SocketAddr> = addr_clone
+                .parse::<std::net::SocketAddr>()
+                .map(|a| vec![a])
+                .unwrap_or_else(|_| {
+                    addr_clone
+                        .to_socket_addrs()
+                        .map(|it| it.collect())
+                        .unwrap_or_default()
+                });
+            if addrs.is_empty() {
+                return Err("could not resolve host".to_string());
+            }
+            let mut last_err = String::new();
+            for socket_addr in &addrs {
+                match std::net::TcpStream::connect_timeout(
+                    socket_addr,
+                    std::time::Duration::from_secs(10),
+                ) {
+                    Ok(stream) => return Ok(stream),
+                    Err(e) => last_err = e.to_string(),
+                }
+            }
+            Err(last_err)
+        })();
+        let _ = tx.send(result);
+    });
+    rx.recv_timeout(std::time::Duration::from_secs(15))
+        .map_err(|_| format!("TCP connect timed out after 15s"))?
+        .map_err(|e| e)
+}
+
+/// Builds a fully authenticated SSH session dedicated to SFTP (stays blocking).
+/// Skips known_hosts check because the host was already verified for the PTY session.
+fn build_sftp_session(
+    host: &str,
+    port: i64,
+    username: &str,
+    auth_method: &str,
+    private_key_path: Option<&str>,
+    password: Option<&str>,
+    passphrase: Option<&str>,
+) -> Result<ssh2::Session, String> {
+    let tcp = tcp_connect(host, port)?;
+    let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
+    session.set_blocking(true);
+    session.set_timeout(15_000);
+    session.set_tcp_stream(tcp);
+    session.handshake().map_err(|e| e.to_string())?;
+
+    if auth_method == "key" {
+        let key_path = private_key_path
+            .map(std::path::Path::new)
+            .ok_or("private_key_path not set for key auth")?;
+        // Try agent first, then key file.
+        let agent_ok = (|| -> bool {
+            if std::env::var("SSH_AUTH_SOCK").is_err() { return false; }
+            let mut agent = match session.agent() { Ok(a) => a, Err(_) => return false };
+            if agent.connect().is_err() { return false; }
+            if agent.list_identities().is_err() { return false; }
+            let ids = match agent.identities() { Ok(i) => i, Err(_) => return false };
+            for id in ids {
+                if agent.userauth(username, &id).is_ok() { return true; }
+            }
+            false
+        })();
+        if !agent_ok {
+            session.userauth_pubkey_file(username, None, key_path, passphrase)
+                .map_err(|e| e.to_string())?;
+        }
+    } else {
+        session.userauth_password(username, password.unwrap_or(""))
+            .map_err(|e| e.to_string())?;
+    }
+
+    if !session.authenticated() {
+        return Err("SFTP session authentication failed".to_string());
+    }
+
+    Ok(session)
 }
 
 /// Tries to authenticate via the running ssh-agent (SSH_AUTH_SOCK).

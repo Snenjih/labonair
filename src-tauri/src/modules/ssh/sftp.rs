@@ -1,26 +1,15 @@
 use crate::modules::ssh::SshState;
 use std::io::{Read as _, Write as _};
 
-// Helper function to get SFTP with retry logic
-fn get_sftp_with_retry(session: &ssh2::Session) -> Result<ssh2::Sftp, String> {
-    let mut last_err = String::new();
-    for attempt in 0..3 {
-        match session.sftp() {
-            Ok(sftp) => {
-                if attempt > 0 {
-                    log::debug!("SFTP subsystem initialized on attempt {}", attempt + 1);
-                }
-                return Ok(sftp);
-            }
-            Err(e) => {
-                last_err = e.to_string();
-                if attempt < 2 {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                }
-            }
-        }
-    }
-    Err(format!("SFTP subsystem failed after 3 attempts: {}", last_err))
+/// Returns a reference to the dedicated SFTP session, or an error if it was
+/// never established (e.g. the host doesn't support SFTP).
+macro_rules! sftp_session {
+    ($entry:expr) => {
+        $entry
+            .sftp_session
+            .as_ref()
+            .ok_or("No dedicated SFTP session — the host may not support SFTP")?
+    };
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -60,7 +49,8 @@ pub async fn sftp_read_dir(
     tokio::task::spawn_blocking(move || {
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&tab_id_clone).ok_or("no session for tab")?;
-        let sftp = get_sftp_with_retry(&entry.session)?;
+        let sess = sftp_session!(entry);
+        let sftp = sess.sftp().map_err(|e| format!("SFTP subsystem failed: {}", e))?;
 
         let entries = sftp
             .readdir(std::path::Path::new(&path_clone))
@@ -111,7 +101,8 @@ pub async fn sftp_rename(
     tokio::task::spawn_blocking(move || {
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = get_sftp_with_retry(&entry.session)?;
+        let sess = sftp_session!(entry);
+        let sftp = sess.sftp().map_err(|e| format!("SFTP subsystem failed: {}", e))?;
         sftp.rename(
             std::path::Path::new(&old_path),
             std::path::Path::new(&new_path),
@@ -133,18 +124,16 @@ pub async fn sftp_delete(
     tokio::task::spawn_blocking(move || {
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = get_sftp_with_retry(&entry.session)?;
+        let sess = sftp_session!(entry);
+        let sftp = sess.sftp().map_err(|e| format!("SFTP subsystem failed: {}", e))?;
 
         for path in &paths {
             let p = std::path::Path::new(path);
             if sftp.unlink(p).is_err() {
-                let mut ch = entry
-                    .session
-                    .channel_session()
-                    .map_err(|e| e.to_string())?;
+                // Fall back to rm -rf for directories via the dedicated SFTP session.
+                let mut ch = sess.channel_session().map_err(|e| e.to_string())?;
                 let safe = path.replace('\'', "'\\''");
-                ch.exec(&format!("rm -rf '{safe}'"))
-                    .map_err(|e| e.to_string())?;
+                ch.exec(&format!("rm -rf '{safe}'")).map_err(|e| e.to_string())?;
                 ch.wait_close().map_err(|e| e.to_string())?;
             }
         }
@@ -164,7 +153,8 @@ pub async fn sftp_mkdir(
     tokio::task::spawn_blocking(move || {
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = get_sftp_with_retry(&entry.session)?;
+        let sess = sftp_session!(entry);
+        let sftp = sess.sftp().map_err(|e| format!("SFTP subsystem failed: {}", e))?;
         sftp.mkdir(std::path::Path::new(&path), 0o755)
             .map_err(|e| e.to_string())
     })
@@ -183,7 +173,8 @@ pub async fn sftp_chmod(
     tokio::task::spawn_blocking(move || {
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = entry.session.sftp().map_err(|e| e.to_string())?;
+        let sess = sftp_session!(entry);
+        let sftp = sess.sftp().map_err(|e| format!("SFTP subsystem failed: {}", e))?;
         let mut stat = sftp
             .stat(std::path::Path::new(&path))
             .map_err(|e| e.to_string())?;
@@ -205,8 +196,9 @@ pub async fn prepare_remote_edit(
     tokio::task::spawn_blocking(move || {
         let file_data = {
             let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-            let sess = map.get(&tab_id).ok_or("no session for tab")?;
-            let sftp = get_sftp_with_retry(&sess.session)?;
+            let entry = map.get(&tab_id).ok_or("no session for tab")?;
+            let sess = sftp_session!(entry);
+            let sftp = sess.sftp().map_err(|e| format!("SFTP subsystem failed: {}", e))?;
             let stat = sftp.stat(std::path::Path::new(&remote_path)).map_err(|e| e.to_string())?;
             let size = stat.size.unwrap_or(0);
             if size > 5 * 1024 * 1024 {
@@ -215,8 +207,8 @@ pub async fn prepare_remote_edit(
             let mut remote_file = sftp.open(std::path::Path::new(&remote_path)).map_err(|e| e.to_string())?;
             let mut buf = Vec::with_capacity(size as usize);
             remote_file.read_to_end(&mut buf).map_err(|e| e.to_string())?;
-            buf
-        };
+            Ok::<_, String>(buf)
+        }?;
 
         let temp_dir = std::env::temp_dir().join("nexum_remote_edits");
         std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
@@ -244,8 +236,9 @@ pub async fn save_remote_edit(
     tokio::task::spawn_blocking(move || {
         let data = std::fs::read(&local_temp_path).map_err(|e| e.to_string())?;
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        let sess = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = sess.session.sftp().map_err(|e| e.to_string())?;
+        let entry = map.get(&tab_id).ok_or("no session for tab")?;
+        let sess = sftp_session!(entry);
+        let sftp = sess.sftp().map_err(|e| format!("SFTP subsystem failed: {}", e))?;
         let mut remote_file = sftp.create(std::path::Path::new(&remote_path)).map_err(|e| e.to_string())?;
         remote_file.write_all(&data).map_err(|e| e.to_string())
     })
