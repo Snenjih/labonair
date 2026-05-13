@@ -3,6 +3,18 @@ use std::path::PathBuf;
 use ignore::WalkBuilder;
 use serde::Serialize;
 
+fn expand_home(path: &str) -> Result<PathBuf, String> {
+    if path == "~" {
+        dirs::home_dir().ok_or("could not determine home directory".to_string())
+    } else if path.starts_with("~/") {
+        let mut home = dirs::home_dir().ok_or("could not determine home directory".to_string())?;
+        home.push(&path[2..]);
+        Ok(home)
+    } else {
+        Ok(PathBuf::from(path))
+    }
+}
+
 #[derive(Serialize)]
 pub struct SearchHit {
     /// Absolute path of the matched file.
@@ -29,7 +41,7 @@ pub fn fs_search(
         return Ok(Vec::new());
     }
     let cap = limit.unwrap_or(200).min(1000);
-    let root_path = PathBuf::from(&root);
+    let root_path = expand_home(&root)?;
     if !root_path.is_dir() {
         return Err(format!("not a directory: {root}"));
     }

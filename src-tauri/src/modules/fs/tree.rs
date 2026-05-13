@@ -3,6 +3,18 @@ use std::time::UNIX_EPOCH;
 
 use serde::Serialize;
 
+fn expand_home(path: &str) -> Result<PathBuf, String> {
+    if path == "~" {
+        dirs::home_dir().ok_or("could not determine home directory".to_string())
+    } else if path.starts_with("~/") {
+        let mut home = dirs::home_dir().ok_or("could not determine home directory".to_string())?;
+        home.push(&path[2..]);
+        Ok(home)
+    } else {
+        Ok(PathBuf::from(path))
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EntryKind {
@@ -26,7 +38,7 @@ pub struct DirEntry {
 #[tauri::command]
 pub async fn fs_read_dir(path: String) -> Result<Vec<DirEntry>, String> {
     tokio::task::spawn_blocking(move || {
-        let root = PathBuf::from(&path);
+        let root = expand_home(&path)?;
         let read = std::fs::read_dir(&root).map_err(|e| {
             log::debug!("fs_read_dir({}) failed: {e}", root.display());
             e.to_string()

@@ -1,9 +1,21 @@
 use std::path::PathBuf;
 
+fn expand_home(path: &str) -> Result<PathBuf, String> {
+    if path == "~" {
+        dirs::home_dir().ok_or("could not determine home directory".to_string())
+    } else if path.starts_with("~/") {
+        let mut home = dirs::home_dir().ok_or("could not determine home directory".to_string())?;
+        home.push(&path[2..]);
+        Ok(home)
+    } else {
+        Ok(PathBuf::from(path))
+    }
+}
+
 /// Creates a new empty file. Fails if the file already exists.
 #[tauri::command]
 pub fn fs_create_file(path: String) -> Result<(), String> {
-    let p = PathBuf::from(&path);
+    let p = expand_home(&path)?;
     if p.exists() {
         return Err(format!("already exists: {}", p.display()));
     }
@@ -18,7 +30,7 @@ pub fn fs_create_file(path: String) -> Result<(), String> {
 /// where typing "a/b/c" creates the full chain.
 #[tauri::command]
 pub fn fs_create_dir(path: String) -> Result<(), String> {
-    let p = PathBuf::from(&path);
+    let p = expand_home(&path)?;
     if p.exists() {
         return Err(format!("already exists: {}", p.display()));
     }
@@ -31,8 +43,8 @@ pub fn fs_create_dir(path: String) -> Result<(), String> {
 /// Renames (or moves) a path. Refuses to overwrite an existing target.
 #[tauri::command]
 pub fn fs_rename(from: String, to: String) -> Result<(), String> {
-    let from_p = PathBuf::from(&from);
-    let to_p = PathBuf::from(&to);
+    let from_p = expand_home(&from)?;
+    let to_p = expand_home(&to)?;
     if !from_p.exists() {
         return Err(format!("not found: {}", from_p.display()));
     }
@@ -53,7 +65,7 @@ pub fn fs_rename(from: String, to: String) -> Result<(), String> {
 /// responsible for confirming destructive operations with the user.
 #[tauri::command]
 pub fn fs_delete(path: String) -> Result<(), String> {
-    let p = PathBuf::from(&path);
+    let p = expand_home(&path)?;
     let meta = std::fs::symlink_metadata(&p).map_err(|e| {
         log::debug!("fs_delete stat({}) failed: {e}", p.display());
         e.to_string()

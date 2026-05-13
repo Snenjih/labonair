@@ -7,6 +7,18 @@ use serde::Serialize;
 const MAX_READ_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
 const BINARY_SNIFF_BYTES: usize = 8 * 1024;
 
+fn expand_home(path: &str) -> Result<PathBuf, String> {
+    if path == "~" {
+        dirs::home_dir().ok_or("could not determine home directory".to_string())
+    } else if path.starts_with("~/") {
+        let mut home = dirs::home_dir().ok_or("could not determine home directory".to_string())?;
+        home.push(&path[2..]);
+        Ok(home)
+    } else {
+        Ok(PathBuf::from(path))
+    }
+}
+
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum ReadResult {
@@ -42,7 +54,7 @@ pub struct FileStat {
 #[tauri::command]
 pub async fn fs_read_file(path: String) -> Result<ReadResult, String> {
     tokio::task::spawn_blocking(move || {
-        let p = PathBuf::from(&path);
+        let p = expand_home(&path)?;
         let meta = std::fs::metadata(&p).map_err(|e| {
             log::debug!("fs_read_file stat({}) failed: {e}", p.display());
             e.to_string()
@@ -82,7 +94,7 @@ pub async fn fs_read_file(path: String) -> Result<ReadResult, String> {
 #[tauri::command]
 pub async fn fs_write_file(path: String, content: String) -> Result<(), String> {
     tokio::task::spawn_blocking(move || {
-        let target = PathBuf::from(&path);
+        let target = expand_home(&path)?;
         let parent = target
             .parent()
             .ok_or_else(|| "path has no parent".to_string())?;
@@ -125,7 +137,7 @@ pub async fn fs_write_file(path: String, content: String) -> Result<(), String> 
 #[tauri::command]
 pub async fn fs_stat(path: String) -> Result<FileStat, String> {
     tokio::task::spawn_blocking(move || {
-        let p = PathBuf::from(&path);
+        let p = expand_home(&path)?;
         let meta = std::fs::metadata(&p).map_err(|e| e.to_string())?;
         let kind = if meta.is_dir() {
             StatKind::Dir
