@@ -10,6 +10,7 @@ type Props = {
   onDirtyChange: (id: number, dirty: boolean) => void;
   registerHandle: (id: number, handle: EditorPaneHandle | null) => void;
   onCloseTab: (id: number) => void;
+  onSaveAs: (id: number, newPath: string) => void;
 };
 
 export function EditorStack({
@@ -18,6 +19,7 @@ export function EditorStack({
   onDirtyChange,
   registerHandle,
   onCloseTab,
+  onSaveAs,
 }: Props) {
   const editors = tabs.filter((t): t is EditorTab => t.kind === "editor");
 
@@ -28,6 +30,7 @@ export function EditorStack({
   const registerRef = useRef(registerHandle);
   const dirtyRef = useRef(onDirtyChange);
   const closeRef = useRef(onCloseTab);
+  const saveAsRef = useRef(onSaveAs);
   useEffect(() => {
     registerRef.current = registerHandle;
   }, [registerHandle]);
@@ -37,6 +40,9 @@ export function EditorStack({
   useEffect(() => {
     closeRef.current = onCloseTab;
   }, [onCloseTab]);
+  useEffect(() => {
+    saveAsRef.current = onSaveAs;
+  }, [onSaveAs]);
 
   const refCallbacks = useRef(
     new Map<number, (h: EditorPaneHandle | null) => void>(),
@@ -44,6 +50,7 @@ export function EditorStack({
   const dirtyCallbacks = useRef(new Map<number, (dirty: boolean) => void>());
   const closeCallbacks = useRef(new Map<number, () => void>());
   const savedCallbacks = useRef(new Map<number, (() => void) | undefined>());
+  const saveAsCallbacks = useRef(new Map<number, ((newPath: string) => void) | undefined>());
 
   const getRefCallback = (id: number) => {
     let cb = refCallbacks.current.get(id);
@@ -66,6 +73,16 @@ export function EditorStack({
     if (!cb) {
       cb = () => closeRef.current(id);
       closeCallbacks.current.set(id, cb);
+    }
+    return cb;
+  };
+
+  const getSaveAsCallback = (t: EditorTab) => {
+    if (!t.isUntitled) return undefined;
+    let cb = saveAsCallbacks.current.get(t.id);
+    if (!cb) {
+      cb = (newPath: string) => saveAsRef.current(t.id, newPath);
+      saveAsCallbacks.current.set(t.id, cb);
     }
     return cb;
   };
@@ -105,6 +122,9 @@ export function EditorStack({
     for (const id of savedCallbacks.current.keys()) {
       if (!live.has(id)) savedCallbacks.current.delete(id);
     }
+    for (const id of saveAsCallbacks.current.keys()) {
+      if (!live.has(id)) saveAsCallbacks.current.delete(id);
+    }
   }, [editors]);
 
   if (editors.length === 0) return null;
@@ -125,9 +145,11 @@ export function EditorStack({
               <EditorPane
                 ref={getRefCallback(t.id)}
                 path={t.path}
+                isUntitled={t.isUntitled}
                 onDirtyChange={getDirtyCallback(t.id)}
                 onClose={getCloseCallback(t.id)}
                 onSaved={getSavedCallback(t)}
+                onSaveAs={getSaveAsCallback(t)}
               />
             </div>
           </div>

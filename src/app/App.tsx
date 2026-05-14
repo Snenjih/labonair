@@ -21,7 +21,6 @@ import { useSnippetsStore } from "@/modules/ai/store/snippetsStore";
 import {
   AiDiffStack,
   EditorStack,
-  NewEditorDialog,
   type EditorPaneHandle,
 } from "@/modules/editor";
 import { FileExplorer } from "@/modules/explorer";
@@ -81,6 +80,7 @@ export default function App() {
     newSshTab,
     newQuickSshTab,
     newSftpTab,
+    openUntitledTab,
   } = useTabs();
 
   const searchAddons = useRef<Map<number, SearchAddon>>(new Map());
@@ -112,7 +112,6 @@ export default function App() {
   }, []);
 
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [newEditorOpen, setNewEditorOpen] = useState(false);
   const miniOpen = useChatStore((s) => s.mini.open);
   const openMini = useChatStore((s) => s.openMini);
   const focusInput = useChatStore((s) => s.focusInput);
@@ -249,6 +248,20 @@ export default function App() {
   const handleClose = useCallback(
     (id: number) => {
       const t = tabs.find((x) => x.id === id);
+      if (t?.kind === "editor" && t.isUntitled) {
+        const choice = window.confirm(
+          `"${t.title}" has not been saved. Save before closing?`,
+        );
+        if (choice) {
+          const handle = editorRefs.current.get(id);
+          if (handle) {
+            void handle.save().then(() => disposeTab(id));
+            return;
+          }
+        }
+        disposeTab(id);
+        return;
+      }
       if (t?.kind === "editor" && t.dirty) {
         const ok = window.confirm(
           `"${t.title}" has unsaved changes. Close anyway?`,
@@ -475,7 +488,7 @@ export default function App() {
     () => ({
       "tab.new": openNewTab,
       "tab.newPreview": () => openPreviewTab(""),
-      "tab.newEditor": () => setNewEditorOpen(true),
+      "tab.newEditor": () => void openUntitledTab(),
       "tab.close": () => handleClose(activeId),
       "tab.next": () => cycleTab(1),
       "tab.prev": () => cycleTab(-1),
@@ -538,6 +551,14 @@ export default function App() {
 
   const handleEditorDirty = useCallback(
     (id: number, dirty: boolean) => updateTab(id, { dirty }),
+    [updateTab],
+  );
+
+  const handleEditorSaveAs = useCallback(
+    (id: number, newPath: string) => {
+      const name = newPath.split("/").pop() ?? newPath;
+      updateTab(id, { path: newPath, title: name });
+    },
     [updateTab],
   );
 
@@ -609,7 +630,7 @@ export default function App() {
             onSelect={setActiveId}
             onNew={openNewTab}
             onNewPreview={() => openPreviewTab("")}
-            onNewEditor={() => setNewEditorOpen(true)}
+            onNewEditor={() => void openUntitledTab()}
             onClose={handleClose}
             onToggleSidebar={toggleSidebar}
             onOpenShortcuts={() => setShortcutsOpen(true)}
@@ -677,6 +698,7 @@ export default function App() {
                         registerHandle={registerEditorHandle}
                         onDirtyChange={handleEditorDirty}
                         onCloseTab={disposeTab}
+                        onSaveAs={handleEditorSaveAs}
                       />
                     </div>
                     <div
@@ -807,13 +829,6 @@ export default function App() {
           <ShortcutsDialog
             open={shortcutsOpen}
             onOpenChange={setShortcutsOpen}
-          />
-
-          <NewEditorDialog
-            open={newEditorOpen}
-            onOpenChange={setNewEditorOpen}
-            rootPath={explorerRoot ?? home}
-            onCreated={(path) => openFileTab(path)}
           />
 
           <UpdaterDialog />

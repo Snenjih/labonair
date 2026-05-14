@@ -14,6 +14,7 @@ export type EditorTab = {
   title: string;
   path: string;
   dirty: boolean;
+  isUntitled?: boolean;
   remoteHostTabId?: string;
   remotePath?: string;
 };
@@ -250,7 +251,7 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
           ...x,
           ...(patch.title !== undefined && { title: patch.title }),
           ...(patch.dirty !== undefined && { dirty: patch.dirty }),
-          ...(patch.path !== undefined && { path: patch.path }),
+          ...(patch.path !== undefined && { path: patch.path, isUntitled: false }),
         };
       }),
     );
@@ -282,6 +283,24 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
   const newSftpTab = useCallback((hostId: string, title: string) => {
     const id = nextIdRef.current++;
     setTabs((t) => [...t, { id, kind: "sftp", title, hostId }]);
+    setActiveId(id);
+    return id;
+  }, []);
+
+  const openUntitledTab = useCallback(async () => {
+    const id = nextIdRef.current++;
+    const tempPath = await invoke<string>("fs_create_temp_file", { prefix: `untitled-${id}` });
+    setTabs((t) => [
+      ...t,
+      {
+        id,
+        kind: "editor" as const,
+        title: "Untitled",
+        path: tempPath,
+        dirty: false,
+        isUntitled: true,
+      },
+    ]);
     setActiveId(id);
     return id;
   }, []);
@@ -328,5 +347,6 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     newQuickSshTab,
     newSftpTab,
     openRemoteEditorTab,
+    openUntitledTab,
   };
 }

@@ -25,6 +25,15 @@ pub fn fs_create_file(path: String) -> Result<(), String> {
     })
 }
 
+/// Creates a temporary empty file in the system temp dir and returns its path.
+#[tauri::command]
+pub fn fs_create_temp_file(prefix: String) -> Result<String, String> {
+    let dir = std::env::temp_dir();
+    let path = dir.join(format!("{}.txt", prefix));
+    std::fs::write(&path, "").map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 /// Creates a new directory. Fails if the directory already exists.
 /// Parents are created as needed — matches the common "new folder" UX
 /// where typing "a/b/c" creates the full chain.

@@ -48,12 +48,16 @@ export type EditorPaneHandle = {
   getPath: () => string;
   /** Re-read the file from disk. Skips silently if the buffer is dirty. */
   reload: () => boolean;
+  /** Save the current buffer (triggers save-as dialog for untitled files). */
+  save: () => Promise<void>;
 };
 
 type Props = {
   path: string;
+  isUntitled?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
+  onSaveAs?: (newPath: string) => void;
   onClose?: () => void;
 };
 
@@ -64,8 +68,8 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, onDirtyChange, onSaved, onClose }, ref) {
-    const { doc, onChange, save, reload } = useDocument({ path, onDirtyChange });
+  function EditorPane({ path, isUntitled, onDirtyChange, onSaved, onSaveAs, onClose }, ref) {
+    const { doc, onChange, save, reload } = useDocument({ path, isUntitled, onDirtyChange, onSaveAs });
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
     const cmRef = useRef<ReactCodeMirrorRef>(null);
@@ -173,6 +177,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     useEffect(() => {
       if (editorAutoSave !== "afterDelay") return;
       if (doc.status !== "ready") return;
+      if (isUntitled) return;
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       autoSaveTimerRef.current = setTimeout(() => {
         autoSaveTimerRef.current = null;
@@ -186,8 +191,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     // Auto-save: onFocusChange — attach blur listener to CodeMirror's DOM.
     const handleBlur = useCallback(() => {
       if (editorAutoSave !== "onFocusChange") return;
+      if (isUntitled) return;
       void saveRef.current().then(() => onSavedRef.current?.());
-    }, [editorAutoSave]);
+    }, [editorAutoSave, isUntitled]);
 
     const extensions = useMemo(
       () => {
@@ -310,6 +316,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         },
         getPath: () => path,
         reload: () => reloadRef.current(),
+        save: async () => {
+          await saveRef.current();
+          onSavedRef.current?.();
+        },
       }),
       [path],
     );

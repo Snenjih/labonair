@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { save as dialogSave } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type ReadResult =
@@ -15,10 +16,12 @@ export type DocumentState =
 
 type Options = {
   path: string;
+  isUntitled?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
+  onSaveAs?: (newPath: string) => void;
 };
 
-export function useDocument({ path, onDirtyChange }: Options) {
+export function useDocument({ path, isUntitled, onDirtyChange, onSaveAs }: Options) {
   const [doc, setDoc] = useState<DocumentState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
   const [reloadCounter, setReloadCounter] = useState(0);
@@ -89,13 +92,28 @@ export function useDocument({ path, onDirtyChange }: Options) {
     setDirty(next !== savedRef.current);
   }, []);
 
+  const onSaveAsRef = useRef(onSaveAs);
+  useEffect(() => { onSaveAsRef.current = onSaveAs; }, [onSaveAs]);
+
   const save = useCallback(async () => {
-    if (!dirty) return;
+    if (!dirty && !isUntitled) return;
     const content = bufferRef.current;
+    if (isUntitled) {
+      const chosen = await dialogSave({
+        defaultPath: "untitled.txt",
+        filters: [{ name: "All Files", extensions: ["*"] }],
+      });
+      if (!chosen) return;
+      await invoke("fs_write_file", { path: chosen, content });
+      savedRef.current = content;
+      setDirty(false);
+      onSaveAsRef.current?.(chosen);
+      return;
+    }
     await invoke("fs_write_file", { path, content });
     savedRef.current = content;
     setDirty(false);
-  }, [path, dirty]);
+  }, [path, dirty, isUntitled]);
 
   return { doc, dirty, onChange, save, reload };
 }
