@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Cancel01Icon,
+  EyeIcon,
   FileAddIcon,
   Folder01Icon,
   FolderAddIcon,
@@ -56,7 +57,12 @@ export function FileExplorer({
   onRevealInTerminal,
   onAttachToAgent,
 }: Props) {
-  const tree = useFileTree(rootPath, { onPathRenamed, onPathDeleted });
+  const [showHiddenFiles, setShowHiddenFiles] = useState(false);
+  const tree = useFileTree(rootPath, {
+    onPathRenamed,
+    onPathDeleted,
+    showHiddenFiles,
+  });
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -237,7 +243,7 @@ export function FileExplorer({
           size="icon"
           className="size-6 text-muted-foreground hover:text-foreground"
           onClick={() => setIsSearchOpen(!isSearchOpen)}
-          title="New file"
+          title="Search"
         >
           <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
         </Button>
@@ -259,6 +265,19 @@ export function FileExplorer({
           title="New folder"
         >
           <HugeiconsIcon icon={FolderAddIcon} size={13} strokeWidth={2} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`size-6 transition-colors duration-75 shrink-0 ${
+            showHiddenFiles
+              ? "text-primary bg-primary/10 hover:bg-primary/20"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+          onClick={() => setShowHiddenFiles(!showHiddenFiles)}
+          title={showHiddenFiles ? "Hide hidden files" : "Show hidden files"}
+        >
+          <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={2} />
         </Button>
         <Button
           variant="ghost"

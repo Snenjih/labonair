@@ -28,6 +28,7 @@ export function dirname(path: string): string {
 type Options = {
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
+  showHiddenFiles?: boolean;
 };
 
 export function useFileTree(rootPath: string | null, options?: Options) {
@@ -42,13 +43,16 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     async (path: string) => {
       setNode(path, { status: "loading" });
       try {
-        const entries = await invoke<DirEntry[]>("fs_read_dir", { path });
+        const entries = await invoke<DirEntry[]>("fs_read_dir", {
+          path,
+          show_hidden: options?.showHiddenFiles,
+        });
         setNode(path, { status: "loaded", entries });
       } catch (e) {
         setNode(path, { status: "error", message: String(e) });
       }
     },
-    [setNode],
+    [setNode, options?.showHiddenFiles],
   );
 
   // Root change → reset persisted tree state and reload root.
