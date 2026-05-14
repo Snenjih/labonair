@@ -21,7 +21,7 @@ fn is_passphrase_error(msg: &str) -> bool {
 }
 
 #[tauri::command]
-pub fn ssh_connect(
+pub async fn ssh_connect(
     tab_id: String,
     host_id: String,
     passphrase: Option<String>,
@@ -29,7 +29,7 @@ pub fn ssh_connect(
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    // Step 1: Fetch host from SQLite
+    // Step 1: Fetch host from SQLite (fast, sync — do before spawn_blocking)
     log_step!(app, tab_id, "Reading host configuration…");
     let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh) = {
         let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
@@ -55,7 +55,7 @@ pub fn ssh_connect(
         .map_err(|e| e.to_string())?
     };
 
-    // Step 2: Fetch password from keychain
+    // Step 2: Fetch password from keychain (fast, sync)
     let password: Option<String> = if auth_method == "password" {
         log_step!(app, tab_id, "Retrieving credentials from keychain…");
         keyring::Entry::new("nexum-app", &host_id)
@@ -64,6 +64,58 @@ pub fn ssh_connect(
     } else {
         None
     };
+
+    // All blocking I/O (TCP, SSH, SFTP) runs on a dedicated thread so the
+    // Tokio runtime and the UI stay responsive during the connection.
+    let state_inner = state.inner().clone();
+    let app_clone = app.clone();
+    let tab_id_clone = tab_id.clone();
+    let host_id_clone = host_id.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        ssh_connect_blocking(
+            tab_id_clone, host_id_clone.clone(), passphrase,
+            host_address, port, username, auth_method,
+            private_key_path, keep_alive_interval, keep_alive_tries,
+            default_path_ssh, password, state_inner, app_clone,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if result.is_ok() {
+        // Update last_connected_at on the DB thread after successful connect.
+        let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        let _ = conn.execute(
+            "UPDATE hosts SET last_connected_at = ?1 WHERE id = ?2",
+            rusqlite::params![now, host_id],
+        );
+    }
+
+    result
+}
+
+fn ssh_connect_blocking(
+    tab_id: String,
+    host_id: String,
+    passphrase: Option<String>,
+    host_address: String,
+    port: i64,
+    username: String,
+    auth_method: String,
+    private_key_path: Option<String>,
+    keep_alive_interval: Option<i64>,
+    keep_alive_tries: Option<i64>,
+    default_path_ssh: Option<String>,
+    password: Option<String>,
+    state: super::SshState,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    // (password already fetched by the async wrapper above)
+    let _ = keep_alive_tries; // suppress unused warning
 
     // Step 3: TCP connect (DNS resolution + connect, with a 15-second total timeout)
     log_step!(
@@ -243,24 +295,24 @@ pub fn ssh_connect(
 
     log_step!(app, tab_id, "Authenticated ✓");
 
-    // Step 7: Dedicated SFTP session — second independent TCP+SSH connection so that
-    // blocking SFTP I/O never contends with the non-blocking PTY reader thread.
-    log_step!(app, tab_id, "Opening dedicated SFTP session…");
-    let sftp_session = build_sftp_session(
-        &host_address,
-        port,
-        &username,
-        &auth_method,
-        private_key_path.as_deref(),
-        password.as_deref(),
-        passphrase.as_deref(),
-    );
-    if sftp_session.is_ok() {
-        log_step!(app, tab_id, "SFTP session ready ✓");
-    } else if let Err(ref e) = sftp_session {
-        log_step!(app, tab_id, format!("SFTP session failed (non-fatal): {}", e));
-    }
-    let sftp_session = sftp_session.ok();
+    // Step 7: Open SFTP subsystem on the SAME session while still in blocking
+    // mode.  This must happen BEFORE open_shell_channel, which sets the
+    // session to non-blocking.  A separate TCP connection times out on this
+    // server (NAT/firewall blocks second-connection sftp_init).
+    log_step!(app, tab_id, "Initialising SFTP subsystem…");
+    log::debug!("[SFTP-CONNECT] calling session.sftp() in blocking mode (before PTY)…");
+    let sftp = match session.sftp() {
+        Ok(s) => {
+            log::debug!("[SFTP-CONNECT] SFTP subsystem open ✓");
+            log_step!(app, tab_id, "SFTP ready ✓");
+            Some(s)
+        }
+        Err(e) => {
+            log::warn!("[SFTP-CONNECT] SFTP subsystem failed (non-fatal): {}", e);
+            log_step!(app, tab_id, format!("SFTP unavailable: {}", e));
+            None
+        }
+    };
 
     // Step 8: Open PTY shell channel — sets PTY session to non-blocking.
     log_step!(app, tab_id, "Opening PTY shell channel…");
@@ -268,7 +320,7 @@ pub fn ssh_connect(
         &mut session,
         &tab_id,
         &app,
-        state.inner().clone(),
+        state.clone(),
     )?;
     log_step!(app, tab_id, "Shell channel open ✓");
 
@@ -280,20 +332,8 @@ pub fn ssh_connect(
             super::SshSession {
                 session,
                 channel: Some(channel),
-                sftp_session,
+                sftp,
             },
-        );
-    }
-
-    {
-        let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis() as i64;
-        let _ = conn.execute(
-            "UPDATE hosts SET last_connected_at = ?1 WHERE id = ?2",
-            rusqlite::params![now, host_id],
         );
     }
 
@@ -346,55 +386,6 @@ fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
         .map_err(|e| e)
 }
 
-/// Builds a fully authenticated SSH session dedicated to SFTP (stays blocking).
-/// Skips known_hosts check because the host was already verified for the PTY session.
-fn build_sftp_session(
-    host: &str,
-    port: i64,
-    username: &str,
-    auth_method: &str,
-    private_key_path: Option<&str>,
-    password: Option<&str>,
-    passphrase: Option<&str>,
-) -> Result<ssh2::Session, String> {
-    let tcp = tcp_connect(host, port)?;
-    let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
-    session.set_blocking(true);
-    session.set_timeout(15_000);
-    session.set_tcp_stream(tcp);
-    session.handshake().map_err(|e| e.to_string())?;
-
-    if auth_method == "key" {
-        let key_path = private_key_path
-            .map(std::path::Path::new)
-            .ok_or("private_key_path not set for key auth")?;
-        // Try agent first, then key file.
-        let agent_ok = (|| -> bool {
-            if std::env::var("SSH_AUTH_SOCK").is_err() { return false; }
-            let mut agent = match session.agent() { Ok(a) => a, Err(_) => return false };
-            if agent.connect().is_err() { return false; }
-            if agent.list_identities().is_err() { return false; }
-            let ids = match agent.identities() { Ok(i) => i, Err(_) => return false };
-            for id in ids {
-                if agent.userauth(username, &id).is_ok() { return true; }
-            }
-            false
-        })();
-        if !agent_ok {
-            session.userauth_pubkey_file(username, None, key_path, passphrase)
-                .map_err(|e| e.to_string())?;
-        }
-    } else {
-        session.userauth_password(username, password.unwrap_or(""))
-            .map_err(|e| e.to_string())?;
-    }
-
-    if !session.authenticated() {
-        return Err("SFTP session authentication failed".to_string());
-    }
-
-    Ok(session)
-}
 
 /// Tries to authenticate via the running ssh-agent (SSH_AUTH_SOCK).
 /// Returns true if authentication succeeded, false if agent unavailable or all

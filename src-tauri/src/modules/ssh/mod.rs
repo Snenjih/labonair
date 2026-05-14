@@ -10,8 +10,10 @@ pub struct SshSession {
     /// PTY session — set to non-blocking after shell channel opens.
     pub session: ssh2::Session,
     pub channel: Option<ssh2::Channel>,
-    /// Dedicated blocking session used exclusively for SFTP operations.
-    pub sftp_session: Option<ssh2::Session>,
+    /// Pre-initialized SFTP handle opened immediately after auth on a dedicated
+    /// connection. ssh2::Sftp holds its own Arc<SessionInner> so the underlying
+    /// session stays alive even after Session is dropped.
+    pub sftp: Option<ssh2::Sftp>,
 }
 
 // ssh2::Session contains raw pointers but is guarded by the Mutex.

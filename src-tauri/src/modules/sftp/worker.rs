@@ -124,8 +124,7 @@ async fn download_file(
     let (file_size, data) = {
         let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&job.host_id).ok_or("no SSH session for host")?;
-        let sftp_sess = entry.sftp_session.as_ref().ok_or("no SFTP session for host")?;
-        let sftp = sftp_sess.sftp().map_err(|e| e.to_string())?;
+        let sftp = entry.sftp.as_ref().ok_or("no SFTP handle for host")?;
         let stat = sftp.stat(std::path::Path::new(&job.src_path)).map_err(|e| e.to_string())?;
         let size = stat.size.unwrap_or(0);
         let mut remote_file = sftp.open(std::path::Path::new(&job.src_path)).map_err(|e| e.to_string())?;
@@ -174,8 +173,7 @@ async fn upload_file(
     let conflict_exists = {
         let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(&job.host_id).ok_or("no SSH session for host")?;
-        let sftp_sess = entry.sftp_session.as_ref().ok_or("no SFTP session for host")?;
-        let sftp = sftp_sess.sftp().map_err(|e| e.to_string())?;
+        let sftp = entry.sftp.as_ref().ok_or("no SFTP handle for host")?;
         sftp.stat(std::path::Path::new(&job.dest_path)).is_ok()
     };
 
@@ -198,8 +196,7 @@ async fn upload_file(
 
     let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
     let entry = map.get(&job.host_id).ok_or("no SSH session for host")?;
-    let sftp_sess = entry.sftp_session.as_ref().ok_or("no SFTP session for host")?;
-    let sftp = sftp_sess.sftp().map_err(|e| e.to_string())?;
+    let sftp = entry.sftp.as_ref().ok_or("no SFTP handle for host")?;
     let mut remote_file = sftp.create(std::path::Path::new(&job.dest_path)).map_err(|e| e.to_string())?;
 
     for (i, chunk) in data.chunks(CHUNK_SIZE).enumerate() {

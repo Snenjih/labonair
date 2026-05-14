@@ -22,6 +22,7 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
   const [password, setPassword] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
+  const [isMismatch, setIsMismatch] = useState(false);
   const connectingRef = useRef(false);
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -68,6 +69,7 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
           if (event.payload.tab_id !== tabId) return;
           setFingerprint(event.payload.fingerprint);
           setHost(event.payload.host);
+          setIsMismatch(event.payload.is_mismatch);
           setStatus("waiting_trust");
         },
       ),
@@ -143,7 +145,11 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
               <button
                 onClick={() => {
                   setStatus("connecting");
-                  onConnected();
+                  // For a key mismatch the backend already returned an error, so
+                  // we must retry.  For an unknown host (not mismatch) the backend
+                  // connection is still in progress — session_established will fire
+                  // and call onConnected() once the session is ready.
+                  if (isMismatch) doConnect();
                 }}
                 className={cn(
                   "flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground",
