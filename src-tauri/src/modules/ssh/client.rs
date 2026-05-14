@@ -258,12 +258,27 @@ fn ssh_connect_blocking(
 
     let known_hosts_path = dirs::home_dir().map(|h| h.join(".ssh").join("known_hosts"));
 
+    // For non-standard ports, OpenSSH known_hosts uses the "[host]:port" format.
+    // We must check both the bracketed form and the plain hostname so that keys
+    // stored by either `ssh-keyscan -p <port>` or a previous plain-host accept
+    // are correctly recognised.
+    let known_host_check_name = if port == 22 {
+        host_address.clone()
+    } else {
+        format!("[{}]:{}", host_address, port)
+    };
     let known_host_status = if let Some(ref path) = known_hosts_path {
         let mut kh = session.known_hosts().map_err(|e| e.to_string())?;
         if path.exists() {
             let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH);
         }
-        kh.check(&host_address, host_key)
+        let result = kh.check(&known_host_check_name, host_key);
+        // Fall back to plain hostname check (covers keys stored without port).
+        if matches!(result, ssh2::CheckResult::NotFound) && port != 22 {
+            kh.check(&host_address, host_key)
+        } else {
+            result
+        }
     } else {
         ssh2::CheckResult::NotFound
     };
@@ -315,12 +330,13 @@ fn ssh_connect_blocking(
 
             // Remove old entry and add updated host key to known_hosts.
             if let Some(ref path) = known_hosts_path {
+                drop_known_host_entry(path, &known_host_check_name);
                 drop_known_host_entry(path, &host_address);
                 let mut kh = session.known_hosts().map_err(|e| e.to_string())?;
                 if path.exists() {
                     let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH);
                 }
-                let _ = kh.add(&host_address, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
+                let _ = kh.add(&known_host_check_name, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
                 let _ = kh.write_file(path, ssh2::KnownHostFileKind::OpenSSH);
             }
             log_step!(app, tab_id, "Host key accepted and updated in known_hosts ✓");
@@ -372,7 +388,7 @@ fn ssh_connect_blocking(
                 if path.exists() {
                     let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH);
                 }
-                let _ = kh.add(&host_address, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
+                let _ = kh.add(&known_host_check_name, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
                 let _ = kh.write_file(path, ssh2::KnownHostFileKind::OpenSSH);
             }
             log_step!(app, tab_id, "Host trusted and added to known_hosts ✓");
@@ -470,6 +486,9 @@ fn ssh_connect_blocking(
     // Skipped for SSH terminal connections — they never need the SFTP handle.
     let sftp = if init_sftp {
         log_step!(app, tab_id, "Initialising SFTP subsystem…");
+        // The 15s handshake timeout is too short for SFTP subsystem negotiation
+        // on slower hosts (RPi, etc.). Use a 60s timeout for this phase only.
+        session.set_timeout(60_000);
         log::debug!("[SFTP-CONNECT] calling session.sftp() in blocking mode…");
         match session.sftp() {
             Ok(s) => {
@@ -526,43 +545,44 @@ fn ssh_connect_blocking(
     Ok(())
 }
 
-/// Opens a TCP connection to host:port with a 15-second timeout.
+/// Opens a TCP connection to host:port with a 10-second timeout.
+/// Uses socket2 for explicit OS-level socket control and IPv4-only filtering.
+/// This fixes "No route to host" errors on macOS with local network addresses.
 fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
-    let addr = format!("{}:{}", host, port);
-    let (tx, rx) = std::sync::mpsc::channel::<Result<std::net::TcpStream, String>>();
-    let addr_clone = addr.clone();
-    std::thread::spawn(move || {
-        let result = (|| {
-            use std::net::ToSocketAddrs;
-            let addrs: Vec<std::net::SocketAddr> = addr_clone
-                .parse::<std::net::SocketAddr>()
-                .map(|a| vec![a])
-                .unwrap_or_else(|_| {
-                    addr_clone
-                        .to_socket_addrs()
-                        .map(|it| it.collect())
-                        .unwrap_or_default()
-                });
-            if addrs.is_empty() {
-                return Err("could not resolve host".to_string());
-            }
-            let mut last_err = String::new();
-            for socket_addr in &addrs {
-                match std::net::TcpStream::connect_timeout(
-                    socket_addr,
-                    std::time::Duration::from_secs(10),
-                ) {
-                    Ok(stream) => return Ok(stream),
+    use socket2::{Domain, Socket, Type};
+    use std::net::{IpAddr, ToSocketAddrs};
+    use std::time::Duration;
+
+    let addr_str = format!("{}:{}", host, port);
+    let addrs: Vec<std::net::SocketAddr> = addr_str
+        .to_socket_addrs()
+        .map_err(|e| format!("Failed to resolve {}: {}", addr_str, e))?
+        .filter(|addr| matches!(addr.ip(), IpAddr::V4(_)))
+        .collect();
+
+    if addrs.is_empty() {
+        return Err(format!("No IPv4 addresses resolved for {}", addr_str));
+    }
+
+    let mut last_err = String::new();
+    for addr in &addrs {
+        match Socket::new(Domain::IPV4, Type::STREAM, None) {
+            Ok(socket) => {
+                let _ = socket.set_nonblocking(false);
+                let sock_addr: socket2::SockAddr = (*addr).into();
+                match socket.connect_timeout(&sock_addr, Duration::from_secs(10)) {
+                    Ok(_) => {
+                        let tcp: std::net::TcpStream = socket.into();
+                        tcp.set_nodelay(true).ok();
+                        return Ok(tcp);
+                    }
                     Err(e) => last_err = e.to_string(),
                 }
             }
-            Err(last_err)
-        })();
-        let _ = tx.send(result);
-    });
-    rx.recv_timeout(std::time::Duration::from_secs(15))
-        .map_err(|_| format!("TCP connect timed out after 15s"))?
-        .map_err(|e| e)
+            Err(e) => last_err = e.to_string(),
+        }
+    }
+    Err(last_err)
 }
 
 

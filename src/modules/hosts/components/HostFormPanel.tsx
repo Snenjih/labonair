@@ -114,7 +114,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
           id: host.id,
           name: form.name,
           host_address: form.host_address,
-          port: parseInt(form.port, 10) || 22,
+          port: parseInt(form.port, 10) || host.port,
           username: form.username,
           auth_method: form.auth_method,
           pin_to_top: form.pin_to_top,

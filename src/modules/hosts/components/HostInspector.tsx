@@ -145,7 +145,7 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
             <Input
               type="number"
               value={current.port}
-              onChange={(e) => setDraft((d) => ({ ...d, port: parseInt(e.target.value, 10) || 22 }))}
+              onChange={(e) => setDraft((d) => { const v = parseInt(e.target.value, 10); return { ...d, port: Number.isNaN(v) ? d.port : v }; })}
               onBlur={handleBlur}
               className="h-8 text-sm bg-background"
             />
