@@ -1,37 +1,44 @@
 # Handshake — Session State
 
-## Last Session: 2026-05-14
+## Last Session: 2026-05-15
 
 ### What Was Done
-- Completed **SFTP Manager Emoji Replacement to Hugeicons**
+- Completed **File Explorer Hidden Files Toggle**
 
   **Files modified:**
-  - `src/modules/sftp/SftpPane.tsx`: Replaced 📁 emoji with `<HugeiconsIcon icon={Folder01Icon} />`
-  - `src/modules/sftp/components/SftpToolbar.tsx`: 
-    - Replaced ↑ with `<HugeiconsIcon icon={ArrowUp01Icon} />`
-    - Replaced ↺ with `<HugeiconsIcon icon={Refresh01Icon} />`
-    - Replaced 👁/🙈 with `<HugeiconsIcon icon={EyeIcon} />`
-    - Replaced ⌘ with `<HugeiconsIcon icon={TerminalIcon} />`
-  - `src/modules/sftp/components/VirtualizedFileList.tsx`: 
-    - Replaced 📁, 🔗, 📄 emojis with proper folder, link, and file icons
-    - Implemented `getIcon()` function returning context-aware HugeiconsIcon components
+  - `src/modules/explorer/FileExplorer.tsx`:
+    - Added `showHiddenFiles` state to track toggle
+    - Added eye icon (EyeIcon) button to toolbar between new folder and refresh buttons
+    - Button shows active state (primary color + background) when enabled
+    - Styled with dynamic classes for visual feedback
+  
+  - `src/modules/explorer/lib/useFileTree.ts`:
+    - Updated `Options` type to accept `showHiddenFiles` parameter
+    - Modified `fetchChildren` to pass `show_hidden` flag to `fs_read_dir` command
+    - Added dependency on `showHiddenFiles` to trigger refetch when toggled
 
-  **Implementation approach:**
-  - Icons imported from `@hugeicons/core-free-icons` (icon definitions)
-  - Wrapped with `HugeiconsIcon` component from `@hugeicons/react`
-  - All icons sized 16px for consistency with UI
-  - Styling preserved (color, hover states, animations)
+  **Implementation details:**
+  - Leverages existing Rust backend support for `show_hidden` parameter in `fs_read_dir`
+  - Reuses icon pattern from SFTP manager for consistency
+  - Toggle automatically refreshes file tree when clicked
+  - Hidden files (starting with `.`) filtered at backend level
 
-  - `cargo check` ✅ `tsc --noEmit` ✅ (SFTP module compiles cleanly)
+  - `tsc --noEmit` ✅ (TypeScript compilation passes)
+  - Feature ready for testing in dev server (port 1420)
 
 ### Current State
-- All SFTP Manager emojis replaced with professional Hugeicons
-- UI consistency improved with proper icon set
-- No functional changes, purely visual/presentation update
+- File explorer sidebar now has 5 action buttons:
+  1. Search (magnifying glass)
+  2. New File (+ file icon) - pre-existing
+  3. New Folder (+ folder icon) - pre-existing
+  4. **Toggle Hidden Files (eye icon)** - NEW
+  5. Refresh (refresh icon)
+- Users can now toggle visibility of dot-prefix files/folders
+- Consistent styling with rest of application
 
 ### What's Next
+- Ready for user testing in the app
 - No further tasks defined
-- Potential future: audit other modules for remaining emoji usage
 
 ### Blockers
 - None
