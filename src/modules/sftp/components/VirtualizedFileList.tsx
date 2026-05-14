@@ -1,7 +1,22 @@
 import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { FileNode } from "../types";
+
+interface ColWidths {
+  size: number;
+  modified: number;
+  permissions: number;
+  type: number;
+}
+
+const DEFAULT_COL_WIDTHS: ColWidths = {
+  size: 96,
+  modified: 128,
+  permissions: 112,
+  type: 72,
+};
 
 interface VirtualizedFileListProps {
   files: FileNode[];
@@ -36,6 +51,12 @@ export function VirtualizedFileList({
 }: VirtualizedFileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [colWidths, setColWidths] = useState<ColWidths>(DEFAULT_COL_WIDTHS);
+
+  const showSize = usePreferencesStore((s) => s.sftpColumnSize);
+  const showModified = usePreferencesStore((s) => s.sftpColumnModified);
+  const showPermissions = usePreferencesStore((s) => s.sftpColumnPermissions);
+  const showType = usePreferencesStore((s) => s.sftpColumnType);
 
   const virtualizer = useVirtualizer({
     count: files.length,
@@ -43,6 +64,34 @@ export function VirtualizedFileList({
     estimateSize: () => 28,
     overscan: 10,
   });
+
+  // Column resize dragging
+  const resizingCol = useRef<keyof ColWidths | null>(null);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
+
+  const startResize = useCallback((col: keyof ColWidths, e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingCol.current = col;
+    resizeStartX.current = e.clientX;
+    resizeStartWidth.current = colWidths[col];
+
+    function onMouseMove(ev: MouseEvent) {
+      if (!resizingCol.current) return;
+      const delta = ev.clientX - resizeStartX.current;
+      const newWidth = Math.max(60, resizeStartWidth.current + delta);
+      setColWidths((prev) => ({ ...prev, [resizingCol.current!]: newWidth }));
+    }
+
+    function onMouseUp() {
+      resizingCol.current = null;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [colWidths]);
 
   function handleDragOver(e: React.DragEvent) {
     if (!onDrop) return;
@@ -63,7 +112,6 @@ export function VirtualizedFileList({
     if (!onDrop) return;
     try {
       const paths = JSON.parse(e.dataTransfer.getData("text/plain")) as string[];
-      // Use the path of the item under cursor, or the current dir
       const targetEl = (e.target as HTMLElement).closest("[data-file-path]");
       const targetPath = targetEl?.getAttribute("data-file-path") ?? "";
       onDrop(targetPath, paths);
@@ -71,6 +119,8 @@ export function VirtualizedFileList({
       // ignore malformed drag data
     }
   }
+
+  const visibleCols = { showSize, showModified, showPermissions, showType };
 
   return (
     <div
@@ -85,21 +135,42 @@ export function VirtualizedFileList({
       {isDragOver && (
         <div className="absolute inset-0 bg-primary/10 z-10 pointer-events-none rounded-sm" />
       )}
+
       {/* Sticky column header */}
-      <div className="flex items-center h-7 px-2 border-b border-border bg-card shrink-0 select-none">
+      <div className="flex items-center h-7 px-2 border-b border-border bg-card shrink-0 select-none overflow-hidden">
         <span className="w-5 shrink-0" />
-        <span className="flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-widest truncate pl-1">
+        <span className="flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-widest truncate pl-1 min-w-0">
           Name
         </span>
-        <span className="w-24 text-right text-[10px] font-semibold text-muted-foreground uppercase tracking-widest pr-1">
-          Size
-        </span>
-        <span className="w-32 text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
-          Modified
-        </span>
-        <span className="w-28 text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">
-          Perms
-        </span>
+        {showSize && (
+          <ResizableHeaderCell
+            label="Size"
+            width={colWidths.size}
+            onResizeStart={(e) => startResize("size", e)}
+            align="right"
+          />
+        )}
+        {showType && (
+          <ResizableHeaderCell
+            label="Type"
+            width={colWidths.type}
+            onResizeStart={(e) => startResize("type", e)}
+          />
+        )}
+        {showModified && (
+          <ResizableHeaderCell
+            label="Modified"
+            width={colWidths.modified}
+            onResizeStart={(e) => startResize("modified", e)}
+          />
+        )}
+        {showPermissions && (
+          <ResizableHeaderCell
+            label="Perms"
+            width={colWidths.permissions}
+            onResizeStart={(e) => startResize("permissions", e)}
+          />
+        )}
       </div>
 
       {/* Scrollable virtual list */}
@@ -114,7 +185,7 @@ export function VirtualizedFileList({
                 <div className="w-4 h-3 rounded bg-muted/20" />
                 <div
                   className="h-3 rounded bg-muted/20"
-                  style={{ width: `${40 + Math.random() * 40}%` }}
+                  style={{ width: `${40 + (i * 7) % 40}%` }}
                 />
               </div>
             ))}
@@ -138,9 +209,11 @@ export function VirtualizedFileList({
                   file={file}
                   isSelected={isSelected}
                   isEven={isEven}
-                  draggable={draggable}
+                  draggable={draggable && file.name !== ".."}
                   onDragStart={onDragStart ? (paths) => onDragStart(paths) : undefined}
                   selectedPaths={selectedPaths}
+                  colWidths={colWidths}
+                  visibleCols={visibleCols}
                   style={{
                     position: "absolute",
                     top: 0,
@@ -148,7 +221,9 @@ export function VirtualizedFileList({
                     width: "100%",
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
-                  onClick={(e) => onSelect(file.path, e.metaKey || e.ctrlKey)}
+                  onClick={(e) => {
+                    if (file.name !== "..") onSelect(file.path, e.metaKey || e.ctrlKey);
+                  }}
                   onDoubleClick={() => onDoubleClick(file)}
                   isRenaming={renamingPath === file.path}
                   renameValue={renameValue ?? ""}
@@ -165,6 +240,36 @@ export function VirtualizedFileList({
   );
 }
 
+interface ResizableHeaderCellProps {
+  label: string;
+  width: number;
+  onResizeStart: (e: React.MouseEvent) => void;
+  align?: "left" | "right";
+}
+
+function ResizableHeaderCell({ label, width, onResizeStart, align = "left" }: ResizableHeaderCellProps) {
+  return (
+    <div
+      className="relative shrink-0 flex items-center"
+      style={{ width }}
+    >
+      <span
+        className={cn(
+          "w-full text-[10px] font-semibold text-muted-foreground uppercase tracking-widest truncate",
+          align === "right" && "text-right pr-1",
+        )}
+      >
+        {label}
+      </span>
+      {/* Drag handle */}
+      <div
+        className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40 transition-colors"
+        onMouseDown={onResizeStart}
+      />
+    </div>
+  );
+}
+
 interface FileRowProps {
   file: FileNode;
   isSelected: boolean;
@@ -175,6 +280,8 @@ interface FileRowProps {
   draggable?: boolean;
   onDragStart?: (paths: string[]) => void;
   selectedPaths?: Set<string>;
+  colWidths: ColWidths;
+  visibleCols: { showSize: boolean; showModified: boolean; showPermissions: boolean; showType: boolean };
   isRenaming?: boolean;
   renameValue?: string;
   onRenameChange?: (v: string) => void;
@@ -192,13 +299,19 @@ function FileRow({
   draggable,
   onDragStart,
   selectedPaths,
+  colWidths,
+  visibleCols,
   isRenaming,
   renameValue,
   onRenameChange,
   onRenameCommit,
   onRenameCancel,
 }: FileRowProps) {
-  const icon = file.is_symlink ? "🔗" : file.is_dir ? "📁" : "📄";
+  const isUpEntry = file.name === "..";
+  const icon = isUpEntry ? "📁" : file.is_symlink ? "🔗" : file.is_dir ? "📁" : "📄";
+  const fileExt = !file.is_dir && !file.is_symlink && !isUpEntry
+    ? (file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() ?? "—" : "—")
+    : "—";
 
   function handleDragStart(e: React.DragEvent) {
     const paths = selectedPaths && selectedPaths.size > 0
@@ -216,12 +329,14 @@ function FileRow({
       draggable={draggable}
       onDragStart={draggable ? handleDragStart : undefined}
       className={cn(
-        "h-7 flex items-center px-2 gap-1 cursor-default select-none transition-colors duration-75",
+        "h-7 flex items-center px-2 gap-1 cursor-default select-none transition-colors duration-75 overflow-hidden",
         isEven && !isSelected && "bg-muted/10",
         isSelected
           ? "bg-primary/20 ring-1 ring-inset ring-primary/40"
           : "hover:bg-accent/20",
-        draggable && "cursor-grab active:cursor-grabbing",
+        draggable && !isUpEntry && "cursor-grab active:cursor-grabbing",
+        isUpEntry && "opacity-60",
+        !isUpEntry && !isSelected && file.name.startsWith(".") && "opacity-50",
       )}
       onClick={isRenaming ? undefined : onClick}
       onDoubleClick={isRenaming ? undefined : onDoubleClick}
@@ -244,22 +359,45 @@ function FileRow({
         <span
           className={cn(
             "flex-1 text-sm truncate min-w-0",
-            file.is_symlink && "italic text-muted-foreground",
-            file.is_dir && "font-medium",
+            file.is_symlink && !isUpEntry && "italic text-muted-foreground",
+            (file.is_dir || isUpEntry) && "font-medium",
           )}
         >
           {file.name}
         </span>
       )}
-      <span className="w-24 text-right text-xs text-muted-foreground tabular-nums pr-1 shrink-0">
-        {file.is_dir ? "" : formatBytes(file.size)}
-      </span>
-      <span className="w-32 text-xs text-muted-foreground tabular-nums shrink-0">
-        {formatRelativeTime(file.modified_at)}
-      </span>
-      <span className="w-28 text-[11px] font-mono text-muted-foreground/60 shrink-0 truncate">
-        {file.permissions || "—"}
-      </span>
+      {visibleCols.showSize && (
+        <span
+          className="text-right text-xs text-muted-foreground tabular-nums pr-1 shrink-0"
+          style={{ width: colWidths.size }}
+        >
+          {!isUpEntry && !file.is_dir ? formatBytes(file.size) : ""}
+        </span>
+      )}
+      {visibleCols.showType && (
+        <span
+          className="text-xs text-muted-foreground/70 tabular-nums shrink-0 truncate"
+          style={{ width: colWidths.type }}
+        >
+          {fileExt}
+        </span>
+      )}
+      {visibleCols.showModified && (
+        <span
+          className="text-xs text-muted-foreground tabular-nums shrink-0"
+          style={{ width: colWidths.modified }}
+        >
+          {!isUpEntry ? formatRelativeTime(file.modified_at) : ""}
+        </span>
+      )}
+      {visibleCols.showPermissions && (
+        <span
+          className="text-[11px] font-mono text-muted-foreground/60 shrink-0 truncate"
+          style={{ width: colWidths.permissions }}
+        >
+          {!isUpEntry ? (file.permissions || "—") : ""}
+        </span>
+      )}
     </div>
   );
 }

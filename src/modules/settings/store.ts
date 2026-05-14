@@ -72,6 +72,14 @@ export type Preferences = {
   editorWordWrap: boolean;
   editorTabSize: 2 | 4 | 8;
   editorBracketMatching: boolean;
+
+  // --- File Manager ---
+  sftpShowHiddenFiles: boolean;
+  sftpShowUpFolder: boolean;
+  sftpColumnSize: boolean;
+  sftpColumnModified: boolean;
+  sftpColumnPermissions: boolean;
+  sftpColumnType: boolean;
 };
 
 const STORE_PATH = "nexum-settings.json";
@@ -107,6 +115,13 @@ const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
 const KEY_EDITOR_TAB_SIZE = "editorTabSize";
 const KEY_EDITOR_BRACKET_MATCHING = "editorBracketMatching";
 
+const KEY_SFTP_SHOW_HIDDEN = "sftpShowHiddenFiles";
+const KEY_SFTP_SHOW_UP_FOLDER = "sftpShowUpFolder";
+const KEY_SFTP_COLUMN_SIZE = "sftpColumnSize";
+const KEY_SFTP_COLUMN_MODIFIED = "sftpColumnModified";
+const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
+const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
+
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   defaultModelId: DEFAULT_MODEL_ID,
@@ -139,6 +154,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorWordWrap: false,
   editorTabSize: 2,
   editorBracketMatching: true,
+
+  sftpShowHiddenFiles: false,
+  sftpShowUpFolder: true,
+  sftpColumnSize: true,
+  sftpColumnModified: true,
+  sftpColumnPermissions: true,
+  sftpColumnType: false,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -219,6 +241,19 @@ export async function loadPreferences(): Promise<Preferences> {
     editorBracketMatching:
       get<boolean>(KEY_EDITOR_BRACKET_MATCHING) ??
       DEFAULT_PREFERENCES.editorBracketMatching,
+
+    sftpShowHiddenFiles:
+      get<boolean>(KEY_SFTP_SHOW_HIDDEN) ?? DEFAULT_PREFERENCES.sftpShowHiddenFiles,
+    sftpShowUpFolder:
+      get<boolean>(KEY_SFTP_SHOW_UP_FOLDER) ?? DEFAULT_PREFERENCES.sftpShowUpFolder,
+    sftpColumnSize:
+      get<boolean>(KEY_SFTP_COLUMN_SIZE) ?? DEFAULT_PREFERENCES.sftpColumnSize,
+    sftpColumnModified:
+      get<boolean>(KEY_SFTP_COLUMN_MODIFIED) ?? DEFAULT_PREFERENCES.sftpColumnModified,
+    sftpColumnPermissions:
+      get<boolean>(KEY_SFTP_COLUMN_PERMISSIONS) ?? DEFAULT_PREFERENCES.sftpColumnPermissions,
+    sftpColumnType:
+      get<boolean>(KEY_SFTP_COLUMN_TYPE) ?? DEFAULT_PREFERENCES.sftpColumnType,
   };
 }
 
@@ -370,6 +405,36 @@ export async function setEditorBracketMatching(value: boolean): Promise<void> {
   await store.save();
 }
 
+export async function setSftpShowHiddenFiles(value: boolean): Promise<void> {
+  await store.set(KEY_SFTP_SHOW_HIDDEN, value);
+  await store.save();
+}
+
+export async function setSftpShowUpFolder(value: boolean): Promise<void> {
+  await store.set(KEY_SFTP_SHOW_UP_FOLDER, value);
+  await store.save();
+}
+
+export async function setSftpColumnSize(value: boolean): Promise<void> {
+  await store.set(KEY_SFTP_COLUMN_SIZE, value);
+  await store.save();
+}
+
+export async function setSftpColumnModified(value: boolean): Promise<void> {
+  await store.set(KEY_SFTP_COLUMN_MODIFIED, value);
+  await store.save();
+}
+
+export async function setSftpColumnPermissions(value: boolean): Promise<void> {
+  await store.set(KEY_SFTP_COLUMN_PERMISSIONS, value);
+  await store.save();
+}
+
+export async function setSftpColumnType(value: boolean): Promise<void> {
+  await store.set(KEY_SFTP_COLUMN_TYPE, value);
+  await store.save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -408,6 +473,13 @@ export function onPreferencesChange(
     [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
     [KEY_EDITOR_TAB_SIZE]: "editorTabSize",
     [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
+
+    [KEY_SFTP_SHOW_HIDDEN]: "sftpShowHiddenFiles",
+    [KEY_SFTP_SHOW_UP_FOLDER]: "sftpShowUpFolder",
+    [KEY_SFTP_COLUMN_SIZE]: "sftpColumnSize",
+    [KEY_SFTP_COLUMN_MODIFIED]: "sftpColumnModified",
+    [KEY_SFTP_COLUMN_PERMISSIONS]: "sftpColumnPermissions",
+    [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
   };
   return store.onChange<unknown>((key, value) => {
     const mapped = map[key];

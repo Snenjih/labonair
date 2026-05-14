@@ -5,6 +5,7 @@ export type SettingCategory =
   | "Appearance"
   | "Terminal"
   | "Editor"
+  | "File Manager"
   | "Models"
   | "Agents"
   | "About";
@@ -207,6 +208,50 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "Editor",
     controlType: "Switch",
   },
+
+  // --- File Manager ---
+  {
+    id: "sftpShowHiddenFiles",
+    label: "Show hidden files",
+    description: "Display files and folders starting with a dot (e.g. .bashrc, .ssh).",
+    category: "File Manager",
+    controlType: "Switch",
+  },
+  {
+    id: "sftpShowUpFolder",
+    label: "Show '..' up-folder entry",
+    description: "Show a '..' entry at the top of each directory to navigate to the parent folder.",
+    category: "File Manager",
+    controlType: "Switch",
+  },
+  {
+    id: "sftpColumnSize",
+    label: "Show Size column",
+    description: "Display the file size column in the file list.",
+    category: "File Manager",
+    controlType: "Switch",
+  },
+  {
+    id: "sftpColumnModified",
+    label: "Show Modified column",
+    description: "Display the last modified date column in the file list.",
+    category: "File Manager",
+    controlType: "Switch",
+  },
+  {
+    id: "sftpColumnPermissions",
+    label: "Show Permissions column",
+    description: "Display the Unix permissions column in the file list.",
+    category: "File Manager",
+    controlType: "Switch",
+  },
+  {
+    id: "sftpColumnType",
+    label: "Show Type column",
+    description: "Display the file type / extension column in the file list.",
+    category: "File Manager",
+    controlType: "Switch",
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [
@@ -214,6 +259,7 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Appearance",
   "Terminal",
   "Editor",
+  "File Manager",
   "Models",
   "Agents",
   "About",

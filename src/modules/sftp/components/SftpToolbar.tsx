@@ -7,6 +7,8 @@ interface SftpToolbarProps {
   placeholder?: string;
   showOpenTerminal?: boolean;
   onOpenTerminal?: () => void;
+  showHidden?: boolean;
+  onToggleHidden?: () => void;
 }
 
 function parentPath(p: string): string {
@@ -23,6 +25,8 @@ export function SftpToolbar({
   placeholder,
   showOpenTerminal = false,
   onOpenTerminal,
+  showHidden = false,
+  onToggleHidden,
 }: SftpToolbarProps) {
   const [inputValue, setInputValue] = useState(path);
   const [focused, setFocused] = useState(false);
@@ -91,6 +95,24 @@ export function SftpToolbar({
       >
         ↺
       </button>
+
+      {/* Toggle hidden files */}
+      {onToggleHidden && (
+        <button
+          onClick={onToggleHidden}
+          className={cn(
+            "h-6 w-6 flex items-center justify-center rounded transition-colors duration-75",
+            "text-xs shrink-0",
+            showHidden
+              ? "text-primary bg-primary/10 hover:bg-primary/20"
+              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+          )}
+          title={showHidden ? "Hide hidden files" : "Show hidden files"}
+          tabIndex={-1}
+        >
+          {showHidden ? "👁" : "🙈"}
+        </button>
+      )}
 
       {/* Open Terminal (remote pane only) */}
       {showOpenTerminal && (

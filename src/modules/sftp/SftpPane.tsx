@@ -5,8 +5,19 @@ import {
 } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/modules/hosts";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import {
+  setSftpShowHiddenFiles,
+} from "@/modules/settings/store";
+
+function toggleHiddenFiles() {
+  const next = !usePreferencesStore.getState().sftpShowHiddenFiles;
+  usePreferencesStore.setState({ sftpShowHiddenFiles: next });
+  setSftpShowHiddenFiles(next);
+}
 import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
 import type { SftpTab } from "@/modules/tabs";
+import { useTabs } from "@/modules/tabs/lib/useTabs";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { SftpContextMenu } from "./components/SftpContextMenu";
@@ -14,6 +25,14 @@ import { SftpToolbar } from "./components/SftpToolbar";
 import { VirtualizedFileList } from "./components/VirtualizedFileList";
 import { useSftpStore } from "./store/sftpStore";
 import type { FileNode } from "./types";
+
+function parentPath(p: string): string {
+  if (p === "/" || p === "") return "/";
+  const trimmed = p.endsWith("/") ? p.slice(0, -1) : p;
+  const lastSlash = trimmed.lastIndexOf("/");
+  if (lastSlash <= 0) return "/";
+  return trimmed.slice(0, lastSlash);
+}
 
 interface SftpPaneProps {
   tab: SftpTab;
@@ -35,6 +54,10 @@ export function SftpPane({ tab }: SftpPaneProps) {
   const hosts = useHostsStore((s) => s.hosts);
   const host = hosts.find((h) => h.id === tab.hostId);
   const hostLabel = host?.name ?? tab.title;
+
+  const { openRemoteEditorTab } = useTabs();
+  const sftpShowHiddenFiles = usePreferencesStore((s) => s.sftpShowHiddenFiles);
+  const sftpShowUpFolder = usePreferencesStore((s) => s.sftpShowUpFolder);
 
   const [isConnected, setIsConnected] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -82,11 +105,23 @@ export function SftpPane({ tab }: SftpPaneProps) {
   }
 
   function handleLocalDoubleClick(file: FileNode) {
+    if (file.name === "..") {
+      loadLocalDir(tabId, parentPath(tabState?.localPath ?? "~"));
+      return;
+    }
     if (file.is_dir) loadLocalDir(tabId, file.path);
   }
 
   function handleRemoteDoubleClick(file: FileNode) {
-    if (file.is_dir) loadRemoteDir(tabId, file.path);
+    if (file.name === "..") {
+      loadRemoteDir(tabId, parentPath(tabState?.remotePath ?? "/"));
+      return;
+    }
+    if (file.is_dir) {
+      loadRemoteDir(tabId, file.path);
+      return;
+    }
+    openRemoteEditorTab(tabId, file.path);
   }
 
   function startRename(path: string) {
@@ -166,6 +201,32 @@ export function SftpPane({ tab }: SftpPaneProps) {
     setNewFolderName("");
   }
 
+  const localPath = tabState?.localPath ?? "~";
+  const remotePath = tabState?.remotePath ?? "/";
+
+  const UP_ENTRY: FileNode = {
+    name: "..",
+    path: "",
+    size: 0,
+    modified_at: 0,
+    is_dir: true,
+    is_symlink: false,
+    permissions: "",
+  };
+
+  function buildFileList(files: FileNode[], currentPath: string): FileNode[] {
+    let result = sftpShowHiddenFiles
+      ? files
+      : files.filter((f) => !f.name.startsWith("."));
+    if (sftpShowUpFolder && currentPath !== "/" && currentPath !== "") {
+      result = [UP_ENTRY, ...result];
+    }
+    return result;
+  }
+
+  const displayedLocalFiles = buildFileList(tabState?.localFiles ?? [], localPath);
+  const displayedRemoteFiles = buildFileList(tabState?.remoteFiles ?? [], remotePath);
+
   if (!isConnected && !hasError) {
     return (
       <SshLoadingScreen
@@ -206,12 +267,14 @@ export function SftpPane({ tab }: SftpPaneProps) {
           <div className="flex flex-col h-full">
             <PaneLabel
               label="LOCAL"
-              count={tabState?.localFiles.length}
+              count={displayedLocalFiles.length}
               selected={tabState?.selectedLocalPaths.size}
             />
             <SftpToolbar
-              path={tabState?.localPath ?? "~"}
+              path={localPath}
               onNavigate={(p) => loadLocalDir(tabId, p)}
+              showHidden={sftpShowHiddenFiles}
+              onToggleHidden={toggleHiddenFiles}
             />
             {creatingFolderSide === "local" && (
               <NewFolderInput
@@ -226,14 +289,14 @@ export function SftpPane({ tab }: SftpPaneProps) {
                 tabId={tabId}
                 side="local"
                 selectedPaths={tabState?.selectedLocalPaths ?? new Set()}
-                currentPath={tabState?.localPath ?? "~"}
-                onRefresh={() => loadLocalDir(tabId, tabState?.localPath ?? "~")}
+                currentPath={localPath}
+                onRefresh={() => loadLocalDir(tabId, localPath)}
                 onStartRename={startRename}
                 onStartNewFolder={() => { setCreatingFolderSide("local"); setNewFolderName(""); }}
               >
                 <div className="h-full">
                   <VirtualizedFileList
-                    files={tabState?.localFiles ?? []}
+                    files={displayedLocalFiles}
                     selectedPaths={tabState?.selectedLocalPaths ?? new Set()}
                     onSelect={handleLocalSelect}
                     onDoubleClick={handleLocalDoubleClick}
@@ -260,14 +323,16 @@ export function SftpPane({ tab }: SftpPaneProps) {
           <div className="flex flex-col h-full">
             <PaneLabel
               label="REMOTE"
-              count={tabState?.remoteFiles.length}
+              count={displayedRemoteFiles.length}
               selected={tabState?.selectedRemotePaths.size}
             />
             <SftpToolbar
-              path={tabState?.remotePath ?? "/"}
+              path={remotePath}
               onNavigate={(p) => loadRemoteDir(tabId, p)}
               showOpenTerminal
               onOpenTerminal={() => {/* Task 05+: open SSH terminal at path */}}
+              showHidden={sftpShowHiddenFiles}
+              onToggleHidden={toggleHiddenFiles}
             />
             {creatingFolderSide === "remote" && (
               <NewFolderInput
@@ -282,14 +347,14 @@ export function SftpPane({ tab }: SftpPaneProps) {
                 tabId={tabId}
                 side="remote"
                 selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
-                currentPath={tabState?.remotePath ?? "/"}
-                onRefresh={() => loadRemoteDir(tabId, tabState?.remotePath ?? "/")}
+                currentPath={remotePath}
+                onRefresh={() => loadRemoteDir(tabId, remotePath)}
                 onStartRename={startRename}
                 onStartNewFolder={() => { setCreatingFolderSide("remote"); setNewFolderName(""); }}
               >
                 <div className="h-full">
                   <VirtualizedFileList
-                    files={tabState?.remoteFiles ?? []}
+                    files={displayedRemoteFiles}
                     selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
                     onSelect={handleRemoteSelect}
                     onDoubleClick={handleRemoteDoubleClick}

@@ -33,10 +33,12 @@ pub struct DirEntry {
 }
 
 /// Lists immediate children of `path`. Dirs first, then files, each sorted
-/// case-insensitively. Hidden (dot-prefix) entries are filtered — UI may add
-/// a "show hidden" toggle later.
+/// case-insensitively. When `show_hidden` is false (default), dot-prefix
+/// entries are filtered. The SFTP file manager passes `true` so React can
+/// handle filtering reactively.
 #[tauri::command]
-pub async fn fs_read_dir(path: String) -> Result<Vec<DirEntry>, String> {
+pub async fn fs_read_dir(path: String, show_hidden: Option<bool>) -> Result<Vec<DirEntry>, String> {
+    let show_hidden = show_hidden.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
         let root = expand_home(&path)?;
         let read = std::fs::read_dir(&root).map_err(|e| {
@@ -48,7 +50,7 @@ pub async fn fs_read_dir(path: String) -> Result<Vec<DirEntry>, String> {
             .filter_map(Result::ok)
             .filter_map(|entry| {
                 let name = entry.file_name().into_string().ok()?;
-                if name.starts_with('.') {
+                if !show_hidden && name.starts_with('.') {
                     return None;
                 }
 

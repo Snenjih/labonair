@@ -99,7 +99,7 @@ export const useSftpStore = create<SftpStore>((set) => ({
       },
     }));
     try {
-      const entries = await invoke<DirEntry[]>("fs_read_dir", { path });
+      const entries = await invoke<DirEntry[]>("fs_read_dir", { path, showHidden: true });
       const files = entries.map((e) => mapDirEntry(path, e));
       set((s) => ({
         tabs: {
