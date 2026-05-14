@@ -66,6 +66,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
 }
 
 type ConnectFn = (hostId: string, title: string) => void;
+type QuickConnectFn = (username: string, hostAddress: string, port: number) => void;
 
 interface SortableHostCardProps {
   host: Host;
@@ -106,7 +107,7 @@ function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit,
 
 const AUTO_REFRESH_MS = 30_000;
 
-export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: ConnectFn; newSftpTab: ConnectFn; tabs: Tab[] }) {
+export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: { newSshTab: ConnectFn; newQuickSshTab: QuickConnectFn; newSftpTab: ConnectFn; tabs: Tab[] }) {
   const hosts = useHostsStore((s) => s.hosts);
   const groups = useHostsStore((s) => s.groups);
   const selectedHostId = useHostsStore((s) => s.selectedHostId);
@@ -166,6 +167,13 @@ export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: Conn
     return list;
   }, [localHosts, activeGroupId, search]);
 
+  const quickConnectMatch = useMemo(() => {
+    const q = search.trim();
+    const m = q.match(/^([^@\s]+)@([^:\s]+)(?::(\d+))?$/);
+    if (!m) return null;
+    return { username: m[1], hostAddress: m[2], port: m[3] ? parseInt(m[3], 10) : 22 };
+  }, [search]);
+
   const handleGroupKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && groupName.trim()) {
       await createGroup(groupName.trim());
@@ -214,22 +222,22 @@ export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: Conn
         <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
           <div className="relative flex-1">
             <svg
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
               width="13" height="13" viewBox="0 0 13 13" fill="none"
             >
               <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2" />
               <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
             </svg>
             <Input
-              className="h-7 pl-8 text-sm bg-muted border-0 focus-visible:ring-1"
-              placeholder="Search hosts…"
+              className="h-9 pl-9 text-sm bg-muted border-0 focus-visible:ring-1"
+              placeholder="Find a host or ssh user@hostname…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <Button
             size="sm"
-            className="h-7 px-3 text-xs shrink-0"
+            className="h-9 px-3 text-xs shrink-0"
             onClick={() => setSelectedHost("__new__")}
           >
             + New Host
@@ -237,7 +245,7 @@ export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: Conn
           <Button
             size="sm"
             variant="outline"
-            className="h-7 px-3 text-xs shrink-0"
+            className="h-9 px-3 text-xs shrink-0"
             onClick={() => setAddingGroup(true)}
           >
             + Group
@@ -292,17 +300,42 @@ export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: Conn
 
         {/* Host grid */}
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Quick connect suggestion */}
+          {quickConnectMatch && (
+            <button
+              onClick={() => {
+                newQuickSshTab(quickConnectMatch.username, quickConnectMatch.hostAddress, quickConnectMatch.port);
+                setSearch("");
+              }}
+              className="mb-4 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left hover:bg-primary/10 transition-colors"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="text-primary">
+                  <rect x="1" y="3" width="12" height="8" rx="1.5" />
+                  <path d="M4 7l1.5 1.5L4 10M8 9.5h2" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">Quick Connect</p>
+                <p className="font-mono text-xs text-muted-foreground truncate">
+                  {quickConnectMatch.username}@{quickConnectMatch.hostAddress}:{quickConnectMatch.port}
+                </p>
+              </div>
+              <span className="text-xs text-muted-foreground shrink-0">↵ Connect</span>
+            </button>
+          )}
+
           {!hasFetched || isLoading ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
             </div>
           ) : filteredHosts.length === 0 && !search && !activeGroupId ? (
             <EmptyState onNew={() => setSelectedHost("__new__")} />
-          ) : filteredHosts.length === 0 ? (
+          ) : filteredHosts.length === 0 && !quickConnectMatch ? (
             <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
               No hosts match your search
             </div>
-          ) : (
+          ) : filteredHosts.length > 0 ? (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={filteredHosts.map((h) => h.id)} strategy={rectSortingStrategy}>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -323,7 +356,7 @@ export function HomeDashboard({ newSshTab, newSftpTab, tabs }: { newSshTab: Conn
                 </div>
               </SortableContext>
             </DndContext>
-          )}
+          ) : null}
         </div>
       </div>
 

@@ -171,6 +171,8 @@ export function SftpPane({ tab }: SftpPaneProps) {
       <SshLoadingScreen
         tabId={tabId}
         hostId={tab.hostId}
+        hostName={tab.title}
+        connectionType="sftp"
         onConnected={() => setIsConnected(true)}
         onError={() => setHasError(true)}
       />

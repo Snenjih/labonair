@@ -8,6 +8,7 @@ export {
   type AiDiffTab,
   type AiDiffStatus,
   type SshTerminalTab,
+  type QuickConnectParams,
   type SftpTab,
   type HomeTab,
 } from "./lib/useTabs";

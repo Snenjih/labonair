@@ -54,11 +54,18 @@ export type SftpTab = {
   hostId: string;
 };
 
+export type QuickConnectParams = {
+  username: string;
+  hostAddress: string;
+  port: number;
+};
+
 export type SshTerminalTab = {
   id: number;
   kind: "ssh-terminal";
   title: string;
-  hostId: string;
+  hostId?: string;
+  quickConnect?: QuickConnectParams;
   cwd?: string;
 };
 
@@ -264,6 +271,14 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     return id;
   }, []);
 
+  const newQuickSshTab = useCallback((username: string, hostAddress: string, port: number) => {
+    const id = nextIdRef.current++;
+    const title = `${username}@${hostAddress}`;
+    setTabs((t) => [...t, { id, kind: "ssh-terminal", title, quickConnect: { username, hostAddress, port } }]);
+    setActiveId(id);
+    return id;
+  }, []);
+
   const newSftpTab = useCallback((hostId: string, title: string) => {
     const id = nextIdRef.current++;
     setTabs((t) => [...t, { id, kind: "sftp", title, hostId }]);
@@ -310,6 +325,7 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     updateTab,
     selectByIndex,
     newSshTab,
+    newQuickSshTab,
     newSftpTab,
     openRemoteEditorTab,
   };

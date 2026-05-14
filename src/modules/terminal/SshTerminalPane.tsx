@@ -219,6 +219,9 @@ export function SshTerminalPane({ tab, isActive }: Props) {
       <SshLoadingScreen
         tabId={tab.id.toString()}
         hostId={tab.hostId}
+        quickConnect={tab.quickConnect}
+        hostName={tab.title}
+        connectionType="ssh"
         onConnected={() => setIsConnected(true)}
         onError={() => setHasError(true)}
       />

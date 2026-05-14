@@ -1,20 +1,51 @@
 import { cn } from "@/lib/utils";
+import type { QuickConnectParams } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface Props {
   tabId: string;
-  hostId: string;
+  hostId?: string;
+  quickConnect?: QuickConnectParams;
+  hostName?: string;
+  connectionType?: "ssh" | "sftp";
   onConnected: () => void;
   onError: (message: string) => void;
 }
 
-type Status = "connecting" | "waiting_trust" | "waiting_auth" | "waiting_passphrase" | "error";
+type Status =
+  | "quick_connect_password"
+  | "connecting"
+  | "waiting_trust"
+  | "waiting_auth"
+  | "waiting_passphrase"
+  | "error";
 
-export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props) {
-  const [status, setStatus] = useState<Status>("connecting");
+const SSH_STAGES = ["TCP Connect", "Handshake", "Auth", "Shell"] as const;
+const SFTP_STAGES = ["TCP Connect", "Handshake", "Auth", "SFTP"] as const;
+
+function detectStage(logs: string[]): number {
+  const last = logs[logs.length - 1] ?? "";
+  if (last.includes("Shell channel") || last.includes("Session established") || last.includes("SFTP ready"))
+    return 4;
+  if (last.includes("Authenticat") || last.includes("credentials") || last.includes("keychain"))
+    return 3;
+  if (last.includes("fingerprint") || last.includes("Verifying") || last.includes("handshake") || last.includes("Handshake"))
+    return 2;
+  if (last.includes("TCP") || last.includes("Connecting"))
+    return 1;
+  return 0;
+}
+
+export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connectionType = "ssh", onConnected, onError }: Props) {
+  const isQuickConnect = !hostId && !!quickConnect;
+  const initSftp = connectionType === "sftp";
+
+  const [status, setStatus] = useState<Status>(
+    isQuickConnect ? "quick_connect_password" : "connecting"
+  );
   const [errorMessage, setErrorMessage] = useState("");
   const [fingerprint, setFingerprint] = useState("");
   const [host, setHost] = useState("");
@@ -23,25 +54,52 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
   const [passphrase, setPassphrase] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [isMismatch, setIsMismatch] = useState(false);
+  const [quickPassword, setQuickPassword] = useState("");
+
   const connectingRef = useRef(false);
+  const pendingPasswordRef = useRef<string | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  const pushLog = (msg: string) =>
-    setLogs((prev) => [...prev, msg]);
+  const pushLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
-  const doConnect = (passphraseArg?: string) => {
+  const STAGES = initSftp ? SFTP_STAGES : SSH_STAGES;
+  const currentStage = useMemo(() => detectStage(logs), [logs]);
+
+  const doConnect = (passphraseArg?: string, passwordOverride?: string) => {
     if (connectingRef.current) return;
     connectingRef.current = true;
     setStatus("connecting");
-    if (!passphraseArg) setLogs([]);
-    invoke("ssh_connect", { tabId, hostId, passphrase: passphraseArg ?? null })
-      .then(() => {
-        console.log("[ssh] ssh_connect resolved for tab", tabId);
-      })
+    if (!passphraseArg && !passwordOverride) setLogs([]);
+
+    const p: Promise<unknown> = isQuickConnect
+      ? invoke("ssh_connect_quick", {
+          tabId,
+          username: quickConnect!.username,
+          hostAddress: quickConnect!.hostAddress,
+          port: quickConnect!.port,
+          password: passwordOverride ?? "",
+          passphrase: passphraseArg ?? null,
+        })
+      : invoke("ssh_connect", {
+          tabId,
+          hostId,
+          passphrase: passphraseArg ?? null,
+          passwordOverride: passwordOverride ?? null,
+          initSftp,
+        });
+
+    p.then(() => {
+      // session_established event triggers onConnected
+    })
       .catch((err: unknown) => {
         const msg = String(err);
-        console.error("[ssh] ssh_connect error for tab", tabId, msg);
-        if (msg.includes("mismatch") || msg.includes("passphrase_required")) return;
+        if (
+          msg.includes("mismatch") ||
+          msg.includes("passphrase_required") ||
+          msg.includes("authentication failed") ||
+          msg.includes("not authenticated")
+        )
+          return;
         setErrorMessage(msg);
         setStatus("error");
       })
@@ -78,6 +136,8 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
         (event) => {
           if (event.payload.tab_id !== tabId) return;
           setPromptMessage(event.payload.prompt_message);
+          setPassword("");
+          pendingPasswordRef.current = null;
           setStatus("waiting_auth");
         },
       ),
@@ -87,13 +147,21 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
         setStatus("waiting_passphrase");
       }),
       listen<{ tab_id: string }>("session_established", (event) => {
-        console.log("[ssh] session_established event", event.payload, "tabId=", tabId);
         if (event.payload.tab_id !== tabId) return;
+        // Save the new password to keychain if the user entered one to fix auth.
+        if (pendingPasswordRef.current && hostId) {
+          invoke("secrets_set", {
+            service: "nexum-app",
+            account: hostId,
+            password: pendingPasswordRef.current,
+          }).catch(console.error);
+          pendingPasswordRef.current = null;
+        }
         onConnected();
       }),
     ]).then((unlisteners) => {
       unlisteners.forEach((u) => cleanups.push(u));
-      if (!cancelled) doConnect();
+      if (!cancelled && !isQuickConnect) doConnect();
     });
 
     return () => {
@@ -103,38 +171,158 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, hostId]);
 
+  const submitPassword = () => {
+    pendingPasswordRef.current = password;
+    doConnect(undefined, password);
+    setPassword("");
+  };
+
+  // Host identity label shown above the card
+  const identityLine = isQuickConnect
+    ? `${quickConnect!.username}@${quickConnect!.hostAddress}:${quickConnect!.port}`
+    : hostName
+    ? hostName
+    : undefined;
+
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-background">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-background">
+      {/* Host identity header */}
+      {identityLine && (
+        <div className="flex flex-col items-center gap-0.5">
+          <p className="text-xs font-medium text-foreground">{identityLine}</p>
+        </div>
+      )}
+
       <AnimatePresence mode="wait">
+        {/* ── Quick connect password ── */}
+        {status === "quick_connect_password" && (
+          <motion.div
+            key="quick-pw"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            className="flex w-[400px] flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg"
+          >
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-foreground">Connect to host</p>
+              <p className="font-mono text-xs text-muted-foreground">
+                {quickConnect!.username}@{quickConnect!.hostAddress}:{quickConnect!.port}
+              </p>
+            </div>
+            <input
+              type="password"
+              value={quickPassword}
+              onChange={(e) => setQuickPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { doConnect(undefined, quickPassword); }
+              }}
+              placeholder="Password"
+              autoFocus
+              className={cn(
+                "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground",
+                "placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary",
+              )}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => doConnect(undefined, quickPassword)}
+                className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                Connect
+              </button>
+              <button
+                onClick={() => onError("User cancelled")}
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── Connecting ── */}
         {status === "connecting" && (
           <motion.div
             key="connecting"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="flex flex-col items-center gap-4"
+            className="flex flex-col items-center gap-5"
           >
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
-            <p className="text-sm text-muted-foreground">Connecting to host…</p>
+
+            {/* Stage indicator */}
+            <div className="flex items-center gap-0">
+              {STAGES.map((label, i) => {
+                const stepNum = i + 1;
+                const done = currentStage > stepNum;
+                const active = currentStage === stepNum;
+                return (
+                  <div key={label} className="flex items-center">
+                    <div className="flex flex-col items-center gap-1">
+                      <div
+                        className={cn(
+                          "h-2 w-2 rounded-full transition-colors",
+                          done && "bg-primary",
+                          active && "bg-primary animate-pulse",
+                          !done && !active && "bg-muted",
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "text-[10px] transition-colors",
+                          (done || active) ? "text-foreground/70" : "text-muted-foreground/40",
+                        )}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                    {i < STAGES.length - 1 && (
+                      <div
+                        className={cn(
+                          "mb-3 mx-2 h-px w-8 transition-colors",
+                          done ? "bg-primary" : "bg-muted",
+                        )}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => onError("User cancelled")}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded border border-transparent hover:border-border"
+            >
+              Cancel
+            </button>
           </motion.div>
         )}
 
+        {/* ── Trust unknown / mismatched host ── */}
         {status === "waiting_trust" && (
           <motion.div
             key="trust"
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
-            className="flex w-[480px] flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg"
+            className={cn(
+              "flex w-[480px] flex-col gap-4 rounded-xl border bg-card p-6 shadow-lg",
+              isMismatch ? "border-destructive/40" : "border-border",
+            )}
           >
             <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium text-foreground">
-                Unknown host — trust this server?
+              <p className={cn("text-sm font-medium", isMismatch ? "text-destructive" : "text-foreground")}>
+                {isMismatch ? "⚠ Host key mismatch — possible MITM!" : "Unknown host — trust this server?"}
               </p>
               <p className="text-xs text-muted-foreground">
-                The authenticity of{" "}
-                <span className="font-mono text-foreground">{host}</span> can&apos;t be
-                established.
+                {isMismatch
+                  ? "The host key for "
+                  : "The authenticity of "}
+                <span className="font-mono text-foreground">{host}</span>
+                {isMismatch
+                  ? " has changed since last connection."
+                  : " can't be established."}
               </p>
             </div>
             <div className="rounded-lg bg-muted px-4 py-3">
@@ -145,25 +333,23 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
               <button
                 onClick={() => {
                   setStatus("connecting");
-                  // For a key mismatch the backend already returned an error, so
-                  // we must retry.  For an unknown host (not mismatch) the backend
-                  // connection is still in progress — session_established will fire
-                  // and call onConnected() once the session is ready.
-                  if (isMismatch) doConnect();
+                  invoke("ssh_trust_host", { tabId, accepted: true }).catch(console.error);
                 }}
                 className={cn(
-                  "flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground",
-                  "hover:opacity-90 transition-opacity",
+                  "flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-opacity",
+                  isMismatch
+                    ? "bg-destructive text-destructive-foreground hover:opacity-90"
+                    : "bg-primary text-primary-foreground hover:opacity-90",
                 )}
               >
-                Trust &amp; Connect
+                {isMismatch ? "Accept anyway" : "Trust & Connect"}
               </button>
               <button
-                onClick={() => onError("User aborted")}
-                className={cn(
-                  "flex-1 rounded-lg border border-border px-4 py-2 text-sm text-foreground",
-                  "hover:bg-accent transition-colors",
-                )}
+                onClick={() => {
+                  invoke("ssh_trust_host", { tabId, accepted: false }).catch(console.error);
+                  onError("User aborted");
+                }}
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
               >
                 Abort
               </button>
@@ -171,6 +357,7 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
           </motion.div>
         )}
 
+        {/* ── Auth required (wrong / missing password) ── */}
         {status === "waiting_auth" && (
           <motion.div
             key="auth"
@@ -179,19 +366,17 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
             exit={{ opacity: 0, scale: 0.96 }}
             className="flex w-[400px] flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg"
           >
-            <p className="text-sm font-medium text-foreground">Authentication required</p>
-            <p className="text-xs text-muted-foreground">{promptMessage}</p>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-foreground">Authentication required</p>
+              {promptMessage && (
+                <p className="text-xs text-muted-foreground">{promptMessage}</p>
+              )}
+            </div>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  invoke("ssh_pty_write", { tabId, data: password + "\n" }).catch(console.error);
-                  setPassword("");
-                  setStatus("connecting");
-                }
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter") submitPassword(); }}
               placeholder="Password"
               autoFocus
               className={cn(
@@ -199,19 +384,24 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
                 "placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary",
               )}
             />
-            <button
-              onClick={() => {
-                invoke("ssh_pty_write", { tabId, data: password + "\n" }).catch(console.error);
-                setPassword("");
-                setStatus("connecting");
-              }}
-              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-            >
-              Submit
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={submitPassword}
+                className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                Submit
+              </button>
+              <button
+                onClick={() => onError("User aborted")}
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </motion.div>
         )}
 
+        {/* ── Passphrase for encrypted key ── */}
         {status === "waiting_passphrase" && (
           <motion.div
             key="passphrase"
@@ -231,10 +421,7 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
               value={passphrase}
               onChange={(e) => setPassphrase(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  doConnect(passphrase);
-                  setPassphrase("");
-                }
+                if (e.key === "Enter") { doConnect(passphrase); setPassphrase(""); }
               }}
               placeholder="Key passphrase"
               autoFocus
@@ -260,6 +447,7 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
           </motion.div>
         )}
 
+        {/* ── Error ── */}
         {status === "error" && (
           <motion.div
             key="error"
@@ -288,8 +476,8 @@ export function SshLoadingScreen({ tabId, hostId, onConnected, onError }: Props)
         )}
       </AnimatePresence>
 
-      {/* Connection log — always shown while connecting or after error */}
-      {logs.length > 0 && (
+      {/* Connection log */}
+      {logs.length > 0 && status !== "quick_connect_password" && (
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}

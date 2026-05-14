@@ -4,7 +4,7 @@ pub mod pty;
 pub mod sftp;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 pub struct SshSession {
     /// PTY session — set to non-blocking after shell channel opens.
@@ -29,3 +29,11 @@ impl Default for SshState {
         SshState(Arc::new(Mutex::new(HashMap::new())))
     }
 }
+
+/// Pending trust confirmation for a specific tab.
+/// The condvar is signalled by `ssh_trust_host` once the user acts.
+pub type TrustPair = Arc<(Mutex<Option<bool>>, Condvar)>;
+
+/// Global map of tab_id → pending trust confirmation pair.
+#[derive(Clone, Default)]
+pub struct TrustState(pub Arc<Mutex<HashMap<String, TrustPair>>>);

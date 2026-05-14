@@ -190,7 +190,7 @@ export function HostCard({
             {/* ZONE B: Action Footer */}
             <div
               className={cn(
-                "flex items-center gap-1 border-t px-2 py-1.5 transition-colors",
+                "flex items-center gap-1.5 border-t px-2 py-2 transition-colors",
                 highlighted
                   ? "border-border/80 bg-muted/20"
                   : "border-border/40 bg-muted/10 group-hover:bg-muted/20",
@@ -200,12 +200,12 @@ export function HostCard({
                 variant="ghost"
                 size="sm"
                 onClick={connectSsh}
-                className="h-7 flex-1 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-background/50"
+                className="h-9 flex-1 gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-background/50"
               >
                 {hasActiveSshTab && (
                   <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 )}
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
                   <rect x="1" y="3" width="12" height="8" rx="1.5" />
                   <path d="M4 7l1.5 1.5L4 10M8 9.5h2" />
                 </svg>
@@ -215,12 +215,12 @@ export function HostCard({
                 variant="ghost"
                 size="sm"
                 onClick={connectSftp}
-                className="h-7 flex-1 gap-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-background/50"
+                className="h-9 flex-1 gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-background/50"
               >
                 {hasActiveSftpTab && (
                   <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 )}
-                <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M1 4.5V11a1 1 0 001 1h10a1 1 0 001-1V5.5a1 1 0 00-1-1H7L5.5 3H2a1 1 0 00-1 1.5z" />
                 </svg>
                 SFTP
@@ -231,7 +231,7 @@ export function HostCard({
                     variant="ghost"
                     size="sm"
                     onClick={(e) => e.stopPropagation()}
-                    className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-foreground hover:bg-background/50"
+                    className="h-9 w-9 shrink-0 p-0 text-muted-foreground hover:text-foreground hover:bg-background/50"
                   >
                     ⋮
                   </Button>
