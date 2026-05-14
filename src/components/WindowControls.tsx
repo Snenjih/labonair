@@ -12,7 +12,7 @@ export function WindowControls() {
         type="button"
         aria-label="Close"
         onClick={() => void getCurrentWindow().close()}
-        className="grid h-full w-10 place-items-center text-muted-foreground hover:bg-card/60 hover:text-white"
+        className="grid h-full w-10 place-items-center text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
       >
         <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
       </button>
