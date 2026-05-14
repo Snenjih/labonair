@@ -11,6 +11,8 @@ interface Props {
   quickConnect?: QuickConnectParams;
   hostName?: string;
   connectionType?: "ssh" | "sftp";
+  initialCols?: number;
+  initialRows?: number;
   onConnected: () => void;
   onError: (message: string) => void;
 }
@@ -39,7 +41,7 @@ function detectStage(logs: string[]): number {
   return 0;
 }
 
-export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connectionType = "ssh", onConnected, onError }: Props) {
+export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connectionType = "ssh", initialCols, initialRows, onConnected, onError }: Props) {
   const isQuickConnect = !hostId && !!quickConnect;
   const initSftp = connectionType === "sftp";
 
@@ -79,6 +81,8 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
           port: quickConnect!.port,
           password: passwordOverride ?? "",
           passphrase: passphraseArg ?? null,
+          initialCols: initialCols ?? null,
+          initialRows: initialRows ?? null,
         })
       : invoke("ssh_connect", {
           tabId,
@@ -86,6 +90,8 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
           passphrase: passphraseArg ?? null,
           passwordOverride: passwordOverride ?? null,
           initSftp,
+          initialCols: initialCols ?? null,
+          initialRows: initialRows ?? null,
         });
 
     p.then(() => {

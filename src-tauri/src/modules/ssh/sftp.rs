@@ -1,13 +1,19 @@
 use crate::modules::ssh::SshState;
 use std::io::{Read as _, Write as _};
+use std::sync::Arc;
 
-macro_rules! get_sftp {
-    ($entry:expr) => {
-        $entry
+/// Extract the SFTP Arc under a brief outer-lock, then release it so the
+/// PTY reader thread can acquire the same lock without waiting for I/O.
+macro_rules! get_sftp_arc {
+    ($state_inner:expr, $tab_id:expr) => {{
+        let map = $state_inner.0.lock().map_err(|e| e.to_string())?;
+        let entry = map.get($tab_id).ok_or("no session for tab")?;
+        entry
             .sftp
             .as_ref()
             .ok_or("No SFTP handle — connection may not support SFTP")?
-    };
+            .clone()
+    }};
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -41,24 +47,19 @@ pub async fn sftp_read_dir(
     state: tauri::State<'_, SshState>,
 ) -> Result<Vec<FileNode>, String> {
     let state_inner = state.inner().clone();
-    let tab_id_clone = tab_id.clone();
-    let path_clone = path.clone();
 
     tokio::task::spawn_blocking(move || {
-        log::debug!("[SFTP] sftp_read_dir called: tab={} path={}", tab_id_clone, path_clone);
+        log::debug!("[SFTP] sftp_read_dir: tab={} path={}", tab_id, path);
 
-        log::debug!("[SFTP] Locking SSH state…");
-        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        log::debug!("[SFTP] Lock acquired.");
+        // Acquire Arc under brief lock, then release outer lock before I/O.
+        let sftp_arc: Arc<std::sync::Mutex<crate::modules::ssh::SftpHandle>> =
+            get_sftp_arc!(state_inner, &tab_id);
 
-        let entry = map.get(&tab_id_clone).ok_or("no session for tab")?;
-        log::debug!("[SFTP] Session entry found.");
+        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        log::debug!("[SFTP] readdir({})…", path);
 
-        let sftp = get_sftp!(entry);
-        log::debug!("[SFTP] Sftp handle acquired. Calling readdir({})…", path_clone);
-
-        let entries = sftp
-            .readdir(std::path::Path::new(&path_clone))
+        let entries = sftp.0
+            .readdir(std::path::Path::new(&path))
             .map_err(|e| e.to_string())?;
 
         let mut files: Vec<FileNode> = entries
@@ -105,10 +106,9 @@ pub async fn sftp_rename(
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
-        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = get_sftp!(entry);
-        sftp.rename(
+        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        sftp.0.rename(
             std::path::Path::new(&old_path),
             std::path::Path::new(&new_path),
             None,
@@ -127,17 +127,16 @@ pub async fn sftp_delete(
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
-        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = get_sftp!(entry);
+        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
 
         for path in &paths {
             let p = std::path::Path::new(path);
             // Try SFTP unlink (files), then rmdir (empty dirs).
             // Non-empty dirs are not supported via SFTP alone — caller should
             // recursively delete children first.
-            if sftp.unlink(p).is_err() {
-                sftp.rmdir(p).map_err(|e| e.to_string())?;
+            if sftp.0.unlink(p).is_err() {
+                sftp.0.rmdir(p).map_err(|e| e.to_string())?;
             }
         }
         Ok(())
@@ -154,10 +153,9 @@ pub async fn sftp_mkdir(
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
-        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = get_sftp!(entry);
-        sftp.mkdir(std::path::Path::new(&path), 0o755)
+        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        sftp.0.mkdir(std::path::Path::new(&path), 0o755)
             .map_err(|e| e.to_string())
     })
     .await
@@ -173,14 +171,13 @@ pub async fn sftp_chmod(
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
-        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = get_sftp!(entry);
-        let mut stat = sftp
+        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        let mut stat = sftp.0
             .stat(std::path::Path::new(&path))
             .map_err(|e| e.to_string())?;
         stat.perm = Some(permissions);
-        sftp.setstat(std::path::Path::new(&path), stat)
+        sftp.0.setstat(std::path::Path::new(&path), stat)
             .map_err(|e| e.to_string())
     })
     .await
@@ -196,10 +193,9 @@ pub async fn prepare_remote_edit(
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let file_data = {
-            let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-            let entry = map.get(&tab_id).ok_or("no session for tab")?;
-            let sftp = get_sftp!(entry);
-            let stat = sftp
+            let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+            let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+            let stat = sftp.0
                 .stat(std::path::Path::new(&remote_path))
                 .map_err(|e| e.to_string())?;
             let size = stat.size.unwrap_or(0);
@@ -208,7 +204,7 @@ pub async fn prepare_remote_edit(
                     "File is too large for in-app editing ({size} bytes). Max 5 MB."
                 ));
             }
-            let mut remote_file = sftp
+            let mut remote_file = sftp.0
                 .open(std::path::Path::new(&remote_path))
                 .map_err(|e| e.to_string())?;
             let mut buf = Vec::with_capacity(size as usize);
@@ -241,10 +237,9 @@ pub async fn save_remote_edit(
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let data = std::fs::read(&local_temp_path).map_err(|e| e.to_string())?;
-        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get(&tab_id).ok_or("no session for tab")?;
-        let sftp = get_sftp!(entry);
-        let mut remote_file = sftp
+        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        let mut remote_file = sftp.0
             .create(std::path::Path::new(&remote_path))
             .map_err(|e| e.to_string())?;
         remote_file.write_all(&data).map_err(|e| e.to_string())

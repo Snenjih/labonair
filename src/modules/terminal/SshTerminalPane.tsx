@@ -215,6 +215,11 @@ export function SshTerminalPane({ tab, isActive }: Props) {
   }, [isActive, isConnected]);
 
   if (!isConnected && !hasError) {
+    // Estimate terminal dimensions from the viewport before the xterm instance
+    // exists. Subtracting typical UI chrome (header ~36px, statusbar ~24px,
+    // sidebar ~220px). Character cell: ~7.8px wide × ~18px tall at 13px font.
+    const estCols = Math.max(80, Math.floor((window.innerWidth - 220) / 7.8));
+    const estRows = Math.max(24, Math.floor((window.innerHeight - 60) / 18));
     return (
       <SshLoadingScreen
         tabId={tab.id.toString()}
@@ -222,6 +227,8 @@ export function SshTerminalPane({ tab, isActive }: Props) {
         quickConnect={tab.quickConnect}
         hostName={tab.title}
         connectionType="ssh"
+        initialCols={estCols}
+        initialRows={estRows}
         onConnected={() => setIsConnected(true)}
         onError={() => setHasError(true)}
       />

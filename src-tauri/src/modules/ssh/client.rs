@@ -27,6 +27,8 @@ pub async fn ssh_connect(
     passphrase: Option<String>,
     password_override: Option<String>,
     init_sftp: bool,
+    initial_cols: Option<u32>,
+    initial_rows: Option<u32>,
     state: tauri::State<'_, super::SshState>,
     trust_state: tauri::State<'_, super::TrustState>,
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
@@ -79,12 +81,15 @@ pub async fn ssh_connect(
     let app_clone = app.clone();
     let tab_id_clone = tab_id.clone();
     let host_id_clone = host_id.clone();
+    let cols = initial_cols.unwrap_or(220);
+    let rows = initial_rows.unwrap_or(50);
     let result = tokio::task::spawn_blocking(move || {
         ssh_connect_blocking(
             tab_id_clone, host_id_clone.clone(), passphrase,
             host_address, port, username, auth_method,
             private_key_path, keep_alive_interval, keep_alive_tries,
-            default_path_ssh, password, init_sftp, state_inner, trust_inner, app_clone,
+            default_path_ssh, password, init_sftp, cols, rows,
+            state_inner, trust_inner, app_clone,
         )
     })
     .await
@@ -116,6 +121,8 @@ pub async fn ssh_connect_quick(
     port: u16,
     password: String,
     passphrase: Option<String>,
+    initial_cols: Option<u32>,
+    initial_rows: Option<u32>,
     state: tauri::State<'_, super::SshState>,
     trust_state: tauri::State<'_, super::TrustState>,
     app: tauri::AppHandle,
@@ -124,6 +131,8 @@ pub async fn ssh_connect_quick(
     let trust_inner = trust_state.inner().clone();
     let app_clone = app.clone();
     let tab_id_clone = tab_id.clone();
+    let cols = initial_cols.unwrap_or(220);
+    let rows = initial_rows.unwrap_or(50);
     tokio::task::spawn_blocking(move || {
         ssh_connect_blocking(
             tab_id_clone,
@@ -139,6 +148,8 @@ pub async fn ssh_connect_quick(
             None,
             Some(password),
             false, // quick connect is always a terminal session
+            cols,
+            rows,
             state_inner,
             trust_inner,
             app_clone,
@@ -196,6 +207,48 @@ pub async fn ssh_remove_known_host(host_address: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Block the calling thread until the user accepts or rejects the host key,
+/// or until the 5-minute dialog timeout expires. Always removes the entry from
+/// TrustState so the HashMap never leaks, even if the dialog is dismissed.
+/// Returns `Ok(true)` = trusted, `Ok(false)` = rejected/timed-out.
+fn wait_for_trust(tab_id: &str, trust_state: &super::TrustState) -> Result<bool, String> {
+    let pair = std::sync::Arc::new((
+        std::sync::Mutex::new(None::<bool>),
+        std::sync::Condvar::new(),
+    ));
+    {
+        let mut map = trust_state.0.lock().map_err(|e| e.to_string())?;
+        map.insert(tab_id.to_string(), pair.clone());
+    }
+
+    let trusted = {
+        let (lock, cvar) = &*pair;
+        let mut guard = lock.lock().map_err(|e| e.to_string())?;
+        let timeout = std::time::Duration::from_secs(300);
+        loop {
+            let (new_guard, result) = cvar
+                .wait_timeout(guard, timeout)
+                .map_err(|e| e.to_string())?;
+            guard = new_guard;
+            if result.timed_out() {
+                // User dismissed the dialog — treat as rejection.
+                break false;
+            }
+            if guard.is_some() {
+                break guard.unwrap();
+            }
+        }
+    };
+
+    // Always clean up — no leaks regardless of how we exit.
+    let _ = trust_state
+        .0
+        .lock()
+        .map(|mut m| m.remove(tab_id));
+
+    Ok(trusted)
+}
+
 fn ssh_connect_blocking(
     tab_id: String,
     _host_id: String,
@@ -210,6 +263,8 @@ fn ssh_connect_blocking(
     default_path_ssh: Option<String>,
     password: Option<String>,
     init_sftp: bool,
+    initial_cols: u32,
+    initial_rows: u32,
     state: super::SshState,
     trust_state: super::TrustState,
     app: tauri::AppHandle,
@@ -304,27 +359,7 @@ fn ssh_connect_blocking(
             )
             .map_err(|e| e.to_string())?;
 
-            // Pause: wait for explicit user acceptance before proceeding.
-            let pair = std::sync::Arc::new((
-                std::sync::Mutex::new(None::<bool>),
-                std::sync::Condvar::new(),
-            ));
-            {
-                let mut map = trust_state.0.lock().unwrap();
-                map.insert(tab_id.clone(), pair.clone());
-            }
-            let trusted = {
-                let (lock, cvar) = &*pair;
-                let mut guard = lock.lock().unwrap();
-                while guard.is_none() {
-                    guard = cvar.wait(guard).unwrap();
-                }
-                guard.unwrap()
-            };
-            {
-                trust_state.0.lock().unwrap().remove(&tab_id);
-            }
-            if !trusted {
+            if !wait_for_trust(&tab_id, &trust_state)? {
                 return Err("User rejected host".to_string());
             }
 
@@ -358,27 +393,7 @@ fn ssh_connect_blocking(
             )
             .map_err(|e| e.to_string())?;
 
-            // Pause: wait for explicit user acceptance before proceeding.
-            let pair = std::sync::Arc::new((
-                std::sync::Mutex::new(None::<bool>),
-                std::sync::Condvar::new(),
-            ));
-            {
-                let mut map = trust_state.0.lock().unwrap();
-                map.insert(tab_id.clone(), pair.clone());
-            }
-            let trusted = {
-                let (lock, cvar) = &*pair;
-                let mut guard = lock.lock().unwrap();
-                while guard.is_none() {
-                    guard = cvar.wait(guard).unwrap();
-                }
-                guard.unwrap()
-            };
-            {
-                trust_state.0.lock().unwrap().remove(&tab_id);
-            }
-            if !trusted {
+            if !wait_for_trust(&tab_id, &trust_state)? {
                 return Err("User rejected host".to_string());
             }
 
@@ -508,19 +523,29 @@ fn ssh_connect_blocking(
     // Step 8 (SSH terminal only): Open PTY shell channel.
     // Switches session to non-blocking mode for the output reader thread.
     // Skipped for SFTP connections — SFTP operations require blocking mode.
-    let channel = if !init_sftp {
+    let (channel, ready_tx, shutdown) = if !init_sftp {
         log_step!(app, tab_id, "Opening PTY shell channel…");
-        let ch = super::pty::open_shell_channel(
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
+        let (ch, shutdown) = super::pty::open_shell_channel(
             &mut session,
             &tab_id,
             &app,
             state.clone(),
+            ready_rx,
+            initial_cols,
+            initial_rows,
         )?;
         log_step!(app, tab_id, "Shell channel open ✓");
-        Some(ch)
+        (Some(ch), Some(ready_tx), shutdown)
     } else {
-        None
+        (None, None, std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)))
     };
+
+    // Wrap the SFTP handle in its own lock so SFTP commands can release the
+    // outer SshState mutex before performing blocking network I/O.
+    let sftp_wrapped = sftp.map(|s| {
+        std::sync::Arc::new(std::sync::Mutex::new(super::SftpHandle(s)))
+    });
 
     // Step 9: Store session and emit session_established.
     {
@@ -530,9 +555,15 @@ fn ssh_connect_blocking(
             super::SshSession {
                 session,
                 channel,
-                sftp,
+                sftp: sftp_wrapped,
+                shutdown,
             },
         );
+    }
+
+    // Unblock the reader thread now that the session is in the map.
+    if let Some(tx) = ready_tx {
+        let _ = tx.send(());
     }
 
     log_step!(app, tab_id, "Session established ✓");
@@ -649,6 +680,8 @@ pub fn ssh_disconnect(
 ) -> Result<(), String> {
     let mut map = state.0.lock().map_err(|e| e.to_string())?;
     if let Some(mut sess) = map.remove(&tab_id) {
+        // Signal the reader thread to exit before closing the channel.
+        sess.shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
         if let Some(mut ch) = sess.channel.take() {
             let _ = ch.close();
         }
