@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { EyeIcon, ArrowUp01Icon, Refresh01Icon, TerminalIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 interface SftpToolbarProps {
   path: string;
@@ -44,12 +46,12 @@ export function SftpToolbar({
         className={cn(
           "h-6 w-6 flex items-center justify-center rounded text-muted-foreground",
           "hover:bg-muted/40 hover:text-foreground transition-colors duration-75",
-          "text-xs font-bold shrink-0",
+          "shrink-0",
         )}
         title="Go up"
         tabIndex={-1}
       >
-        ↑
+        <HugeiconsIcon icon={ArrowUp01Icon} size={16} />
       </button>
 
       {/* Path input */}
@@ -88,12 +90,12 @@ export function SftpToolbar({
         className={cn(
           "h-6 w-6 flex items-center justify-center rounded text-muted-foreground",
           "hover:bg-muted/40 hover:text-foreground transition-colors duration-75",
-          "text-xs shrink-0",
+          "shrink-0",
         )}
         title="Refresh"
         tabIndex={-1}
       >
-        ↺
+        <HugeiconsIcon icon={Refresh01Icon} size={16} />
       </button>
 
       {/* Toggle hidden files */}
@@ -102,7 +104,7 @@ export function SftpToolbar({
           onClick={onToggleHidden}
           className={cn(
             "h-6 w-6 flex items-center justify-center rounded transition-colors duration-75",
-            "text-xs shrink-0",
+            "shrink-0",
             showHidden
               ? "text-primary bg-primary/10 hover:bg-primary/20"
               : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
@@ -110,7 +112,7 @@ export function SftpToolbar({
           title={showHidden ? "Hide hidden files" : "Show hidden files"}
           tabIndex={-1}
         >
-          {showHidden ? "👁" : "🙈"}
+          <HugeiconsIcon icon={EyeIcon} size={16} />
         </button>
       )}
 
@@ -126,7 +128,7 @@ export function SftpToolbar({
           title="Open terminal here"
           tabIndex={-1}
         >
-          <span className="text-[11px]">⌘</span>
+          <HugeiconsIcon icon={TerminalIcon} size={14} />
           <span>Term</span>
         </button>
       )}

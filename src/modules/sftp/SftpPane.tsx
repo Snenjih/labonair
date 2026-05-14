@@ -9,6 +9,8 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setSftpShowHiddenFiles,
 } from "@/modules/settings/store";
+import { Folder01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 function toggleHiddenFiles() {
   const next = !usePreferencesStore.getState().sftpShowHiddenFiles;
@@ -416,7 +418,7 @@ interface NewFolderInputProps {
 function NewFolderInput({ value, onChange, onCommit, onCancel }: NewFolderInputProps) {
   return (
     <div className={cn("flex items-center gap-1 px-2 h-7 border-b border-border bg-muted/10 shrink-0")}>
-      <span className="text-[13px]">📁</span>
+      <HugeiconsIcon icon={Folder01Icon} size={16} className="shrink-0 text-muted-foreground" />
       <input
         autoFocus
         value={value}

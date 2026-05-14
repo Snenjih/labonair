@@ -2,6 +2,8 @@ import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useRef, useState } from "react";
+import { Folder01Icon, File01Icon, Link01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { FileNode } from "../types";
 
 interface ColWidths {
@@ -308,7 +310,11 @@ function FileRow({
   onRenameCancel,
 }: FileRowProps) {
   const isUpEntry = file.name === "..";
-  const icon = isUpEntry ? "📁" : file.is_symlink ? "🔗" : file.is_dir ? "📁" : "📄";
+  const getIcon = () => {
+    if (isUpEntry || file.is_dir) return <HugeiconsIcon icon={Folder01Icon} size={16} />;
+    if (file.is_symlink) return <HugeiconsIcon icon={Link01Icon} size={16} />;
+    return <HugeiconsIcon icon={File01Icon} size={16} />;
+  };
   const fileExt = !file.is_dir && !file.is_symlink && !isUpEntry
     ? (file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() ?? "—" : "—")
     : "—";
@@ -341,7 +347,7 @@ function FileRow({
       onClick={isRenaming ? undefined : onClick}
       onDoubleClick={isRenaming ? undefined : onDoubleClick}
     >
-      <span className="w-5 shrink-0 text-[13px] leading-none">{icon}</span>
+      <span className="w-5 flex items-center justify-center shrink-0 leading-none text-muted-foreground">{getIcon()}</span>
       {isRenaming ? (
         <input
           autoFocus
