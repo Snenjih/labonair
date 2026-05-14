@@ -76,6 +76,18 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     }
   }, [rootPath, setRootPath, fetchChildren]);
 
+  // When showHiddenFiles toggles, refresh all loaded directories
+  useEffect(() => {
+    if (!rootPath) return;
+    const state = useLocalExplorerStore.getState();
+    // Refresh root
+    void fetchChildren(rootPath);
+    // Refresh all expanded directories
+    for (const path of state.expanded) {
+      void fetchChildren(path);
+    }
+  }, [options?.showHiddenFiles, rootPath, fetchChildren]);
+
   const toggle = useCallback(
     (path: string) => {
       toggleExpanded(path);
