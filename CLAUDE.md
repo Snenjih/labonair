@@ -1,5 +1,22 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Nexum — CLAUDE.md
 **AI Developer Guidelines & Project Reference**
+
+## Commands
+
+| Task | Command |
+|---|---|
+| Dev (frontend only) | `pnpm dev` |
+| Dev (full Tauri app) | `pnpm tauri dev` |
+| Build | `pnpm tauri build` |
+| TypeScript check | `pnpm exec tsc --noEmit` |
+| Rust check | `cd src-tauri && cargo check` |
+| Rust lint | `cd src-tauri && cargo clippy` |
+
+Package manager: **pnpm**. Bundle id: `com.nexum.app`.
 
 ## Session START Protocol
 Whenever a new conversation/session starts, you MUST:
@@ -16,6 +33,7 @@ Before working on any area, read the relevant context file:
 - **SSH/SFTP Architecture** → [`sftp_ssh_context.md`](./sftp_ssh_context.md) — Connection lifecycle, PTY, transfer manager IPC contracts
 - **Host Manager UI** → [`hosts_manager_context.md`](./hosts_manager_context.md) — Master-Detail layout, TitleBar dropdown, Inspector pane, Zustand store shape
 - **Host Manager Overhaul** → [`host_manager_overhaul_context.md`](./host_manager_overhaul_context.md) — Full implementation reference: new data model, IPC contracts, HostFormPanel tabs, dnd-kit reorder, multi-select, context menu, loading fix, future work
+- **macOS TCP socket2 Fix** → [`macos_tcp_socket2_context.md`](./macos_tcp_socket2_context.md) — Local network SSH "No route to host" fix using socket2 + IPv4-only filtering; design decisions & rationale
 
 ## Architecture Summary
 ```
@@ -57,10 +75,7 @@ All implementation tasks live in [`tasks/`](./tasks/). Each task file contains:
 - Files to create/modify
 - Expected outcome
 
-**Current Phase: 2 — Database & Host Management**
-Next task: [`tasks/TASK_02_1_sqlite_backend.md`](./tasks/TASK_02_1_sqlite_backend.md)
-
-Full task registry: [`tasks/README.md`](./tasks/README.md)
+**Do not rely on the phase/task pointer here — it drifts.** Always check [`tasks/README.md`](./tasks/README.md) for the current `in_progress` task, and `handshake.md` for session continuity.
 
 ## Session End Protocol
 At the end of every session you MUST:
@@ -92,15 +107,6 @@ See [`sftp_ssh_context.md`](./sftp_ssh_context.md) Section 6 for the full list.
 **Key Rust commands:** `hosts_get_all`, `hosts_create`, `hosts_update`, `hosts_delete`, `groups_get_all`, `groups_create`, `groups_delete`, `ssh_connect`, `ssh_disconnect`, `ssh_pty_write`, `ssh_pty_resize`, `sftp_read_dir`, `sftp_rename`, `sftp_delete`, `sftp_mkdir`, `sftp_chmod`, `enqueue_transfer`, `cancel_transfer`, `resolve_conflict`, `prepare_remote_edit`, `save_remote_edit`
 
 **Key Tauri events (Rust → React):** `transfer_progress`, `file_conflict`, `ssh_pty_output` `{tab_id, data}`, `auth_required` `{tab_id, prompt_message, is_2fa}`, `session_established` `{tab_id}`, `known_hosts_warning` `{tab_id, fingerprint, host, is_mismatch}`
-
-## Project
-
-**Nexum** — macOS-native remote workspace (hard-fork of "Terax"). Tauri 2 + Rust backend, React 19 + TypeScript + xterm.js (webgl) client, BYOK AI via Vercel AI SDK.
-
-Bundle id: `com.nexum.app`. Package manager: **pnpm**.
-
-Type-check the frontend without bundling: `pnpm exec tsc --noEmit`.
-Rust checks: `cd src-tauri && cargo check` / `cargo clippy`.
 
 ## Architecture
 
@@ -145,7 +151,7 @@ BYOK. Currently OpenAI-only via `@ai-sdk/openai`; default model in `config.ts` (
 
 - **shadcn/ui** is configured (`components.json`, style `radix-luma`, base `mist`, icon lib **hugeicons**). Generated primitives live in `src/components/ui/` — don't hand-edit them; re-run `pnpm dlx shadcn add` if a primitive needs an upgrade.
 - **AI Elements** (AI Vercel SDK) live in `src/components/ai-elements/` and come from the `@ai-elements` registry declared in `components.json`. Same rule: regenerate, don't hand-patch — but composition wrappers belong in `modules/ai/components/`.
-- Tailwind v4 (no `tailwind.config.*` — config is in `src/App.css` via `@theme`). Use `cn()` from `@/lib/utils` for class merging.
+- Tailwind v4 (no `tailwind.config.*` — config is in `src/styles/globals.css` via `@theme`). Use `cn()` from `@/lib/utils` for class merging.
 - Animation: `motion` (Framer Motion successor). Resizable layout: `react-resizable-panels`.
 - Path imports: always `@/…`, never relative across modules.
 
