@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import type { CreateHostPayload, Group, Host, ReorderItem, UpdateHostPayload } from "../types";
 
+type PingStatus = "online" | "offline" | "checking";
+
 interface HostsState {
   hosts: Host[];
   groups: Group[];
@@ -11,6 +13,10 @@ interface HostsState {
   isLoading: boolean;
   hasFetched: boolean;
   fetchError: string | null;
+
+  hostStatuses: Record<string, PingStatus>;
+  startPingWorker: () => void;
+  stopPingWorker: () => void;
 
   fetchData: () => Promise<void>;
   createHost: (payload: CreateHostPayload) => Promise<Host>;
@@ -29,6 +35,39 @@ interface HostsState {
   deleteGroup: (id: string) => Promise<void>;
 }
 
+let _pingIntervalId: ReturnType<typeof setInterval> | null = null;
+
+async function runPingCycle(get: () => HostsState, set: (fn: (s: HostsState) => Partial<HostsState>) => void) {
+  const { hosts } = get();
+  // Deduplicate by address:port to avoid redundant pings
+  const seen = new Map<string, string[]>(); // key -> hostIds[]
+  for (const h of hosts) {
+    const key = `${h.host_address}:${h.port}`;
+    const bucket = seen.get(key) ?? [];
+    bucket.push(h.id);
+    seen.set(key, bucket);
+  }
+
+  const results = await Promise.allSettled(
+    [...seen.entries()].map(async ([key, ids]) => {
+      const [addr, portStr] = key.split(":");
+      const online = await invoke<boolean>("ping_host", { hostAddress: addr, port: parseInt(portStr, 10) });
+      return { ids, online };
+    })
+  );
+
+  set((s) => {
+    const next = { ...s.hostStatuses };
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        const status: PingStatus = r.value.online ? "online" : "offline";
+        for (const id of r.value.ids) next[id] = status;
+      }
+    }
+    return { hostStatuses: next };
+  });
+}
+
 export const useHostsStore = create<HostsState>((set, get) => ({
   hosts: [],
   groups: [],
@@ -38,6 +77,21 @@ export const useHostsStore = create<HostsState>((set, get) => ({
   isLoading: true,
   hasFetched: false,
   fetchError: null,
+
+  hostStatuses: {},
+
+  startPingWorker: () => {
+    if (_pingIntervalId !== null) return;
+    void runPingCycle(get, set);
+    _pingIntervalId = setInterval(() => void runPingCycle(get, set), 60_000);
+  },
+
+  stopPingWorker: () => {
+    if (_pingIntervalId !== null) {
+      clearInterval(_pingIntervalId);
+      _pingIntervalId = null;
+    }
+  },
 
   fetchData: async () => {
     set({ isLoading: true, fetchError: null });

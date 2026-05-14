@@ -78,9 +78,10 @@ interface SortableHostCardProps {
   newSshTab: ConnectFn;
   newSftpTab: ConnectFn;
   tabs: Tab[];
+  pingStatus?: "online" | "offline" | "checking";
 }
 
-function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, tabs }: SortableHostCardProps) {
+function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, tabs, pingStatus }: SortableHostCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: host.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -100,6 +101,7 @@ function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit,
         newSshTab={newSshTab}
         newSftpTab={newSftpTab}
         tabs={tabs}
+        pingStatus={pingStatus}
       />
     </div>
   );
@@ -116,10 +118,13 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
   const hasFetched = useHostsStore((s) => s.hasFetched);
   const fetchError = useHostsStore((s) => s.fetchError);
   const fetchData = useHostsStore((s) => s.fetchData);
+  const startPingWorker = useHostsStore((s) => s.startPingWorker);
+  const stopPingWorker = useHostsStore((s) => s.stopPingWorker);
   const createGroup = useHostsStore((s) => s.createGroup);
   const setSelectedHost = useHostsStore((s) => s.setSelectedHost);
   const selectHost = useHostsStore((s) => s.selectHost);
   const reorderHosts = useHostsStore((s) => s.reorderHosts);
+  const hostStatuses = useHostsStore((s) => s.hostStatuses);
 
   const [search, setSearch] = useState("");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -134,6 +139,12 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
 
   // Initial load
   useEffect(() => { void fetchData(); }, [fetchData]);
+
+  // Ping worker lifecycle
+  useEffect(() => {
+    startPingWorker();
+    return () => stopPingWorker();
+  }, [startPingWorker, stopPingWorker]);
 
   // Auto-refresh every 30 s
   useEffect(() => {
@@ -351,6 +362,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
                       newSshTab={newSshTab}
                       newSftpTab={newSftpTab}
                       tabs={tabs}
+                      pingStatus={hostStatuses[host.id]}
                     />
                   ))}
                 </div>

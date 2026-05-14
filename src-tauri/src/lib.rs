@@ -10,6 +10,57 @@ use modules::{
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[tauri::command]
+async fn ping_host(host_address: String, port: u16) -> Result<bool, String> {
+    use std::net::ToSocketAddrs;
+    use std::time::Duration;
+    use socket2::{Socket, Domain, Type, Protocol};
+
+    let addrs: Vec<_> = format!("{}:{}", host_address, port)
+        .to_socket_addrs()
+        .map_err(|e| e.to_string())?
+        .collect();
+
+    for addr in addrs {
+        // Only try IPv4 to avoid macOS Error 65 on link-local routes
+        if addr.is_ipv6() {
+            continue;
+        }
+        let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))
+            .map_err(|e| e.to_string())?;
+        socket.set_nonblocking(true).map_err(|e| e.to_string())?;
+        let sock_addr = socket2::SockAddr::from(addr);
+        match socket.connect(&sock_addr) {
+            Ok(_) => return Ok(true),
+            Err(e) if e.raw_os_error() == Some(libc::EINPROGRESS) || e.raw_os_error() == Some(libc::EWOULDBLOCK) => {
+                // Poll with select — wait up to 1500 ms
+                use std::os::unix::io::AsRawFd;
+                let fd = socket.as_raw_fd();
+                let timeout = Duration::from_millis(1500);
+                let secs = timeout.as_secs() as libc::time_t;
+                let micros = timeout.subsec_micros() as libc::suseconds_t;
+                let mut tv = libc::timeval { tv_sec: secs, tv_usec: micros };
+                let result = unsafe {
+                    let mut writefds: libc::fd_set = std::mem::zeroed();
+                    libc::FD_SET(fd, &mut writefds);
+                    libc::select(fd + 1, std::ptr::null_mut(), &mut writefds, std::ptr::null_mut(), &mut tv as *mut _)
+                };
+                if result > 0 {
+                    // Check SO_ERROR to confirm connection succeeded
+                    let so_err: i32 = socket.take_error()
+                        .map(|opt| opt.map(|e| e.raw_os_error().unwrap_or(1)).unwrap_or(0))
+                        .unwrap_or(1);
+                    if so_err == 0 {
+                        return Ok(true);
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+    }
+    Ok(false)
+}
+
+#[tauri::command]
 async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Result<(), String> {
     let url_path = match tab.as_deref() {
         Some(t) if !t.is_empty() => format!("settings.html?tab={}", t),
@@ -158,6 +209,7 @@ pub fn run() {
             theme_import,
             theme_export,
             theme_delete,
+            ping_host,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

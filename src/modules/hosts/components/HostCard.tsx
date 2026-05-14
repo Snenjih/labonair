@@ -41,6 +41,7 @@ interface HostCardProps {
   newSshTab: (hostId: string, title: string) => void;
   newSftpTab: (hostId: string, title: string) => void;
   tabs: Tab[];
+  pingStatus?: "online" | "offline" | "checking";
 }
 
 function relativeTime(ms: number): string {
@@ -73,6 +74,7 @@ export function HostCard({
   newSshTab,
   newSftpTab,
   tabs,
+  pingStatus,
 }: HostCardProps) {
   const selectedHostIds = useHostsStore((s) => s.selectedHostIds);
   const hosts = useHostsStore((s) => s.hosts);
@@ -156,11 +158,19 @@ export function HostCard({
               onDoubleClick={(e) => { e.stopPropagation(); newSshTab(host.id, host.name); }}
               className="flex flex-1 items-start gap-3 p-3.5 text-left outline-none"
             >
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40 text-sm font-semibold text-muted-foreground shadow-sm">
+              <div className="relative flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40 text-sm font-semibold text-muted-foreground shadow-sm">
                 {host.pin_to_top ? (
                   <span className="text-[10px] text-primary">★</span>
                 ) : null}
                 {initials(host.name) || "?"}
+                <span
+                  className={cn(
+                    "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background",
+                    pingStatus === "online" && "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]",
+                    pingStatus === "offline" && "bg-destructive",
+                    (!pingStatus || pingStatus === "checking") && "bg-muted-foreground/40 animate-pulse",
+                  )}
+                />
               </div>
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center justify-between gap-2">
