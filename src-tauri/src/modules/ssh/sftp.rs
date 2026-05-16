@@ -2,6 +2,10 @@ use crate::modules::ssh::SshState;
 use std::io::{Read as _, Write as _};
 use std::sync::Arc;
 
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
 /// Extract the SFTP Arc under a brief outer-lock, then release it so the
 /// PTY reader thread can acquire the same lock without waiting for I/O.
 macro_rules! get_sftp_arc {
@@ -71,6 +75,11 @@ pub async fn sftp_read_dir(
                     .unwrap_or_else(|| pb.to_string_lossy().to_string());
                 let is_dir = stat.is_dir();
                 let is_symlink = stat.file_type().is_symlink();
+                let symlink_target = if is_symlink {
+                    sftp.0.readlink(&pb).ok().map(|p| p.to_string_lossy().to_string())
+                } else {
+                    None
+                };
                 FileNode {
                     path: pb.to_string_lossy().to_string(),
                     name,
@@ -78,7 +87,7 @@ pub async fn sftp_read_dir(
                     modified_at: stat.mtime.unwrap_or(0) as i64,
                     is_dir,
                     is_symlink,
-                    symlink_target: None,
+                    symlink_target,
                     permissions: mode_to_string(stat.perm.unwrap_or(0)),
                 }
             })
@@ -243,6 +252,104 @@ pub async fn save_remote_edit(
             .create(std::path::Path::new(&remote_path))
             .map_err(|e| e.to_string())?;
         remote_file.write_all(&data).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Run `du -sh '<path>'` on the remote server and return the human-readable size.
+#[tauri::command]
+pub async fn sftp_calculate_size(
+    tab_id: String,
+    path: String,
+    state: tauri::State<'_, SshState>,
+) -> Result<String, String> {
+    let state_inner = state.inner().clone();
+    tokio::task::spawn_blocking(move || {
+        use std::io::Read;
+        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
+        let session = &map
+            .get(&tab_id)
+            .ok_or_else(|| format!("no SSH session for tab {tab_id}"))?
+            .session;
+        let mut ch = session.channel_session().map_err(|e| e.to_string())?;
+        ch.exec(&format!("du -sh {}", shell_quote(&path))).map_err(|e| e.to_string())?;
+        let mut stdout = String::new();
+        ch.read_to_string(&mut stdout).map_err(|e| e.to_string())?;
+        ch.wait_close().ok();
+        Ok(stdout.split_whitespace().next().unwrap_or("?").to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Execute `chown owner:group '<path>'` on the remote server.
+#[tauri::command]
+pub async fn sftp_chown(
+    tab_id: String,
+    path: String,
+    owner: String,
+    group: String,
+    state: tauri::State<'_, SshState>,
+) -> Result<(), String> {
+    let state_inner = state.inner().clone();
+    tokio::task::spawn_blocking(move || {
+        use std::io::Read;
+        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
+        let session = &map
+            .get(&tab_id)
+            .ok_or_else(|| format!("no SSH session for tab {tab_id}"))?
+            .session;
+        let mut ch = session.channel_session().map_err(|e| e.to_string())?;
+        let cmd = format!(
+            "chown {}:{} {}",
+            shell_quote(&owner),
+            shell_quote(&group),
+            shell_quote(&path)
+        );
+        ch.exec(&cmd).map_err(|e| e.to_string())?;
+        let mut stderr_buf = String::new();
+        ch.stderr().read_to_string(&mut stderr_buf).ok();
+        ch.wait_close().ok();
+        let exit_code = ch.exit_status().unwrap_or(-1);
+        if exit_code != 0 && !stderr_buf.is_empty() {
+            return Err(stderr_buf.trim().to_string());
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Run `find <start_path> -iname '*<query>*' -maxdepth 5` on the remote server.
+/// Returns up to 200 matching paths.
+#[tauri::command]
+pub async fn sftp_deep_search(
+    tab_id: String,
+    start_path: String,
+    query: String,
+    state: tauri::State<'_, SshState>,
+) -> Result<Vec<String>, String> {
+    let state_inner = state.inner().clone();
+    tokio::task::spawn_blocking(move || {
+        use std::io::Read;
+        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
+        let session = &map
+            .get(&tab_id)
+            .ok_or_else(|| format!("no SSH session for tab {tab_id}"))?
+            .session;
+        let mut ch = session.channel_session().map_err(|e| e.to_string())?;
+        let safe_query = query.replace('\'', "'\\''");
+        let cmd = format!(
+            "find {} -iname '*{}*' -maxdepth 5 -print 2>/dev/null | head -n 200",
+            shell_quote(&start_path),
+            safe_query,
+        );
+        ch.exec(&cmd).map_err(|e| e.to_string())?;
+        let mut stdout = String::new();
+        ch.read_to_string(&mut stdout).map_err(|e| e.to_string())?;
+        ch.wait_close().ok();
+        Ok(stdout.lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect())
     })
     .await
     .map_err(|e| e.to_string())?

@@ -56,6 +56,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
   const hosts = useHostsStore((s) => s.hosts);
   const host = hosts.find((h) => h.id === tab.hostId);
   const hostLabel = host?.name ?? tab.title;
+  const hostAddress = host?.host_address ?? "";
 
   const { openRemoteEditorTab } = useTabs();
   const sftpShowHiddenFiles = usePreferencesStore((s) => s.sftpShowHiddenFiles);
@@ -74,6 +75,10 @@ export function SftpPane({ tab }: SftpPaneProps) {
   // Inline new folder state (separate for local/remote)
   const [creatingFolderSide, setCreatingFolderSide] = useState<"local" | "remote" | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
+
+  // Deep search state
+  const [deepSearchResults, setDeepSearchResults] = useState<string[] | null>(null);
+  const [isDeepSearching, setIsDeepSearching] = useState(false);
 
   useEffect(() => {
     if (!isConnected) return;
@@ -114,10 +119,21 @@ export function SftpPane({ tab }: SftpPaneProps) {
     if (file.is_dir) loadLocalDir(tabId, file.path);
   }
 
-  function handleRemoteDoubleClick(file: FileNode) {
+  async function handleRemoteDoubleClick(file: FileNode) {
     if (file.name === "..") {
       loadRemoteDir(tabId, parentPath(tabState?.remotePath ?? "/"));
       return;
+    }
+    // Symlink: try navigating to the target if available, else fall through
+    if (file.is_symlink && file.symlink_target) {
+      try {
+        await invoke("sftp_read_dir", { tabId, path: file.symlink_target });
+        // If it didn't throw, it's a directory — navigate
+        loadRemoteDir(tabId, file.symlink_target);
+        return;
+      } catch {
+        // Target is a file; open as editor below
+      }
     }
     if (file.is_dir) {
       loadRemoteDir(tabId, file.path);
@@ -203,6 +219,27 @@ export function SftpPane({ tab }: SftpPaneProps) {
     setNewFolderName("");
   }
 
+  async function handleDeepSearch(query: string) {
+    if (!query) {
+      setDeepSearchResults(null);
+      return;
+    }
+    setIsDeepSearching(true);
+    try {
+      const results = await invoke<string[]>("sftp_deep_search", {
+        tabId,
+        startPath: tabState?.remotePath ?? "/",
+        query,
+      });
+      setDeepSearchResults(results);
+    } catch (e) {
+      console.error("Deep search failed:", e);
+      setDeepSearchResults([]);
+    } finally {
+      setIsDeepSearching(false);
+    }
+  }
+
   const localPath = tabState?.localPath ?? "~";
   const remotePath = tabState?.remotePath ?? "/";
 
@@ -277,6 +314,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
               onNavigate={(p) => loadLocalDir(tabId, p)}
               showHidden={sftpShowHiddenFiles}
               onToggleHidden={toggleHiddenFiles}
+              bookmarkKey="local"
             />
             {creatingFolderSide === "local" && (
               <NewFolderInput
@@ -289,9 +327,12 @@ export function SftpPane({ tab }: SftpPaneProps) {
             <div className="flex-1 min-h-0">
               <SftpContextMenu
                 tabId={tabId}
+                hostId={tab.hostId}
                 side="local"
                 selectedPaths={tabState?.selectedLocalPaths ?? new Set()}
                 currentPath={localPath}
+                hostAddress={hostAddress}
+                files={displayedLocalFiles}
                 onRefresh={() => loadLocalDir(tabId, localPath)}
                 onStartRename={startRename}
                 onStartNewFolder={() => { setCreatingFolderSide("local"); setNewFolderName(""); }}
@@ -322,19 +363,22 @@ export function SftpPane({ tab }: SftpPaneProps) {
 
         {/* REMOTE */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full relative">
             <PaneLabel
-              label="REMOTE"
-              count={displayedRemoteFiles.length}
+              label={deepSearchResults !== null ? `SEARCH RESULTS (${deepSearchResults.length})` : "REMOTE"}
+              count={deepSearchResults !== null ? deepSearchResults.length : displayedRemoteFiles.length}
               selected={tabState?.selectedRemotePaths.size}
             />
             <SftpToolbar
               path={remotePath}
-              onNavigate={(p) => loadRemoteDir(tabId, p)}
+              onNavigate={(p) => { setDeepSearchResults(null); loadRemoteDir(tabId, p); }}
               showOpenTerminal
               onOpenTerminal={() => {/* Task 05+: open SSH terminal at path */}}
               showHidden={sftpShowHiddenFiles}
               onToggleHidden={toggleHiddenFiles}
+              bookmarkKey={hostAddress || undefined}
+              onDeepSearch={handleDeepSearch}
+              isSearching={isDeepSearching}
             />
             {creatingFolderSide === "remote" && (
               <NewFolderInput
@@ -344,35 +388,89 @@ export function SftpPane({ tab }: SftpPaneProps) {
                 onCancel={() => { setCreatingFolderSide(null); setNewFolderName(""); }}
               />
             )}
-            <div className="flex-1 min-h-0">
-              <SftpContextMenu
-                tabId={tabId}
-                side="remote"
-                selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
-                currentPath={remotePath}
-                onRefresh={() => loadRemoteDir(tabId, remotePath)}
-                onStartRename={startRename}
-                onStartNewFolder={() => { setCreatingFolderSide("remote"); setNewFolderName(""); }}
-              >
-                <div className="h-full">
-                  <VirtualizedFileList
-                    files={displayedRemoteFiles}
-                    selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
-                    onSelect={handleRemoteSelect}
-                    onDoubleClick={handleRemoteDoubleClick}
-                    isLoading={tabState?.isLoadingRemote}
-                    draggable
-                    onDragStart={() => { dragSourceRef.current = "remote"; }}
-                    onDrop={handleRemoteDrop}
-                    renamingPath={renamingPath}
-                    renameValue={renameValue}
-                    onRenameChange={setRenameValue}
-                    onRenameCommit={() => commitRename("remote")}
-                    onRenameCancel={() => setRenamingPath(null)}
-                  />
+
+            {/* Deep search results overlay or normal file list */}
+            {deepSearchResults !== null ? (
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-border bg-yellow-500/5">
+                  <span className="text-[10px] text-yellow-500/80 flex-1 truncate">
+                    Results for search in {remotePath} — double-click to navigate to parent
+                  </span>
+                  <button
+                    onClick={() => setDeepSearchResults(null)}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    ✕
+                  </button>
                 </div>
-              </SftpContextMenu>
-            </div>
+                <div className="flex-1 overflow-auto min-h-0">
+                  {isDeepSearching ? (
+                    <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
+                      Searching…
+                    </div>
+                  ) : deepSearchResults.length === 0 ? (
+                    <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
+                      No results found
+                    </div>
+                  ) : (
+                    deepSearchResults.map((p) => {
+                      const name = p.split("/").pop() ?? p;
+                      const dir = p.substring(0, p.lastIndexOf("/")) || "/";
+                      return (
+                        <button
+                          key={p}
+                          onDoubleClick={() => {
+                            setDeepSearchResults(null);
+                            loadRemoteDir(tabId, dir);
+                          }}
+                          className={cn(
+                            "w-full flex flex-col px-3 py-1.5 text-left",
+                            "hover:bg-accent/20 transition-colors",
+                            "border-b border-border/30",
+                          )}
+                        >
+                          <span className="text-xs font-medium text-foreground truncate">{name}</span>
+                          <span className="text-[10px] font-mono text-muted-foreground/60 truncate">{p}</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 min-h-0">
+                <SftpContextMenu
+                  tabId={tabId}
+                  hostId={tab.hostId}
+                  side="remote"
+                  selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
+                  currentPath={remotePath}
+                  hostAddress={hostAddress}
+                  files={displayedRemoteFiles}
+                  onRefresh={() => loadRemoteDir(tabId, remotePath)}
+                  onStartRename={startRename}
+                  onStartNewFolder={() => { setCreatingFolderSide("remote"); setNewFolderName(""); }}
+                >
+                  <div className="h-full">
+                    <VirtualizedFileList
+                      files={displayedRemoteFiles}
+                      selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
+                      onSelect={handleRemoteSelect}
+                      onDoubleClick={handleRemoteDoubleClick}
+                      isLoading={tabState?.isLoadingRemote}
+                      draggable
+                      onDragStart={() => { dragSourceRef.current = "remote"; }}
+                      onDrop={handleRemoteDrop}
+                      renamingPath={renamingPath}
+                      renameValue={renameValue}
+                      onRenameChange={setRenameValue}
+                      onRenameCommit={() => commitRename("remote")}
+                      onRenameCancel={() => setRenamingPath(null)}
+                    />
+                  </div>
+                </SftpContextMenu>
+              </div>
+            )}
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

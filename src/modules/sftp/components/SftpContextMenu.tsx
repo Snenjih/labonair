@@ -17,13 +17,20 @@ import {
 } from "@/components/ui/context-menu";
 import { useTabs } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
+import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
+import { useBookmarksStore } from "../store/bookmarksStore";
+import type { FileNode } from "../types";
+import { PropertiesDialog } from "./PropertiesDialog";
 
 interface SftpContextMenuProps {
   tabId: string;
+  hostId?: string;
   side: "local" | "remote";
   selectedPaths: Set<string>;
   currentPath?: string;
+  hostAddress?: string;
+  files?: FileNode[];
   onRefresh: () => void;
   onStartRename?: (path: string) => void;
   onStartNewFolder?: () => void;
@@ -32,8 +39,12 @@ interface SftpContextMenuProps {
 
 export function SftpContextMenu({
   tabId,
+  hostId,
   side,
   selectedPaths,
+  currentPath,
+  hostAddress,
+  files,
   onRefresh,
   onStartRename,
   onStartNewFolder,
@@ -42,10 +53,13 @@ export function SftpContextMenu({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [chmodOpen, setChmodOpen] = useState(false);
   const [chmodValue, setChmodValue] = useState("755");
+  const [propertiesFile, setPropertiesFile] = useState<FileNode | null>(null);
   const { openRemoteEditorTab } = useTabs();
+  const addBookmark = useBookmarksStore((s) => s.addBookmark);
 
   const count = selectedPaths.size;
   const singlePath = count === 1 ? [...selectedPaths][0] : null;
+  const singleFile = singlePath ? files?.find((f) => f.path === singlePath) ?? null : null;
 
   async function handleDelete() {
     if (count === 0) return;
@@ -53,8 +67,7 @@ export function SftpContextMenu({
       if (side === "remote") {
         await invoke("sftp_delete", { tabId, paths: [...selectedPaths] });
       } else {
-        // Local deletion: use Tauri fs commands (not implemented here — placeholder)
-        console.warn("Local delete not yet implemented");
+        await Promise.all([...selectedPaths].map((p) => invoke("fs_delete", { path: p })));
       }
       onRefresh();
     } catch (e) {
@@ -79,6 +92,47 @@ export function SftpContextMenu({
     navigator.clipboard.writeText(text).catch(console.error);
   }
 
+  async function handleDownloadTo() {
+    if (count === 0 || !hostId) return;
+    const dest = await dialogOpen({ directory: true, multiple: false, title: "Choose download folder" });
+    if (!dest || typeof dest !== "string") return;
+    for (const remotePath of selectedPaths) {
+      const fileName = remotePath.split("/").pop() ?? "file";
+      const destPath = `${dest}/${fileName}`;
+      await invoke("enqueue_transfer", {
+        host_id: hostId,
+        src_path: remotePath,
+        dest_path: destPath,
+        direction: "download",
+      }).catch(console.error);
+    }
+  }
+
+  async function handleUploadHere() {
+    if (!hostId || !currentPath) return;
+    const selected = await dialogOpen({ multiple: true, directory: false, title: "Choose files to upload" });
+    if (!selected) return;
+    const paths = Array.isArray(selected) ? selected : [selected];
+    for (const localPath of paths) {
+      const fileName = localPath.split(/[\\/]/).pop() ?? "file";
+      const sep = currentPath.endsWith("/") ? "" : "/";
+      const destPath = `${currentPath}${sep}${fileName}`;
+      await invoke("enqueue_transfer", {
+        host_id: hostId,
+        src_path: localPath,
+        dest_path: destPath,
+        direction: "upload",
+      }).catch(console.error);
+    }
+  }
+
+  function handleBookmark() {
+    const path = singlePath ?? currentPath;
+    if (!path) return;
+    const key = side === "remote" ? (hostAddress ?? "remote") : "local";
+    void addBookmark(key, path);
+  }
+
   return (
     <>
       <ContextMenu>
@@ -93,6 +147,29 @@ export function SftpContextMenu({
               Rename
             </ContextMenuItem>
           )}
+
+          <ContextMenuSeparator />
+
+          {/* OS-native download (remote → local) */}
+          {side === "remote" && count > 0 && (
+            <ContextMenuItem onClick={handleDownloadTo}>
+              Download to…
+            </ContextMenuItem>
+          )}
+
+          {/* OS-native upload (local files → remote) */}
+          {side === "remote" && (
+            <ContextMenuItem onClick={handleUploadHere}>
+              Upload files here…
+            </ContextMenuItem>
+          )}
+
+          {(side === "remote" && count >= 0) && <ContextMenuSeparator />}
+
+          {/* Bookmark current path or selected item */}
+          <ContextMenuItem onClick={handleBookmark}>
+            Bookmark this path
+          </ContextMenuItem>
 
           <ContextMenuSeparator />
 
@@ -115,8 +192,13 @@ export function SftpContextMenu({
             <>
               <ContextMenuSeparator />
               <ContextMenuItem onClick={() => { setChmodValue("755"); setChmodOpen(true); }}>
-                Permissions…
+                Quick Permissions…
               </ContextMenuItem>
+              {singleFile && (
+                <ContextMenuItem onClick={() => setPropertiesFile(singleFile)}>
+                  Properties…
+                </ContextMenuItem>
+              )}
               <ContextMenuItem
                 onClick={async () => {
                   if (!singlePath) return;
@@ -159,7 +241,7 @@ export function SftpContextMenu({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Chmod dialog */}
+      {/* Quick chmod dialog */}
       {chmodOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
@@ -200,6 +282,16 @@ export function SftpContextMenu({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Full Properties dialog */}
+      {propertiesFile && (
+        <PropertiesDialog
+          open={!!propertiesFile}
+          onClose={() => setPropertiesFile(null)}
+          file={propertiesFile}
+          tabId={tabId}
+        />
       )}
     </>
   );
