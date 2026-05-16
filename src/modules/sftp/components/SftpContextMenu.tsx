@@ -15,6 +15,13 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useTabs } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
@@ -129,7 +136,8 @@ export function SftpContextMenu({
   function handleBookmark() {
     const path = singlePath ?? currentPath;
     if (!path) return;
-    const key = side === "remote" ? (hostAddress ?? "remote") : "local";
+    // Use || so an empty string also falls back to "remote" (not just null/undefined).
+    const key = side === "remote" ? (hostAddress || "remote") : "local";
     void addBookmark(key, path);
   }
 
@@ -241,48 +249,40 @@ export function SftpContextMenu({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Quick chmod dialog */}
-      {chmodOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={(e) => { if (e.target === e.currentTarget) setChmodOpen(false); }}
-        >
-          <div className="bg-card border border-border rounded-lg p-5 w-72 shadow-xl">
-            <p className="text-sm font-semibold text-foreground mb-1">
-              Set Permissions
-            </p>
-            <p className="text-xs text-muted-foreground mb-3 truncate">
-              {singlePath}
-            </p>
-            <input
-              value={chmodValue}
-              onChange={(e) => setChmodValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { handleChmod(); setChmodOpen(false); }
-                if (e.key === "Escape") setChmodOpen(false);
-              }}
-              placeholder="755"
-              maxLength={4}
-              className="w-full h-8 px-2 text-sm font-mono rounded bg-muted/30 border border-border text-foreground focus:outline-none focus:border-primary mb-4"
-              autoFocus
-            />
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setChmodOpen(false)}
-                className="h-7 px-3 text-xs rounded bg-muted/30 text-muted-foreground hover:text-foreground"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => { handleChmod(); setChmodOpen(false); }}
-                className="h-7 px-3 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Quick chmod dialog — uses shadcn Dialog for proper focus-trap and ARIA */}
+      <Dialog open={chmodOpen} onOpenChange={(v) => { if (!v) setChmodOpen(false); }}>
+        <DialogContent className="w-72">
+          <DialogHeader>
+            <DialogTitle className="text-sm">Set Permissions</DialogTitle>
+            <p className="text-xs text-muted-foreground truncate">{singlePath}</p>
+          </DialogHeader>
+          <input
+            value={chmodValue}
+            onChange={(e) => setChmodValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { handleChmod(); setChmodOpen(false); }
+            }}
+            placeholder="755"
+            maxLength={4}
+            className="w-full h-8 px-2 text-sm font-mono rounded bg-muted/30 border border-border text-foreground focus:outline-none focus:border-primary"
+            autoFocus
+          />
+          <DialogFooter>
+            <button
+              onClick={() => setChmodOpen(false)}
+              className="h-7 px-3 text-xs rounded bg-muted/30 text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { handleChmod(); setChmodOpen(false); }}
+              className="h-7 px-3 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Apply
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Full Properties dialog */}
       {propertiesFile && (

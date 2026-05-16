@@ -73,19 +73,38 @@ pub async fn sftp_read_dir(
                     .file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_else(|| pb.to_string_lossy().to_string());
-                let is_dir = stat.is_dir();
                 let is_symlink = stat.file_type().is_symlink();
-                let symlink_target = if is_symlink {
-                    sftp.0.readlink(&pb).ok().map(|p| p.to_string_lossy().to_string())
+                let (symlink_target, resolved_is_dir) = if is_symlink {
+                    // readlink gives the raw target (may be relative).
+                    let raw_target = sftp.0.readlink(&pb).ok()
+                        .map(|p| p.to_string_lossy().to_string());
+                    // Resolve relative targets against the entry's parent directory
+                    // so navigation works regardless of how the symlink was created.
+                    let abs_target = raw_target.as_deref().map(|t| {
+                        if t.starts_with('/') {
+                            t.to_string()
+                        } else {
+                            let parent = pb.parent()
+                                .map(|p| p.to_string_lossy().to_string())
+                                .unwrap_or_else(|| "/".to_string());
+                            format!("{}/{}", parent.trim_end_matches('/'), t)
+                        }
+                    });
+                    // stat() follows the symlink; tells us if the target is a dir.
+                    let is_target_dir = abs_target.as_deref()
+                        .and_then(|t| sftp.0.stat(std::path::Path::new(t)).ok())
+                        .map(|s| s.is_dir())
+                        .unwrap_or(false);
+                    (abs_target, is_target_dir)
                 } else {
-                    None
+                    (None, stat.is_dir())
                 };
                 FileNode {
                     path: pb.to_string_lossy().to_string(),
                     name,
                     size: stat.size.unwrap_or(0),
                     modified_at: stat.mtime.unwrap_or(0) as i64,
-                    is_dir,
+                    is_dir: resolved_is_dir,
                     is_symlink,
                     symlink_target,
                     permissions: mode_to_string(stat.perm.unwrap_or(0)),
@@ -245,7 +264,15 @@ pub async fn save_remote_edit(
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
-        let data = std::fs::read(&local_temp_path).map_err(|e| e.to_string())?;
+        // Validate that the path is inside the expected temp directory to prevent
+        // the frontend from reading arbitrary local files and uploading them.
+        let temp_dir = std::env::temp_dir().join("nexum_remote_edits");
+        let canonical = std::fs::canonicalize(&local_temp_path)
+            .map_err(|e| format!("invalid temp path: {e}"))?;
+        if !canonical.starts_with(&temp_dir) {
+            return Err("temp path is outside the allowed directory".to_string());
+        }
+        let data = std::fs::read(&canonical).map_err(|e| e.to_string())?;
         let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
         let mut remote_file = sftp.0
@@ -295,18 +322,21 @@ pub async fn sftp_chown(
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
+        // Build the ownership spec: "owner:group", "owner:", ":group".
+        // An empty string means "leave unchanged". Both empty → nothing to do.
+        let spec = match (owner.is_empty(), group.is_empty()) {
+            (true, true)   => return Ok(()),
+            (false, false) => format!("{}:{}", shell_quote(&owner), shell_quote(&group)),
+            (false, true)  => format!("{}:", shell_quote(&owner)),
+            (true, false)  => format!(":{}", shell_quote(&group)),
+        };
         let map = state_inner.0.lock().map_err(|e| e.to_string())?;
         let session = &map
             .get(&tab_id)
             .ok_or_else(|| format!("no SSH session for tab {tab_id}"))?
             .session;
         let mut ch = session.channel_session().map_err(|e| e.to_string())?;
-        let cmd = format!(
-            "chown {}:{} {}",
-            shell_quote(&owner),
-            shell_quote(&group),
-            shell_quote(&path)
-        );
+        let cmd = format!("chown {} {}", spec, shell_quote(&path));
         ch.exec(&cmd).map_err(|e| e.to_string())?;
         let mut stderr_buf = String::new();
         ch.stderr().read_to_string(&mut stderr_buf).ok();
@@ -339,11 +369,13 @@ pub async fn sftp_deep_search(
             .ok_or_else(|| format!("no SSH session for tab {tab_id}"))?
             .session;
         let mut ch = session.channel_session().map_err(|e| e.to_string())?;
-        let safe_query = query.replace('\'', "'\\''");
+        // Build the glob as a Rust string first, then shell_quote the whole thing.
+        // This prevents any metacharacter in `query` from escaping the -iname argument.
+        let glob = format!("*{}*", query.replace('\'', "'\\''"));
         let cmd = format!(
-            "find {} -iname '*{}*' -maxdepth 5 -print 2>/dev/null | head -n 200",
+            "find {} -iname {} -maxdepth 5 -print 2>/dev/null | head -n 200",
             shell_quote(&start_path),
-            safe_query,
+            shell_quote(&glob),
         );
         ch.exec(&cmd).map_err(|e| e.to_string())?;
         let mut stdout = String::new();

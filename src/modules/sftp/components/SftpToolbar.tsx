@@ -10,6 +10,7 @@ import { Bookmark02Icon, Cancel01Icon, EyeIcon, ArrowUp01Icon, Refresh01Icon, Te
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { useBookmarksStore } from "../store/bookmarksStore";
+import { parentPath } from "../utils";
 
 interface SftpToolbarProps {
   path: string;
@@ -24,14 +25,6 @@ interface SftpToolbarProps {
   // Deep search (remote only)
   onDeepSearch?: (query: string) => void;
   isSearching?: boolean;
-}
-
-function parentPath(p: string): string {
-  if (p === "/" || p === "") return "/";
-  const trimmed = p.endsWith("/") ? p.slice(0, -1) : p;
-  const lastSlash = trimmed.lastIndexOf("/");
-  if (lastSlash <= 0) return "/";
-  return trimmed.slice(0, lastSlash);
 }
 
 export function SftpToolbar({

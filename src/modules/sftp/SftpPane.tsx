@@ -27,14 +27,7 @@ import { SftpToolbar } from "./components/SftpToolbar";
 import { VirtualizedFileList } from "./components/VirtualizedFileList";
 import { useSftpStore } from "./store/sftpStore";
 import type { FileNode } from "./types";
-
-function parentPath(p: string): string {
-  if (p === "/" || p === "") return "/";
-  const trimmed = p.endsWith("/") ? p.slice(0, -1) : p;
-  const lastSlash = trimmed.lastIndexOf("/");
-  if (lastSlash <= 0) return "/";
-  return trimmed.slice(0, lastSlash);
-}
+import { parentPath } from "./utils";
 
 interface SftpPaneProps {
   tab: SftpTab;
@@ -119,24 +112,16 @@ export function SftpPane({ tab }: SftpPaneProps) {
     if (file.is_dir) loadLocalDir(tabId, file.path);
   }
 
-  async function handleRemoteDoubleClick(file: FileNode) {
+  function handleRemoteDoubleClick(file: FileNode) {
     if (file.name === "..") {
       loadRemoteDir(tabId, parentPath(tabState?.remotePath ?? "/"));
       return;
     }
-    // Symlink: try navigating to the target if available, else fall through
-    if (file.is_symlink && file.symlink_target) {
-      try {
-        await invoke("sftp_read_dir", { tabId, path: file.symlink_target });
-        // If it didn't throw, it's a directory — navigate
-        loadRemoteDir(tabId, file.symlink_target);
-        return;
-      } catch {
-        // Target is a file; open as editor below
-      }
-    }
+    // is_dir is now resolved through stat() server-side for symlinks too,
+    // so we can rely on it directly without an extra round-trip.
     if (file.is_dir) {
-      loadRemoteDir(tabId, file.path);
+      const target = file.is_symlink && file.symlink_target ? file.symlink_target : file.path;
+      loadRemoteDir(tabId, target);
       return;
     }
     openRemoteEditorTab(tabId, file.path);
@@ -370,6 +355,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
               selected={tabState?.selectedRemotePaths.size}
             />
             <SftpToolbar
+              key={`toolbar-remote-${remotePath}`}
               path={remotePath}
               onNavigate={(p) => { setDeepSearchResults(null); loadRemoteDir(tabId, p); }}
               showOpenTerminal
@@ -394,7 +380,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-border bg-yellow-500/5">
                   <span className="text-[10px] text-yellow-500/80 flex-1 truncate">
-                    Results for search in {remotePath} — double-click to navigate to parent
+                    Results in {remotePath} — click to navigate to parent folder
                   </span>
                   <button
                     onClick={() => setDeepSearchResults(null)}
@@ -419,15 +405,16 @@ export function SftpPane({ tab }: SftpPaneProps) {
                       return (
                         <button
                           key={p}
-                          onDoubleClick={() => {
+                          onClick={() => {
                             setDeepSearchResults(null);
                             loadRemoteDir(tabId, dir);
                           }}
                           className={cn(
                             "w-full flex flex-col px-3 py-1.5 text-left",
-                            "hover:bg-accent/20 transition-colors",
-                            "border-b border-border/30",
+                            "hover:bg-accent/30 focus:bg-accent/30 transition-colors",
+                            "border-b border-border/30 focus:outline-none",
                           )}
+                          tabIndex={0}
                         >
                           <span className="text-xs font-medium text-foreground truncate">{name}</span>
                           <span className="text-[10px] font-mono text-muted-foreground/60 truncate">{p}</span>

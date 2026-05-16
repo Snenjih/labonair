@@ -13,13 +13,23 @@ interface BookmarksState {
   getBookmarks: (key: string) => string[];
 }
 
-let _store: Awaited<ReturnType<typeof load>> | null = null;
+// Single shared promise prevents double-initialization on concurrent calls.
+let _storePromise: ReturnType<typeof load> | null = null;
 
-async function getStore() {
-  if (!_store) {
-    _store = await load("nexum-bookmarks.json", { autoSave: true, defaults: {} });
+function getStore() {
+  if (!_storePromise) {
+    _storePromise = load("nexum-bookmarks.json", { autoSave: true, defaults: {} });
   }
-  return _store;
+  return _storePromise;
+}
+
+// Serialize all writes so concurrent addBookmark/removeBookmark calls never
+// read stale state and overwrite each other's result.
+let _writeLock: Promise<void> = Promise.resolve();
+
+function enqueueWrite(fn: () => Promise<void>) {
+  _writeLock = _writeLock.then(fn).catch(() => {});
+  return _writeLock;
 }
 
 export const useBookmarksStore = create<BookmarksState>((set, get) => ({
@@ -33,24 +43,26 @@ export const useBookmarksStore = create<BookmarksState>((set, get) => ({
     set({ bookmarks: raw ?? {}, hydrated: true });
   },
 
-  addBookmark: async (key, path) => {
-    const current = get().bookmarks;
-    const existing = current[key] ?? [];
-    if (existing.includes(path)) return;
-    const next = { ...current, [key]: [...existing, path] };
-    set({ bookmarks: next });
-    const store = await getStore();
-    await store.set("bookmarks", next);
-  },
+  addBookmark: (key, path) =>
+    enqueueWrite(async () => {
+      const current = get().bookmarks;
+      const existing = current[key] ?? [];
+      if (existing.includes(path)) return;
+      const next = { ...current, [key]: [...existing, path] };
+      set({ bookmarks: next });
+      const store = await getStore();
+      await store.set("bookmarks", next);
+    }),
 
-  removeBookmark: async (key, path) => {
-    const current = get().bookmarks;
-    const existing = current[key] ?? [];
-    const next = { ...current, [key]: existing.filter((p) => p !== path) };
-    set({ bookmarks: next });
-    const store = await getStore();
-    await store.set("bookmarks", next);
-  },
+  removeBookmark: (key, path) =>
+    enqueueWrite(async () => {
+      const current = get().bookmarks;
+      const existing = current[key] ?? [];
+      const next = { ...current, [key]: existing.filter((p) => p !== path) };
+      set({ bookmarks: next });
+      const store = await getStore();
+      await store.set("bookmarks", next);
+    }),
 
   getBookmarks: (key) => get().bookmarks[key] ?? [],
 }));

@@ -89,9 +89,15 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
     }
   }, [open, file.path]);
 
+  const octalWarning = /^[0-7]{4}$/.test(octalInput)
+    ? "Special bits (setuid/setgid/sticky) are not supported here. Only the last 3 digits apply."
+    : null;
+
   function handleOctalChange(val: string) {
     setOctalInput(val);
-    if (/^[0-7]{1,4}$/.test(val)) {
+    // Sync checkboxes only for standard 3-digit octal (9 permission bits).
+    // 4-digit input with special bits is accepted but checkboxes show only the lower 3.
+    if (/^[0-7]{1,3}$/.test(val)) {
       setMatrix(octalToMatrix(val));
     }
   }
@@ -125,12 +131,13 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
       if (!isNaN(octal)) {
         await invoke("sftp_chmod", { tabId, path: file.path, permissions: octal });
       }
+      // Only chown when at least one field is filled. Empty = leave unchanged.
       if (owner.trim() || group.trim()) {
         await invoke("sftp_chown", {
           tabId,
           path: file.path,
-          owner: owner.trim() || "root",
-          group: group.trim() || "root",
+          owner: owner.trim(),
+          group: group.trim(),
         });
       }
       setApplySuccess(true);
@@ -196,13 +203,18 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
             {/* Octal input */}
             <div className="flex items-center gap-3">
               <span className="w-24 text-xs text-muted-foreground text-right shrink-0">Octal</span>
-              <input
-                value={octalInput}
-                onChange={(e) => handleOctalChange(e.target.value)}
-                maxLength={4}
-                placeholder="755"
-                className="w-20 h-7 px-2 text-sm font-mono rounded bg-muted/30 border border-border text-foreground focus:outline-none focus:border-primary"
-              />
+              <div className="flex flex-col gap-1">
+                <input
+                  value={octalInput}
+                  onChange={(e) => handleOctalChange(e.target.value)}
+                  maxLength={4}
+                  placeholder="755"
+                  className="w-20 h-7 px-2 text-sm font-mono rounded bg-muted/30 border border-border text-foreground focus:outline-none focus:border-primary"
+                />
+                {octalWarning && (
+                  <p className="text-[10px] text-yellow-500/80 max-w-52">{octalWarning}</p>
+                )}
+              </div>
             </div>
 
             {/* Checkbox grid */}
@@ -236,7 +248,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
                 <input
                   value={owner}
                   onChange={(e) => setOwner(e.target.value)}
-                  placeholder="root"
+                  placeholder="unchanged"
                   className="flex-1 h-7 px-2 text-sm rounded bg-muted/30 border border-border text-foreground focus:outline-none focus:border-primary"
                 />
               </div>
@@ -245,7 +257,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
                 <input
                   value={group}
                   onChange={(e) => setGroup(e.target.value)}
-                  placeholder="root"
+                  placeholder="unchanged"
                   className="flex-1 h-7 px-2 text-sm rounded bg-muted/30 border border-border text-foreground focus:outline-none focus:border-primary"
                 />
               </div>
@@ -255,7 +267,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
               <p className="text-xs text-destructive">{applyError}</p>
             )}
             {applySuccess && (
-              <p className="text-xs text-emerald-500">Applied successfully.</p>
+              <p className="text-xs text-primary">Applied successfully.</p>
             )}
           </TabsContent>
         </Tabs>
