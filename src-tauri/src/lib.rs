@@ -7,7 +7,48 @@ use modules::{
     sftp::{TransferWorkerState, commands::{enqueue_transfer, cancel_transfer, resolve_conflict}, worker::run_worker},
     themes::{themes_get_all, theme_import, theme_export, theme_delete},
 };
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
+
+/// Clamps the window position and size so it fits entirely within the current monitor.
+/// Called after tauri_plugin_window_state has restored the previous session's geometry —
+/// that state can be stale if the user had a different monitor attached last time.
+fn clamp_window_to_monitor(window: &tauri::WebviewWindow) {
+    let monitor = match window.current_monitor() {
+        Ok(Some(m)) => m,
+        _ => return,
+    };
+
+    let mon_pos = monitor.position();
+    let mon_size = monitor.size();
+    let scale = monitor.scale_factor();
+
+    let outer_pos = match window.outer_position() { Ok(p) => p, Err(_) => return };
+    let outer_size = match window.outer_size() { Ok(s) => s, Err(_) => return };
+
+    let max_w = (mon_size.width as f64 * 0.95) as u32;
+    let max_h = (mon_size.height as f64 * 0.95) as u32;
+    let new_w = outer_size.width.min(max_w);
+    let new_h = outer_size.height.min(max_h);
+
+    // Ensure the top-left corner is on-screen with a 40px margin so the title bar is always reachable.
+    let screen_right = mon_pos.x + mon_size.width as i32;
+    let screen_bottom = mon_pos.y + mon_size.height as i32;
+    let margin = (40.0 * scale) as i32;
+
+    let new_x = outer_pos.x
+        .max(mon_pos.x)
+        .min(screen_right - margin);
+    let new_y = outer_pos.y
+        .max(mon_pos.y)
+        .min(screen_bottom - margin);
+
+    if new_w != outer_size.width || new_h != outer_size.height {
+        let _ = window.set_size(PhysicalSize::new(new_w, new_h));
+    }
+    if new_x != outer_pos.x || new_y != outer_pos.y {
+        let _ = window.set_position(PhysicalPosition::new(new_x, new_y));
+    }
+}
 
 #[tauri::command]
 async fn ping_host(host_address: String, port: u16) -> Result<bool, String> {
@@ -81,6 +122,7 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         .title("Settings")
         .inner_size(860.0, 580.0)
         .min_inner_size(720.0, 480.0)
+        .max_inner_size(1400.0, 900.0)
         .resizable(true);
 
     #[cfg(target_os = "macos")]
@@ -142,6 +184,16 @@ pub fn run() {
                 run_worker(rx, std::sync::Arc::new(ssh_state_for_worker), app_handle, conflicts_for_worker).await;
             });
             app.manage(TransferWorkerState { sender: tx, conflicts });
+
+            // Clamp the main window to the monitor bounds after tauri_plugin_window_state
+            // has had a chance to restore the previous session's geometry (~1 frame later).
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    clamp_window_to_monitor(&window);
+                }
+            });
 
             Ok(())
         })
