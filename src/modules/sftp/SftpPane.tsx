@@ -31,9 +31,10 @@ import { parentPath } from "./utils";
 
 interface SftpPaneProps {
   tab: SftpTab;
+  onOpenSshTerminal?: (hostId: string, title: string, cwd: string) => void;
 }
 
-export function SftpPane({ tab }: SftpPaneProps) {
+export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
   const tabId = String(tab.id);
   const {
     initTab,
@@ -359,7 +360,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
               path={remotePath}
               onNavigate={(p) => { setDeepSearchResults(null); loadRemoteDir(tabId, p); }}
               showOpenTerminal
-              onOpenTerminal={() => {/* Task 05+: open SSH terminal at path */}}
+              onOpenTerminal={() => onOpenSshTerminal?.(tab.hostId, hostLabel, remotePath)}
               showHidden={sftpShowHiddenFiles}
               onToggleHidden={toggleHiddenFiles}
               bookmarkKey={hostAddress || undefined}

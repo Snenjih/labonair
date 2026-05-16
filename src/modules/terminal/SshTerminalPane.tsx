@@ -142,6 +142,11 @@ export function SshTerminalPane({ tab, isActive }: Props) {
       for (const chunk of earlyBuffer) t.write(chunk);
       earlyBuffer.length = 0;
 
+      // Navigate to initial directory if the tab was opened from SFTP
+      if (tab.cwd) {
+        invoke("ssh_pty_write", { tabId: tabIdStr, data: `cd ${tab.cwd}\n` }).catch(console.error);
+      }
+
       // Send keystrokes to the SSH channel
       t.onData((data) => {
         invoke("ssh_pty_write", { tabId: tabIdStr, data }).catch(console.error);

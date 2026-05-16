@@ -265,9 +265,9 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     [tabs],
   );
 
-  const newSshTab = useCallback((hostId: string, title: string) => {
+  const newSshTab = useCallback((hostId: string, title: string, cwd?: string) => {
     const id = nextIdRef.current++;
-    setTabs((t) => [...t, { id, kind: "ssh-terminal", title, hostId }]);
+    setTabs((t) => [...t, { id, kind: "ssh-terminal", title, hostId, cwd }]);
     setActiveId(id);
     return id;
   }, []);

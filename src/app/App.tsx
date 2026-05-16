@@ -762,7 +762,7 @@ export default function App() {
                         )}
                         aria-hidden={activeId !== t.id}
                       >
-                        <SftpPane tab={t as SftpTab} />
+                        <SftpPane tab={t as SftpTab} onOpenSshTerminal={newSshTab} />
                       </div>
                     ))}
                   </div>
