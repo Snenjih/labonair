@@ -4,6 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # Nexum — CLAUDE.md
 **AI Developer Guidelines & Project Reference**
+When implementing complex tasks, use the tasks feature and make yourself plans for the implementation. 
 
 ## Commands
 
