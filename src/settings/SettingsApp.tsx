@@ -22,6 +22,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useState } from "react";
+import * as store from "@/modules/settings/store";
+import type { PrefKey } from "@/modules/settings/store";
 import { AboutSection } from "./sections/AboutSection";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
@@ -199,6 +201,29 @@ export function SettingsApp() {
   );
 }
 
+function applySettingChange(id: PrefKey, value: unknown): void {
+  switch (id) {
+    case "autostart": void store.setAutostart(value as boolean); break;
+    case "restoreWindowState": void store.setRestoreWindowState(value as boolean); break;
+    case "vimMode": void store.setVimMode(value as boolean); break;
+    case "theme": void store.setTheme(value as store.ThemePref); break;
+    case "terminalCursorBlink": void store.setTerminalCursorBlink(value as boolean); break;
+    case "terminalCursorStyle": void store.setTerminalCursorStyle(value as "block" | "underline" | "bar"); break;
+    case "terminalFontWeight": void store.setTerminalFontWeight(value as "normal" | "medium" | "bold"); break;
+    case "editorAutoSave": void store.setEditorAutoSave(value as "off" | "afterDelay" | "onFocusChange"); break;
+    case "editorLineNumbers": void store.setEditorLineNumbers(value as boolean); break;
+    case "editorWordWrap": void store.setEditorWordWrap(value as boolean); break;
+    case "editorTabSize": void store.setEditorTabSize(Number(value) as 2 | 4 | 8); break;
+    case "editorBracketMatching": void store.setEditorBracketMatching(value as boolean); break;
+    case "sftpShowHiddenFiles": void store.setSftpShowHiddenFiles(value as boolean); break;
+    case "sftpShowUpFolder": void store.setSftpShowUpFolder(value as boolean); break;
+    case "sftpColumnSize": void store.setSftpColumnSize(value as boolean); break;
+    case "sftpColumnModified": void store.setSftpColumnModified(value as boolean); break;
+    case "sftpColumnPermissions": void store.setSftpColumnPermissions(value as boolean); break;
+    case "sftpColumnType": void store.setSftpColumnType(value as boolean); break;
+  }
+}
+
 function SearchResults({
   query,
   results,
@@ -244,7 +269,10 @@ function SearchResults({
                     title={def.label}
                     description={def.description}
                   >
-                    <Switch checked={val} disabled />
+                    <Switch
+                      checked={val}
+                      onCheckedChange={(v) => applySettingChange(def.id, v)}
+                    />
                   </SettingRow>
                 );
               }
@@ -257,7 +285,10 @@ function SearchResults({
                     title={def.label}
                     description={def.description}
                   >
-                    <Select value={val} disabled>
+                    <Select
+                      value={val}
+                      onValueChange={(v) => applySettingChange(def.id, v)}
+                    >
                       <SelectTrigger className="h-7 w-36 text-[11.5px]">
                         <SelectValue>{opt?.label ?? val}</SelectValue>
                       </SelectTrigger>

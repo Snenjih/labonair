@@ -12,6 +12,7 @@ import {
   setTheme as persistTheme,
   type ThemePref,
 } from "@/modules/settings/store";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 export type Theme = ThemePref;
 
@@ -91,6 +92,9 @@ export function ThemeProvider({
     theme === "system" ? (systemDark ? "dark" : "light") : theme;
 
   useEffect(() => {
+    // If a custom JSON theme is active, it owns the dark/light class — don't fight it.
+    const currentAppTheme = usePreferencesStore.getState().appTheme;
+    if (currentAppTheme !== "default") return;
     const root = document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(resolvedTheme);

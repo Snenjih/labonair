@@ -47,19 +47,11 @@ fn themes_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-/// Return all available themes: the built-in default plus any user `.json` files.
+/// Return all available themes: only user `.json` files from the themes directory.
+/// The built-in "Default (System)" entry is hardcoded in ThemePicker.tsx.
 #[tauri::command]
 pub async fn themes_get_all(app: tauri::AppHandle) -> Result<Vec<ThemeMeta>, String> {
-    let default_theme: Theme =
-        serde_json::from_str(DEFAULT_DARK_JSON).map_err(|e| e.to_string())?;
-    let mut themes = vec![ThemeMeta {
-        id: "default-dark".to_string(),
-        name: default_theme.name,
-        author: default_theme.author,
-        theme_type: default_theme.theme_type,
-        colors: default_theme.colors,
-        builtin: true,
-    }];
+    let mut themes = Vec::new();
 
     let dir = themes_dir(&app)?;
     let entries = std::fs::read_dir(&dir).map_err(|e| e.to_string())?;

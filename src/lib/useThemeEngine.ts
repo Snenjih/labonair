@@ -73,6 +73,7 @@ const ALL_VARS = Object.values(COLOR_VAR_MAP);
  * Using the full hsl() wrapper ensures the value is a valid CSS <color>.
  */
 export function hexToHslCss(hex: string): string {
+  if (!/^#([A-Fa-f0-9]{3,8})$/.test(hex.trim())) return hex;
   const clean = hex.replace(/^#/, "");
   const full =
     clean.length === 3
