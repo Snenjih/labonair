@@ -142,7 +142,7 @@ export function SftpPane({ tab }: SftpPaneProps) {
         await invoke("sftp_rename", { tabId, oldPath: renamingPath, newPath });
         loadRemoteDir(tabId, tabState?.remotePath ?? "/");
       } else {
-        await invoke("fs_rename", { old_path: renamingPath, new_path: newPath });
+        await invoke("fs_rename", { from: renamingPath, to: newPath });
         loadLocalDir(tabId, tabState?.localPath ?? "~");
       }
     } catch (e) {

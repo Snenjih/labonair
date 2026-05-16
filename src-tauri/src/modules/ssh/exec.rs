@@ -16,13 +16,11 @@ pub fn ssh_exec_command(
     command: String,
     state: tauri::State<'_, super::SshState>,
 ) -> Result<ExecResult, String> {
-    let map = state.0.lock().map_err(|e| e.to_string())?;
-    let session = &map
-        .get(&tab_id)
-        .ok_or_else(|| format!("no SSH session for tab {tab_id}"))?
-        .session;
+    // Clone the session Arc and release the outer lock before blocking I/O.
+    let session_arc = crate::get_session_arc!(state, &tab_id);
+    let sess = session_arc.lock().map_err(|e| e.to_string())?;
 
-    let mut channel = session.channel_session().map_err(|e| e.to_string())?;
+    let mut channel = sess.0.channel_session().map_err(|e| e.to_string())?;
     channel.exec(&command).map_err(|e| e.to_string())?;
 
     let mut stdout = String::new();

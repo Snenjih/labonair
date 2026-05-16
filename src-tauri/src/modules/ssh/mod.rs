@@ -13,15 +13,36 @@ pub struct SftpHandle(pub ssh2::Sftp);
 unsafe impl Send for SftpHandle {}
 unsafe impl Sync for SftpHandle {}
 
+/// A separately-locked session handle so exec-channel commands (du, chown,
+/// find…) don't hold the outer SshState mutex during blocking network I/O.
+/// ssh2::Session contains raw pointers but access is serialised by the Mutex.
+pub struct SessionHandle(pub ssh2::Session);
+unsafe impl Send for SessionHandle {}
+unsafe impl Sync for SessionHandle {}
+
 pub struct SshSession {
-    /// PTY session — set to non-blocking after shell channel opens.
-    pub session: ssh2::Session,
+    /// Session behind its own Arc so exec-channel commands can clone the Arc,
+    /// release the outer SshState lock, and then lock only the session.
+    pub session: Arc<Mutex<SessionHandle>>,
     pub channel: Option<ssh2::Channel>,
     /// Pre-initialized SFTP handle in its own lock so SFTP commands can
     /// release the outer SshState mutex before blocking on network I/O.
     pub sftp: Option<Arc<Mutex<SftpHandle>>>,
     /// Set to true by ssh_disconnect so the reader thread exits cleanly.
     pub shutdown: Arc<AtomicBool>,
+}
+
+/// Clones the `Arc<Mutex<SessionHandle>>` from the SshState map and releases
+/// the outer lock before returning — analogous to get_sftp_arc!.
+#[macro_export]
+macro_rules! get_session_arc {
+    ($state_inner:expr, $tab_id:expr) => {{
+        let map = $state_inner.0.lock().map_err(|e| e.to_string())?;
+        map.get($tab_id)
+            .ok_or_else(|| format!("no SSH session for tab {}", $tab_id))?
+            .session
+            .clone()
+    }};
 }
 
 // ssh2::Session contains raw pointers but is guarded by the Mutex.

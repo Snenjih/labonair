@@ -523,11 +523,14 @@ fn ssh_connect_blocking(
     // Step 8 (SSH terminal only): Open PTY shell channel.
     // Switches session to non-blocking mode for the output reader thread.
     // Skipped for SFTP connections — SFTP operations require blocking mode.
+    // Wrap the session now so open_shell_channel can receive it via Arc.
+    let session_for_pty = std::sync::Arc::new(std::sync::Mutex::new(super::SessionHandle(session)));
+
     let (channel, ready_tx, shutdown) = if !init_sftp {
         log_step!(app, tab_id, "Opening PTY shell channel…");
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
         let (ch, shutdown) = super::pty::open_shell_channel(
-            &mut session,
+            session_for_pty.clone(),
             &tab_id,
             &app,
             state.clone(),
@@ -547,13 +550,18 @@ fn ssh_connect_blocking(
         std::sync::Arc::new(std::sync::Mutex::new(super::SftpHandle(s)))
     });
 
+    // For SFTP-only connections (init_sftp=true), session_for_pty was never
+    // used by open_shell_channel, so re-use it as the stored session_arc.
+    // For PTY connections it was already cloned into open_shell_channel.
+    let session_arc = session_for_pty;
+
     // Step 9: Store session and emit session_established.
     {
         let mut map = state.0.lock().map_err(|e| e.to_string())?;
         map.insert(
             tab_id.clone(),
             super::SshSession {
-                session,
+                session: session_arc,
                 channel,
                 sftp: sftp_wrapped,
                 shutdown,
@@ -685,7 +693,9 @@ pub fn ssh_disconnect(
         if let Some(mut ch) = sess.channel.take() {
             let _ = ch.close();
         }
-        let _ = sess.session.disconnect(None, "User disconnected", None);
+        if let Ok(s) = sess.session.lock() {
+            let _ = s.0.disconnect(None, "User disconnected", None);
+        }
     }
     Ok(())
 }

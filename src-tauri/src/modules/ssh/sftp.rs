@@ -291,15 +291,14 @@ pub async fn sftp_calculate_size(
     path: String,
     state: tauri::State<'_, SshState>,
 ) -> Result<String, String> {
+    // Clone the session Arc first so we can release the outer SshState lock
+    // before blocking on network I/O (avoids blocking sftp_read_dir).
     let state_inner = state.inner().clone();
+    let session_arc = crate::get_session_arc!(state_inner, &tab_id);
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
-        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        let session = &map
-            .get(&tab_id)
-            .ok_or_else(|| format!("no SSH session for tab {tab_id}"))?
-            .session;
-        let mut ch = session.channel_session().map_err(|e| e.to_string())?;
+        let sess = session_arc.lock().map_err(|e| e.to_string())?;
+        let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
         ch.exec(&format!("du -sh {}", shell_quote(&path))).map_err(|e| e.to_string())?;
         let mut stdout = String::new();
         ch.read_to_string(&mut stdout).map_err(|e| e.to_string())?;
@@ -319,23 +318,18 @@ pub async fn sftp_chown(
     group: String,
     state: tauri::State<'_, SshState>,
 ) -> Result<(), String> {
+    let spec = match (owner.is_empty(), group.is_empty()) {
+        (true, true)   => return Ok(()),
+        (false, false) => format!("{}:{}", shell_quote(&owner), shell_quote(&group)),
+        (false, true)  => format!("{}:", shell_quote(&owner)),
+        (true, false)  => format!(":{}", shell_quote(&group)),
+    };
     let state_inner = state.inner().clone();
+    let session_arc = crate::get_session_arc!(state_inner, &tab_id);
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
-        // Build the ownership spec: "owner:group", "owner:", ":group".
-        // An empty string means "leave unchanged". Both empty → nothing to do.
-        let spec = match (owner.is_empty(), group.is_empty()) {
-            (true, true)   => return Ok(()),
-            (false, false) => format!("{}:{}", shell_quote(&owner), shell_quote(&group)),
-            (false, true)  => format!("{}:", shell_quote(&owner)),
-            (true, false)  => format!(":{}", shell_quote(&group)),
-        };
-        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        let session = &map
-            .get(&tab_id)
-            .ok_or_else(|| format!("no SSH session for tab {tab_id}"))?
-            .session;
-        let mut ch = session.channel_session().map_err(|e| e.to_string())?;
+        let sess = session_arc.lock().map_err(|e| e.to_string())?;
+        let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
         let cmd = format!("chown {} {}", spec, shell_quote(&path));
         ch.exec(&cmd).map_err(|e| e.to_string())?;
         let mut stderr_buf = String::new();
@@ -361,14 +355,11 @@ pub async fn sftp_deep_search(
     state: tauri::State<'_, SshState>,
 ) -> Result<Vec<String>, String> {
     let state_inner = state.inner().clone();
+    let session_arc = crate::get_session_arc!(state_inner, &tab_id);
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
-        let map = state_inner.0.lock().map_err(|e| e.to_string())?;
-        let session = &map
-            .get(&tab_id)
-            .ok_or_else(|| format!("no SSH session for tab {tab_id}"))?
-            .session;
-        let mut ch = session.channel_session().map_err(|e| e.to_string())?;
+        let sess = session_arc.lock().map_err(|e| e.to_string())?;
+        let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
         // Build the glob as a Rust string first, then shell_quote the whole thing.
         // This prevents any metacharacter in `query` from escaping the -iname argument.
         let glob = format!("*{}*", query.replace('\'', "'\\''"));

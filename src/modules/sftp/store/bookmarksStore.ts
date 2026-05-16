@@ -13,6 +13,10 @@ interface BookmarksState {
   getBookmarks: (key: string) => string[];
 }
 
+// Stable empty array so Zustand selectors that call getBookmarks("unknown-key")
+// always receive the same reference — prevents spurious re-renders.
+const EMPTY_BOOKMARKS: string[] = [];
+
 // Single shared promise prevents double-initialization on concurrent calls.
 let _storePromise: ReturnType<typeof load> | null = null;
 
@@ -64,5 +68,5 @@ export const useBookmarksStore = create<BookmarksState>((set, get) => ({
       await store.set("bookmarks", next);
     }),
 
-  getBookmarks: (key) => get().bookmarks[key] ?? [],
+  getBookmarks: (key) => get().bookmarks[key] ?? EMPTY_BOOKMARKS,
 }));

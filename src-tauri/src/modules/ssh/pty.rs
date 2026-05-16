@@ -42,7 +42,7 @@ pub fn ssh_pty_resize(
 ///
 /// `cols`/`rows` set the initial terminal size to avoid a jarring resize on connect.
 pub fn open_shell_channel(
-    session: &mut ssh2::Session,
+    session_arc: std::sync::Arc<std::sync::Mutex<super::SessionHandle>>,
     tab_id: &str,
     app: &tauri::AppHandle,
     state: super::SshState,
@@ -50,14 +50,16 @@ pub fn open_shell_channel(
     cols: u32,
     rows: u32,
 ) -> Result<(ssh2::Channel, Arc<AtomicBool>), String> {
-    let mut channel = session.channel_session().map_err(|e| e.to_string())?;
+    let sess = session_arc.lock().map_err(|e| e.to_string())?;
+    let mut channel = sess.0.channel_session().map_err(|e| e.to_string())?;
     channel
         .request_pty("xterm-256color", None, Some((cols, rows, 0, 0)))
         .map_err(|e| e.to_string())?;
     channel.shell().map_err(|e| e.to_string())?;
 
-    // Non-blocking so the reader never holds the mutex indefinitely.
-    session.set_blocking(false);
+    // Non-blocking so the reader never holds the session lock indefinitely.
+    sess.0.set_blocking(false);
+    drop(sess);
 
     let app_clone = app.clone();
     let tab_id_clone = tab_id.to_string();
