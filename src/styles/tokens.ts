@@ -21,7 +21,25 @@ type TokenName =
   | "border"
   | "primary"
   | "destructive"
-  | "ring";
+  | "ring"
+  | "terminal-background"
+  | "terminal-foreground"
+  | "terminal-black"
+  | "terminal-red"
+  | "terminal-green"
+  | "terminal-yellow"
+  | "terminal-blue"
+  | "terminal-magenta"
+  | "terminal-cyan"
+  | "terminal-white"
+  | "terminal-bright-black"
+  | "terminal-bright-red"
+  | "terminal-bright-green"
+  | "terminal-bright-yellow"
+  | "terminal-bright-blue"
+  | "terminal-bright-magenta"
+  | "terminal-bright-cyan"
+  | "terminal-bright-white";
 
 export type AppTokens = Record<TokenName, string>;
 
@@ -37,6 +55,24 @@ const TOKENS: TokenName[] = [
   "primary",
   "destructive",
   "ring",
+  "terminal-background",
+  "terminal-foreground",
+  "terminal-black",
+  "terminal-red",
+  "terminal-green",
+  "terminal-yellow",
+  "terminal-blue",
+  "terminal-magenta",
+  "terminal-cyan",
+  "terminal-white",
+  "terminal-bright-black",
+  "terminal-bright-red",
+  "terminal-bright-green",
+  "terminal-bright-yellow",
+  "terminal-bright-blue",
+  "terminal-bright-magenta",
+  "terminal-bright-cyan",
+  "terminal-bright-white",
 ];
 
 let probe: HTMLDivElement | null = null;

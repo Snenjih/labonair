@@ -3,48 +3,9 @@ import type { ITheme } from "@xterm/xterm";
 
 /**
  * xterm.js ITheme is 18 colors: bg/fg/cursor/cursorAccent/selection + ANSI 16.
- *
- * Chrome colors (background, foreground, cursor, selection) come from shadcn's
- * globals.css tokens so the terminal visually fuses with the app. ANSI 16
- * stays curated — globals.css is grayscale, it has no semantic color palette.
+ * All colors come from CSS custom properties set by the theme engine, so any
+ * loaded JSON theme fully controls the terminal palette.
  */
-
-/** Curated ANSI 16 palette, tuned for shadcn's dark surface. */
-const ansi = {
-  black: "#18181b",
-  red: "#ef4444",
-  green: "#22c55e",
-  yellow: "#eab308",
-  blue: "#3b82f6",
-  magenta: "#a855f7",
-  cyan: "#06b6d4",
-  white: "#e4e4e7",
-
-  brightBlack: "#52525b",
-  brightRed: "#f87171",
-  brightGreen: "#4ade80",
-  brightYellow: "#facc15",
-  brightBlue: "#60a5fa",
-  brightMagenta: "#c084fc",
-  brightCyan: "#22d3ee",
-  brightWhite: "#fafafa",
-} as const;
-
-/** Semantic palette reused by the code editor. Kept in one place so the
- *  terminal's ANSI colors and syntax highlighting stay visually coherent. */
-export const syntaxPalette = {
-  comment: ansi.brightBlack,
-  keyword: ansi.blue,
-  string: ansi.green,
-  number: ansi.yellow,
-  constant: ansi.magenta,
-  fn: ansi.cyan,
-  type: ansi.brightCyan,
-  tag: ansi.red,
-  punctuation: "#a1a1aa",
-  invalid: ansi.red,
-  link: ansi.blue,
-} as const;
 
 /**
  * Builds an xterm theme at runtime from the current app tokens. Must be
@@ -54,11 +15,44 @@ export const syntaxPalette = {
 export function buildTerminalTheme(): ITheme {
   const t = readAppTokens();
   return {
-    background: t.background,
-    foreground: t.foreground,
-    cursor: t.foreground,
-    cursorAccent: t.background,
+    background: t["terminal-background"] || t.background,
+    foreground: t["terminal-foreground"] || t.foreground,
+    cursor: t["terminal-foreground"] || t.foreground,
+    cursorAccent: t["terminal-background"] || t.background,
     selectionBackground: t.accent,
-    ...ansi,
+    black: t["terminal-black"],
+    red: t["terminal-red"],
+    green: t["terminal-green"],
+    yellow: t["terminal-yellow"],
+    blue: t["terminal-blue"],
+    magenta: t["terminal-magenta"],
+    cyan: t["terminal-cyan"],
+    white: t["terminal-white"],
+    brightBlack: t["terminal-bright-black"],
+    brightRed: t["terminal-bright-red"],
+    brightGreen: t["terminal-bright-green"],
+    brightYellow: t["terminal-bright-yellow"],
+    brightBlue: t["terminal-bright-blue"],
+    brightMagenta: t["terminal-bright-magenta"],
+    brightCyan: t["terminal-bright-cyan"],
+    brightWhite: t["terminal-bright-white"],
+  };
+}
+
+/** Semantic palette reused by the code editor, derived from terminal tokens. */
+export function buildSyntaxPalette() {
+  const t = readAppTokens();
+  return {
+    comment: t["terminal-bright-black"],
+    keyword: t["terminal-blue"],
+    string: t["terminal-green"],
+    number: t["terminal-yellow"],
+    constant: t["terminal-magenta"],
+    fn: t["terminal-cyan"],
+    type: t["terminal-bright-cyan"],
+    tag: t["terminal-red"],
+    punctuation: t["terminal-bright-black"],
+    invalid: t["terminal-red"],
+    link: t["terminal-blue"],
   };
 }
