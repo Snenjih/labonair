@@ -124,7 +124,7 @@ async fn download_file(
     let (file_size, data) = {
         let sftp_arc = {
             let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
-            let entry = map.get(&job.host_id).ok_or("no SSH session for host")?;
+            let entry = map.get(&job.tab_id).ok_or("no SSH session for host")?;
             entry.sftp.as_ref().ok_or("no SFTP handle for host")?.clone()
         };
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
@@ -176,7 +176,7 @@ async fn upload_file(
     let conflict_exists = {
         let sftp_arc = {
             let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
-            let entry = map.get(&job.host_id).ok_or("no SSH session for host")?;
+            let entry = map.get(&job.tab_id).ok_or("no SSH session for host")?;
             entry.sftp.as_ref().ok_or("no SFTP handle for host")?.clone()
         };
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
@@ -202,7 +202,7 @@ async fn upload_file(
 
     let sftp_arc = {
         let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get(&job.host_id).ok_or("no SSH session for host")?;
+        let entry = map.get(&job.tab_id).ok_or("no SSH session for host")?;
         entry.sftp.as_ref().ok_or("no SFTP handle for host")?.clone()
     };
     let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;

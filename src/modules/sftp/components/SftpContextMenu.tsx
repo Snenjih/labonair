@@ -46,7 +46,7 @@ interface SftpContextMenuProps {
 
 export function SftpContextMenu({
   tabId,
-  hostId,
+  hostId: _hostId,
   side,
   selectedPaths,
   currentPath,
@@ -100,23 +100,27 @@ export function SftpContextMenu({
   }
 
   async function handleDownloadTo() {
-    if (count === 0 || !hostId) return;
+    if (count === 0 || !tabId) return;
     const dest = await dialogOpen({ directory: true, multiple: false, title: "Choose download folder" });
     if (!dest || typeof dest !== "string") return;
     for (const remotePath of selectedPaths) {
       const fileName = remotePath.split("/").pop() ?? "file";
       const destPath = `${dest}/${fileName}`;
-      await invoke("enqueue_transfer", {
-        host_id: hostId,
-        src_path: remotePath,
-        dest_path: destPath,
-        direction: "download",
-      }).catch(console.error);
+      try {
+        await invoke("enqueue_transfer", {
+          tab_id: tabId,
+          src_path: remotePath,
+          dest_path: destPath,
+          direction: "download",
+        });
+      } catch (e) {
+        console.error("Download to enqueue failed:", e);
+      }
     }
   }
 
   async function handleUploadHere() {
-    if (!hostId || !currentPath) return;
+    if (!tabId || !currentPath) return;
     const selected = await dialogOpen({ multiple: true, directory: false, title: "Choose files to upload" });
     if (!selected) return;
     const paths = Array.isArray(selected) ? selected : [selected];
@@ -124,12 +128,16 @@ export function SftpContextMenu({
       const fileName = localPath.split(/[\\/]/).pop() ?? "file";
       const sep = currentPath.endsWith("/") ? "" : "/";
       const destPath = `${currentPath}${sep}${fileName}`;
-      await invoke("enqueue_transfer", {
-        host_id: hostId,
-        src_path: localPath,
-        dest_path: destPath,
-        direction: "upload",
-      }).catch(console.error);
+      try {
+        await invoke("enqueue_transfer", {
+          tab_id: tabId,
+          src_path: localPath,
+          dest_path: destPath,
+          direction: "upload",
+        });
+      } catch (e) {
+        console.error("Upload here enqueue failed:", e);
+      }
     }
   }
 

@@ -12,7 +12,7 @@ export type TransferStatus =
 
 export interface TransferJob {
   id: string;
-  host_id: string;
+  tab_id: string;
   src_path: string;
   dest_path: string;
   direction: "upload" | "download";

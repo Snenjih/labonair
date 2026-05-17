@@ -2,7 +2,7 @@ use super::*;
 
 #[tauri::command]
 pub async fn enqueue_transfer(
-    host_id: String,
+    tab_id: String,
     src_path: String,
     dest_path: String,
     direction: String,
@@ -11,7 +11,7 @@ pub async fn enqueue_transfer(
     let id = uuid::Uuid::new_v4().to_string();
     let job = TransferJob {
         id: id.clone(),
-        host_id,
+        tab_id,
         src_path,
         dest_path,
         direction: if direction == "upload" {

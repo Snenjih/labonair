@@ -159,12 +159,16 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
     for (const remotePath of remotePaths) {
       const fileName = remotePath.split("/").pop() ?? "file";
       const destPath = `${localBase}/${fileName}`;
-      await invoke("enqueue_transfer", {
-        host_id: tab.hostId,
-        src_path: remotePath,
-        dest_path: destPath,
-        direction: "download",
-      });
+      try {
+        await invoke("enqueue_transfer", {
+          tab_id: String(tab.id),
+          src_path: remotePath,
+          dest_path: destPath,
+          direction: "download",
+        });
+      } catch (e) {
+        console.error("Download enqueue failed:", e);
+      }
     }
   }
 
@@ -175,12 +179,16 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
       const fileName = localPath.split(/[\\/]/).pop() ?? "file";
       const sep = remoteBase.endsWith("/") ? "" : "/";
       const destPath = `${remoteBase}${sep}${fileName}`;
-      await invoke("enqueue_transfer", {
-        host_id: tab.hostId,
-        src_path: localPath,
-        dest_path: destPath,
-        direction: "upload",
-      });
+      try {
+        await invoke("enqueue_transfer", {
+          tab_id: String(tab.id),
+          src_path: localPath,
+          dest_path: destPath,
+          direction: "upload",
+        });
+      } catch (e) {
+        console.error("Upload enqueue failed:", e);
+      }
     }
   }
 
