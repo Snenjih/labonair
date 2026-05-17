@@ -53,6 +53,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
   const hostAddress = host?.host_address ?? "";
 
   const { openRemoteEditorTab } = useTabs();
+  const sftpFontSize = usePreferencesStore((s) => s.sftpFontSize);
   const sftpShowHiddenFiles = usePreferencesStore((s) => s.sftpShowHiddenFiles);
   const sftpShowUpFolder = usePreferencesStore((s) => s.sftpShowUpFolder);
 
@@ -274,7 +275,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-background">
+    <div className="flex flex-col h-full overflow-hidden bg-background" style={{ fontSize: `${sftpFontSize}px` }}>
       {/* Top host bar */}
       <div className="h-8 shrink-0 border-b border-border bg-card flex items-center px-4 gap-2">
         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest select-none">

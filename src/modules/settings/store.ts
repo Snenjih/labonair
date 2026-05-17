@@ -67,6 +67,7 @@ export type Preferences = {
   terminalFontWeight: "normal" | "medium" | "bold";
 
   // --- Editor ---
+  editorFontSize: number;
   editorAutoSave: "off" | "afterDelay" | "onFocusChange";
   editorLineNumbers: boolean;
   editorWordWrap: boolean;
@@ -74,6 +75,7 @@ export type Preferences = {
   editorBracketMatching: boolean;
 
   // --- File Manager ---
+  sftpFontSize: number;
   sftpShowHiddenFiles: boolean;
   sftpShowUpFolder: boolean;
   sftpColumnSize: boolean;
@@ -109,12 +111,14 @@ const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_LINE_HEIGHT = "terminalLineHeight";
 const KEY_TERMINAL_FONT_WEIGHT = "terminalFontWeight";
 
+const KEY_EDITOR_FONT_SIZE = "editorFontSize";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
 const KEY_EDITOR_LINE_NUMBERS = "editorLineNumbers";
 const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
 const KEY_EDITOR_TAB_SIZE = "editorTabSize";
 const KEY_EDITOR_BRACKET_MATCHING = "editorBracketMatching";
 
+const KEY_SFTP_FONT_SIZE = "sftpFontSize";
 const KEY_SFTP_SHOW_HIDDEN = "sftpShowHiddenFiles";
 const KEY_SFTP_SHOW_UP_FOLDER = "sftpShowUpFolder";
 const KEY_SFTP_COLUMN_SIZE = "sftpColumnSize";
@@ -149,12 +153,14 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalLineHeight: 1.05,
   terminalFontWeight: "normal",
 
+  editorFontSize: 13,
   editorAutoSave: "off",
   editorLineNumbers: true,
   editorWordWrap: false,
   editorTabSize: 2,
   editorBracketMatching: true,
 
+  sftpFontSize: 13,
   sftpShowHiddenFiles: false,
   sftpShowUpFolder: true,
   sftpColumnSize: true,
@@ -228,6 +234,8 @@ export async function loadPreferences(): Promise<Preferences> {
       get<"normal" | "medium" | "bold">(KEY_TERMINAL_FONT_WEIGHT) ??
       DEFAULT_PREFERENCES.terminalFontWeight,
 
+    editorFontSize:
+      get<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
     editorAutoSave:
       get<"off" | "afterDelay" | "onFocusChange">(KEY_EDITOR_AUTO_SAVE) ??
       DEFAULT_PREFERENCES.editorAutoSave,
@@ -242,6 +250,8 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_EDITOR_BRACKET_MATCHING) ??
       DEFAULT_PREFERENCES.editorBracketMatching,
 
+    sftpFontSize:
+      get<number>(KEY_SFTP_FONT_SIZE) ?? DEFAULT_PREFERENCES.sftpFontSize,
     sftpShowHiddenFiles:
       get<boolean>(KEY_SFTP_SHOW_HIDDEN) ?? DEFAULT_PREFERENCES.sftpShowHiddenFiles,
     sftpShowUpFolder:
@@ -378,6 +388,11 @@ export async function setTerminalFontWeight(
   await store.save();
 }
 
+export async function setEditorFontSize(value: number): Promise<void> {
+  await store.set(KEY_EDITOR_FONT_SIZE, value);
+  await store.save();
+}
+
 export async function setEditorAutoSave(
   value: "off" | "afterDelay" | "onFocusChange",
 ): Promise<void> {
@@ -402,6 +417,11 @@ export async function setEditorTabSize(value: 2 | 4 | 8): Promise<void> {
 
 export async function setEditorBracketMatching(value: boolean): Promise<void> {
   await store.set(KEY_EDITOR_BRACKET_MATCHING, value);
+  await store.save();
+}
+
+export async function setSftpFontSize(value: number): Promise<void> {
+  await store.set(KEY_SFTP_FONT_SIZE, value);
   await store.save();
 }
 
@@ -468,12 +488,14 @@ export function onPreferencesChange(
     [KEY_TERMINAL_LINE_HEIGHT]: "terminalLineHeight",
     [KEY_TERMINAL_FONT_WEIGHT]: "terminalFontWeight",
 
+    [KEY_EDITOR_FONT_SIZE]: "editorFontSize",
     [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
     [KEY_EDITOR_LINE_NUMBERS]: "editorLineNumbers",
     [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
     [KEY_EDITOR_TAB_SIZE]: "editorTabSize",
     [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
 
+    [KEY_SFTP_FONT_SIZE]: "sftpFontSize",
     [KEY_SFTP_SHOW_HIDDEN]: "sftpShowHiddenFiles",
     [KEY_SFTP_SHOW_UP_FOLDER]: "sftpShowUpFolder",
     [KEY_SFTP_COLUMN_SIZE]: "sftpColumnSize",

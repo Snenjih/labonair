@@ -5,6 +5,7 @@ import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 
 // Compartments allow runtime reconfiguration without rebuilding state.
+export const fontSizeCompartment = new Compartment();
 export const languageCompartment = new Compartment();
 export const readOnlyCompartment = new Compartment();
 export const wrapCompartment = new Compartment();
@@ -17,12 +18,17 @@ export const tabSizeCompartment = new Compartment();
 // basicSetup gives us line numbers, fold gutter, history, indentOnInput,
 // bracketMatching, closeBrackets, autocompletion, highlightActiveLine,
 // highlightSelectionMatches and the search keymap.
-export function buildSharedExtensions(): Extension[] {
+export function buildSharedExtensions(fontSize = 13): Extension[] {
   return [
     indentUnit.of("  "),
     EditorState.tabSize.of(2),
     search({ top: true }),
     lintGutter(),
+    fontSizeCompartment.of(
+      EditorView.theme({
+        ".cm-scroller": { fontSize: `${fontSize}px` },
+      }),
+    ),
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
         backgroundColor: "transparent !important",
@@ -32,7 +38,6 @@ export function buildSharedExtensions(): Extension[] {
       },
       ".cm-scroller": {
         fontFamily: '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
-        fontSize: "13px",
         lineHeight: "1.55",
         backgroundColor: "transparent !important",
       },

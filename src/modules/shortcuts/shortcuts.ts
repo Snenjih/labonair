@@ -19,7 +19,10 @@ export type ShortcutId =
   | "ai.toggle"
   | "ai.askSelection"
   | "shortcuts.open"
-  | "sidebar.toggle";
+  | "sidebar.toggle"
+  | "view.zoomIn"
+  | "view.zoomOut"
+  | "view.zoomReset";
 
 export type ShortcutGroup = "General" | "Tabs" | "Search" | "AI" | "View";
 
@@ -118,6 +121,27 @@ export const SHORTCUTS: Shortcut[] = [
     keys: ["⌘", "B"],
     group: "View",
     match: (e) => isMod(e) && e.key.toLowerCase() === "b",
+  },
+  {
+    id: "view.zoomIn",
+    label: "Zoom in",
+    keys: ["⌘", "+"],
+    group: "View",
+    match: (e) => isMod(e) && (e.key === "+" || e.key === "="),
+  },
+  {
+    id: "view.zoomOut",
+    label: "Zoom out",
+    keys: ["⌘", "−"],
+    group: "View",
+    match: (e) => isMod(e) && e.key === "-",
+  },
+  {
+    id: "view.zoomReset",
+    label: "Reset zoom",
+    keys: ["⌘", "0"],
+    group: "View",
+    match: (e) => isMod(e) && e.key === "0",
   },
 ];
 

@@ -33,7 +33,13 @@ import {
 import { PreviewStack, type PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { onKeysChanged } from "@/modules/settings/store";
+import {
+  onKeysChanged,
+  DEFAULT_PREFERENCES,
+  setTerminalFontSize,
+  setEditorFontSize,
+  setSftpFontSize,
+} from "@/modules/settings/store";
 import {
   ShortcutsDialog,
   useGlobalShortcuts,
@@ -498,9 +504,46 @@ export default function App() {
       "ai.askSelection": askFromSelection,
       "shortcuts.open": () => setShortcutsOpen((v) => !v),
       "sidebar.toggle": toggleSidebar,
+      "view.zoomIn": () => {
+        const kind = activeTab?.kind;
+        if (kind === "terminal" || kind === "ssh-terminal") {
+          const cur = usePreferencesStore.getState().terminalFontSize;
+          void setTerminalFontSize(Math.min(cur + 1, 32));
+        } else if (kind === "editor") {
+          const cur = usePreferencesStore.getState().editorFontSize;
+          void setEditorFontSize(Math.min(cur + 1, 32));
+        } else if (kind === "sftp") {
+          const cur = usePreferencesStore.getState().sftpFontSize;
+          void setSftpFontSize(Math.min(cur + 1, 20));
+        }
+      },
+      "view.zoomOut": () => {
+        const kind = activeTab?.kind;
+        if (kind === "terminal" || kind === "ssh-terminal") {
+          const cur = usePreferencesStore.getState().terminalFontSize;
+          void setTerminalFontSize(Math.max(cur - 1, 8));
+        } else if (kind === "editor") {
+          const cur = usePreferencesStore.getState().editorFontSize;
+          void setEditorFontSize(Math.max(cur - 1, 8));
+        } else if (kind === "sftp") {
+          const cur = usePreferencesStore.getState().sftpFontSize;
+          void setSftpFontSize(Math.max(cur - 1, 10));
+        }
+      },
+      "view.zoomReset": () => {
+        const kind = activeTab?.kind;
+        if (kind === "terminal" || kind === "ssh-terminal") {
+          void setTerminalFontSize(DEFAULT_PREFERENCES.terminalFontSize);
+        } else if (kind === "editor") {
+          void setEditorFontSize(DEFAULT_PREFERENCES.editorFontSize);
+        } else if (kind === "sftp") {
+          void setSftpFontSize(DEFAULT_PREFERENCES.sftpFontSize);
+        }
+      },
     }),
     [
       activeId,
+      activeTab,
       cycleTab,
       handleClose,
       openNewTab,

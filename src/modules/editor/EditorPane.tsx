@@ -24,6 +24,7 @@ import { vim } from "@replit/codemirror-vim";
 import {
   bracketMatchingCompartment,
   buildSharedExtensions,
+  fontSizeCompartment,
   languageCompartment,
   lineNumbersCompartment,
   tabSizeCompartment,
@@ -213,7 +214,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             },
             close: () => onCloseRef.current?.(),
           })),
-          ...buildSharedExtensions(),
+          ...buildSharedExtensions(prefs.editorFontSize),
           lineNumbersCompartment.of(prefs.editorLineNumbers ? lineNumbers() : []),
           bracketMatchingCompartment.of(prefs.editorBracketMatching ? bracketMatching() : []),
           tabSizeCompartment.of(EditorState.tabSize.of(prefs.editorTabSize)),
@@ -261,6 +262,20 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         ),
       });
     }, [vimMode]);
+
+    // Reconfigure font size compartment when editorFontSize pref changes.
+    useEffect(() => {
+      return usePreferencesStore.subscribe((state, prev) => {
+        if (state.editorFontSize === prev.editorFontSize) return;
+        const view = cmRef.current?.view;
+        if (!view) return;
+        view.dispatch({
+          effects: fontSizeCompartment.reconfigure(
+            EditorView.theme({ ".cm-scroller": { fontSize: `${state.editorFontSize}px` } }),
+          ),
+        });
+      });
+    }, []);
 
     useEffect(() => {
       let cancelled = false;
