@@ -13,7 +13,7 @@ pub enum TransferDirection {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case", tag = "type", content = "message")]
+#[serde(rename_all = "snake_case")]
 pub enum TransferStatus {
     Queued,
     Running,

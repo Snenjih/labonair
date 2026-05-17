@@ -8,7 +8,7 @@ export type TransferStatus =
   | "paused"
   | "cancelled"
   | "completed"
-  | { type: "failed"; message: string };
+  | { failed: string };
 
 export interface TransferJob {
   id: string;
@@ -57,7 +57,7 @@ export const useTransferStore = create<TransferState>((set) => ({
     })),
 
   cancelJob: async (id) => {
-    await invoke("cancel_transfer", { job_id: id });
+    await invoke("cancel_transfer", { jobId: id });
   },
 
   resolveConflict: async (jobId, resolution, newName) => {
@@ -69,9 +69,9 @@ export const useTransferStore = create<TransferState>((set) => ({
       ),
     }));
     await invoke("resolve_conflict", {
-      job_id: jobId,
+      jobId,
       resolution,
-      new_name: newName ?? null,
+      newName: newName ?? null,
     });
   },
 }));

@@ -60,8 +60,13 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [hasError, setHasError] = useState(false);
 
-  // Track drag source pane ("local" | "remote" | null)
+  // Pointer-based drag state (HTML5 DnD doesn't work reliably in WKWebView/Tauri)
   const dragSourceRef = useRef<"local" | "remote" | null>(null);
+  const [activeDragSource, setActiveDragSource] = useState<"local" | "remote" | null>(null);
+  const [dropHoveredPane, setDropHoveredPane] = useState<"local" | "remote" | null>(null);
+  const localPaneRef = useRef<HTMLDivElement>(null);
+  const remotePaneRef = useRef<HTMLDivElement>(null);
+  const draggedPathsRef = useRef<string[]>([]);
 
   // Inline rename state
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
@@ -153,17 +158,61 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
     setRenamingPath(null);
   }
 
-  async function handleLocalDrop(_targetPath: string, remotePaths: string[]) {
-    if (dragSourceRef.current !== "remote") return;
+  function startDrag(source: "local" | "remote", paths: string[]) {
+    dragSourceRef.current = source;
+    draggedPathsRef.current = paths;
+    setActiveDragSource(source);
+    setDropHoveredPane(null);
+
+    function getHoveredPane(x: number, y: number): "local" | "remote" | null {
+      const lr = localPaneRef.current?.getBoundingClientRect();
+      const rr = remotePaneRef.current?.getBoundingClientRect();
+      if (lr && x >= lr.left && x <= lr.right && y >= lr.top && y <= lr.bottom) return "local";
+      if (rr && x >= rr.left && x <= rr.right && y >= rr.top && y <= rr.bottom) return "remote";
+      return null;
+    }
+
+    function onMove(e: PointerEvent) {
+      const hovered = getHoveredPane(e.clientX, e.clientY);
+      setDropHoveredPane(hovered !== source ? hovered : null);
+    }
+
+    function onUp(e: PointerEvent) {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+
+      const landed = getHoveredPane(e.clientX, e.clientY);
+      const src = dragSourceRef.current;
+      const paths = draggedPathsRef.current;
+
+      dragSourceRef.current = null;
+      draggedPathsRef.current = [];
+      setActiveDragSource(null);
+      setDropHoveredPane(null);
+
+      if (!src || landed === src || !landed) return;
+
+      if (src === "remote" && landed === "local") {
+        void enqueueDownloads(paths);
+      } else if (src === "local" && landed === "remote") {
+        void enqueueUploads(paths);
+      }
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
+  async function enqueueDownloads(remotePaths: string[]) {
     const localBase = tabState?.localPath ?? "~";
     for (const remotePath of remotePaths) {
       const fileName = remotePath.split("/").pop() ?? "file";
       const destPath = `${localBase}/${fileName}`;
       try {
         await invoke("enqueue_transfer", {
-          tab_id: String(tab.id),
-          src_path: remotePath,
-          dest_path: destPath,
+          tabId: String(tab.id),
+          srcPath: remotePath,
+          destPath,
           direction: "download",
         });
       } catch (e) {
@@ -172,8 +221,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
     }
   }
 
-  async function handleRemoteDrop(_targetPath: string, localPaths: string[]) {
-    if (dragSourceRef.current !== "local") return;
+  async function enqueueUploads(localPaths: string[]) {
     const remoteBase = tabState?.remotePath ?? "/";
     for (const localPath of localPaths) {
       const fileName = localPath.split(/[\\/]/).pop() ?? "file";
@@ -181,9 +229,9 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
       const destPath = `${remoteBase}${sep}${fileName}`;
       try {
         await invoke("enqueue_transfer", {
-          tab_id: String(tab.id),
-          src_path: localPath,
-          dest_path: destPath,
+          tabId: String(tab.id),
+          srcPath: localPath,
+          destPath,
           direction: "upload",
         });
       } catch (e) {
@@ -298,7 +346,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
         {/* LOCAL */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <div className="flex flex-col h-full">
+          <div ref={localPaneRef} className="flex flex-col h-full">
             <PaneLabel
               label="LOCAL"
               count={displayedLocalFiles.length}
@@ -340,8 +388,9 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
                     onDoubleClick={handleLocalDoubleClick}
                     isLoading={tabState?.isLoadingLocal}
                     draggable
-                    onDragStart={() => { dragSourceRef.current = "local"; }}
-                    onDrop={handleLocalDrop}
+                    onDragStart={(paths) => startDrag("local", paths)}
+                    dropDirection={activeDragSource === "remote" ? "download" : undefined}
+                    isDropHovered={dropHoveredPane === "local"}
                     renamingPath={renamingPath}
                     renameValue={renameValue}
                     onRenameChange={setRenameValue}
@@ -358,7 +407,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
 
         {/* REMOTE */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <div className="flex flex-col h-full relative">
+          <div ref={remotePaneRef} className="flex flex-col h-full relative">
             <PaneLabel
               label={deepSearchResults !== null ? `SEARCH RESULTS (${deepSearchResults.length})` : "REMOTE"}
               count={deepSearchResults !== null ? deepSearchResults.length : displayedRemoteFiles.length}
@@ -456,8 +505,9 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
                       onDoubleClick={handleRemoteDoubleClick}
                       isLoading={tabState?.isLoadingRemote}
                       draggable
-                      onDragStart={() => { dragSourceRef.current = "remote"; }}
-                      onDrop={handleRemoteDrop}
+                      onDragStart={(paths) => startDrag("remote", paths)}
+                      dropDirection={activeDragSource === "local" ? "upload" : undefined}
+                      isDropHovered={dropHoveredPane === "remote"}
                       renamingPath={renamingPath}
                       renameValue={renameValue}
                       onRenameChange={setRenameValue}

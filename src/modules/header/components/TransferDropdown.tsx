@@ -26,9 +26,13 @@ export function TransferDropdown() {
   const activeCount = jobs.filter(
     (j) => j.status === "queued" || j.status === "running"
   ).length;
-  const hasConflicts = jobs.some((j) => j.status === "paused" && j.conflict);
+  const hasConflicts = jobs.some(
+    (j) => !isFailed(j.status) && j.status === "paused" && j.conflict
+  );
 
-  const conflictJob = jobs.find((j) => j.status === "paused" && j.conflict);
+  const conflictJob = jobs.find(
+    (j) => !isFailed(j.status) && j.status === "paused" && j.conflict
+  );
 
   return (
     <>
@@ -253,13 +257,17 @@ function ConflictModal({
   );
 }
 
+function isFailed(status: TransferStatus): status is { failed: string } {
+  return typeof status === "object" && "failed" in status;
+}
+
 function statusLabel(status: TransferStatus): string {
-  if (typeof status === "object") return "failed";
+  if (isFailed(status)) return "failed";
   return status;
 }
 
 function statusColorClass(status: TransferStatus): string {
-  if (typeof status === "object") return "bg-destructive/20 text-destructive";
+  if (isFailed(status)) return "bg-destructive/20 text-destructive";
   switch (status) {
     case "running": return "bg-blue-500/20 text-blue-500";
     case "completed": return "bg-green-500/20 text-green-600";
@@ -271,7 +279,7 @@ function statusColorClass(status: TransferStatus): string {
 }
 
 function statusProgressClass(status: TransferStatus): string {
-  if (typeof status === "object") return "bg-destructive";
+  if (isFailed(status)) return "bg-destructive";
   switch (status) {
     case "running": return "bg-primary";
     case "completed": return "bg-green-500";

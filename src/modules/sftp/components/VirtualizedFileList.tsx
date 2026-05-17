@@ -2,9 +2,11 @@ import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useRef, useState } from "react";
-import { Folder01Icon, File01Icon, Link01Icon } from "@hugeicons/core-free-icons";
+import { Folder01Icon, File01Icon, Link01Icon, ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { FileNode } from "../types";
+
+const DRAG_THRESHOLD_PX = 6;
 
 interface ColWidths {
   size: number;
@@ -26,9 +28,13 @@ interface VirtualizedFileListProps {
   onSelect: (path: string, multiSelect: boolean) => void;
   onDoubleClick: (file: FileNode) => void;
   isLoading?: boolean;
+  /** When set, rows are pointer-draggable; fires onDragStart with the dragged paths */
   draggable?: boolean;
   onDragStart?: (paths: string[]) => void;
-  onDrop?: (targetPath: string, paths: string[]) => void;
+  /** When set, this pane is the valid drop target — show a directional drop overlay */
+  dropDirection?: "upload" | "download";
+  /** Whether the pointer is currently hovering over this pane during a drag */
+  isDropHovered?: boolean;
   renamingPath?: string | null;
   renameValue?: string;
   onRenameChange?: (v: string) => void;
@@ -44,7 +50,8 @@ export function VirtualizedFileList({
   isLoading = false,
   draggable,
   onDragStart,
-  onDrop,
+  dropDirection,
+  isDropHovered,
   renamingPath,
   renameValue,
   onRenameChange,
@@ -52,7 +59,6 @@ export function VirtualizedFileList({
   onRenameCancel,
 }: VirtualizedFileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [colWidths, setColWidths] = useState<ColWidths>(DEFAULT_COL_WIDTHS);
 
   const showSize = usePreferencesStore((s) => s.sftpColumnSize);
@@ -95,47 +101,50 @@ export function VirtualizedFileList({
     document.addEventListener("mouseup", onMouseUp);
   }, [colWidths]);
 
-  function handleDragOver(e: React.DragEvent) {
-    if (!onDrop) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
-    setIsDragOver(true);
-  }
-
-  function handleDragLeave(e: React.DragEvent) {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setIsDragOver(false);
-    if (!onDrop) return;
-    try {
-      const paths = JSON.parse(e.dataTransfer.getData("text/plain")) as string[];
-      const targetEl = (e.target as HTMLElement).closest("[data-file-path]");
-      const targetPath = targetEl?.getAttribute("data-file-path") ?? "";
-      onDrop(targetPath, paths);
-    } catch {
-      // ignore malformed drag data
-    }
-  }
-
   const visibleCols = { showSize, showModified, showPermissions, showType };
+  const showOverlay = !!dropDirection;
 
   return (
     <div
       className={cn(
         "flex flex-col h-full min-h-0 overflow-hidden relative",
-        isDragOver && "ring-2 ring-inset ring-primary/40"
+        showOverlay && isDropHovered && "ring-2 ring-inset ring-primary/60"
       )}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
     >
-      {isDragOver && (
-        <div className="absolute inset-0 bg-primary/10 z-10 pointer-events-none rounded-sm" />
+      {showOverlay && (
+        <div className={cn(
+          "absolute inset-0 z-20 pointer-events-none flex flex-col items-center justify-center gap-3 rounded-sm transition-opacity duration-150",
+          isDropHovered ? "opacity-100" : "opacity-50"
+        )}>
+          <div className={cn(
+            "absolute inset-0 rounded-sm transition-colors duration-150",
+            isDropHovered
+              ? (dropDirection === "upload" ? "bg-blue-500/15" : "bg-green-500/15")
+              : "bg-primary/5"
+          )} />
+          <div className={cn(
+            "relative flex flex-col items-center gap-2 px-6 py-4 rounded-xl backdrop-blur-sm border shadow-lg transition-all duration-150",
+            isDropHovered
+              ? (dropDirection === "upload"
+                  ? "bg-background/90 border-blue-500/50 scale-105"
+                  : "bg-background/90 border-green-500/50 scale-105")
+              : "bg-background/60 border-primary/20 scale-100"
+          )}>
+            <HugeiconsIcon
+              icon={dropDirection === "upload" ? ArrowUp01Icon : ArrowDown01Icon}
+              size={28}
+              className={cn(
+                dropDirection === "upload" ? "text-blue-400" : "text-green-400"
+              )}
+            />
+            <span className={cn(
+              "text-sm font-semibold",
+              dropDirection === "upload" ? "text-blue-400" : "text-green-400"
+            )}>
+              {dropDirection === "upload" ? "Upload here" : "Download here"}
+            </span>
+          </div>
+        </div>
       )}
 
       {/* Sticky column header */}
@@ -319,31 +328,49 @@ function FileRow({
     ? (file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() ?? "—" : "—")
     : "—";
 
-  function handleDragStart(e: React.DragEvent) {
-    const paths = selectedPaths && selectedPaths.size > 0
-      ? [...selectedPaths]
-      : [file.path];
-    e.dataTransfer.setData("text/plain", JSON.stringify(paths));
-    e.dataTransfer.effectAllowed = "copy";
-    onDragStart?.(paths);
+  function handlePointerDown(e: React.PointerEvent) {
+    if (!draggable || !onDragStart || isUpEntry || e.button !== 0) return;
+    const fireDragStart = onDragStart;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const paths = selectedPaths && selectedPaths.size > 0 ? [...selectedPaths] : [file.path];
+    let dragging = false;
+
+    function onMove(ev: PointerEvent) {
+      if (dragging) return;
+      const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+      if (dist > DRAG_THRESHOLD_PX) {
+        dragging = true;
+        cleanup();
+        fireDragStart(paths);
+      }
+    }
+    function onUp() {
+      cleanup();
+    }
+    function cleanup() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    }
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
   }
 
   return (
     <div
       style={style}
       data-file-path={file.path}
-      draggable={draggable}
-      onDragStart={draggable ? handleDragStart : undefined}
       className={cn(
         "h-7 flex items-center px-2 gap-1 cursor-default select-none transition-colors duration-75 overflow-hidden",
         isEven && !isSelected && "bg-muted/10",
         isSelected
           ? "bg-primary/20 ring-1 ring-inset ring-primary/40"
           : "hover:bg-accent/20",
-        draggable && !isUpEntry && "cursor-grab active:cursor-grabbing",
+        draggable && !isUpEntry && "cursor-grab",
         isUpEntry && "opacity-60",
         !isUpEntry && !isSelected && file.name.startsWith(".") && "opacity-50",
       )}
+      onPointerDown={draggable && !isUpEntry ? handlePointerDown : undefined}
       onClick={isRenaming ? undefined : onClick}
       onDoubleClick={isRenaming ? undefined : onDoubleClick}
     >

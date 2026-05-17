@@ -108,9 +108,9 @@ export function SftpContextMenu({
       const destPath = `${dest}/${fileName}`;
       try {
         await invoke("enqueue_transfer", {
-          tab_id: tabId,
-          src_path: remotePath,
-          dest_path: destPath,
+          tabId,
+          srcPath: remotePath,
+          destPath,
           direction: "download",
         });
       } catch (e) {
@@ -130,9 +130,9 @@ export function SftpContextMenu({
       const destPath = `${currentPath}${sep}${fileName}`;
       try {
         await invoke("enqueue_transfer", {
-          tab_id: tabId,
-          src_path: localPath,
-          dest_path: destPath,
+          tabId,
+          srcPath: localPath,
+          destPath,
           direction: "upload",
         });
       } catch (e) {
