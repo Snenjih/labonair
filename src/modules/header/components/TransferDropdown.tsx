@@ -16,9 +16,9 @@ import {
   type TransferStatus,
   useTransferStore,
 } from "@/modules/sftp/store/transferStore";
-import { Cancel01Icon, ArrowUpDownIcon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, ArrowUpDownIcon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function TransferDropdown() {
   const { jobs, clearCompleted, cancelJob, resolveConflict } = useTransferStore();
@@ -103,6 +103,62 @@ export function TransferDropdown() {
   );
 }
 
+function FailedBadge({ message }: { message: string }) {
+  const [tooltip, setTooltip] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const badgeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!tooltip) return;
+    function onFocusOut(e: FocusEvent) {
+      if (!badgeRef.current?.contains(e.relatedTarget as Node)) {
+        setTooltip(false);
+        setCopied(false);
+      }
+    }
+    document.addEventListener("focusin", onFocusOut);
+    return () => document.removeEventListener("focusin", onFocusOut);
+  }, [tooltip]);
+
+  function handleClick() {
+    void navigator.clipboard.writeText(message).then(() => setCopied(true));
+    setTooltip(true);
+  }
+
+  return (
+    <span className="relative shrink-0">
+      <button
+        ref={badgeRef}
+        onClick={handleClick}
+        onBlur={() => { setTooltip(false); setCopied(false); }}
+        className={cn(
+          "text-[10px] font-semibold px-1.5 py-0.5 rounded-full transition-colors",
+          "bg-destructive/20 text-destructive hover:bg-destructive/30 cursor-pointer",
+        )}
+        title="Click to copy error"
+      >
+        failed
+      </button>
+      {tooltip && (
+        <div className={cn(
+          "absolute bottom-full right-0 mb-1.5 z-50 min-w-[180px] max-w-[260px]",
+          "bg-popover border border-border rounded-lg shadow-lg px-3 py-2",
+          "flex flex-col gap-1.5 pointer-events-none",
+        )}>
+          <div className="flex items-center gap-1.5">
+            <HugeiconsIcon icon={Copy01Icon} size={11} className="shrink-0 text-muted-foreground" />
+            <span className="text-[10px] text-muted-foreground">
+              {copied ? "Copied!" : "Copied to clipboard"}
+            </span>
+          </div>
+          <p className="text-[11px] font-mono text-destructive break-all leading-snug">{message}</p>
+          <div className="absolute -bottom-1 right-3 w-2 h-2 bg-popover border-r border-b border-border rotate-45" />
+        </div>
+      )}
+    </span>
+  );
+}
+
 function TransferItem({
   job,
   onCancel,
@@ -116,7 +172,7 @@ function TransferItem({
       ? Math.round((job.bytes_transferred / job.bytes_total) * 100)
       : 0;
   const isActive = job.status === "running" || job.status === "queued";
-  const statusStr = statusLabel(job.status);
+  const failedMsg = isFailed(job.status) ? job.status.failed : null;
 
   return (
     <div className="px-3 py-2 flex flex-col gap-1.5">
@@ -127,14 +183,18 @@ function TransferItem({
         <span className="flex-1 text-sm font-medium truncate min-w-0">
           {fileName}
         </span>
-        <span
-          className={cn(
-            "shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
-            statusColorClass(job.status)
-          )}
-        >
-          {statusStr}
-        </span>
+        {failedMsg !== null ? (
+          <FailedBadge message={failedMsg} />
+        ) : (
+          <span
+            className={cn(
+              "shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
+              statusColorClass(job.status)
+            )}
+          >
+            {statusLabel(job.status)}
+          </span>
+        )}
         {isActive && (
           <button
             onClick={onCancel}

@@ -8,6 +8,7 @@ pub async fn enqueue_transfer(
     direction: String,
     worker: tauri::State<'_, TransferWorkerState>,
 ) -> Result<String, String> {
+    log::info!("[sftp] enqueue_transfer tab={} direction={} src={} dest={}", tab_id, direction, src_path, dest_path);
     let id = uuid::Uuid::new_v4().to_string();
     let job = TransferJob {
         id: id.clone(),

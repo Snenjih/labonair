@@ -94,10 +94,19 @@ async fn process_job(
     conflicts: &ConflictMap,
     cancelled: &std::collections::HashSet<String>,
 ) -> Result<(), String> {
-    match job.direction {
+    log::info!(
+        "[sftp] starting {:?} | id={} tab={} src={} dest={}",
+        job.direction, job.id, job.tab_id, job.src_path, job.dest_path
+    );
+    let result = match job.direction {
         TransferDirection::Download => download_file(job, ssh_state, app, conflicts, cancelled).await,
         TransferDirection::Upload => upload_file(job, ssh_state, app, conflicts, cancelled).await,
+    };
+    match &result {
+        Ok(()) => log::info!("[sftp] completed id={}", job.id),
+        Err(e) => log::error!("[sftp] failed id={} tab={} src={} dest={} — {}", job.id, job.tab_id, job.src_path, job.dest_path, e),
     }
+    result
 }
 
 async fn download_file(
@@ -107,38 +116,52 @@ async fn download_file(
     conflicts: &ConflictMap,
     cancelled: &std::collections::HashSet<String>,
 ) -> Result<(), String> {
+    log::debug!("[sftp/download] checking dest exists: {}", job.dest_path);
     let dest = std::path::Path::new(&job.dest_path);
     if dest.exists() {
+        log::debug!("[sftp/download] conflict detected, waiting for resolution");
         let resolution = ask_conflict(job, app, conflicts).await?;
         match resolution.resolution.as_str() {
-            "skip" => return Ok(()),
+            "skip" => { log::debug!("[sftp/download] skipped by user"); return Ok(()); }
             "rename" => {
                 let new_name = resolution.new_name.ok_or("rename requires new_name")?;
                 let new_dest = dest.parent().unwrap_or(dest).join(new_name);
                 job.dest_path = new_dest.to_string_lossy().to_string();
+                log::debug!("[sftp/download] renamed dest to: {}", job.dest_path);
             }
             _ => {}
         }
     }
 
+    log::debug!("[sftp/download] looking up SFTP session for tab_id={}", job.tab_id);
     let (file_size, data) = {
         let sftp_arc = {
-            let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
-            let entry = map.get(&job.tab_id).ok_or("no SSH session for host")?;
-            entry.sftp.as_ref().ok_or("no SFTP handle for host")?.clone()
+            let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
+            let entry = map.get(&job.tab_id)
+                .ok_or_else(|| format!("no SSH session for tab_id={} (active tabs: {:?})", job.tab_id, map.keys().collect::<Vec<_>>()))?;
+            entry.sftp.as_ref()
+                .ok_or_else(|| format!("SSH session found for tab_id={} but SFTP handle is None — was SFTP opened?", job.tab_id))?
+                .clone()
         };
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-        let stat = sftp.0.stat(std::path::Path::new(&job.src_path)).map_err(|e| e.to_string())?;
+        log::debug!("[sftp/download] opening remote file: {}", job.src_path);
+        let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
+        let stat = sftp.0.stat(std::path::Path::new(&job.src_path))
+            .map_err(|e| format!("stat({}) failed: {e}", job.src_path))?;
         let size = stat.size.unwrap_or(0);
-        let mut remote_file = sftp.0.open(std::path::Path::new(&job.src_path)).map_err(|e| e.to_string())?;
+        log::debug!("[sftp/download] remote file size={} bytes", size);
+        let mut remote_file = sftp.0.open(std::path::Path::new(&job.src_path))
+            .map_err(|e| format!("open({}) failed: {e}", job.src_path))?;
         let mut buf = Vec::with_capacity(size as usize);
-        remote_file.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+        remote_file.read_to_end(&mut buf).map_err(|e| format!("read({}) failed: {e}", job.src_path))?;
+        log::debug!("[sftp/download] read {} bytes from remote", buf.len());
         (size, buf)
     };
 
     job.bytes_total = file_size;
 
-    let mut local_file = std::fs::File::create(&job.dest_path).map_err(|e| e.to_string())?;
+    log::debug!("[sftp/download] creating local file: {}", job.dest_path);
+    let mut local_file = std::fs::File::create(&job.dest_path)
+        .map_err(|e| format!("create({}) failed: {e}", job.dest_path))?;
     let mut written = 0usize;
     let mut last_emit = std::time::Instant::now();
     let mut last_bytes = 0u64;
@@ -170,28 +193,37 @@ async fn upload_file(
     conflicts: &ConflictMap,
     cancelled: &std::collections::HashSet<String>,
 ) -> Result<(), String> {
-    let data = std::fs::read(&job.src_path).map_err(|e| e.to_string())?;
+    log::debug!("[sftp/upload] reading local file: {}", job.src_path);
+    let data = std::fs::read(&job.src_path)
+        .map_err(|e| format!("read local file({}) failed: {e}", job.src_path))?;
     job.bytes_total = data.len() as u64;
+    log::debug!("[sftp/upload] local file size={} bytes", data.len());
 
+    log::debug!("[sftp/upload] looking up SFTP session for tab_id={}", job.tab_id);
     let conflict_exists = {
         let sftp_arc = {
-            let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
-            let entry = map.get(&job.tab_id).ok_or("no SSH session for host")?;
-            entry.sftp.as_ref().ok_or("no SFTP handle for host")?.clone()
+            let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
+            let entry = map.get(&job.tab_id)
+                .ok_or_else(|| format!("no SSH session for tab_id={} (active tabs: {:?})", job.tab_id, map.keys().collect::<Vec<_>>()))?;
+            entry.sftp.as_ref()
+                .ok_or_else(|| format!("SSH session found for tab_id={} but SFTP handle is None — was SFTP opened?", job.tab_id))?
+                .clone()
         };
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
         sftp.0.stat(std::path::Path::new(&job.dest_path)).is_ok()
     };
 
     if conflict_exists {
+        log::debug!("[sftp/upload] conflict at dest: {}", job.dest_path);
         let resolution = ask_conflict(job, app, conflicts).await?;
         match resolution.resolution.as_str() {
-            "skip" => return Ok(()),
+            "skip" => { log::debug!("[sftp/upload] skipped by user"); return Ok(()); }
             "rename" => {
                 let new_name = resolution.new_name.ok_or("rename requires new_name")?;
                 let dest = std::path::Path::new(&job.dest_path);
                 let new_dest = dest.parent().unwrap_or(dest).join(new_name);
                 job.dest_path = new_dest.to_string_lossy().to_string();
+                log::debug!("[sftp/upload] renamed dest to: {}", job.dest_path);
             }
             _ => {}
         }
@@ -200,13 +232,18 @@ async fn upload_file(
     let mut last_emit = std::time::Instant::now();
     let mut last_bytes = 0u64;
 
+    log::debug!("[sftp/upload] creating remote file: {}", job.dest_path);
     let sftp_arc = {
-        let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get(&job.tab_id).ok_or("no SSH session for host")?;
-        entry.sftp.as_ref().ok_or("no SFTP handle for host")?.clone()
+        let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
+        let entry = map.get(&job.tab_id)
+            .ok_or_else(|| format!("no SSH session for tab_id={}", job.tab_id))?;
+        entry.sftp.as_ref()
+            .ok_or_else(|| format!("no SFTP handle for tab_id={}", job.tab_id))?
+            .clone()
     };
-    let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-    let mut remote_file = sftp.0.create(std::path::Path::new(&job.dest_path)).map_err(|e| e.to_string())?;
+    let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
+    let mut remote_file = sftp.0.create(std::path::Path::new(&job.dest_path))
+        .map_err(|e| format!("create remote({}) failed: {e}", job.dest_path))?;
 
     for (i, chunk) in data.chunks(CHUNK_SIZE).enumerate() {
         if cancelled.contains(&job.id) {
