@@ -3,6 +3,29 @@ use std::io::{Read, Write};
 use std::sync::Arc;
 
 const CHUNK_SIZE: usize = 65536;
+
+fn compute_local_md5(path: &std::path::Path) -> Result<String, String> {
+    let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
+    let mut ctx = md5::Context::new();
+    let mut buf = vec![0u8; CHUNK_SIZE];
+    loop {
+        let n = file.read(&mut buf).map_err(|e| e.to_string())?;
+        if n == 0 { break; }
+        ctx.consume(&buf[..n]);
+    }
+    Ok(format!("{:x}", ctx.compute()))
+}
+
+fn compute_remote_md5(session: &ssh2::Session, remote_path: &str) -> Option<String> {
+    let mut ch = session.channel_session().ok()?;
+    let escaped = remote_path.replace('\'', "'\\''");
+    ch.exec(&format!("md5sum '{}'", escaped)).ok()?;
+    let mut out = String::new();
+    ch.read_to_string(&mut out).ok()?;
+    ch.wait_close().ok()?;
+    if ch.exit_status().ok()? != 0 { return None; }
+    out.split_whitespace().next().map(|s| s.to_string())
+}
 const PROGRESS_EMIT_INTERVAL_MS: u128 = 100;
 
 fn expand_home(path: &str) -> String {
@@ -199,6 +222,46 @@ async fn download_file(
             emit_progress(app, job);
         }
     }
+    drop(local_file);
+
+    // --- Post-transfer verification ---
+    log::debug!("[sftp/download] verifying transfer id={}", job.id);
+    let local_size = std::fs::metadata(&job.dest_path)
+        .map_err(|e| format!("verify metadata({}) failed: {e}", job.dest_path))?
+        .len();
+    if local_size != file_size {
+        return Err(format!(
+            "Transfer failed: Size mismatch (remote={file_size}, local={local_size})."
+        ));
+    }
+
+    let session_arc = {
+        let sftp_arc2 = {
+            let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
+            let entry = map.get(&job.tab_id)
+                .ok_or_else(|| format!("no SSH session for tab_id={}", job.tab_id))?;
+            (entry.session.clone(), entry.sftp.as_ref().map(|s| s.clone()))
+        };
+        sftp_arc2.0
+    };
+    let local_hash = compute_local_md5(std::path::Path::new(&job.dest_path))?;
+    {
+        let session = session_arc.lock().map_err(|e| format!("session lock: {e}"))?;
+        match compute_remote_md5(&session.0, &job.src_path) {
+            Some(remote_hash) => {
+                if local_hash != remote_hash {
+                    return Err(format!(
+                        "Transfer failed: MD5 checksum mismatch (remote={remote_hash}, local={local_hash}). File is corrupted."
+                    ));
+                }
+                log::debug!("[sftp/download] md5 verified ok id={}", job.id);
+            }
+            None => {
+                log::warn!("[sftp/download] md5sum unavailable on remote, relying on size check id={}", job.id);
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -279,6 +342,47 @@ async fn upload_file(
             emit_progress(app, job);
         }
     }
+    drop(remote_file);
+
+    // --- Post-transfer verification ---
+    log::debug!("[sftp/upload] verifying transfer id={}", job.id);
+    {
+        let remote_size = sftp.0.stat(std::path::Path::new(&job.dest_path))
+            .map_err(|e| format!("verify stat({}) failed: {e}", job.dest_path))?
+            .size.unwrap_or(0);
+        if remote_size != data.len() as u64 {
+            return Err(format!(
+                "Transfer failed: Size mismatch (local={}, remote={}).",
+                data.len(), remote_size
+            ));
+        }
+    }
+    drop(sftp);
+
+    let session_arc = {
+        let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
+        map.get(&job.tab_id)
+            .ok_or_else(|| format!("no SSH session for tab_id={}", job.tab_id))?
+            .session.clone()
+    };
+    let local_hash = compute_local_md5(std::path::Path::new(&job.src_path))?;
+    {
+        let session = session_arc.lock().map_err(|e| format!("session lock: {e}"))?;
+        match compute_remote_md5(&session.0, &job.dest_path) {
+            Some(remote_hash) => {
+                if local_hash != remote_hash {
+                    return Err(format!(
+                        "Transfer failed: MD5 checksum mismatch (local={local_hash}, remote={remote_hash}). File is corrupted."
+                    ));
+                }
+                log::debug!("[sftp/upload] md5 verified ok id={}", job.id);
+            }
+            None => {
+                log::warn!("[sftp/upload] md5sum unavailable on remote, relying on size check id={}", job.id);
+            }
+        }
+    }
+
     Ok(())
 }
 
