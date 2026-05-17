@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { useSftpStore } from "./sftpStore";
 
 export type TransferStatus =
   | "queued"
@@ -83,12 +84,26 @@ export async function bootstrapTransferListeners() {
   _listenersBootstrapped = true;
 
   await listen<TransferJob>("transfer_progress", (event) => {
+    const job = event.payload;
     const store = useTransferStore.getState();
-    const existing = store.jobs.find((j) => j.id === event.payload.id);
+    const existing = store.jobs.find((j) => j.id === job.id);
     if (existing) {
-      store.updateJob(event.payload);
+      store.updateJob(job);
     } else {
-      store.addJob(event.payload);
+      store.addJob(job);
+    }
+
+    // Refresh the relevant pane when a transfer finishes
+    if (job.status === "completed") {
+      const sftp = useSftpStore.getState();
+      const tabState = sftp.tabs[job.tab_id];
+      if (tabState) {
+        if (job.direction === "download") {
+          void sftp.loadLocalDir(job.tab_id, tabState.localPath);
+        } else {
+          void sftp.loadRemoteDir(job.tab_id, tabState.remotePath);
+        }
+      }
     }
   });
 
