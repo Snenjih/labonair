@@ -5,6 +5,20 @@ use std::sync::Arc;
 const CHUNK_SIZE: usize = 65536;
 const PROGRESS_EMIT_INTERVAL_MS: u128 = 100;
 
+fn expand_home(path: &str) -> String {
+    if path == "~" {
+        dirs::home_dir()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.to_string())
+    } else if path.starts_with("~/") {
+        dirs::home_dir()
+            .map(|mut h| { h.push(&path[2..]); h.to_string_lossy().to_string() })
+            .unwrap_or_else(|| path.to_string())
+    } else {
+        path.to_string()
+    }
+}
+
 pub async fn run_worker(
     mut rx: mpsc::Receiver<WorkerMessage>,
     ssh_state: Arc<crate::modules::ssh::SshState>,
@@ -116,6 +130,8 @@ async fn download_file(
     conflicts: &ConflictMap,
     cancelled: &std::collections::HashSet<String>,
 ) -> Result<(), String> {
+    job.src_path = expand_home(&job.src_path);
+    job.dest_path = expand_home(&job.dest_path);
     log::debug!("[sftp/download] checking dest exists: {}", job.dest_path);
     let dest = std::path::Path::new(&job.dest_path);
     if dest.exists() {
@@ -193,6 +209,8 @@ async fn upload_file(
     conflicts: &ConflictMap,
     cancelled: &std::collections::HashSet<String>,
 ) -> Result<(), String> {
+    job.src_path = expand_home(&job.src_path);
+    job.dest_path = expand_home(&job.dest_path);
     log::debug!("[sftp/upload] reading local file: {}", job.src_path);
     let data = std::fs::read(&job.src_path)
         .map_err(|e| format!("read local file({}) failed: {e}", job.src_path))?;

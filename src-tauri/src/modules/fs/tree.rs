@@ -106,6 +106,13 @@ pub async fn fs_read_dir(path: String, show_hidden: Option<bool>) -> Result<Vec<
     .map_err(|e| e.to_string())?
 }
 
+/// Returns the absolute expanded path for a given input (expands `~`).
+/// Used by the frontend to normalise the local base path before storing it.
+#[tauri::command]
+pub async fn fs_resolve_path(path: String) -> Result<String, String> {
+    expand_home(&path).map(|p| p.to_string_lossy().to_string())
+}
+
 /// Lists immediate subdirectories of `path`. Kept for the CwdBreadcrumb.
 ///
 /// Symlinks to directories are included (matches shell `cd` semantics).

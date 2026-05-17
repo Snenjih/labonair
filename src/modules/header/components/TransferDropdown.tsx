@@ -19,6 +19,7 @@ import {
 import { Cancel01Icon, ArrowUpDownIcon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export function TransferDropdown() {
   const { jobs, clearCompleted, cancelJob, resolveConflict } = useTransferStore();
@@ -107,26 +108,60 @@ function FailedBadge({ message }: { message: string }) {
   const [tooltip, setTooltip] = useState(false);
   const [copied, setCopied] = useState(false);
   const badgeRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
 
+  // Close on any outside click
   useEffect(() => {
     if (!tooltip) return;
-    function onFocusOut(e: FocusEvent) {
-      if (!badgeRef.current?.contains(e.relatedTarget as Node)) {
+    function onPointerDown(e: PointerEvent) {
+      if (!badgeRef.current?.contains(e.target as Node)) {
         setTooltip(false);
         setCopied(false);
       }
     }
-    document.addEventListener("focusin", onFocusOut);
-    return () => document.removeEventListener("focusin", onFocusOut);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [tooltip]);
 
   function handleClick() {
     void navigator.clipboard.writeText(message).then(() => setCopied(true));
+    if (badgeRef.current) {
+      const r = badgeRef.current.getBoundingClientRect();
+      // Position the tooltip above the badge, right-aligned to it
+      setPos({ top: r.top - 8, right: window.innerWidth - r.right });
+    }
     setTooltip(true);
   }
 
+  const tooltipEl = tooltip && pos
+    ? createPortal(
+        <div
+          style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 9999, transform: "translateY(-100%)" }}
+          className={cn(
+            "min-w-[200px] max-w-[280px]",
+            "bg-popover border border-border rounded-lg shadow-xl px-3 py-2.5",
+            "flex flex-col gap-1.5 pointer-events-none",
+          )}
+        >
+          <div className="flex items-center gap-1.5">
+            <HugeiconsIcon icon={Copy01Icon} size={11} className="shrink-0 text-muted-foreground" />
+            <span className="text-[10px] font-medium text-muted-foreground">
+              {copied ? "Copied to clipboard ✓" : "Error message"}
+            </span>
+          </div>
+          <p className="text-[11px] font-mono text-destructive break-all leading-snug">{message}</p>
+          {/* Arrow pointing down toward the badge */}
+          <div
+            style={{ position: "absolute", bottom: -5, right: 8, width: 10, height: 10 }}
+            className="bg-popover border-r border-b border-border rotate-45"
+          />
+        </div>,
+        document.body
+      )
+    : null;
+
   return (
-    <span className="relative shrink-0">
+    <span className="shrink-0">
       <button
         ref={badgeRef}
         onClick={handleClick}
@@ -139,22 +174,7 @@ function FailedBadge({ message }: { message: string }) {
       >
         failed
       </button>
-      {tooltip && (
-        <div className={cn(
-          "absolute bottom-full right-0 mb-1.5 z-50 min-w-[180px] max-w-[260px]",
-          "bg-popover border border-border rounded-lg shadow-lg px-3 py-2",
-          "flex flex-col gap-1.5 pointer-events-none",
-        )}>
-          <div className="flex items-center gap-1.5">
-            <HugeiconsIcon icon={Copy01Icon} size={11} className="shrink-0 text-muted-foreground" />
-            <span className="text-[10px] text-muted-foreground">
-              {copied ? "Copied!" : "Copied to clipboard"}
-            </span>
-          </div>
-          <p className="text-[11px] font-mono text-destructive break-all leading-snug">{message}</p>
-          <div className="absolute -bottom-1 right-3 w-2 h-2 bg-popover border-r border-b border-border rotate-45" />
-        </div>
-      )}
+      {tooltipEl}
     </span>
   );
 }

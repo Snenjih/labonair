@@ -99,15 +99,19 @@ export const useSftpStore = create<SftpStore>((set) => ({
       },
     }));
     try {
-      const entries = await invoke<DirEntry[]>("fs_read_dir", { path, showHidden: true });
-      const files = entries.map((e) => mapDirEntry(path, e));
+      // Resolve ~ to an absolute path so file.path values are always absolute.
+      // The Rust fs_read_dir expands ~ internally but returns only names, so
+      // we need the real base path to build correct absolute file paths.
+      const resolvedPath = await invoke<string>("fs_resolve_path", { path });
+      const entries = await invoke<DirEntry[]>("fs_read_dir", { path: resolvedPath, showHidden: true });
+      const files = entries.map((e) => mapDirEntry(resolvedPath, e));
       set((s) => ({
         tabs: {
           ...s.tabs,
           [tabId]: {
             ...s.tabs[tabId],
             localFiles: files,
-            localPath: path,
+            localPath: resolvedPath,
             isLoadingLocal: false,
           },
         },
