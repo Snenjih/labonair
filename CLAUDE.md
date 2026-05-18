@@ -35,6 +35,7 @@ Before working on any area, read the relevant context file:
 - **Host Manager UI** → [`hosts_manager_context.md`](./hosts_manager_context.md) — Master-Detail layout, TitleBar dropdown, Inspector pane, Zustand store shape
 - **Host Manager Overhaul** → [`host_manager_overhaul_context.md`](./host_manager_overhaul_context.md) — Full implementation reference: new data model, IPC contracts, HostFormPanel tabs, dnd-kit reorder, multi-select, context menu, loading fix, future work
 - **macOS TCP socket2 Fix** → [`macos_tcp_socket2_context.md`](./macos_tcp_socket2_context.md) — Local network SSH "No route to host" fix using socket2 + IPv4-only filtering; design decisions & rationale
+- **PRs** when i ask you to create a pr read .github/PULL_REQUEST_TEMPLATE.md and then create a pr using that template, with the "gh" command
 
 ## Architecture Summary
 ```
