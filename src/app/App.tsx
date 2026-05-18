@@ -153,6 +153,7 @@ export default function App() {
   const initPrefs = usePreferencesStore((s) => s.init);
   const prefDefaultModel = usePreferencesStore((s) => s.defaultModelId);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
+  const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
   useEffect(() => {
     void initPrefs();
   }, [initPrefs]);
@@ -688,27 +689,31 @@ export default function App() {
               orientation="horizontal"
               className="min-h-0 flex-1"
             >
-              <ResizablePanel
-                id="sidebar"
-                panelRef={sidebarRef}
-                defaultSize="225px"
-                minSize="130px"
-                maxSize="450px"
-                collapsible
-                collapsedSize={0}
-              >
-                <div className="h-full border-r border-border/60 bg-card">
-                  <FileExplorer
-                    rootPath={explorerRoot}
-                    onOpenFile={handleOpenFile}
-                    onPathRenamed={handlePathRenamed}
-                    onPathDeleted={handlePathDeleted}
-                    onRevealInTerminal={cdInNewTab}
-                    onAttachToAgent={handleAttachFileToAgent}
-                  />
-                </div>
-              </ResizablePanel>
-              <ResizableHandle withHandle />
+              {sidebarPosition !== "right" && (
+                <>
+                  <ResizablePanel
+                    id="sidebar"
+                    panelRef={sidebarRef}
+                    defaultSize="225px"
+                    minSize="130px"
+                    maxSize="450px"
+                    collapsible
+                    collapsedSize={0}
+                  >
+                    <div className="h-full border-r border-border/60 bg-card">
+                      <FileExplorer
+                        rootPath={explorerRoot}
+                        onOpenFile={handleOpenFile}
+                        onPathRenamed={handlePathRenamed}
+                        onPathDeleted={handlePathDeleted}
+                        onRevealInTerminal={cdInNewTab}
+                        onAttachToAgent={handleAttachFileToAgent}
+                      />
+                    </div>
+                  </ResizablePanel>
+                  <ResizableHandle withHandle />
+                </>
+              )}
               <ResizablePanel id="workspace" defaultSize="78%" minSize="30%">
                 <div className="flex h-full min-h-0 flex-col">
                   <div className="relative min-h-0 flex-1">
@@ -833,6 +838,31 @@ export default function App() {
                   ) : null}
                 </div>
               </ResizablePanel>
+              {sidebarPosition === "right" && (
+                <>
+                  <ResizableHandle withHandle />
+                  <ResizablePanel
+                    id="sidebar"
+                    panelRef={sidebarRef}
+                    defaultSize="225px"
+                    minSize="130px"
+                    maxSize="450px"
+                    collapsible
+                    collapsedSize={0}
+                  >
+                    <div className="h-full border-l border-border/60 bg-card">
+                      <FileExplorer
+                        rootPath={explorerRoot}
+                        onOpenFile={handleOpenFile}
+                        onPathRenamed={handlePathRenamed}
+                        onPathDeleted={handlePathDeleted}
+                        onRevealInTerminal={cdInNewTab}
+                        onAttachToAgent={handleAttachFileToAgent}
+                      />
+                    </div>
+                  </ResizablePanel>
+                </>
+              )}
             </ResizablePanelGroup>
           </main>
 

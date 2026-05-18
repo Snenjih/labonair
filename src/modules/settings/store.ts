@@ -82,6 +82,9 @@ export type Preferences = {
   sftpColumnModified: boolean;
   sftpColumnPermissions: boolean;
   sftpColumnType: boolean;
+
+  // --- Sidebar ---
+  sidebarPosition: "left" | "right";
 };
 
 const STORE_PATH = "nexum-settings.json";
@@ -125,6 +128,7 @@ const KEY_SFTP_COLUMN_SIZE = "sftpColumnSize";
 const KEY_SFTP_COLUMN_MODIFIED = "sftpColumnModified";
 const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
 const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
+const KEY_SIDEBAR_POSITION = "sidebarPosition";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -167,6 +171,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpColumnModified: true,
   sftpColumnPermissions: true,
   sftpColumnType: false,
+
+  sidebarPosition: "left",
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -264,6 +270,10 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_SFTP_COLUMN_PERMISSIONS) ?? DEFAULT_PREFERENCES.sftpColumnPermissions,
     sftpColumnType:
       get<boolean>(KEY_SFTP_COLUMN_TYPE) ?? DEFAULT_PREFERENCES.sftpColumnType,
+
+    sidebarPosition:
+      get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
+      DEFAULT_PREFERENCES.sidebarPosition,
   };
 }
 
@@ -455,6 +465,13 @@ export async function setSftpColumnType(value: boolean): Promise<void> {
   await store.save();
 }
 
+export async function setSidebarPosition(
+  value: "left" | "right",
+): Promise<void> {
+  await store.set(KEY_SIDEBAR_POSITION, value);
+  await store.save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -502,6 +519,7 @@ export function onPreferencesChange(
     [KEY_SFTP_COLUMN_MODIFIED]: "sftpColumnModified",
     [KEY_SFTP_COLUMN_PERMISSIONS]: "sftpColumnPermissions",
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
+    [KEY_SIDEBAR_POSITION]: "sidebarPosition",
   };
   return store.onChange<unknown>((key, value) => {
     const mapped = map[key];
