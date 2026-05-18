@@ -56,7 +56,7 @@ Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. I
 - Tasks, plans, search, file read/write tools with in-app approval flow
 
 **Quality**
-- Lightweight (~7 MB bundle), fast startup
+- Lightweight (~22 MB bundle), fast startup
 - API keys stored in macOS Keychain via `keyring`
 - No telemetry, no account required
 
