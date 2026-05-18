@@ -101,6 +101,14 @@ function FileTreeNodeImpl({
             <button
               type="button"
               data-fs-path={path}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(
+                  "application/nexum-file-paths",
+                  JSON.stringify([path]),
+                );
+                e.dataTransfer.effectAllowed = "copy";
+              }}
               onClick={handleClick}
               onDoubleClick={() => !isDir && tree.beginRename(path)}
               className={cn(

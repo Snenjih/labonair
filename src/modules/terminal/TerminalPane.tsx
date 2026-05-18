@@ -23,6 +23,7 @@ type Props = {
   onExit?: (tabId: number, code: number) => void;
   onCwd?: (tabId: number, cwd: string) => void;
   onDetectedLocalUrl?: (tabId: number, url: string) => void;
+  onDropPaths?: (paths: string[]) => void;
 };
 
 export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
@@ -35,6 +36,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       onExit,
       onCwd,
       onDetectedLocalUrl,
+      onDropPaths,
     },
     ref,
   ) {
@@ -75,6 +77,23 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
         style={{
           visibility: visible ? "visible" : "hidden",
           pointerEvents: visible ? "auto" : "none",
+        }}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes("application/nexum-file-paths")) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+          }
+        }}
+        onDrop={(e) => {
+          const raw = e.dataTransfer.getData("application/nexum-file-paths");
+          if (!raw) return;
+          e.preventDefault();
+          try {
+            const paths = JSON.parse(raw) as string[];
+            if (paths.length > 0) onDropPaths?.(paths);
+          } catch {
+            // malformed drag data — ignore
+          }
         }}
       />
     );

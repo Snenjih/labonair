@@ -2,6 +2,7 @@ import type { Tab } from "@/modules/tabs";
 import type { SearchAddon } from "@xterm/addon-search";
 import { useEffect, useRef } from "react";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
+import { dropPaths } from "./lib/drop-paths";
 
 type Props = {
   tabs: Tab[];
@@ -45,12 +46,17 @@ export function TerminalStack({
     onCwd: (cwd: string) => void;
     onDetectedUrl: (url: string) => void;
   };
+  const handleMap = useRef(new Map<number, TerminalPaneHandle | null>());
+
   const bundles = useRef(new Map<number, Bundle>());
   const getBundle = (id: number): Bundle => {
     let b = bundles.current.get(id);
     if (!b) {
       b = {
-        setRef: (h) => registerRef.current(id, h),
+        setRef: (h) => {
+          registerRef.current(id, h);
+          handleMap.current.set(id, h);
+        },
         onSearch: (addon) => searchReadyRef.current(id, addon),
         onCwd: (cwd) => cwdRef.current(id, cwd),
         onDetectedUrl: (url) => detectedUrlRef.current(id, url),
@@ -63,7 +69,10 @@ export function TerminalStack({
   useEffect(() => {
     const live = new Set(terminals.map((t) => t.id));
     for (const id of bundles.current.keys()) {
-      if (!live.has(id)) bundles.current.delete(id);
+      if (!live.has(id)) {
+        bundles.current.delete(id);
+        handleMap.current.delete(id);
+      }
     }
   }, [terminals]);
 
@@ -81,6 +90,11 @@ export function TerminalStack({
               onSearchReady={(_id, addon) => b.onSearch(addon)}
               onCwd={(_id, cwd) => b.onCwd(cwd)}
               onDetectedLocalUrl={(_id, url) => b.onDetectedUrl(url)}
+              onDropPaths={(paths) => {
+                const handle = handleMap.current.get(t.id);
+                handle?.write(dropPaths(paths));
+                handle?.focus();
+              }}
             />
           </div>
         );
