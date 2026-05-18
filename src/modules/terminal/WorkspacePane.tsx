@@ -86,7 +86,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
         <div
           key={paneId}
           className={cn(
-            "relative flex h-full w-full flex-col overflow-hidden",
+            "group relative flex h-full w-full flex-col overflow-hidden",
             isActive && "ring-1 ring-inset ring-accent",
           )}
           onClick={() => onSetActivePane(paneId)}
@@ -151,7 +151,7 @@ function PaneHeader({
           e.stopPropagation();
           onClose();
         }}
-        className="flex h-4 w-4 items-center justify-center rounded text-[10px] text-muted-foreground/50 opacity-0 transition-opacity hover:bg-accent hover:text-foreground hover:opacity-100 group-hover:opacity-100 focus:opacity-100"
+        className="flex h-4 w-4 items-center justify-center rounded text-[10px] text-foreground/60 opacity-40 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-100 focus:opacity-100"
         tabIndex={-1}
         aria-label="Close pane"
       >

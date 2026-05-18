@@ -75,7 +75,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
 
     const p: Promise<unknown> = isQuickConnect
       ? invoke("ssh_connect_quick", {
-          tabId,
+          sessionId: tabId,
           username: quickConnect!.username,
           hostAddress: quickConnect!.hostAddress,
           port: quickConnect!.port,
@@ -85,7 +85,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
           initialRows: initialRows ?? null,
         })
       : invoke("ssh_connect", {
-          tabId,
+          sessionId: tabId,
           hostId,
           passphrase: passphraseArg ?? null,
           passwordOverride: passwordOverride ?? null,
