@@ -248,7 +248,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       const estRows = Math.max(24, Math.floor((window.innerHeight - 60) / 18));
       return (
         <SshLoadingScreen
-          tabId={sessionId}
+          sessionId={sessionId}
           hostId={session.hostId}
           quickConnect={session.quickConnect}
           hostName={session.title}

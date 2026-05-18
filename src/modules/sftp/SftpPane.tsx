@@ -312,7 +312,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
   if (!isConnected && !hasError) {
     return (
       <SshLoadingScreen
-        tabId={tabId}
+        sessionId={tabId}
         hostId={tab.hostId}
         hostName={tab.title}
         connectionType="sftp"

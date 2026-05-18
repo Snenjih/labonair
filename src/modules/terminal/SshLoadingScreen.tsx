@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 interface Props {
-  tabId: string;
+  sessionId: string;
   hostId?: string;
   quickConnect?: QuickConnectParams;
   hostName?: string;
@@ -41,7 +41,7 @@ function detectStage(logs: string[]): number {
   return 0;
 }
 
-export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connectionType = "ssh", initialCols, initialRows, onConnected, onError }: Props) {
+export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, connectionType = "ssh", initialCols, initialRows, onConnected, onError }: Props) {
   const isQuickConnect = !hostId && !!quickConnect;
   const initSftp = connectionType === "sftp";
 
@@ -75,7 +75,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
 
     const p: Promise<unknown> = isQuickConnect
       ? invoke("ssh_connect_quick", {
-          sessionId: tabId,
+          sessionId: sessionId,
           username: quickConnect!.username,
           hostAddress: quickConnect!.hostAddress,
           port: quickConnect!.port,
@@ -85,7 +85,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
           initialRows: initialRows ?? null,
         })
       : invoke("ssh_connect", {
-          sessionId: tabId,
+          sessionId: sessionId,
           hostId,
           passphrase: passphraseArg ?? null,
           passwordOverride: passwordOverride ?? null,
@@ -124,13 +124,13 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
 
     Promise.all([
       listen<{ session_id: string; message: string }>("ssh_connect_log", (event) => {
-        if (event.payload.session_id !== tabId) return;
+        if (event.payload.session_id !== sessionId) return;
         pushLog(event.payload.message);
       }),
       listen<{ session_id: string; fingerprint: string; host: string; is_mismatch: boolean }>(
         "known_hosts_warning",
         (event) => {
-          if (event.payload.session_id !== tabId) return;
+          if (event.payload.session_id !== sessionId) return;
           setFingerprint(event.payload.fingerprint);
           setHost(event.payload.host);
           setIsMismatch(event.payload.is_mismatch);
@@ -140,7 +140,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
       listen<{ session_id: string; prompt_message: string; is_2fa: boolean }>(
         "auth_required",
         (event) => {
-          if (event.payload.session_id !== tabId) return;
+          if (event.payload.session_id !== sessionId) return;
           setPromptMessage(event.payload.prompt_message);
           setPassword("");
           pendingPasswordRef.current = null;
@@ -148,12 +148,12 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
         },
       ),
       listen<{ session_id: string }>("passphrase_required", (event) => {
-        if (event.payload.session_id !== tabId) return;
+        if (event.payload.session_id !== sessionId) return;
         setPassphrase("");
         setStatus("waiting_passphrase");
       }),
       listen<{ session_id: string }>("session_established", (event) => {
-        if (event.payload.session_id !== tabId) return;
+        if (event.payload.session_id !== sessionId) return;
         // Save the new password to keychain if the user entered one to fix auth.
         if (pendingPasswordRef.current && hostId) {
           invoke("secrets_set", {
@@ -175,7 +175,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
       cleanups.forEach((fn) => fn());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabId, hostId]);
+  }, [sessionId, hostId]);
 
   const submitPassword = () => {
     pendingPasswordRef.current = password;
@@ -339,7 +339,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
               <button
                 onClick={() => {
                   setStatus("connecting");
-                  invoke("ssh_trust_host", { sessionId: tabId, accepted: true }).catch(console.error);
+                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: true }).catch(console.error);
                 }}
                 className={cn(
                   "flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-opacity",
@@ -352,7 +352,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
               </button>
               <button
                 onClick={() => {
-                  invoke("ssh_trust_host", { sessionId: tabId, accepted: false }).catch(console.error);
+                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: false }).catch(console.error);
                   onError("User aborted");
                 }}
                 className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
