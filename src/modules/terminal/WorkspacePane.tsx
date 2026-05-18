@@ -4,14 +4,22 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { PaneNode, TerminalSessionData, WorkspaceTab } from "@/modules/tabs";
-import { useCallback, forwardRef, useImperativeHandle, useRef, type ReactNode } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { SshTerminalPane } from "./SshTerminalPane";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import type { SearchAddon } from "@xterm/addon-search";
 
 export type WorkspacePaneHandle = {
-  /** Returns the handle for a specific session, or null. */
   getSessionHandle: (sessionId: string) => TerminalPaneHandle | null;
 };
 
@@ -25,30 +33,72 @@ interface Props {
   onDetectedLocalUrl?: (sessionId: string, url: string) => void;
 }
 
+type PaneRect = { x: number; y: number; w: number; h: number };
+
 export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
   function WorkspacePane(
     { tab, onSetActivePane, onRegisterHandle, onCwd, onClosePane, onSearchReady, onDetectedLocalUrl },
     ref,
   ) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const slotRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const handleRefs = useRef<Map<string, TerminalPaneHandle>>(new Map());
+    const [paneRects, setPaneRects] = useState<Map<string, PaneRect>>(new Map());
+    const showPaneHeader = usePreferencesStore((s) => s.terminalShowPaneHeader);
 
     useImperativeHandle(ref, () => ({
       getSessionHandle: (sessionId: string) =>
         handleRefs.current.get(sessionId) ?? null,
     }), []);
 
+    // Sync slot element rects → terminal absolute positions
+    useEffect(() => {
+      const observers: ResizeObserver[] = [];
+      const updateRect = (paneId: string) => {
+        const slotEl = slotRefs.current.get(paneId);
+        const containerEl = containerRef.current;
+        if (!slotEl || !containerEl) return;
+        const s = slotEl.getBoundingClientRect();
+        const c = containerEl.getBoundingClientRect();
+        setPaneRects((prev) => {
+          const next = new Map(prev);
+          next.set(paneId, { x: s.left - c.left, y: s.top - c.top, w: s.width, h: s.height });
+          return next;
+        });
+      };
+
+      for (const paneId of Object.keys(tab.sessions)) {
+        const el = slotRefs.current.get(paneId);
+        if (!el) continue;
+        updateRect(paneId);
+        const obs = new ResizeObserver(() => updateRect(paneId));
+        obs.observe(el);
+        observers.push(obs);
+      }
+
+      return () => {
+        for (const obs of observers) obs.disconnect();
+      };
+    }, [tab.sessions, tab.layout]);
+
     const registerHandle = useCallback(
-      (sessionId: string, handle: TerminalPaneHandle | null) => {
-        if (handle) handleRefs.current.set(sessionId, handle);
-        else handleRefs.current.delete(sessionId);
-        onRegisterHandle(sessionId, handle);
+      (paneId: string, handle: TerminalPaneHandle | null) => {
+        if (handle) handleRefs.current.set(paneId, handle);
+        else handleRefs.current.delete(paneId);
+        onRegisterHandle(paneId, handle);
       },
       [onRegisterHandle],
     );
 
-    const renderNode = (node: PaneNode): ReactNode => {
+    const registerSlot = useCallback((paneId: string, el: HTMLDivElement | null) => {
+      if (el) slotRefs.current.set(paneId, el);
+      else slotRefs.current.delete(paneId);
+    }, []);
+
+    // Slot tree: transparent panels with resize handles, no terminals inside
+    const renderSlotTree = (node: PaneNode): ReactNode => {
       if (node.type === "split") {
-        const panelChildren = node.children.flatMap((child, idx): ReactNode[] => {
+        const children = node.children.flatMap((child, idx): ReactNode[] => {
           const items: ReactNode[] = [];
           if (idx > 0) {
             items.push(<ResizableHandle key={`handle-${node.id}-${idx}`} withHandle />);
@@ -59,7 +109,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
               defaultSize={`${node.sizes[idx] ?? 50}%`}
               minSize="10%"
             >
-              {renderNode(child)}
+              {renderSlotTree(child)}
             </ResizablePanel>,
           );
           return items;
@@ -70,69 +120,100 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
             orientation={node.direction === "horizontal" ? "horizontal" : "vertical"}
             className="h-full w-full"
           >
-            {panelChildren}
+            {children}
           </ResizablePanelGroup>
         );
       }
 
-      // Leaf pane
-      const paneId = node.id;
-      const session = tab.sessions[paneId];
-      const isActive = tab.activePaneId === paneId;
-
-      if (!session) return null;
-
+      // Leaf: transparent slot div — sized by the panel, no terminal here
       return (
         <div
-          key={paneId}
-          className={cn(
-            "group relative flex h-full w-full flex-col overflow-hidden",
-            isActive && "ring-1 ring-inset ring-accent",
-          )}
-          onClick={() => onSetActivePane(paneId)}
-        >
-          <PaneHeader
-            session={session}
-            onClose={() => onClosePane(paneId)}
-          />
-          <div className="min-h-0 flex-1">
-            {session.kind === "local" ? (
-              <TerminalPane
-                key={paneId}
-                tabId={paneId}
-                visible
-                initialCwd={session.cwd}
-                ref={(h) => registerHandle(paneId, h)}
-                onSearchReady={(_, addon) => onSearchReady?.(paneId, addon)}
-                onCwd={(_, cwd) => onCwd(paneId, cwd)}
-                onDetectedLocalUrl={(_, url) => onDetectedLocalUrl?.(paneId, url)}
-              />
-            ) : (
-              <SshTerminalPane
-                key={paneId}
-                sessionId={paneId}
-                session={session}
-                isActive={isActive}
-                ref={(h) => registerHandle(paneId, h)}
-              />
-            )}
-          </div>
-        </div>
+          key={node.id}
+          className="h-full w-full pointer-events-none"
+          ref={(el) => registerSlot(node.id, el)}
+        />
       );
     };
 
-    return <div className="h-full w-full">{renderNode(tab.layout)}</div>;
+    return (
+      <div ref={containerRef} className="relative h-full w-full overflow-hidden">
+        {/* Sizing layer: transparent resize panels + handles */}
+        <div className="absolute inset-0 z-10">
+          {renderSlotTree(tab.layout)}
+        </div>
+
+        {/* Terminal layer: flat, stable keys — never remounts on layout changes */}
+        {Object.entries(tab.sessions).map(([paneId, session]) => {
+          const rect = paneRects.get(paneId);
+          const isActive = tab.activePaneId === paneId;
+          const headerH = showPaneHeader ? 24 : 0; // h-6 = 24px
+
+          return (
+            <div
+              key={paneId}
+              className={cn("absolute z-0", isActive && "ring-1 ring-inset ring-accent")}
+              style={
+                rect
+                  ? { left: rect.x, top: rect.y, width: rect.w, height: rect.h }
+                  : { display: "none" }
+              }
+              onClick={() => onSetActivePane(paneId)}
+            >
+              {showPaneHeader && (
+                <PaneHeader
+                  session={session}
+                  onClose={(e) => {
+                    e.stopPropagation();
+                    onClosePane(paneId);
+                  }}
+                />
+              )}
+              <div
+                style={{
+                  position: "absolute",
+                  top: headerH,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                }}
+              >
+                {session.kind === "local" ? (
+                  <TerminalPane
+                    key={paneId}
+                    tabId={paneId}
+                    visible
+                    initialCwd={session.cwd}
+                    ref={(h) => registerHandle(paneId, h)}
+                    onSearchReady={(_, addon) => onSearchReady?.(paneId, addon)}
+                    onCwd={(_, cwd) => onCwd(paneId, cwd)}
+                    onDetectedLocalUrl={(_, url) => onDetectedLocalUrl?.(paneId, url)}
+                  />
+                ) : (
+                  <SshTerminalPane
+                    key={paneId}
+                    sessionId={paneId}
+                    session={session}
+                    isActive={isActive}
+                    ref={(h) => registerHandle(paneId, h)}
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
   },
 );
 
-// ── Tiny pane header ──────────────────────────────────────────────────────────
+// ── Pane header ───────────────────────────────────────────────────────────────
 
 function PaneHeader({
   session,
   onClose,
 }: {
   session: TerminalSessionData;
-  onClose: () => void;
+  onClose: (e: React.MouseEvent) => void;
 }) {
   const label =
     session.kind === "ssh"
@@ -147,11 +228,8 @@ function PaneHeader({
     <div className="flex h-6 shrink-0 items-center justify-between gap-1 bg-muted/20 px-2">
       <span className="truncate text-[10px] text-muted-foreground">{label}</span>
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        className="flex h-4 w-4 items-center justify-center rounded text-[10px] text-foreground/60 opacity-40 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-100 focus:opacity-100"
+        onClick={onClose}
+        className="flex h-4 w-4 items-center justify-center rounded text-[10px] text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-foreground focus:text-foreground"
         tabIndex={-1}
         aria-label="Close pane"
       >
