@@ -162,6 +162,7 @@ export default function App() {
   const prefDefaultModel = usePreferencesStore((s) => s.defaultModelId);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
+  const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
   useEffect(() => {
     void initPrefs();
   }, [initPrefs]);
@@ -764,7 +765,8 @@ export default function App() {
                         <div
                           key={t.id}
                           className={cn(
-                            "absolute inset-0 px-3 pt-2 pb-2",
+                            "absolute inset-0 px-3 pt-2",
+                            terminalShowPaneFooter && "pb-2",
                             !isActive && "invisible pointer-events-none",
                           )}
                           aria-hidden={!isActive}
