@@ -83,6 +83,8 @@ export type Preferences = {
   sftpColumnPermissions: boolean;
   sftpColumnType: boolean;
 
+  // --- Sidebar ---
+  sidebarPosition: "left" | "right";
   // --- Security ---
   credentialEncryption: boolean;
 };
@@ -128,6 +130,7 @@ const KEY_SFTP_COLUMN_SIZE = "sftpColumnSize";
 const KEY_SFTP_COLUMN_MODIFIED = "sftpColumnModified";
 const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
 const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
+const KEY_SIDEBAR_POSITION = "sidebarPosition";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 
@@ -173,6 +176,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpColumnPermissions: true,
   sftpColumnType: false,
 
+  sidebarPosition: "left",
   credentialEncryption: false,
 };
 
@@ -272,6 +276,9 @@ export async function loadPreferences(): Promise<Preferences> {
     sftpColumnType:
       get<boolean>(KEY_SFTP_COLUMN_TYPE) ?? DEFAULT_PREFERENCES.sftpColumnType,
 
+    sidebarPosition:
+      get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
+      DEFAULT_PREFERENCES.sidebarPosition,
     credentialEncryption:
       get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
   };
@@ -465,6 +472,10 @@ export async function setSftpColumnType(value: boolean): Promise<void> {
   await store.save();
 }
 
+export async function setSidebarPosition(
+  value: "left" | "right",
+): Promise<void> {
+  await store.set(KEY_SIDEBAR_POSITION, value);
 export async function setCredentialEncryption(value: boolean): Promise<void> {
   await store.set(KEY_CREDENTIAL_ENCRYPTION, value);
   await store.save();
@@ -517,6 +528,7 @@ export function onPreferencesChange(
     [KEY_SFTP_COLUMN_MODIFIED]: "sftpColumnModified",
     [KEY_SFTP_COLUMN_PERMISSIONS]: "sftpColumnPermissions",
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
+    [KEY_SIDEBAR_POSITION]: "sidebarPosition",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
   };
   return store.onChange<unknown>((key, value) => {
