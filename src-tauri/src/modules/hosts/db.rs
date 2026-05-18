@@ -1,4 +1,5 @@
 use super::{Group, Host, HostsDb, ReorderItem};
+use crate::modules::secrets::{delete_password, get_password, store_password, SecretsState};
 
 pub fn initialize_db(
     app_local_data_dir: std::path::PathBuf,
@@ -107,7 +108,9 @@ pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, S
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn hosts_create(
+    app: tauri::AppHandle,
     db: tauri::State<'_, HostsDb>,
+    secrets: tauri::State<'_, SecretsState>,
     name: String,
     host_address: String,
     port: i64,
@@ -149,18 +152,12 @@ pub async fn hosts_create(
     }
     if let Some(pw) = password {
         if !pw.is_empty() {
-            keyring::Entry::new("nexum-app", &id)
-                .map_err(|e| e.to_string())?
-                .set_password(&pw)
-                .map_err(|e| e.to_string())?;
+            store_password(&app, &secrets, "nexum-app", &id, &pw)?;
         }
     }
     if let Some(sp) = sudo_password {
         if !sp.is_empty() {
-            keyring::Entry::new("nexum-sudo", &id)
-                .map_err(|e| e.to_string())?
-                .set_password(&sp)
-                .map_err(|e| e.to_string())?;
+            store_password(&app, &secrets, "nexum-sudo", &id, &sp)?;
         }
     }
     let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -175,7 +172,9 @@ pub async fn hosts_create(
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn hosts_update(
+    app: tauri::AppHandle,
     db: tauri::State<'_, HostsDb>,
+    secrets: tauri::State<'_, SecretsState>,
     id: String,
     name: Option<String>,
     host_address: Option<String>,
@@ -242,24 +241,18 @@ pub async fn hosts_update(
     }
     if let Some(pw) = password {
         if pw.is_empty() {
-            let _ = keyring::Entry::new("nexum-app", &id).and_then(|e| e.delete_credential());
+            let _ = delete_password(&app, &secrets, "nexum-app", &id);
         } else {
-            keyring::Entry::new("nexum-app", &id)
-                .map_err(|e| e.to_string())?
-                .set_password(&pw)
-                .map_err(|e| e.to_string())?;
+            store_password(&app, &secrets, "nexum-app", &id, &pw)?;
         }
     }
     if let Some(sp) = sudo_password {
         if sp.is_empty() {
-            let _ = keyring::Entry::new("nexum-sudo", &id).and_then(|e| e.delete_credential());
+            let _ = delete_password(&app, &secrets, "nexum-sudo", &id);
             let conn = db.0.lock().map_err(|e| e.to_string())?;
             let _ = conn.execute("UPDATE hosts SET sudo_password_set=0 WHERE id=?1", rusqlite::params![id]);
         } else {
-            keyring::Entry::new("nexum-sudo", &id)
-                .map_err(|e| e.to_string())?
-                .set_password(&sp)
-                .map_err(|e| e.to_string())?;
+            store_password(&app, &secrets, "nexum-sudo", &id, &sp)?;
             let conn = db.0.lock().map_err(|e| e.to_string())?;
             let _ = conn.execute("UPDATE hosts SET sudo_password_set=1 WHERE id=?1", rusqlite::params![id]);
         }
@@ -274,14 +267,19 @@ pub async fn hosts_update(
 }
 
 #[tauri::command]
-pub async fn hosts_delete(db: tauri::State<'_, HostsDb>, id: String) -> Result<(), String> {
+pub async fn hosts_delete(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, HostsDb>,
+    secrets: tauri::State<'_, SecretsState>,
+    id: String,
+) -> Result<(), String> {
     {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM hosts WHERE id=?1", rusqlite::params![id])
             .map_err(|e| e.to_string())?;
     }
-    let _ = keyring::Entry::new("nexum-app", &id).and_then(|e| e.delete_credential());
-    let _ = keyring::Entry::new("nexum-sudo", &id).and_then(|e| e.delete_credential());
+    let _ = delete_password(&app, &secrets, "nexum-app", &id);
+    let _ = delete_password(&app, &secrets, "nexum-sudo", &id);
     Ok(())
 }
 
@@ -303,10 +301,11 @@ pub async fn hosts_reorder(
 
 #[tauri::command]
 pub async fn get_sudo_password(
+    app: tauri::AppHandle,
     db: tauri::State<'_, HostsDb>,
+    secrets: tauri::State<'_, SecretsState>,
     host_id: String,
 ) -> Result<Option<String>, String> {
-    // Verify host exists and has sudo set
     let sudo_set: bool = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         conn.query_row(
@@ -320,9 +319,7 @@ pub async fn get_sudo_password(
     if !sudo_set {
         return Ok(None);
     }
-    Ok(keyring::Entry::new("nexum-sudo", &host_id)
-        .ok()
-        .and_then(|e| e.get_password().ok()))
+    get_password(&app, &secrets, "nexum-sudo", &host_id)
 }
 
 #[tauri::command]
