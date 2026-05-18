@@ -332,3 +332,50 @@ pub async fn secrets_set_encryption_enabled(
     invalidate_cache(&state);
     Ok(())
 }
+
+// ── Internal helpers for Rust callers (db.rs, client.rs) ─────────────────────
+
+pub(crate) fn store_password(
+    app: &AppHandle,
+    state: &SecretsState,
+    service: &str,
+    account: &str,
+    password: &str,
+) -> Result<(), String> {
+    let k = composite_key(service, account);
+    with_cache(app, state, |m| {
+        m.insert(k, password.to_string());
+    })?;
+    let snapshot = {
+        let guard = state.cache.lock().map_err(|e| e.to_string())?;
+        guard.as_ref().cloned().unwrap_or_default()
+    };
+    write_map(app, state, &snapshot)
+}
+
+pub(crate) fn delete_password(
+    app: &AppHandle,
+    state: &SecretsState,
+    service: &str,
+    account: &str,
+) -> Result<(), String> {
+    let k = composite_key(service, account);
+    with_cache(app, state, |m| {
+        m.remove(&k);
+    })?;
+    let snapshot = {
+        let guard = state.cache.lock().map_err(|e| e.to_string())?;
+        guard.as_ref().cloned().unwrap_or_default()
+    };
+    write_map(app, state, &snapshot)
+}
+
+pub(crate) fn get_password(
+    app: &AppHandle,
+    state: &SecretsState,
+    service: &str,
+    account: &str,
+) -> Result<Option<String>, String> {
+    let k = composite_key(service, account);
+    with_cache(app, state, |m| m.get(&k).cloned())
+}
