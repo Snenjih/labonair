@@ -144,7 +144,9 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
         </div>
 
         {/* Terminal layer: flat, stable keys — never remounts on layout changes */}
-        {Object.entries(tab.sessions).map(([paneId, session]) => {
+        {(() => {
+          const hasMultiplePanes = Object.keys(tab.sessions).length > 1;
+          return Object.entries(tab.sessions).map(([paneId, session]) => {
           const rect = paneRects.get(paneId);
           const isActive = tab.activePaneId === paneId;
           const headerH = showPaneHeader ? 24 : 0; // h-6 = 24px
@@ -152,7 +154,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
           return (
             <div
               key={paneId}
-              className={cn("absolute z-0", isActive && "ring-1 ring-inset ring-accent")}
+              className={cn("absolute z-0", isActive && hasMultiplePanes && "ring-1 ring-inset ring-accent")}
               style={
                 rect
                   ? { left: rect.x, top: rect.y, width: rect.w, height: rect.h }
@@ -201,7 +203,8 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
               </div>
             </div>
           );
-        })}
+        });
+        })()}
       </div>
     );
   },
