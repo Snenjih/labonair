@@ -41,18 +41,64 @@
   - `SshLoadingScreen.tsx`: Updated all event payload field refs from `tab_id` → `session_id`
   - `tsc --noEmit` ✅
 
+---
+
+## Session: 2026-05-18 (Bug Fix Round)
+
+### What Was Fixed
+
+**SSH/SFTP connection error** (`fix(ssh): rename SshLoadingScreen tabId prop to sessionId`)
+- `SshLoadingScreen` props interface still had `tabId: string`; after the refactor `SshTerminalPane` passed `sessionId`, making `tabId` undefined → invoke failed
+- Renamed prop + all internal refs in `SshLoadingScreen.tsx`; fixed a third call site in `SftpPane.tsx`
+
+**Tab bar close requiring multiple clicks** (`fix(terminal): fix tab close …`)
+- `handleClose` in `App.tsx` was calling `closePane` (closes one pane) instead of `disposeTab` for workspace tabs
+- Fixed to always call `disposeTab(id)` for workspace tabs from the tab bar; individual pane X buttons still call `closePane` directly
+
+**Ghost empty panels after pane close** (same commit)
+- Root cause: `replaceNode` in `useTabs.ts` only matched LEAF nodes (`type === "pane"`), never split nodes
+- When `closePane` called `replaceNode(layout, parentSplit.id, sibling)`, the split node was silently skipped → sessions dict updated but layout unchanged → ghost `null` panels
+- Fix: match by `id` first, regardless of node type
+
+**Terminal remount on every split/close — history loss** (`fix(terminal): implement flat terminal layer`)
+- Root cause: `TerminalPane` lived inside `ResizablePanelGroup > ResizablePanel`; when layout changed (split or close), component changed depth in React tree → unmounted → new PTY opened, history lost
+- Rewrote `WorkspacePane` with two-layer architecture:
+  - Layer 1 (z-10, `pointer-events-none`): transparent `ResizablePanelGroup` slot tree — sizing only, no terminals
+  - Layer 2 (z-0): flat list of absolutely-positioned terminals synced to slot rects via `ResizeObserver`
+  - `key={paneId}` is always at same React depth → never remounts
+
+**Terminals not clickable after flat layer refactor** (`fix(terminal): fix terminal click interactivity`)
+- `ResizablePanelGroup`/`ResizablePanel` in the slot tree (z-10) were intercepting all pointer events
+- Fix: `pointer-events-none` on slot tree wrapper div; `pointer-events-auto` on `ResizableHandle` so drag-resize still works
+
+**Close button not visible** (same commit as tab close fix)
+- Changed from `opacity-40 text-foreground/60` to `text-muted-foreground hover:text-foreground hover:bg-destructive/20`
+
+**Pane header/footer as optional settings** (two commits)
+- Added `terminalShowPaneHeader: boolean` (default `false`) — toggles the h-6 per-pane label bar
+- Added `terminalShowPaneFooter: boolean` (default `false`) — toggles the `pb-2` bottom margin on the workspace wrapper
+- Both have toggles in Settings → Terminal → Layout
+- Pref wired into `WorkspacePane.tsx` (header) and `App.tsx` (footer)
+
+**⌘⇧W shortcut to close active pane** (`feat(terminal): add ⌘⇧W shortcut`)
+- Added `pane.close` shortcut id; `tab.close` match guarded with `!e.shiftKey` to prevent double-firing
+
+**Accent ring stripe at bottom in single-pane view** (`fix(terminal): only show active pane ring when multiple panes exist`)
+- `ring-1 ring-inset ring-accent` was always applied; with footer padding removed the bottom ring edge was visible as a stripe
+- Ring now only rendered when `Object.keys(tab.sessions).length > 1`
+
 ### Current State
-- Full recursive split-pane terminal workspace is implemented and compiles
-- ⌘D splits the active pane horizontally, ⌘⇧D splits vertically
-- ⌘W closes pane (or tab if last pane)
-- Both local and SSH sessions can coexist in split panes within one tab
-- All IPC uses `session_id` throughout Rust + frontend
+- All 7 original bugs fixed + 2 follow-up fixes applied
+- Shortcuts: ⌘D (split right), ⌘⇧D (split down), ⌘⇧W (close pane), ⌘W (close tab)
+- SSH and SFTP connections work correctly
+- Terminal history survives split/close operations (no remounts)
+- Settings → Terminal → Layout: "Show pane headers" + "Show pane footer" toggles (both default off)
+- `tsc --noEmit` ✅
 
 ### What's Next
-- Test the feature end-to-end (requires running the Tauri app)
 - The GitHub repo `Snenjih/nexum-themes` still needs to be created for community themes
 - (Optional) Add pane navigation shortcuts (⌘← / ⌘→ to cycle active pane)
 - (Optional) Persist split layout across app restarts
 
 ### Blockers
-- None (both Rust and TypeScript compile cleanly)
+- None
