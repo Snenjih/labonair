@@ -346,7 +346,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
                   onBlur={handleBlur}
                   className="h-8 text-sm bg-background"
                 />
-                <p className="text-[11px] text-muted-foreground/70">Stored securely in macOS Keychain</p>
+                <p className="text-[11px] text-muted-foreground/70">Stored securely in local encrypted store</p>
               </div>
             )}
           </section>

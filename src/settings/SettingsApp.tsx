@@ -17,6 +17,7 @@ import {
   SourceCodeIcon,
   TerminalIcon,
   UserMultiple02Icon,
+  LockPasswordIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -25,6 +26,7 @@ import { useEffect, useState } from "react";
 import * as store from "@/modules/settings/store";
 import type { PrefKey } from "@/modules/settings/store";
 import { AboutSection } from "./sections/AboutSection";
+import { SecuritySection } from "./sections/SecuritySection";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { EditorSection } from "./sections/EditorSection";
@@ -56,6 +58,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "models", category: "Models", label: "Models", icon: AiScanIcon },
   { id: "agents", category: "Agents", label: "Agents", icon: UserMultiple02Icon },
+  { id: "security", category: null, label: "Security", icon: LockPasswordIcon },
   { id: "about", category: "About", label: "About", icon: InformationCircleIcon },
 ];
 
@@ -191,6 +194,7 @@ export function SettingsApp() {
                 {active === "editor" && <EditorSection />}
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
+                {active === "security" && <SecuritySection />}
                 {active === "about" && <AboutSection />}
               </>
             )}

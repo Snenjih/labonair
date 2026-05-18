@@ -33,6 +33,7 @@ pub async fn ssh_connect(
     state: tauri::State<'_, super::SshState>,
     trust_state: tauri::State<'_, super::TrustState>,
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
+    secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     // Step 1: Fetch host from SQLite (fast, sync — do before spawn_blocking)
@@ -61,15 +62,13 @@ pub async fn ssh_connect(
         .map_err(|e| e.to_string())?
     };
 
-    // Step 2: Fetch password — use override if provided, else keychain.
+    // Step 2: Fetch password — use override if provided, else local store.
     let password: Option<String> = if auth_method == "password" {
         if password_override.is_some() {
             password_override.clone()
         } else {
-            log_step!(app, tab_id, "Retrieving credentials from keychain…");
-            keyring::Entry::new("nexum-app", &host_id)
-                .ok()
-                .and_then(|e| e.get_password().ok())
+            log_step!(app, tab_id, "Retrieving credentials from local store…");
+            crate::modules::secrets::get_password(&app, &secrets, "nexum-app", &host_id).ok().flatten()
         }
     } else {
         None

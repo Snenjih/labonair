@@ -85,6 +85,8 @@ export type Preferences = {
 
   // --- Sidebar ---
   sidebarPosition: "left" | "right";
+  // --- Security ---
+  credentialEncryption: boolean;
 };
 
 const STORE_PATH = "nexum-settings.json";
@@ -130,6 +132,8 @@ const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
 const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
 const KEY_SIDEBAR_POSITION = "sidebarPosition";
 
+const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
+
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   defaultModelId: DEFAULT_MODEL_ID,
@@ -173,6 +177,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpColumnType: false,
 
   sidebarPosition: "left",
+  credentialEncryption: false,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -274,6 +279,8 @@ export async function loadPreferences(): Promise<Preferences> {
     sidebarPosition:
       get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
       DEFAULT_PREFERENCES.sidebarPosition,
+    credentialEncryption:
+      get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
   };
 }
 
@@ -469,6 +476,8 @@ export async function setSidebarPosition(
   value: "left" | "right",
 ): Promise<void> {
   await store.set(KEY_SIDEBAR_POSITION, value);
+export async function setCredentialEncryption(value: boolean): Promise<void> {
+  await store.set(KEY_CREDENTIAL_ENCRYPTION, value);
   await store.save();
 }
 
@@ -520,6 +529,7 @@ export function onPreferencesChange(
     [KEY_SFTP_COLUMN_PERMISSIONS]: "sftpColumnPermissions",
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
+    [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
   };
   return store.onChange<unknown>((key, value) => {
     const mapped = map[key];

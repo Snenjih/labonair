@@ -232,6 +232,8 @@ pub fn run() {
             secrets::secrets_set,
             secrets::secrets_delete,
             secrets::secrets_get_all,
+            secrets::secrets_get_encryption_enabled,
+            secrets::secrets_set_encryption_enabled,
             hosts_get_all,
             hosts_create,
             hosts_update,
