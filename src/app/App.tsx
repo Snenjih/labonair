@@ -534,6 +534,9 @@ export default function App() {
       "pane.splitDown": () => {
         if (activeTab?.kind === "workspace") splitPane(activeId, "vertical");
       },
+      "pane.close": () => {
+        if (activeTab?.kind === "workspace") closePane(activeId, activeTab.activePaneId);
+      },
       "view.zoomIn": () => {
         const kind = activeTab?.kind;
         if (kind === "workspace") {
