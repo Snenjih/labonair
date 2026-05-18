@@ -73,7 +73,7 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Close tab",
     keys: ["⌘", "W"],
     group: "Tabs",
-    match: (e) => isMod(e) && e.key.toLowerCase() === "w",
+    match: (e) => isMod(e) && !e.shiftKey && e.key.toLowerCase() === "w",
   },
   {
     id: "tab.next",
