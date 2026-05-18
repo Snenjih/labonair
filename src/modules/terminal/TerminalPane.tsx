@@ -73,7 +73,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
         ref={containerRef}
         className="h-full w-full"
         style={{
-          visibility: visible ? "visible" : "hidden",
+          visibility: visible ? undefined : "hidden",
           pointerEvents: visible ? "auto" : "none",
         }}
       />
