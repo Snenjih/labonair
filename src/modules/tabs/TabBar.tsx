@@ -241,6 +241,7 @@ function labelFor(t: Tab): string {
   if (t.kind === "home") return t.title;
   if (t.kind === "sftp") return t.title;
   if (t.kind === "ssh-terminal") return t.title;
+  if (t.kind === "file-preview") return t.title;
   if (!t.cwd) return t.title;
   const parts = t.cwd.split("/").filter(Boolean);
   return parts.length ? parts[parts.length - 1] : "/";

@@ -30,7 +30,7 @@ import {
   type SearchInlineHandle,
   type SearchTarget,
 } from "@/modules/header";
-import { PreviewStack, type PreviewPaneHandle } from "@/modules/preview";
+import { FilePreviewStack, PreviewStack, type PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -59,6 +59,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 
+const PREVIEW_EXTS = new Set([
+  "md", "html", "htm",
+  "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif",
+]);
+
 function sameOrigin(a: string, b: string): boolean {
   try {
     const ua = new URL(a);
@@ -76,6 +81,7 @@ export default function App() {
     setActiveId,
     newTab,
     openFileTab,
+    openFilePreviewTab,
     newPreviewTab,
     openAiDiffTab,
     setAiDiffStatus,
@@ -177,6 +183,7 @@ export default function App() {
   const isTerminalTab = activeTab?.kind === "terminal";
   const isEditorTab = activeTab?.kind === "editor";
   const isPreviewTab = activeTab?.kind === "preview";
+  const isFilePreviewTab = activeTab?.kind === "file-preview";
   const isAiDiffTab = activeTab?.kind === "ai-diff";
   const isHomeTab = activeTab?.kind === "home";
   // isSshTab not needed — SSH tabs rendered per-instance below
@@ -438,9 +445,15 @@ export default function App() {
 
   const handleOpenFile = useCallback(
     (path: string) => {
-      openFileTab(path);
+      const dot = path.lastIndexOf(".");
+      const ext = dot === -1 ? "" : path.slice(dot + 1).toLowerCase();
+      if (PREVIEW_EXTS.has(ext)) {
+        openFilePreviewTab(path);
+      } else {
+        openFileTab(path);
+      }
     },
-    [openFileTab],
+    [openFileTab, openFilePreviewTab],
   );
 
   const handlePathRenamed = useCallback(
@@ -757,6 +770,15 @@ export default function App() {
                         registerHandle={registerPreviewHandle}
                         onUrlChange={handlePreviewUrl}
                       />
+                    </div>
+                    <div
+                      className={cn(
+                        "absolute inset-0 px-3 pt-2 pb-2",
+                        !isFilePreviewTab && "invisible pointer-events-none",
+                      )}
+                      aria-hidden={!isFilePreviewTab}
+                    >
+                      <FilePreviewStack tabs={tabs} activeId={activeId} />
                     </div>
                     <div
                       className={cn(

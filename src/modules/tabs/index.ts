@@ -11,5 +11,6 @@ export {
   type QuickConnectParams,
   type SftpTab,
   type HomeTab,
+  type FilePreviewTab,
 } from "./lib/useTabs";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";

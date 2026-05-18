@@ -70,7 +70,14 @@ export type SshTerminalTab = {
   cwd?: string;
 };
 
-export type Tab = TerminalTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | SshTerminalTab;
+export type FilePreviewTab = {
+  id: number;
+  kind: "file-preview";
+  title: string;
+  path: string;
+};
+
+export type Tab = TerminalTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | SshTerminalTab | FilePreviewTab;
 
 export type TabPatch = Partial<{
   title: string;
@@ -203,6 +210,27 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     },
     [],
   );
+
+  const openFilePreviewTab = useCallback((path: string) => {
+    let targetId: number | null = null;
+    setTabs((curr) => {
+      const existing = curr.find(
+        (t) => t.kind === "file-preview" && t.path === path,
+      );
+      if (existing) {
+        targetId = existing.id;
+        return curr;
+      }
+      const id = nextIdRef.current++;
+      targetId = id;
+      return [
+        ...curr,
+        { id, kind: "file-preview", title: basename(path), path },
+      ];
+    });
+    if (targetId !== null) setActiveId(targetId);
+    return targetId as number | null;
+  }, []);
 
   const newPreviewTab = useCallback((url: string) => {
     const id = nextIdRef.current++;
@@ -337,6 +365,7 @@ export function useTabs(_initial?: Partial<TerminalTab>) {
     newTab,
     openHomeTab,
     openFileTab,
+    openFilePreviewTab,
     newPreviewTab,
     openAiDiffTab,
     setAiDiffStatus,
