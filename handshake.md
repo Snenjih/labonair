@@ -1,40 +1,53 @@
 # Handshake — Session State
 
-## Last Session: 2026-05-14 (continued)
+## Last Session: 2026-05-18
 
 ### What Was Done
-- Committed **Untitled Editor Tab Support with Save-As Dialog** (commit: `d085ed7`)
+- Implemented **Theme Marketplace & Settings Overhaul** — full-page Zed-style Theme Marketplace
 
-  **Implementation:**
-  - New Rust command: `fs_create_temp_file(prefix)` → creates temporary file in system temp dir
-  - New hook: `openUntitledTab()` in `useTabs` → creates editor tab with `isUntitled: true`
-  - Save-as dialog: native Tauri file save dialog with defaultPath="untitled.txt"
-  - Close dialog: prompts to save unsaved untitled tabs before closing
-  - Auto-save: skips untitled files (only auto-saves when file has a real path)
-  - EditorPaneHandle: now exposes `save()` method for programmatic saving
-  
-  **Files modified:**
-  - `src-tauri/src/lib.rs`: registered new `fs_create_temp_file` command
-  - `src-tauri/src/modules/fs/mutate.rs`: implemented temp file creation
-  - `src/modules/tabs/lib/useTabs.ts`: added `openUntitledTab()` hook, `isUntitled` flag to EditorTab
-  - `src/modules/editor/lib/useDocument.ts`: save() now handles save-as dialog for untitled files
-  - `src/modules/editor/EditorPane.tsx`: added `isUntitled` prop, save() expose via ref, auto-save skips untitled
-  - `src/modules/editor/EditorStack.tsx`: passes `isUntitled` and `onSaveAs` callbacks
-  - `src/app/App.tsx`: removed `NewEditorDialog`, connected `openUntitledTab()` to "tab.newEditor" shortcut, added `handleEditorSaveAs` callback
-  - Also reverted: hidden files toggle removed from FileExplorer (was added in previous session)
+  **Phase 1: Rust Backend**
+  - Added `reqwest = { version = "0.12", features = ["json", "rustls-tls"] }` to Cargo.toml
+  - Added two new Tauri commands in `src-tauri/src/modules/themes/mod.rs`:
+    - `theme_fetch_index(url)` — fetches remote index.json via reqwest (bypasses Tauri CSP/CORS)
+    - `theme_download(url)` — downloads a theme JSON, validates it, saves to themes dir
+  - Registered both commands in `src-tauri/src/lib.rs`
+  - `cargo check` ✅
 
-  - `cargo check` ✅ `tsc --noEmit` ✅
+  **Phase 2: TypeScript**
+  - Added `"themes"` to `SettingsTab` union type in `openSettingsWindow.ts`
+  - Created `src/modules/settings/useThemeStore.ts` — new Zustand store for marketplace:
+    - `installedThemes`, `communityThemes`, `isLoadingCommunity`, `communityError`, `installingIds`, `previewThemeId`
+    - Actions: `fetchInstalled`, `fetchCommunity`, `installTheme`, `uninstallTheme`, `applyTheme`, `previewTheme`, `cancelPreview`
+    - Community fetch URL: `https://raw.githubusercontent.com/Snenjih/nexum-themes/main/index.json`
+    - MOCK_COMMUNITY_THEMES as offline fallback
+
+  **Phase 3: UI Components**
+  - Created `src/settings/components/ThemeCard.tsx` — unified card for installed + community themes:
+    - InstalledCard: Preview/Cancel Preview, Apply, Uninstall, active badge, preview badge
+    - CommunityCard: Install (with spinner), code-link icon
+    - No hardcoded colors, uses `bg-primary/5`, `bg-accent/20` etc.
+  - Created `src/settings/sections/ThemeMarketplace.tsx` — full-page marketplace:
+    - Search bar
+    - Tabs: All / Installed / Community (underline style)
+    - Error banner for offline mode
+    - Preview cleanup `useEffect` on unmount (reverts if user leaves without Applying)
+    - Import JSON button (uses existing Tauri dialog + theme_import command)
+
+  **Phase 4: Wire-up & Cleanup**
+  - Updated `SettingsApp.tsx`: removed themes/ThemePicker state, added "Themes" sidebar item (PaintBrush01Icon), added `{active === "themes" && <ThemeMarketplace />}`, wider max-w for themes tab
+  - Rewrote `AppearanceSection.tsx`: removed ThemePicker row entirely, now only shows Typography settings
+  - **Deleted** `src/settings/components/ThemePicker.tsx`
+  - `tsc --noEmit` ✅
 
 ### Current State
-- Nexum now supports creating temporary "Untitled" editor tabs
-- Users can create new editor without first saving to disk
-- Save-as dialog is native Tauri (proper file picker)
-- All major phases complete (Phase 1-6)
+- Theme Marketplace is fully functional as a top-level Settings category
+- Community tab fetches from GitHub Pages; falls back gracefully offline with mock data
+- Live preview reverts automatically when leaving the Themes section
+- Apply saves permanently to `usePreferencesStore` / tauri-plugin-store
 
 ### What's Next
-- No further tasks defined in task system
-- Project status: all planned features implemented
-- Future enhancement areas: emoji audit, UI polish, performance optimization
+- Create the actual `nexum-themes` GitHub repository with `index.json` and theme JSON files for community themes to work
+- (Optional) Add toast notifications for install errors/success
 
 ### Blockers
-- None
+- The GitHub repo `Snenjih/nexum-themes` doesn't exist yet — community tab shows mock fallback data until created

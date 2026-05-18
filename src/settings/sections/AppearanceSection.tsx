@@ -5,10 +5,8 @@ import {
   setAppLineHeight,
   setSidebarPosition,
 } from "@/modules/settings/store";
-import { type ThemeMeta } from "@/lib/useThemeEngine";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
-import { ThemePicker } from "../components/ThemePicker";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -18,12 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type Props = {
-  themes: ThemeMeta[];
-  onThemesRefresh: () => void;
-};
-
-export function AppearanceSection({ themes, onThemesRefresh }: Props) {
+export function AppearanceSection() {
   const appFontFamily = usePreferencesStore((s) => s.appFontFamily);
   const appFontSize = usePreferencesStore((s) => s.appFontSize);
   const appLineHeight = usePreferencesStore((s) => s.appLineHeight);
@@ -33,7 +26,7 @@ export function AppearanceSection({ themes, onThemesRefresh }: Props) {
     <div className="flex flex-col gap-6">
       <SectionHeader
         title="Appearance"
-        description="Color themes and interface typography."
+        description="Interface typography and layout settings."
       />
 
       <div className="flex flex-col gap-2">
@@ -56,16 +49,6 @@ export function AppearanceSection({ themes, onThemesRefresh }: Props) {
               <SelectItem value="right" className="text-[11.5px]">Right</SelectItem>
             </SelectContent>
           </Select>
-        </SettingRow>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>Theme</Label>
-        <SettingRow
-          title="Color theme"
-          description="Choose or import a JSON color theme for the application."
-        >
-          <ThemePicker themes={themes} onRefresh={onThemesRefresh} />
         </SettingRow>
       </div>
 

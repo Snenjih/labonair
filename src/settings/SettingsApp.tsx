@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { type ThemeMeta, useThemeEngine } from "@/lib/useThemeEngine";
+import { useThemeEngine } from "@/lib/useThemeEngine";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -13,6 +13,7 @@ import {
   AiScanIcon,
   InformationCircleIcon,
   PaintBoardIcon,
+  PaintBrush01Icon,
   Settings01Icon,
   SourceCodeIcon,
   TerminalIcon,
@@ -20,7 +21,6 @@ import {
   LockPasswordIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useState } from "react";
 import * as store from "@/modules/settings/store";
@@ -33,6 +33,7 @@ import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { ModelsSection } from "./sections/ModelsSection";
 import { TerminalSection } from "./sections/TerminalSection";
+import { ThemeMarketplace } from "./sections/ThemeMarketplace";
 import { SettingRow } from "./components/SettingRow";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -54,6 +55,7 @@ type SidebarItem = {
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "general", category: "General", label: "General", icon: Settings01Icon },
   { id: "appearance", category: "Appearance", label: "Appearance", icon: PaintBoardIcon },
+  { id: "themes", category: null, label: "Themes", icon: PaintBrush01Icon },
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "models", category: "Models", label: "Models", icon: AiScanIcon },
@@ -76,21 +78,12 @@ function readInitialTab(): SettingsTab {
 export function SettingsApp() {
   const [active, setActive] = useState<SettingsTab>(readInitialTab);
   const [searchQuery, setSearchQuery] = useState("");
-  const [themes, setThemes] = useState<ThemeMeta[]>([]);
   const init = usePreferencesStore((s) => s.init);
 
   useEffect(() => {
     void init();
   }, [init]);
   useThemeEngine();
-
-  useEffect(() => {
-    void invoke<ThemeMeta[]>("themes_get_all").then(setThemes).catch(console.error);
-  }, []);
-
-  const refreshThemes = () => {
-    void invoke<ThemeMeta[]>("themes_get_all").then(setThemes).catch(console.error);
-  };
 
   useEffect(() => {
     const apply = (detail: string) => {
@@ -178,18 +171,14 @@ export function SettingsApp() {
 
         {/* Right content */}
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto px-8 pt-6 pb-7">
-          <div className="mx-auto w-full max-w-[580px]">
+          <div className={cn("mx-auto w-full", active === "themes" ? "max-w-[680px]" : "max-w-[580px]")}>
             {isSearching ? (
               <SearchResults query={trimmed} results={searchResults} />
             ) : (
               <>
                 {active === "general" && <GeneralSection />}
-                {active === "appearance" && (
-                  <AppearanceSection
-                    themes={themes}
-                    onThemesRefresh={refreshThemes}
-                  />
-                )}
+                {active === "appearance" && <AppearanceSection />}
+                {active === "themes" && <ThemeMarketplace />}
                 {active === "terminal" && <TerminalSection />}
                 {active === "editor" && <EditorSection />}
                 {active === "models" && <ModelsSection />}

@@ -476,6 +476,9 @@ export async function setSidebarPosition(
   value: "left" | "right",
 ): Promise<void> {
   await store.set(KEY_SIDEBAR_POSITION, value);
+  await store.save();
+}
+
 export async function setCredentialEncryption(value: boolean): Promise<void> {
   await store.set(KEY_CREDENTIAL_ENCRYPTION, value);
   await store.save();

@@ -142,3 +142,60 @@ pub async fn theme_delete(app: tauri::AppHandle, id: String) -> Result<(), Strin
     }
     Ok(())
 }
+
+/// Fetch the remote theme index JSON via reqwest (bypasses Tauri CSP / CORS).
+/// Returns the raw JSON string; React parses it with JSON.parse().
+#[tauri::command]
+pub async fn theme_fetch_index(url: String) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let res = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("HTTP {}", res.status()));
+    }
+    res.text().await.map_err(|e| e.to_string())
+}
+
+/// Download a theme JSON from a URL, validate it, and save it to the themes dir.
+#[tauri::command]
+pub async fn theme_download(app: tauri::AppHandle, url: String) -> Result<ThemeMeta, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let res = client.get(&url).send().await.map_err(|e| e.to_string())?;
+    if !res.status().is_success() {
+        return Err(format!("Failed to download theme. HTTP {}", res.status()));
+    }
+    let raw_json = res.text().await.map_err(|e| e.to_string())?;
+
+    let theme: Theme = serde_json::from_str(&raw_json)
+        .map_err(|e| format!("Invalid theme JSON: {}", e))?;
+
+    // Derive a safe filesystem ID from the name
+    let id: String = theme
+        .name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    let id = if id.is_empty() { "imported-theme".to_string() } else { id };
+
+    let dest = themes_dir(&app)?.join(format!("{}.json", id));
+    std::fs::write(&dest, &raw_json).map_err(|e| e.to_string())?;
+
+    Ok(ThemeMeta {
+        id,
+        name: theme.name,
+        author: theme.author,
+        theme_type: theme.theme_type,
+        colors: theme.colors,
+        builtin: false,
+    })
+}
