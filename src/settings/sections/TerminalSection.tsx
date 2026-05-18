@@ -17,6 +17,7 @@ import {
   setTerminalLetterSpacing,
   setTerminalLineHeight,
   setTerminalScrollback,
+  setTerminalShowPaneHeader,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -30,6 +31,7 @@ export function TerminalSection() {
   const terminalLetterSpacing = usePreferencesStore((s) => s.terminalLetterSpacing);
   const terminalLineHeight = usePreferencesStore((s) => s.terminalLineHeight);
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
+  const terminalShowPaneHeader = usePreferencesStore((s) => s.terminalShowPaneHeader);
 
   return (
     <div className="flex flex-col gap-6">
@@ -143,6 +145,19 @@ export function TerminalSection() {
             />
           </SettingRow>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Layout</Label>
+        <SettingRow
+          title="Show pane headers"
+          description="Display a header bar above each terminal pane in split-pane workspaces."
+        >
+          <Switch
+            checked={terminalShowPaneHeader}
+            onCheckedChange={(v) => void setTerminalShowPaneHeader(v)}
+          />
+        </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">

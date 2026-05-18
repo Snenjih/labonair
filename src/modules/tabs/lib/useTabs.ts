@@ -130,11 +130,10 @@ function findParent(
   return null;
 }
 
-/** Replace a node at targetId with a replacement node. */
+/** Replace a node at targetId with a replacement node. Handles both leaf and split nodes. */
 function replaceNode(root: PaneNode, targetId: string, replacement: PaneNode): PaneNode {
-  if (root.type === "pane") {
-    return root.id === targetId ? replacement : root;
-  }
+  if (root.id === targetId) return replacement;
+  if (root.type === "pane") return root;
   return {
     ...root,
     children: [

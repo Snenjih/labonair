@@ -270,15 +270,10 @@ export default function App() {
     (id: number) => {
       const t = tabs.find((x) => x.id === id);
 
-      // For workspace tabs: close active pane first; if last pane, close tab.
+      // For workspace tabs: always close the entire tab from the tab bar.
+      // Individual pane X buttons call closePane directly via onClosePane.
       if (t?.kind === "workspace") {
-        const layout = t.layout;
-        if (layout.type === "pane") {
-          // Only one pane — close the entire tab
-          disposeTab(id);
-        } else {
-          closePane(id, t.activePaneId);
-        }
+        disposeTab(id);
         return;
       }
 
