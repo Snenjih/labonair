@@ -101,7 +101,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
         const children = node.children.flatMap((child, idx): ReactNode[] => {
           const items: ReactNode[] = [];
           if (idx > 0) {
-            items.push(<ResizableHandle key={`handle-${node.id}-${idx}`} withHandle />);
+            items.push(<ResizableHandle key={`handle-${node.id}-${idx}`} withHandle className="pointer-events-auto" />);
           }
           items.push(
             <ResizablePanel
@@ -137,8 +137,9 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
 
     return (
       <div ref={containerRef} className="relative h-full w-full overflow-hidden">
-        {/* Sizing layer: transparent resize panels + handles */}
-        <div className="absolute inset-0 z-10">
+        {/* Sizing layer: pointer-events-none so clicks fall through to terminals;
+            ResizableHandle restores pointer-events-auto for dragging. */}
+        <div className="absolute inset-0 z-10 pointer-events-none">
           {renderSlotTree(tab.layout)}
         </div>
 
