@@ -6,9 +6,9 @@ use serde::Serialize;
 fn expand_home(path: &str) -> Result<PathBuf, String> {
     if path == "~" {
         dirs::home_dir().ok_or("could not determine home directory".to_string())
-    } else if path.starts_with("~/") {
+    } else if let Some(stripped) = path.strip_prefix("~/") {
         let mut home = dirs::home_dir().ok_or("could not determine home directory".to_string())?;
-        home.push(&path[2..]);
+        home.push(stripped);
         Ok(home)
     } else {
         Ok(PathBuf::from(path))

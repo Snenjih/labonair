@@ -104,6 +104,7 @@ pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, S
     Ok(hosts)
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn hosts_create(
     db: tauri::State<'_, HostsDb>,
@@ -171,6 +172,7 @@ pub async fn hosts_create(
     .map_err(|e| e.to_string())
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn hosts_update(
     db: tauri::State<'_, HostsDb>,

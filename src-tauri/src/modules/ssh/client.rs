@@ -20,6 +20,7 @@ fn is_passphrase_error(msg: &str) -> bool {
         || lower.contains("wrong passphrase")
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn ssh_connect(
     tab_id: String,
@@ -113,6 +114,7 @@ pub async fn ssh_connect(
 
 /// Quick-connect: initiate an SSH connection without a saved host record.
 /// Password is provided directly; no keyring lookup.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn ssh_connect_quick(
     tab_id: String,
@@ -249,6 +251,7 @@ fn wait_for_trust(tab_id: &str, trust_state: &super::TrustState) -> Result<bool,
     Ok(trusted)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ssh_connect_blocking(
     tab_id: String,
     _host_id: String,

@@ -39,6 +39,7 @@ pub struct TransferJob {
 pub enum WorkerMessage {
     Enqueue(TransferJob),
     Cancel(String),
+    #[allow(dead_code)]
     ResolveConflict {
         job_id: String,
         resolution: String,
