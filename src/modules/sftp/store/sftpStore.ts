@@ -138,7 +138,7 @@ export const useSftpStore = create<SftpStore>((set) => ({
       },
     }));
     try {
-      const files = await invoke<FileNode[]>("sftp_read_dir", { tabId, path });
+      const files = await invoke<FileNode[]>("sftp_read_dir", { sessionId: tabId, path });
       set((s) => ({
         tabs: {
           ...s.tabs,

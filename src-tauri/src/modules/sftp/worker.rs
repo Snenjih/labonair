@@ -133,7 +133,7 @@ async fn process_job(
 ) -> Result<(), String> {
     log::info!(
         "[sftp] starting {:?} | id={} tab={} src={} dest={}",
-        job.direction, job.id, job.tab_id, job.src_path, job.dest_path
+        job.direction, job.id, job.session_id, job.src_path, job.dest_path
     );
     let result = match job.direction {
         TransferDirection::Download => download_file(job, ssh_state, app, conflicts, cancelled).await,
@@ -141,7 +141,7 @@ async fn process_job(
     };
     match &result {
         Ok(()) => log::info!("[sftp] completed id={}", job.id),
-        Err(e) => log::error!("[sftp] failed id={} tab={} src={} dest={} — {}", job.id, job.tab_id, job.src_path, job.dest_path, e),
+        Err(e) => log::error!("[sftp] failed id={} tab={} src={} dest={} — {}", job.id, job.session_id, job.src_path, job.dest_path, e),
     }
     result
 }
@@ -172,14 +172,14 @@ async fn download_file(
         }
     }
 
-    log::debug!("[sftp/download] looking up SFTP session for tab_id={}", job.tab_id);
+    log::debug!("[sftp/download] looking up SFTP session for session_id={}", job.session_id);
     let (file_size, data) = {
         let sftp_arc = {
             let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
-            let entry = map.get(&job.tab_id)
-                .ok_or_else(|| format!("no SSH session for tab_id={} (active tabs: {:?})", job.tab_id, map.keys().collect::<Vec<_>>()))?;
+            let entry = map.get(&job.session_id)
+                .ok_or_else(|| format!("no SSH session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
             entry.sftp.as_ref()
-                .ok_or_else(|| format!("SSH session found for tab_id={} but SFTP handle is None — was SFTP opened?", job.tab_id))?
+                .ok_or_else(|| format!("SSH session found for session_id={} but SFTP handle is None — was SFTP opened?", job.session_id))?
                 .clone()
         };
         log::debug!("[sftp/download] opening remote file: {}", job.src_path);
@@ -238,8 +238,8 @@ async fn download_file(
     let session_arc = {
         let sftp_arc2 = {
             let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
-            let entry = map.get(&job.tab_id)
-                .ok_or_else(|| format!("no SSH session for tab_id={}", job.tab_id))?;
+            let entry = map.get(&job.session_id)
+                .ok_or_else(|| format!("no SSH session for session_id={}", job.session_id))?;
             (entry.session.clone(), entry.sftp.as_ref().map(|s| s.clone()))
         };
         sftp_arc2.0
@@ -280,14 +280,14 @@ async fn upload_file(
     job.bytes_total = data.len() as u64;
     log::debug!("[sftp/upload] local file size={} bytes", data.len());
 
-    log::debug!("[sftp/upload] looking up SFTP session for tab_id={}", job.tab_id);
+    log::debug!("[sftp/upload] looking up SFTP session for session_id={}", job.session_id);
     let conflict_exists = {
         let sftp_arc = {
             let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
-            let entry = map.get(&job.tab_id)
-                .ok_or_else(|| format!("no SSH session for tab_id={} (active tabs: {:?})", job.tab_id, map.keys().collect::<Vec<_>>()))?;
+            let entry = map.get(&job.session_id)
+                .ok_or_else(|| format!("no SSH session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
             entry.sftp.as_ref()
-                .ok_or_else(|| format!("SSH session found for tab_id={} but SFTP handle is None — was SFTP opened?", job.tab_id))?
+                .ok_or_else(|| format!("SSH session found for session_id={} but SFTP handle is None — was SFTP opened?", job.session_id))?
                 .clone()
         };
         let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
@@ -316,10 +316,10 @@ async fn upload_file(
     log::debug!("[sftp/upload] creating remote file: {}", job.dest_path);
     let sftp_arc = {
         let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
-        let entry = map.get(&job.tab_id)
-            .ok_or_else(|| format!("no SSH session for tab_id={}", job.tab_id))?;
+        let entry = map.get(&job.session_id)
+            .ok_or_else(|| format!("no SSH session for session_id={}", job.session_id))?;
         entry.sftp.as_ref()
-            .ok_or_else(|| format!("no SFTP handle for tab_id={}", job.tab_id))?
+            .ok_or_else(|| format!("no SFTP handle for session_id={}", job.session_id))?
             .clone()
     };
     let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
@@ -361,8 +361,8 @@ async fn upload_file(
 
     let session_arc = {
         let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
-        map.get(&job.tab_id)
-            .ok_or_else(|| format!("no SSH session for tab_id={}", job.tab_id))?
+        map.get(&job.session_id)
+            .ok_or_else(|| format!("no SSH session for session_id={}", job.session_id))?
             .session.clone()
     };
     let local_hash = compute_local_md5(std::path::Path::new(&job.src_path))?;

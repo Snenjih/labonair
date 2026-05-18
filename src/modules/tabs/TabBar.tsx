@@ -22,7 +22,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef } from "react";
-import type { Tab } from "./lib/useTabs";
+import type { Tab, WorkspaceTab } from "./lib/useTabs";
 
 type Props = {
   tabs: Tab[];
@@ -214,10 +214,13 @@ function TabIcon({ tab, active }: { tab: Tab; active: boolean }) {
       />
     );
   }
-  if (tab.kind === "ssh-terminal") {
+  if (tab.kind === "workspace") {
+    const wt = tab as WorkspaceTab;
+    const activeSession = wt.sessions[wt.activePaneId];
+    const icon = activeSession?.kind === "ssh" ? ComputerTerminal02Icon : ComputerTerminal02Icon;
     return (
       <HugeiconsIcon
-        icon={ComputerTerminal02Icon}
+        icon={icon}
         size={14}
         strokeWidth={1.75}
         className="shrink-0"
@@ -240,8 +243,12 @@ function labelFor(t: Tab): string {
   if (t.kind === "ai-diff") return t.title;
   if (t.kind === "home") return t.title;
   if (t.kind === "sftp") return t.title;
-  if (t.kind === "ssh-terminal") return t.title;
-  if (!t.cwd) return t.title;
-  const parts = t.cwd.split("/").filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : "/";
+  // workspace tab
+  const wt = t as WorkspaceTab;
+  const activeSession = wt.sessions[wt.activePaneId];
+  if (activeSession?.kind === "local" && activeSession.cwd) {
+    const parts = activeSession.cwd.split("/").filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : "/";
+  }
+  return wt.title;
 }

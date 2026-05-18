@@ -48,8 +48,13 @@ import {
 import { StatusBar } from "@/modules/statusbar";
 import { SftpPane } from "@/modules/sftp";
 import { bootstrapTransferListeners } from "@/modules/sftp/store/transferStore";
-import { useTabs, useWorkspaceCwd, type SftpTab, type SshTerminalTab } from "@/modules/tabs";
-import { SshTerminalPane, TerminalStack, type TerminalPaneHandle } from "@/modules/terminal";
+import {
+  useTabs,
+  useWorkspaceCwd,
+  type SftpTab,
+  type WorkspaceTab,
+} from "@/modules/tabs";
+import { WorkspacePane, type TerminalPaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { UpdaterDialog } from "@/modules/updater";
@@ -87,16 +92,21 @@ export default function App() {
     newQuickSshTab,
     newSftpTab,
     openUntitledTab,
+    setActivePaneId,
+    updatePaneSessionCwd,
+    splitPane,
+    closePane,
   } = useTabs();
 
-  const searchAddons = useRef<Map<number, SearchAddon>>(new Map());
+  const searchAddons = useRef<Map<string, SearchAddon>>(new Map());
   const [activeSearchAddon, setActiveSearchAddon] =
     useState<SearchAddon | null>(null);
   const searchInlineRef = useRef<SearchInlineHandle | null>(null);
-  const terminalRefs = useRef<Map<number, TerminalPaneHandle>>(new Map());
+  // Keyed by session_id (pane UUID) for workspace tabs
+  const terminalRefs = useRef<Map<string, TerminalPaneHandle>>(new Map());
   const editorRefs = useRef<Map<number, EditorPaneHandle>>(new Map());
   const previewRefs = useRef<Map<number, PreviewPaneHandle>>(new Map());
-  const detectedUrls = useRef<Map<number, string>>(new Map());
+  const detectedUrls = useRef<Map<string, string>>(new Map());
   const [activeDetectedUrl, setActiveDetectedUrl] = useState<string | null>(
     null,
   );
@@ -148,8 +158,6 @@ export default function App() {
     };
   }, [setApiKeys]);
 
-  // Hydrate the cross-window preference store and mirror the default model
-  // into chatStore so the dropdown reflects what the user picked in Settings.
   const initPrefs = usePreferencesStore((s) => s.init);
   const prefDefaultModel = usePreferencesStore((s) => s.defaultModelId);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
@@ -175,18 +183,16 @@ export default function App() {
   }, []);
 
   const activeTab = tabs.find((t) => t.id === activeId);
-  const isTerminalTab = activeTab?.kind === "terminal";
+  const isWorkspaceTab = activeTab?.kind === "workspace";
   const isEditorTab = activeTab?.kind === "editor";
   const isPreviewTab = activeTab?.kind === "preview";
   const isAiDiffTab = activeTab?.kind === "ai-diff";
   const isHomeTab = activeTab?.kind === "home";
-  // isSshTab not needed — SSH tabs rendered per-instance below
 
+  // Active pane session id (only for workspace tabs)
+  const activePaneId =
+    activeTab?.kind === "workspace" ? activeTab.activePaneId : null;
 
-  // When an AI diff is approved (write_file applied to disk), reload any
-  // open editor tabs for that path so the user sees the new content. We
-  // track which approvalIds we've already handled to fire the reload only
-  // once per applied diff.
   const appliedDiffsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     for (const t of tabs) {
@@ -209,52 +215,73 @@ export default function App() {
   );
 
   useEffect(() => {
-    setActiveSearchAddon(searchAddons.current.get(activeId) ?? null);
+    const currentSearchAddon = activePaneId
+      ? (searchAddons.current.get(activePaneId) ?? null)
+      : null;
+    setActiveSearchAddon(currentSearchAddon);
     setActiveEditorHandle(editorRefs.current.get(activeId) ?? null);
-    setActiveDetectedUrl(detectedUrls.current.get(activeId) ?? null);
-  }, [activeId]);
+    const url = activePaneId ? (detectedUrls.current.get(activePaneId) ?? null) : null;
+    setActiveDetectedUrl(url);
+  }, [activeId, activePaneId]);
 
   const handleDetectedLocalUrl = useCallback(
-    (id: number, url: string) => {
-      detectedUrls.current.set(id, url);
-      if (id === activeId) setActiveDetectedUrl(url);
+    (sessionId: string, url: string) => {
+      detectedUrls.current.set(sessionId, url);
+      if (sessionId === activePaneId) setActiveDetectedUrl(url);
     },
-    [activeId],
+    [activePaneId],
   );
 
-  // Suppress the chip once a preview tab already targets the detected URL —
-  // avoids prompting users to re-open a tab they already have.
   const detectedPreviewUrl = useMemo(() => {
-    if (!isTerminalTab || !activeDetectedUrl) return null;
+    if (!isWorkspaceTab || !activeDetectedUrl) return null;
     const alreadyOpen = tabs.some(
       (t) => t.kind === "preview" && sameOrigin(t.url, activeDetectedUrl),
     );
     return alreadyOpen ? null : activeDetectedUrl;
-  }, [isTerminalTab, activeDetectedUrl, tabs]);
+  }, [isWorkspaceTab, activeDetectedUrl, tabs]);
 
   const handleSearchReady = useCallback(
-    (id: number, addon: SearchAddon) => {
-      searchAddons.current.set(id, addon);
-      if (id === activeId) setActiveSearchAddon(addon);
+    (sessionId: string, addon: SearchAddon) => {
+      searchAddons.current.set(sessionId, addon);
+      if (sessionId === activePaneId) setActiveSearchAddon(addon);
     },
-    [activeId],
+    [activePaneId],
   );
 
   const disposeTab = useCallback(
     (id: number) => {
-      searchAddons.current.delete(id);
-      terminalRefs.current.delete(id);
+      // Clean up session refs for workspace tabs
+      const tab = tabs.find((t) => t.id === id);
+      if (tab?.kind === "workspace") {
+        for (const sessionId of Object.keys(tab.sessions)) {
+          terminalRefs.current.delete(sessionId);
+          searchAddons.current.delete(sessionId);
+          detectedUrls.current.delete(sessionId);
+        }
+      }
       editorRefs.current.delete(id);
       previewRefs.current.delete(id);
-      detectedUrls.current.delete(id);
       closeTab(id);
     },
-    [closeTab],
+    [closeTab, tabs],
   );
 
   const handleClose = useCallback(
     (id: number) => {
       const t = tabs.find((x) => x.id === id);
+
+      // For workspace tabs: close active pane first; if last pane, close tab.
+      if (t?.kind === "workspace") {
+        const layout = t.layout;
+        if (layout.type === "pane") {
+          // Only one pane — close the entire tab
+          disposeTab(id);
+        } else {
+          closePane(id, t.activePaneId);
+        }
+        return;
+      }
+
       if (t?.kind === "editor" && t.isUntitled) {
         const choice = window.confirm(
           `"${t.title}" has not been saved. Save before closing?`,
@@ -277,7 +304,7 @@ export default function App() {
       }
       disposeTab(id);
     },
-    [tabs, disposeTab],
+    [tabs, disposeTab, closePane],
   );
 
   const cycleTab = useCallback(
@@ -293,8 +320,8 @@ export default function App() {
   const captureActiveSelection = useCallback((): string | null => {
     const t = tabs.find((x) => x.id === activeId);
     if (!t) return null;
-    if (t.kind === "terminal") {
-      return terminalRefs.current.get(activeId)?.getSelection() ?? null;
+    if (t.kind === "workspace" && t.activePaneId) {
+      return terminalRefs.current.get(t.activePaneId)?.getSelection() ?? null;
     }
     if (t.kind === "editor") {
       return editorRefs.current.get(activeId)?.getSelection() ?? null;
@@ -323,8 +350,6 @@ export default function App() {
         void openSettingsWindow("models");
         return;
       }
-      // Dispatch a window event the composer listens for. Same pattern as
-      // selections — keeps file-explorer decoupled from the AI module.
       window.dispatchEvent(
         new CustomEvent<string>("nexum:ai-attach-file", { detail: path }),
       );
@@ -376,7 +401,6 @@ export default function App() {
     };
     const onUp = (e: MouseEvent) => {
       if (isInsideAi(e.target)) return;
-      // Defer one tick so xterm/CodeMirror finalize the selection.
       setTimeout(() => {
         const text = captureActiveSelection();
         if (text && text.trim().length > 0) {
@@ -410,7 +434,8 @@ export default function App() {
 
   const sendCd = useCallback(
     (path: string) => {
-      const term = terminalRefs.current.get(activeId);
+      if (!activePaneId) return;
+      const term = terminalRefs.current.get(activePaneId);
       if (!term) return;
       const quoted = path.includes(" ")
         ? `'${path.replace(/'/g, `'\\''`)}'`
@@ -418,14 +443,18 @@ export default function App() {
       term.write(`cd ${quoted}\n`);
       term.focus();
     },
-    [activeId],
+    [activePaneId],
   );
 
   const cdInNewTab = useCallback(
     (path: string) => {
       const id = newTab(path);
       setTimeout(() => {
-        const t = terminalRefs.current.get(id);
+        // The new tab will have a single pane; find it from the tab.
+        const newTabData = tabs.find((t) => t.id === id);
+        if (!newTabData || newTabData.kind !== "workspace") return;
+        const paneId = newTabData.activePaneId;
+        const t = terminalRefs.current.get(paneId);
         if (!t) return;
         const quoted = path.includes(" ")
           ? `'${path.replace(/'/g, `'\\''`)}'`
@@ -434,7 +463,7 @@ export default function App() {
         t.focus();
       }, 80);
     },
-    [newTab],
+    [newTab, tabs],
   );
 
   const handleOpenFile = useCallback(
@@ -482,7 +511,6 @@ export default function App() {
   const openPreviewTab = useCallback(
     (url: string) => {
       const id = newPreviewTab(url);
-      // Focus the address bar if the URL is empty so the user can type.
       if (!url) {
         setTimeout(() => previewRefs.current.get(id)?.focusAddressBar(), 0);
       }
@@ -505,9 +533,15 @@ export default function App() {
       "ai.askSelection": askFromSelection,
       "shortcuts.open": () => setShortcutsOpen((v) => !v),
       "sidebar.toggle": toggleSidebar,
+      "pane.splitRight": () => {
+        if (activeTab?.kind === "workspace") splitPane(activeId, "horizontal");
+      },
+      "pane.splitDown": () => {
+        if (activeTab?.kind === "workspace") splitPane(activeId, "vertical");
+      },
       "view.zoomIn": () => {
         const kind = activeTab?.kind;
-        if (kind === "terminal" || kind === "ssh-terminal") {
+        if (kind === "workspace") {
           const cur = usePreferencesStore.getState().terminalFontSize;
           void setTerminalFontSize(Math.min(cur + 1, 32));
         } else if (kind === "editor") {
@@ -520,7 +554,7 @@ export default function App() {
       },
       "view.zoomOut": () => {
         const kind = activeTab?.kind;
-        if (kind === "terminal" || kind === "ssh-terminal") {
+        if (kind === "workspace") {
           const cur = usePreferencesStore.getState().terminalFontSize;
           void setTerminalFontSize(Math.max(cur - 1, 8));
         } else if (kind === "editor") {
@@ -533,7 +567,7 @@ export default function App() {
       },
       "view.zoomReset": () => {
         const kind = activeTab?.kind;
-        if (kind === "terminal" || kind === "ssh-terminal") {
+        if (kind === "workspace") {
           void setTerminalFontSize(DEFAULT_PREFERENCES.terminalFontSize);
         } else if (kind === "editor") {
           void setEditorFontSize(DEFAULT_PREFERENCES.editorFontSize);
@@ -553,18 +587,11 @@ export default function App() {
       togglePanelAndFocus,
       askFromSelection,
       toggleSidebar,
+      splitPane,
     ],
   );
 
   useGlobalShortcuts(shortcutHandlers);
-
-  const registerTerminalHandle = useCallback(
-    (id: number, h: TerminalPaneHandle | null) => {
-      if (h) terminalRefs.current.set(id, h);
-      else terminalRefs.current.delete(id);
-    },
-    [],
-  );
 
   const registerEditorHandle = useCallback(
     (id: number, h: EditorPaneHandle | null) => {
@@ -588,11 +615,6 @@ export default function App() {
     [updateTab],
   );
 
-  const handleTerminalCwd = useCallback(
-    (id: number, cwd: string) => updateTab(id, { cwd }),
-    [updateTab],
-  );
-
   const handleEditorDirty = useCallback(
     (id: number, dirty: boolean) => updateTab(id, { dirty }),
     [updateTab],
@@ -607,23 +629,33 @@ export default function App() {
   );
 
   const searchTarget = useMemo<SearchTarget>(() => {
-    if (isTerminalTab && activeSearchAddon)
+    if (isWorkspaceTab && activeSearchAddon)
       return { kind: "terminal", addon: activeSearchAddon };
     if (isEditorTab && activeEditorHandle)
       return { kind: "editor", handle: activeEditorHandle };
     return null;
-  }, [isTerminalTab, isEditorTab, activeSearchAddon, activeEditorHandle]);
+  }, [isWorkspaceTab, isEditorTab, activeSearchAddon, activeEditorHandle]);
 
-  const activeCwd =
-    activeTab?.kind === "terminal" ? (activeTab.cwd ?? null) : null;
+  const activeCwd = useMemo<string | null>(() => {
+    if (activeTab?.kind !== "workspace") return null;
+    const session = activeTab.sessions[activeTab.activePaneId];
+    if (session?.kind === "local") return session.cwd ?? null;
+    return null;
+  }, [activeTab]);
 
   useEffect(() => {
     const findCwd = () => {
       const active = tabs.find((x) => x.id === activeId);
-      if (active?.kind === "terminal" && active.cwd) return active.cwd;
+      if (active?.kind === "workspace") {
+        const session = active.sessions[active.activePaneId];
+        if (session?.kind === "local" && session.cwd) return session.cwd;
+      }
       for (let i = tabs.length - 1; i >= 0; i--) {
         const t = tabs[i];
-        if (t.kind === "terminal" && t.cwd) return t.cwd;
+        if (t.kind !== "workspace") continue;
+        for (const s of Object.values(t.sessions)) {
+          if (s.kind === "local" && s.cwd) return s.cwd;
+        }
       }
       return explorerRoot ?? home ?? null;
     };
@@ -632,13 +664,13 @@ export default function App() {
       getCwd: findCwd,
       getTerminalContext: () => {
         const t = tabs.find((x) => x.id === activeId);
-        if (t?.kind !== "terminal") return null;
-        return terminalRefs.current.get(activeId)?.getBuffer(300) ?? null;
+        if (t?.kind !== "workspace") return null;
+        return terminalRefs.current.get(t.activePaneId)?.getBuffer(300) ?? null;
       },
       injectIntoActivePty: (text) => {
         const t = tabs.find((x) => x.id === activeId);
-        if (t?.kind !== "terminal") return false;
-        const term = terminalRefs.current.get(activeId);
+        if (t?.kind !== "workspace") return false;
+        const term = terminalRefs.current.get(t.activePaneId);
         if (!term) return false;
         term.write(text);
         term.focus();
@@ -659,10 +691,19 @@ export default function App() {
       },
       getActiveSshTabId: () => {
         const t = tabs.find((x) => x.id === activeId);
-        return t?.kind === "ssh-terminal" ? String(t.id) : null;
+        if (t?.kind !== "workspace") return null;
+        const session = t.sessions[t.activePaneId];
+        return session?.kind === "ssh" ? t.activePaneId : null;
       },
     });
   }, [setLive, activeId, tabs, explorerRoot, home, openPreviewTab]);
+
+  const handleWorkspaceCwd = useCallback(
+    (tabId: number, sessionId: string, cwd: string) => {
+      updatePaneSessionCwd(tabId, sessionId, cwd);
+    },
+    [updatePaneSessionCwd],
+  );
 
   const shell = (
     <ThemeProvider>
@@ -717,22 +758,43 @@ export default function App() {
               <ResizablePanel id="workspace" defaultSize="78%" minSize="30%">
                 <div className="flex h-full min-h-0 flex-col">
                   <div className="relative min-h-0 flex-1">
-                    <div
-                      className={cn(
-                        "absolute inset-0 px-3 pt-2 pb-2",
-                        !isTerminalTab && "invisible pointer-events-none",
-                      )}
-                      aria-hidden={!isTerminalTab}
-                    >
-                      <TerminalStack
-                        tabs={tabs}
-                        activeId={activeId}
-                        registerHandle={registerTerminalHandle}
-                        onSearchReady={handleSearchReady}
-                        onCwd={handleTerminalCwd}
-                        onDetectedLocalUrl={handleDetectedLocalUrl}
-                      />
-                    </div>
+                    {/* Workspace (terminal) tabs — keep all mounted, hide inactive */}
+                    {tabs.filter((t) => t.kind === "workspace").map((t) => {
+                      const wt = t as WorkspaceTab;
+                      const isActive = t.id === activeId;
+                      return (
+                        <div
+                          key={t.id}
+                          className={cn(
+                            "absolute inset-0 px-3 pt-2 pb-2",
+                            !isActive && "invisible pointer-events-none",
+                          )}
+                          aria-hidden={!isActive}
+                        >
+                          <WorkspacePane
+                            tab={wt}
+                            onSetActivePane={(paneId) =>
+                              setActivePaneId(t.id, paneId)
+                            }
+                            onRegisterHandle={(sessionId, handle) => {
+                              if (handle)
+                                terminalRefs.current.set(sessionId, handle);
+                              else terminalRefs.current.delete(sessionId);
+                            }}
+                            onCwd={(sessionId, cwd) =>
+                              handleWorkspaceCwd(t.id, sessionId, cwd)
+                            }
+                            onClosePane={(paneId) => closePane(t.id, paneId)}
+                            onSearchReady={(sessionId, addon) =>
+                              handleSearchReady(sessionId, addon)
+                            }
+                            onDetectedLocalUrl={(sessionId, url) =>
+                              handleDetectedLocalUrl(sessionId, url)
+                            }
+                          />
+                        </div>
+                      );
+                    })}
                     <div
                       className={cn(
                         "absolute inset-0 px-3 pt-2 pb-2",
@@ -784,23 +846,13 @@ export default function App() {
                       )}
                       aria-hidden={!isHomeTab}
                     >
-                      <HomeDashboard newSshTab={newSshTab} newQuickSshTab={newQuickSshTab} newSftpTab={newSftpTab} tabs={tabs} />
+                      <HomeDashboard
+                        newSshTab={newSshTab}
+                        newQuickSshTab={newQuickSshTab}
+                        newSftpTab={newSftpTab}
+                        tabs={tabs}
+                      />
                     </div>
-                    {tabs.filter((t) => t.kind === "ssh-terminal").map((t) => (
-                      <div
-                        key={t.id}
-                        className={cn(
-                          "absolute inset-0",
-                          activeId !== t.id && "invisible pointer-events-none",
-                        )}
-                        aria-hidden={activeId !== t.id}
-                      >
-                        <SshTerminalPane
-                          tab={t as SshTerminalTab}
-                          isActive={activeId === t.id}
-                        />
-                      </div>
-                    ))}
                     {tabs.filter((t) => t.kind === "sftp").map((t) => (
                       <div
                         key={t.id}
@@ -910,8 +962,6 @@ export default function App() {
     </ThemeProvider>
   );
 
-  // Mount the composer provider whenever any provider has a key — independent
-  // of panelOpen — so toggling the panel never re-mounts terminals/editors.
   if (hasComposer) {
     return <AiComposerProvider>{shell}</AiComposerProvider>;
   }

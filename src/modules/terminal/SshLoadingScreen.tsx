@@ -123,37 +123,37 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
     let cancelled = false;
 
     Promise.all([
-      listen<{ tab_id: string; message: string }>("ssh_connect_log", (event) => {
-        if (event.payload.tab_id !== tabId) return;
+      listen<{ session_id: string; message: string }>("ssh_connect_log", (event) => {
+        if (event.payload.session_id !== tabId) return;
         pushLog(event.payload.message);
       }),
-      listen<{ tab_id: string; fingerprint: string; host: string; is_mismatch: boolean }>(
+      listen<{ session_id: string; fingerprint: string; host: string; is_mismatch: boolean }>(
         "known_hosts_warning",
         (event) => {
-          if (event.payload.tab_id !== tabId) return;
+          if (event.payload.session_id !== tabId) return;
           setFingerprint(event.payload.fingerprint);
           setHost(event.payload.host);
           setIsMismatch(event.payload.is_mismatch);
           setStatus("waiting_trust");
         },
       ),
-      listen<{ tab_id: string; prompt_message: string; is_2fa: boolean }>(
+      listen<{ session_id: string; prompt_message: string; is_2fa: boolean }>(
         "auth_required",
         (event) => {
-          if (event.payload.tab_id !== tabId) return;
+          if (event.payload.session_id !== tabId) return;
           setPromptMessage(event.payload.prompt_message);
           setPassword("");
           pendingPasswordRef.current = null;
           setStatus("waiting_auth");
         },
       ),
-      listen<{ tab_id: string }>("passphrase_required", (event) => {
-        if (event.payload.tab_id !== tabId) return;
+      listen<{ session_id: string }>("passphrase_required", (event) => {
+        if (event.payload.session_id !== tabId) return;
         setPassphrase("");
         setStatus("waiting_passphrase");
       }),
-      listen<{ tab_id: string }>("session_established", (event) => {
-        if (event.payload.tab_id !== tabId) return;
+      listen<{ session_id: string }>("session_established", (event) => {
+        if (event.payload.session_id !== tabId) return;
         // Save the new password to keychain if the user entered one to fix auth.
         if (pendingPasswordRef.current && hostId) {
           invoke("secrets_set", {
@@ -339,7 +339,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
               <button
                 onClick={() => {
                   setStatus("connecting");
-                  invoke("ssh_trust_host", { tabId, accepted: true }).catch(console.error);
+                  invoke("ssh_trust_host", { sessionId: tabId, accepted: true }).catch(console.error);
                 }}
                 className={cn(
                   "flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-opacity",
@@ -352,7 +352,7 @@ export function SshLoadingScreen({ tabId, hostId, quickConnect, hostName, connec
               </button>
               <button
                 onClick={() => {
-                  invoke("ssh_trust_host", { tabId, accepted: false }).catch(console.error);
+                  invoke("ssh_trust_host", { sessionId: tabId, accepted: false }).catch(console.error);
                   onError("User aborted");
                 }}
                 className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"

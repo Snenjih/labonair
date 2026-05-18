@@ -113,7 +113,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
     setIsCalculating(true);
     setSizeError(null);
     try {
-      const size = await invoke<string>("sftp_calculate_size", { tabId, path: file.path });
+      const size = await invoke<string>("sftp_calculate_size", { sessionId: tabId, path: file.path });
       setCalculatedSize(size);
     } catch (e) {
       setSizeError(String(e));
@@ -129,7 +129,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
     try {
       const octal = parseInt(octalInput, 8);
       if (!isNaN(octal)) {
-        await invoke("sftp_chmod", { tabId, path: file.path, permissions: octal });
+        await invoke("sftp_chmod", { sessionId: tabId, path: file.path, permissions: octal });
       }
       // Only chown when at least one field is filled. Empty = leave unchanged.
       if (owner.trim() || group.trim()) {

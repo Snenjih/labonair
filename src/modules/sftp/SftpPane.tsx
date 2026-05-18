@@ -146,7 +146,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
     const newPath = `${dir}/${renameValue.trim()}`;
     try {
       if (side === "remote") {
-        await invoke("sftp_rename", { tabId, oldPath: renamingPath, newPath });
+        await invoke("sftp_rename", { sessionId: tabId, oldPath: renamingPath, newPath });
         loadRemoteDir(tabId, tabState?.remotePath ?? "/");
       } else {
         await invoke("fs_rename", { from: renamingPath, to: newPath });
@@ -210,7 +210,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
       const destPath = `${localBase}/${fileName}`;
       try {
         await invoke("enqueue_transfer", {
-          tabId: String(tab.id),
+          sessionId: String(tab.id),
           srcPath: remotePath,
           destPath,
           direction: "download",
@@ -229,7 +229,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
       const destPath = `${remoteBase}${sep}${fileName}`;
       try {
         await invoke("enqueue_transfer", {
-          tabId: String(tab.id),
+          sessionId: String(tab.id),
           srcPath: localPath,
           destPath,
           direction: "upload",
@@ -249,7 +249,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
     const newPath = `${basePath}${sep}${newFolderName.trim()}`;
     try {
       if (side === "remote") {
-        await invoke("sftp_mkdir", { tabId, path: newPath });
+        await invoke("sftp_mkdir", { sessionId: tabId, path: newPath });
         loadRemoteDir(tabId, basePath);
       } else {
         await invoke("fs_create_dir", { path: newPath });

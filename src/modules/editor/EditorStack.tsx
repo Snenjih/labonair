@@ -93,7 +93,7 @@ export function EditorStack({
     if (!cb) {
       cb = () => {
         void invoke("save_remote_edit", {
-          tab_id: t.remoteHostTabId,
+          sessionId: t.remoteHostTabId,
           remote_path: t.remotePath,
           local_temp_path: t.path,
         }).then(() => {
