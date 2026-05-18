@@ -16,13 +16,13 @@ export type TerminalPaneHandle = {
 };
 
 type Props = {
-  tabId: number;
+  tabId: string;
   visible: boolean;
   initialCwd?: string;
-  onSearchReady?: (tabId: number, addon: SearchAddon) => void;
-  onExit?: (tabId: number, code: number) => void;
-  onCwd?: (tabId: number, cwd: string) => void;
-  onDetectedLocalUrl?: (tabId: number, url: string) => void;
+  onSearchReady?: (tabId: string, addon: SearchAddon) => void;
+  onExit?: (tabId: string, code: number) => void;
+  onCwd?: (tabId: string, cwd: string) => void;
+  onDetectedLocalUrl?: (tabId: string, url: string) => void;
 };
 
 export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
@@ -73,7 +73,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
         ref={containerRef}
         className="h-full w-full"
         style={{
-          visibility: visible ? "visible" : "hidden",
+          visibility: visible ? undefined : "hidden",
           pointerEvents: visible ? "auto" : "none",
         }}
       />

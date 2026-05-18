@@ -1,10 +1,10 @@
 use tauri::Emitter;
 
 macro_rules! log_step {
-    ($app:expr, $tab_id:expr, $msg:expr) => {
+    ($app:expr, $session_id:expr, $msg:expr) => {
         let _ = $app.emit(
             "ssh_connect_log",
-            serde_json::json!({ "tab_id": $tab_id, "message": $msg }),
+            serde_json::json!({ "session_id": $session_id, "message": $msg }),
         );
     };
 }
@@ -23,7 +23,7 @@ fn is_passphrase_error(msg: &str) -> bool {
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn ssh_connect(
-    tab_id: String,
+    session_id: String,
     host_id: String,
     passphrase: Option<String>,
     password_override: Option<String>,
@@ -37,7 +37,7 @@ pub async fn ssh_connect(
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     // Step 1: Fetch host from SQLite (fast, sync — do before spawn_blocking)
-    log_step!(app, tab_id, "Reading host configuration…");
+    log_step!(app, session_id, "Reading host configuration…");
     let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh) = {
         let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
@@ -67,7 +67,7 @@ pub async fn ssh_connect(
         if password_override.is_some() {
             password_override.clone()
         } else {
-            log_step!(app, tab_id, "Retrieving credentials from local store…");
+            log_step!(app, session_id, "Retrieving credentials from local store…");
             crate::modules::secrets::get_password(&app, &secrets, "nexum-app", &host_id).ok().flatten()
         }
     } else {
@@ -79,13 +79,13 @@ pub async fn ssh_connect(
     let state_inner = state.inner().clone();
     let trust_inner = trust_state.inner().clone();
     let app_clone = app.clone();
-    let tab_id_clone = tab_id.clone();
+    let session_id_clone = session_id.clone();
     let host_id_clone = host_id.clone();
     let cols = initial_cols.unwrap_or(220);
     let rows = initial_rows.unwrap_or(50);
     let result = tokio::task::spawn_blocking(move || {
         ssh_connect_blocking(
-            tab_id_clone, host_id_clone.clone(), passphrase,
+            session_id_clone, host_id_clone.clone(), passphrase,
             host_address, port, username, auth_method,
             private_key_path, keep_alive_interval, keep_alive_tries,
             default_path_ssh, password, init_sftp, cols, rows,
@@ -116,7 +116,7 @@ pub async fn ssh_connect(
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn ssh_connect_quick(
-    tab_id: String,
+    session_id: String,
     username: String,
     host_address: String,
     port: u16,
@@ -131,12 +131,12 @@ pub async fn ssh_connect_quick(
     let state_inner = state.inner().clone();
     let trust_inner = trust_state.inner().clone();
     let app_clone = app.clone();
-    let tab_id_clone = tab_id.clone();
+    let session_id_clone = session_id.clone();
     let cols = initial_cols.unwrap_or(220);
     let rows = initial_rows.unwrap_or(50);
     tokio::task::spawn_blocking(move || {
         ssh_connect_blocking(
-            tab_id_clone,
+            session_id_clone,
             String::new(), // no host_id — quick connect has no DB record
             passphrase,
             host_address,
@@ -164,12 +164,12 @@ pub async fn ssh_connect_quick(
 /// Called by the frontend after the user acts on the trust dialog.
 #[tauri::command]
 pub async fn ssh_trust_host(
-    tab_id: String,
+    session_id: String,
     accepted: bool,
     trust_state: tauri::State<'_, super::TrustState>,
 ) -> Result<(), String> {
     let map = trust_state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(pair) = map.get(&tab_id) {
+    if let Some(pair) = map.get(&session_id) {
         let (lock, cvar) = &**pair;
         *lock.lock().unwrap() = Some(accepted);
         cvar.notify_one();
@@ -212,14 +212,14 @@ pub async fn ssh_remove_known_host(host_address: String) -> Result<(), String> {
 /// or until the 5-minute dialog timeout expires. Always removes the entry from
 /// TrustState so the HashMap never leaks, even if the dialog is dismissed.
 /// Returns `Ok(true)` = trusted, `Ok(false)` = rejected/timed-out.
-fn wait_for_trust(tab_id: &str, trust_state: &super::TrustState) -> Result<bool, String> {
+fn wait_for_trust(session_id: &str, trust_state: &super::TrustState) -> Result<bool, String> {
     let pair = std::sync::Arc::new((
         std::sync::Mutex::new(None::<bool>),
         std::sync::Condvar::new(),
     ));
     {
         let mut map = trust_state.0.lock().map_err(|e| e.to_string())?;
-        map.insert(tab_id.to_string(), pair.clone());
+        map.insert(session_id.to_string(), pair.clone());
     }
 
     let trusted = {
@@ -245,14 +245,14 @@ fn wait_for_trust(tab_id: &str, trust_state: &super::TrustState) -> Result<bool,
     let _ = trust_state
         .0
         .lock()
-        .map(|mut m| m.remove(tab_id));
+        .map(|mut m| m.remove(session_id));
 
     Ok(trusted)
 }
 
 #[allow(clippy::too_many_arguments)]
 fn ssh_connect_blocking(
-    tab_id: String,
+    session_id: String,
     _host_id: String,
     passphrase: Option<String>,
     host_address: String,
@@ -277,21 +277,21 @@ fn ssh_connect_blocking(
     // Step 3: TCP connect (DNS resolution + connect, with a 15-second total timeout)
     log_step!(
         app,
-        tab_id,
+        session_id,
         format!("TCP connecting to {}:{}…", host_address, port)
     );
     let tcp = tcp_connect(&host_address, port)
         .map_err(|e| format!("TCP connect to {}:{} failed: {}", host_address, port, e))?;
-    log_step!(app, tab_id, "TCP connection established.");
+    log_step!(app, session_id, "TCP connection established.");
 
     // Step 4: SSH handshake
-    log_step!(app, tab_id, "Starting SSH handshake…");
+    log_step!(app, session_id, "Starting SSH handshake…");
     let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
     session.set_blocking(true);
     session.set_timeout(15_000);
     session.set_tcp_stream(tcp);
     session.handshake().map_err(|e| e.to_string())?;
-    log_step!(app, tab_id, "SSH handshake complete.");
+    log_step!(app, session_id, "SSH handshake complete.");
 
     // Configure keepalive if set
     if let Some(interval) = keep_alive_interval {
@@ -301,7 +301,7 @@ fn ssh_connect_blocking(
     }
 
     // Step 5: known_hosts check
-    log_step!(app, tab_id, "Verifying host fingerprint…");
+    log_step!(app, session_id, "Verifying host fingerprint…");
     let (host_key, key_type) = session.host_key().ok_or("no host key")?;
     let fingerprint = session
         .host_key_hash(ssh2::HashType::Md5)
@@ -342,18 +342,18 @@ fn ssh_connect_blocking(
 
     match known_host_status {
         ssh2::CheckResult::Match => {
-            log_step!(app, tab_id, "Host fingerprint verified ✓");
+            log_step!(app, session_id, "Host fingerprint verified ✓");
         }
         ssh2::CheckResult::Mismatch => {
             log_step!(
                 app,
-                tab_id,
+                session_id,
                 format!("Host key mismatch! Fingerprint: {}", fingerprint)
             );
             app.emit(
                 "known_hosts_warning",
                 serde_json::json!({
-                    "tab_id": tab_id,
+                    "session_id": session_id,
                     "fingerprint": fingerprint,
                     "host": host_address,
                     "is_mismatch": true
@@ -361,7 +361,7 @@ fn ssh_connect_blocking(
             )
             .map_err(|e| e.to_string())?;
 
-            if !wait_for_trust(&tab_id, &trust_state)? {
+            if !wait_for_trust(&session_id, &trust_state)? {
                 return Err("User rejected host".to_string());
             }
 
@@ -376,18 +376,18 @@ fn ssh_connect_blocking(
                 let _ = kh.add(&known_host_check_name, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
                 let _ = kh.write_file(path, ssh2::KnownHostFileKind::OpenSSH);
             }
-            log_step!(app, tab_id, "Host key accepted and updated in known_hosts ✓");
+            log_step!(app, session_id, "Host key accepted and updated in known_hosts ✓");
         }
         ssh2::CheckResult::NotFound | ssh2::CheckResult::Failure => {
             log_step!(
                 app,
-                tab_id,
+                session_id,
                 format!("Unknown host — fingerprint: {}", fingerprint)
             );
             app.emit(
                 "known_hosts_warning",
                 serde_json::json!({
-                    "tab_id": tab_id,
+                    "session_id": session_id,
                     "fingerprint": fingerprint,
                     "host": host_address,
                     "is_mismatch": false
@@ -395,7 +395,7 @@ fn ssh_connect_blocking(
             )
             .map_err(|e| e.to_string())?;
 
-            if !wait_for_trust(&tab_id, &trust_state)? {
+            if !wait_for_trust(&session_id, &trust_state)? {
                 return Err("User rejected host".to_string());
             }
 
@@ -408,12 +408,12 @@ fn ssh_connect_blocking(
                 let _ = kh.add(&known_host_check_name, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
                 let _ = kh.write_file(path, ssh2::KnownHostFileKind::OpenSSH);
             }
-            log_step!(app, tab_id, "Host trusted and added to known_hosts ✓");
+            log_step!(app, session_id, "Host trusted and added to known_hosts ✓");
         }
     }
 
     // Step 6: Authentication
-    log_step!(app, tab_id, "Authenticating…");
+    log_step!(app, session_id, "Authenticating…");
 
     let authenticated = if auth_method == "key" {
         let key_path = private_key_path
@@ -422,12 +422,12 @@ fn ssh_connect_blocking(
             .ok_or("private_key_path not set for key auth")?;
 
         // 6a. Try ssh-agent first (works for keys loaded via `ssh-add`).
-        let agent_ok = try_agent_auth(&session, &username, &tab_id, &app);
+        let agent_ok = try_agent_auth(&session, &username, &session_id, &app);
         if agent_ok {
             true
         } else {
             // 6b. Direct key file auth — use provided passphrase if any.
-            log_step!(app, tab_id, "Authenticating with public key file…");
+            log_step!(app, session_id, "Authenticating with public key file…");
             match session.userauth_pubkey_file(
                 &username,
                 None,
@@ -439,19 +439,19 @@ fn ssh_connect_blocking(
                     let msg = e.to_string();
                     if passphrase.is_none() && is_passphrase_error(&msg) {
                         // Key is encrypted — ask frontend for passphrase.
-                        log_step!(app, tab_id, "Key is passphrase-protected, prompting…");
+                        log_step!(app, session_id, "Key is passphrase-protected, prompting…");
                         app.emit(
                             "passphrase_required",
-                            serde_json::json!({ "tab_id": tab_id }),
+                            serde_json::json!({ "session_id": session_id }),
                         )
                         .map_err(|e| e.to_string())?;
                         return Err("passphrase_required".to_string());
                     }
-                    log_step!(app, tab_id, format!("Key auth failed: {}", msg));
+                    log_step!(app, session_id, format!("Key auth failed: {}", msg));
                     app.emit(
                         "auth_required",
                         serde_json::json!({
-                            "tab_id": tab_id,
+                            "session_id": session_id,
                             "prompt_message": msg,
                             "is_2fa": false
                         }),
@@ -467,11 +467,11 @@ fn ssh_connect_blocking(
             Ok(_) => true,
             Err(e) => {
                 let msg = e.to_string();
-                log_step!(app, tab_id, format!("Password auth failed: {}", msg));
+                log_step!(app, session_id, format!("Password auth failed: {}", msg));
                 app.emit(
                     "auth_required",
                     serde_json::json!({
-                        "tab_id": tab_id,
+                        "session_id": session_id,
                         "prompt_message": msg,
                         "is_2fa": false
                     }),
@@ -483,11 +483,11 @@ fn ssh_connect_blocking(
     };
 
     if !authenticated || !session.authenticated() {
-        log_step!(app, tab_id, "Authentication failed.");
+        log_step!(app, session_id, "Authentication failed.");
         app.emit(
             "auth_required",
             serde_json::json!({
-                "tab_id": tab_id,
+                "session_id": session_id,
                 "prompt_message": "Authentication failed",
                 "is_2fa": false
             }),
@@ -496,13 +496,13 @@ fn ssh_connect_blocking(
         return Err("not authenticated".to_string());
     }
 
-    log_step!(app, tab_id, "Authenticated ✓");
+    log_step!(app, session_id, "Authenticated ✓");
 
     // Step 7 (SFTP only): Open SFTP subsystem while still in blocking mode.
     // Must happen BEFORE open_shell_channel, which switches to non-blocking.
     // Skipped for SSH terminal connections — they never need the SFTP handle.
     let sftp = if init_sftp {
-        log_step!(app, tab_id, "Initialising SFTP subsystem…");
+        log_step!(app, session_id, "Initialising SFTP subsystem…");
         // The 15s handshake timeout is too short for SFTP subsystem negotiation
         // on slower hosts (RPi, etc.). Use a 60s timeout for this phase only.
         session.set_timeout(60_000);
@@ -510,7 +510,7 @@ fn ssh_connect_blocking(
         match session.sftp() {
             Ok(s) => {
                 log::debug!("[SFTP-CONNECT] SFTP subsystem open ✓");
-                log_step!(app, tab_id, "SFTP ready ✓");
+                log_step!(app, session_id, "SFTP ready ✓");
                 Some(s)
             }
             Err(e) => {
@@ -529,18 +529,18 @@ fn ssh_connect_blocking(
     let session_for_pty = std::sync::Arc::new(std::sync::Mutex::new(super::SessionHandle(session)));
 
     let (channel, ready_tx, shutdown) = if !init_sftp {
-        log_step!(app, tab_id, "Opening PTY shell channel…");
+        log_step!(app, session_id, "Opening PTY shell channel…");
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
         let (ch, shutdown) = super::pty::open_shell_channel(
             session_for_pty.clone(),
-            &tab_id,
+            &session_id,
             &app,
             state.clone(),
             ready_rx,
             initial_cols,
             initial_rows,
         )?;
-        log_step!(app, tab_id, "Shell channel open ✓");
+        log_step!(app, session_id, "Shell channel open ✓");
         (Some(ch), Some(ready_tx), shutdown)
     } else {
         (None, None, std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)))
@@ -561,7 +561,7 @@ fn ssh_connect_blocking(
     {
         let mut map = state.0.lock().map_err(|e| e.to_string())?;
         map.insert(
-            tab_id.clone(),
+            session_id.clone(),
             super::SshSession {
                 session: session_arc,
                 channel,
@@ -576,10 +576,10 @@ fn ssh_connect_blocking(
         let _ = tx.send(());
     }
 
-    log_step!(app, tab_id, "Session established ✓");
+    log_step!(app, session_id, "Session established ✓");
     app.emit(
         "session_established",
-        serde_json::json!({ "tab_id": tab_id, "default_path_ssh": default_path_ssh }),
+        serde_json::json!({ "session_id": session_id, "default_path_ssh": default_path_ssh }),
     )
     .map_err(|e| e.to_string())?;
 
@@ -633,7 +633,7 @@ fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
 fn try_agent_auth(
     session: &ssh2::Session,
     username: &str,
-    tab_id: &str,
+    session_id: &str,
     app: &tauri::AppHandle,
 ) -> bool {
     if std::env::var("SSH_AUTH_SOCK").is_err() {
@@ -655,7 +655,7 @@ fn try_agent_auth(
     };
     for identity in identities {
         if agent.userauth(username, &identity).is_ok() {
-            log_step!(app, tab_id, "Authenticated via ssh-agent ✓");
+            log_step!(app, session_id, "Authenticated via ssh-agent ✓");
             return true;
         }
     }
@@ -685,11 +685,11 @@ pub fn drop_known_host_entry(path: &std::path::Path, host_address: &str) {
 
 #[tauri::command]
 pub fn ssh_disconnect(
-    tab_id: String,
+    session_id: String,
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
     let mut map = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(mut sess) = map.remove(&tab_id) {
+    if let Some(mut sess) = map.remove(&session_id) {
         // Signal the reader thread to exit before closing the channel.
         sess.shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
         if let Some(mut ch) = sess.channel.take() {

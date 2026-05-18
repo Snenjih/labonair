@@ -12,12 +12,12 @@ pub struct ExecResult {
 /// Opens a fresh exec channel each time — does not affect the interactive PTY.
 #[tauri::command]
 pub fn ssh_exec_command(
-    tab_id: String,
+    session_id: String,
     command: String,
     state: tauri::State<'_, super::SshState>,
 ) -> Result<ExecResult, String> {
     // Clone the session Arc and release the outer lock before blocking I/O.
-    let session_arc = crate::get_session_arc!(state, &tab_id);
+    let session_arc = crate::get_session_arc!(state, &session_id);
     let sess = session_arc.lock().map_err(|e| e.to_string())?;
 
     let mut channel = sess.0.channel_session().map_err(|e| e.to_string())?;

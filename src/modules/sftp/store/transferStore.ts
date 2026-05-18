@@ -13,7 +13,7 @@ export type TransferStatus =
 
 export interface TransferJob {
   id: string;
-  tab_id: string;
+  session_id: string;
   src_path: string;
   dest_path: string;
   direction: "upload" | "download";
@@ -96,12 +96,12 @@ export async function bootstrapTransferListeners() {
     // Refresh the relevant pane when a transfer finishes
     if (job.status === "completed") {
       const sftp = useSftpStore.getState();
-      const tabState = sftp.tabs[job.tab_id];
+      const tabState = sftp.tabs[job.session_id];
       if (tabState) {
         if (job.direction === "download") {
-          void sftp.loadLocalDir(job.tab_id, tabState.localPath);
+          void sftp.loadLocalDir(job.session_id, tabState.localPath);
         } else {
-          void sftp.loadRemoteDir(job.tab_id, tabState.remotePath);
+          void sftp.loadRemoteDir(job.session_id, tabState.remotePath);
         }
       }
     }

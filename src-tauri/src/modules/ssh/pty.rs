@@ -5,12 +5,12 @@ use tauri::Emitter;
 
 #[tauri::command]
 pub fn ssh_pty_write(
-    tab_id: String,
+    session_id: String,
     data: String,
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
     let mut map = state.0.lock().map_err(|e| e.to_string())?;
-    let session = map.get_mut(&tab_id).ok_or("no session for tab")?;
+    let session = map.get_mut(&session_id).ok_or("no session for tab")?;
     let channel = session.channel.as_mut().ok_or("no channel open")?;
     channel.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
     channel.flush().map_err(|e| e.to_string())?;
@@ -19,13 +19,13 @@ pub fn ssh_pty_write(
 
 #[tauri::command]
 pub fn ssh_pty_resize(
-    tab_id: String,
+    session_id: String,
     cols: u32,
     rows: u32,
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
     let mut map = state.0.lock().map_err(|e| e.to_string())?;
-    let session = map.get_mut(&tab_id).ok_or("no session for tab")?;
+    let session = map.get_mut(&session_id).ok_or("no session for tab")?;
     let channel = session.channel.as_mut().ok_or("no channel open")?;
     channel
         .request_pty_size(cols, rows, None, None)
@@ -43,7 +43,7 @@ pub fn ssh_pty_resize(
 /// `cols`/`rows` set the initial terminal size to avoid a jarring resize on connect.
 pub fn open_shell_channel(
     session_arc: std::sync::Arc<std::sync::Mutex<super::SessionHandle>>,
-    tab_id: &str,
+    session_id: &str,
     app: &tauri::AppHandle,
     state: super::SshState,
     ready_rx: std::sync::mpsc::Receiver<()>,
@@ -62,7 +62,7 @@ pub fn open_shell_channel(
     drop(sess);
 
     let app_clone = app.clone();
-    let tab_id_clone = tab_id.to_string();
+    let session_id_clone = session_id.to_string();
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_clone = shutdown.clone();
 
@@ -81,7 +81,7 @@ pub fn open_shell_channel(
                     Ok(m) => m,
                     Err(_) => break,
                 };
-                let Some(sess) = map.get_mut(&tab_id_clone) else { break };
+                let Some(sess) = map.get_mut(&session_id_clone) else { break };
                 let Some(ch) = sess.channel.as_mut() else { break };
 
                 if ch.eof() {
@@ -101,7 +101,7 @@ pub fn open_shell_channel(
                 let _ = app_clone.emit(
                     "ssh_pty_output",
                     serde_json::json!({
-                        "tab_id": tab_id_clone,
+                        "session_id": session_id_clone,
                         "data": output
                     }),
                 );

@@ -72,7 +72,7 @@ export function SftpContextMenu({
     if (count === 0) return;
     try {
       if (side === "remote") {
-        await invoke("sftp_delete", { tabId, paths: [...selectedPaths] });
+        await invoke("sftp_delete", { sessionId: tabId, paths: [...selectedPaths] });
       } else {
         await Promise.all([...selectedPaths].map((p) => invoke("fs_delete", { path: p })));
       }
@@ -87,7 +87,7 @@ export function SftpContextMenu({
     const octal = parseInt(chmodValue, 8);
     if (isNaN(octal)) return;
     try {
-      await invoke("sftp_chmod", { tabId, path: singlePath, permissions: octal });
+      await invoke("sftp_chmod", { sessionId: tabId, path: singlePath, permissions: octal });
       onRefresh();
     } catch (e) {
       console.error("Chmod failed:", e);
@@ -108,7 +108,7 @@ export function SftpContextMenu({
       const destPath = `${dest}/${fileName}`;
       try {
         await invoke("enqueue_transfer", {
-          tabId,
+          sessionId: tabId,
           srcPath: remotePath,
           destPath,
           direction: "download",
@@ -130,7 +130,7 @@ export function SftpContextMenu({
       const destPath = `${currentPath}${sep}${fileName}`;
       try {
         await invoke("enqueue_transfer", {
-          tabId,
+          sessionId: tabId,
           srcPath: localPath,
           destPath,
           direction: "upload",

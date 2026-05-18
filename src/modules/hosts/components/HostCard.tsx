@@ -92,7 +92,11 @@ export function HostCard({
   const highlighted = isSelected || isMultiSelected;
 
   const hasActiveSshTab = tabs.some(
-    (t) => t.kind === "ssh-terminal" && (t as { hostId: string }).hostId === host.id,
+    (t) =>
+      t.kind === "workspace" &&
+      Object.values(t.sessions).some(
+        (s) => s.kind === "ssh" && s.hostId === host.id,
+      ),
   );
   const hasActiveSftpTab = tabs.some(
     (t) => t.kind === "sftp" && (t as { hostId: string }).hostId === host.id,
