@@ -1,0 +1,61 @@
+# Automatically applied labels based on changed file paths
+
+frontend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/**"
+      - "index.html"
+      - "vite.config.*"
+
+backend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src-tauri/**"
+
+ci:
+  - changed-files:
+    - any-glob-to-any-file:
+      - ".github/**"
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "src-tauri/Cargo.toml"
+      - "src-tauri/Cargo.lock"
+
+terminal:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/modules/terminal/**"
+      - "src-tauri/src/modules/pty/**"
+
+ssh/sftp:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/modules/sftp/**"
+      - "src-tauri/src/modules/ssh/**"
+      - "src-tauri/src/modules/sftp/**"
+
+hosts:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/modules/hosts/**"
+      - "src-tauri/src/modules/hosts/**"
+
+ai:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/modules/ai/**"
+
+editor:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/modules/editor/**"
+
+theme:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/styles/**"
+      - "src/modules/theme/**"
