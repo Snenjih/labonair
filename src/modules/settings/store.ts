@@ -67,6 +67,7 @@ export type Preferences = {
   terminalFontWeight: "normal" | "medium" | "bold";
   terminalShowPaneHeader: boolean;
   terminalShowPaneFooter: boolean;
+  terminalUseWebGL: boolean;
 
   // --- Editor ---
   editorFontSize: number;
@@ -121,6 +122,7 @@ const KEY_TERMINAL_LINE_HEIGHT = "terminalLineHeight";
 const KEY_TERMINAL_FONT_WEIGHT = "terminalFontWeight";
 const KEY_TERMINAL_SHOW_PANE_HEADER = "terminalShowPaneHeader";
 const KEY_TERMINAL_SHOW_PANE_FOOTER = "terminalShowPaneFooter";
+const KEY_TERMINAL_USE_WEBGL = "terminalUseWebGL";
 
 const KEY_EDITOR_FONT_SIZE = "editorFontSize";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
@@ -169,6 +171,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalFontWeight: "normal",
   terminalShowPaneHeader: false,
   terminalShowPaneFooter: false,
+  terminalUseWebGL: true,
 
   editorFontSize: 13,
   editorAutoSave: "off",
@@ -260,6 +263,9 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalShowPaneFooter:
       get<boolean>(KEY_TERMINAL_SHOW_PANE_FOOTER) ??
       DEFAULT_PREFERENCES.terminalShowPaneFooter,
+    terminalUseWebGL:
+      get<boolean>(KEY_TERMINAL_USE_WEBGL) ??
+      DEFAULT_PREFERENCES.terminalUseWebGL,
 
     editorFontSize:
       get<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
@@ -433,6 +439,11 @@ export async function setTerminalShowPaneFooter(value: boolean): Promise<void> {
   await store.save();
 }
 
+export async function setTerminalUseWebGL(value: boolean): Promise<void> {
+  await store.set(KEY_TERMINAL_USE_WEBGL, value);
+  await store.save();
+}
+
 export async function setEditorFontSize(value: number): Promise<void> {
   await store.set(KEY_EDITOR_FONT_SIZE, value);
   await store.save();
@@ -551,6 +562,7 @@ export function onPreferencesChange(
     [KEY_TERMINAL_FONT_WEIGHT]: "terminalFontWeight",
     [KEY_TERMINAL_SHOW_PANE_HEADER]: "terminalShowPaneHeader",
     [KEY_TERMINAL_SHOW_PANE_FOOTER]: "terminalShowPaneFooter",
+    [KEY_TERMINAL_USE_WEBGL]: "terminalUseWebGL",
 
     [KEY_EDITOR_FONT_SIZE]: "editorFontSize",
     [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",

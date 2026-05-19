@@ -19,6 +19,7 @@ import {
   setTerminalScrollback,
   setTerminalShowPaneHeader,
   setTerminalShowPaneFooter,
+  setTerminalUseWebGL,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -34,6 +35,7 @@ export function TerminalSection() {
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
   const terminalShowPaneHeader = usePreferencesStore((s) => s.terminalShowPaneHeader);
   const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
+  const terminalUseWebGL = usePreferencesStore((s) => s.terminalUseWebGL);
 
   return (
     <div className="flex flex-col gap-6">
@@ -167,6 +169,19 @@ export function TerminalSection() {
           <Switch
             checked={terminalShowPaneFooter}
             onCheckedChange={(v) => void setTerminalShowPaneFooter(v)}
+          />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Rendering</Label>
+        <SettingRow
+          title="Use WebGL renderer"
+          description="Accelerates terminal rendering using your GPU. Turn off if terminal text flickers, appears blurry, or causes graphics issues. Applies to new terminal sessions."
+        >
+          <Switch
+            checked={terminalUseWebGL}
+            onCheckedChange={(v) => void setTerminalUseWebGL(v)}
           />
         </SettingRow>
       </div>

@@ -158,12 +158,14 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         t.open(containerRef.current);
         fit.fit();
 
-        try {
-          const webgl = new WebglAddon();
-          webgl.onContextLoss(() => webgl.dispose());
-          t.loadAddon(webgl);
-        } catch (e) {
-          console.warn("WebGL unavailable:", e);
+        if (prefs.terminalUseWebGL) {
+          try {
+            const webgl = new WebglAddon();
+            webgl.onContextLoss(() => webgl.dispose());
+            t.loadAddon(webgl);
+          } catch (e) {
+            console.warn("WebGL unavailable:", e);
+          }
         }
 
         for (const chunk of earlyBuffer) t.write(chunk);
