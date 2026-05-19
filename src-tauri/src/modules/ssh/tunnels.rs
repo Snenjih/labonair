@@ -52,7 +52,7 @@ fn handle_connection(
                 Ok(s) => s,
                 Err(_) => return,
             };
-            sess.0.channel_direct_tcpip(&remote_host, remote_port as u32, None)
+            sess.0.channel_direct_tcpip(&remote_host, remote_port, None)
         };
         let mut channel = match channel {
             Ok(c) => c,
