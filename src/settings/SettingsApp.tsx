@@ -214,6 +214,7 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "sftpColumnModified": void store.setSftpColumnModified(value as boolean); break;
     case "sftpColumnPermissions": void store.setSftpColumnPermissions(value as boolean); break;
     case "sftpColumnType": void store.setSftpColumnType(value as boolean); break;
+    case "sftpRemoteEditShowTransfers": void store.setSftpRemoteEditShowTransfers(value as boolean); break;
   }
 }
 

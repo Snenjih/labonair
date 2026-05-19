@@ -263,6 +263,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "File Manager",
     controlType: "Switch",
   },
+  {
+    id: "sftpRemoteEditShowTransfers",
+    label: "Show remote edit transfers",
+    description: "Display temporary download and upload operations when editing remote files in the transfers panel.",
+    category: "File Manager",
+    controlType: "Switch",
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [

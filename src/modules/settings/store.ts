@@ -85,6 +85,7 @@ export type Preferences = {
   sftpColumnModified: boolean;
   sftpColumnPermissions: boolean;
   sftpColumnType: boolean;
+  sftpRemoteEditShowTransfers: boolean;
 
   // --- Sidebar ---
   sidebarPosition: "left" | "right";
@@ -138,6 +139,7 @@ const KEY_SFTP_COLUMN_SIZE = "sftpColumnSize";
 const KEY_SFTP_COLUMN_MODIFIED = "sftpColumnModified";
 const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
 const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
+const KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS = "sftpRemoteEditShowTransfers";
 const KEY_SIDEBAR_POSITION = "sidebarPosition";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
@@ -187,6 +189,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpColumnModified: true,
   sftpColumnPermissions: true,
   sftpColumnType: false,
+  sftpRemoteEditShowTransfers: true,
 
   sidebarPosition: "left",
   credentialEncryption: false,
@@ -297,6 +300,8 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_SFTP_COLUMN_PERMISSIONS) ?? DEFAULT_PREFERENCES.sftpColumnPermissions,
     sftpColumnType:
       get<boolean>(KEY_SFTP_COLUMN_TYPE) ?? DEFAULT_PREFERENCES.sftpColumnType,
+    sftpRemoteEditShowTransfers:
+      get<boolean>(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS) ?? DEFAULT_PREFERENCES.sftpRemoteEditShowTransfers,
 
     sidebarPosition:
       get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
@@ -511,6 +516,11 @@ export async function setSftpColumnType(value: boolean): Promise<void> {
   await store.save();
 }
 
+export async function setSftpRemoteEditShowTransfers(value: boolean): Promise<void> {
+  await store.set(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS, value);
+  await store.save();
+}
+
 export async function setSidebarPosition(
   value: "left" | "right",
 ): Promise<void> {
@@ -578,6 +588,7 @@ export function onPreferencesChange(
     [KEY_SFTP_COLUMN_MODIFIED]: "sftpColumnModified",
     [KEY_SFTP_COLUMN_PERMISSIONS]: "sftpColumnPermissions",
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
+    [KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS]: "sftpRemoteEditShowTransfers",
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",

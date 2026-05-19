@@ -22,7 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useTabs } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
@@ -41,6 +40,7 @@ interface SftpContextMenuProps {
   onRefresh: () => void;
   onStartRename?: (path: string) => void;
   onStartNewFolder?: () => void;
+  onOpenRemoteEditor: (tabId: string, remotePath: string) => Promise<void>;
   children: React.ReactNode;
 }
 
@@ -55,13 +55,13 @@ export function SftpContextMenu({
   onRefresh,
   onStartRename,
   onStartNewFolder,
+  onOpenRemoteEditor,
   children,
 }: SftpContextMenuProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [chmodOpen, setChmodOpen] = useState(false);
   const [chmodValue, setChmodValue] = useState("755");
   const [propertiesFile, setPropertiesFile] = useState<FileNode | null>(null);
-  const { openRemoteEditorTab } = useTabs();
   const addBookmark = useBookmarksStore((s) => s.addBookmark);
 
   const count = selectedPaths.size;
@@ -219,7 +219,7 @@ export function SftpContextMenu({
                 onClick={async () => {
                   if (!singlePath) return;
                   try {
-                    await openRemoteEditorTab(tabId, singlePath);
+                    await onOpenRemoteEditor(tabId, singlePath);
                   } catch (e) {
                     alert(String(e));
                   }

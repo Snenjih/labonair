@@ -19,7 +19,6 @@ function toggleHiddenFiles() {
 }
 import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
 import type { SftpTab } from "@/modules/tabs";
-import { useTabs } from "@/modules/tabs/lib/useTabs";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { SftpContextMenu } from "./components/SftpContextMenu";
@@ -32,9 +31,10 @@ import { parentPath } from "./utils";
 interface SftpPaneProps {
   tab: SftpTab;
   onOpenSshTerminal?: (hostId: string, title: string, cwd: string) => void;
+  onOpenRemoteEditor: (tabId: string, remotePath: string) => Promise<void>;
 }
 
-export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
+export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor }: SftpPaneProps) {
   const tabId = String(tab.id);
   const {
     initTab,
@@ -52,7 +52,6 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
   const hostLabel = host?.name ?? tab.title;
   const hostAddress = host?.host_address ?? "";
 
-  const { openRemoteEditorTab } = useTabs();
   const sftpFontSize = usePreferencesStore((s) => s.sftpFontSize);
   const sftpShowHiddenFiles = usePreferencesStore((s) => s.sftpShowHiddenFiles);
   const sftpShowUpFolder = usePreferencesStore((s) => s.sftpShowUpFolder);
@@ -131,7 +130,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
       loadRemoteDir(tabId, target);
       return;
     }
-    openRemoteEditorTab(tabId, file.path);
+    onOpenRemoteEditor(tabId, file.path).catch((e) => alert(String(e)));
   }
 
   function startRename(path: string) {
@@ -379,6 +378,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
                 onRefresh={() => loadLocalDir(tabId, localPath)}
                 onStartRename={startRename}
                 onStartNewFolder={() => { setCreatingFolderSide("local"); setNewFolderName(""); }}
+                onOpenRemoteEditor={onOpenRemoteEditor}
               >
                 <div className="h-full">
                   <VirtualizedFileList
@@ -496,6 +496,7 @@ export function SftpPane({ tab, onOpenSshTerminal }: SftpPaneProps) {
                   onRefresh={() => loadRemoteDir(tabId, remotePath)}
                   onStartRename={startRename}
                   onStartNewFolder={() => { setCreatingFolderSide("remote"); setNewFolderName(""); }}
+                  onOpenRemoteEditor={onOpenRemoteEditor}
                 >
                   <div className="h-full">
                     <VirtualizedFileList

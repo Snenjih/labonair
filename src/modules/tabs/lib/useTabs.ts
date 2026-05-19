@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef, useState } from "react";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTransferStore } from "@/modules/sftp/store/transferStore";
 
 // ─── Pane tree ────────────────────────────────────────────────────────────────
 
@@ -542,10 +544,60 @@ export function useTabs() {
 
   const openRemoteEditorTab = useCallback(
     async (sftpTabId: string, remotePath: string) => {
-      const localTempPath = await invoke<string>("prepare_remote_edit", {
-        sessionId: sftpTabId,
-        remote_path: remotePath,
-      });
+      const showTransfers = usePreferencesStore.getState().sftpRemoteEditShowTransfers;
+      const jobId = crypto.randomUUID();
+
+      if (showTransfers) {
+        useTransferStore.getState().addJob({
+          id: jobId,
+          session_id: sftpTabId,
+          src_path: remotePath,
+          dest_path: "(editor)",
+          direction: "download",
+          status: "running",
+          bytes_total: 0,
+          bytes_transferred: 0,
+          speed_bps: 0,
+        });
+      }
+
+      let localTempPath: string;
+      try {
+        localTempPath = await invoke<string>("prepare_remote_edit", {
+          sessionId: sftpTabId,
+          remotePath,
+        });
+      } catch (e) {
+        if (showTransfers) {
+          useTransferStore.getState().updateJob({
+            id: jobId,
+            session_id: sftpTabId,
+            src_path: remotePath,
+            dest_path: "(editor)",
+            direction: "download",
+            status: { failed: String(e) },
+            bytes_total: 0,
+            bytes_transferred: 0,
+            speed_bps: 0,
+          });
+        }
+        throw e;
+      }
+
+      if (showTransfers) {
+        useTransferStore.getState().updateJob({
+          id: jobId,
+          session_id: sftpTabId,
+          src_path: remotePath,
+          dest_path: "(editor)",
+          direction: "download",
+          status: "completed",
+          bytes_total: 1,
+          bytes_transferred: 1,
+          speed_bps: 0,
+        });
+      }
+
       const fileName = remotePath.split("/").pop() ?? "remote-file";
       const id = nextIdRef.current++;
       setTabs((t) => [

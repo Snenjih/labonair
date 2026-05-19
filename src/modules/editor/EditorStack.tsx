@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { EditorTab, Tab } from "@/modules/tabs";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTransferStore } from "@/modules/sftp/store/transferStore";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
@@ -92,13 +94,53 @@ export function EditorStack({
     let cb = savedCallbacks.current.get(t.id);
     if (!cb) {
       cb = () => {
+        const showTransfers = usePreferencesStore.getState().sftpRemoteEditShowTransfers;
+        const jobId = crypto.randomUUID();
+        if (showTransfers) {
+          useTransferStore.getState().addJob({
+            id: jobId,
+            session_id: t.remoteHostTabId!,
+            src_path: "(editor)",
+            dest_path: t.remotePath!,
+            direction: "upload",
+            status: "running",
+            bytes_total: 0,
+            bytes_transferred: 0,
+            speed_bps: 0,
+          });
+        }
         void invoke("save_remote_edit", {
           sessionId: t.remoteHostTabId,
-          remote_path: t.remotePath,
-          local_temp_path: t.path,
+          remotePath: t.remotePath,
+          localTempPath: t.path,
         }).then(() => {
-          console.info(`Saved ${t.remotePath} to remote server.`);
+          if (showTransfers) {
+            useTransferStore.getState().updateJob({
+              id: jobId,
+              session_id: t.remoteHostTabId!,
+              src_path: "(editor)",
+              dest_path: t.remotePath!,
+              direction: "upload",
+              status: "completed",
+              bytes_total: 1,
+              bytes_transferred: 1,
+              speed_bps: 0,
+            });
+          }
         }).catch((e: unknown) => {
+          if (showTransfers) {
+            useTransferStore.getState().updateJob({
+              id: jobId,
+              session_id: t.remoteHostTabId!,
+              src_path: "(editor)",
+              dest_path: t.remotePath!,
+              direction: "upload",
+              status: { failed: String(e) },
+              bytes_total: 0,
+              bytes_transferred: 0,
+              speed_bps: 0,
+            });
+          }
           console.error("Failed to save to remote:", e);
         });
       };

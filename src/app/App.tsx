@@ -92,6 +92,7 @@ export default function App() {
     newSshTab,
     newQuickSshTab,
     newSftpTab,
+    openRemoteEditorTab,
     openUntitledTab,
     setActivePaneId,
     updatePaneSessionCwd,
@@ -958,7 +959,7 @@ export default function App() {
                         )}
                         aria-hidden={activeId !== t.id}
                       >
-                        <SftpPane tab={t as SftpTab} onOpenSshTerminal={newSshTab} />
+                        <SftpPane tab={t as SftpTab} onOpenSshTerminal={newSshTab} onOpenRemoteEditor={openRemoteEditorTab} />
                       </div>
                     ))}
                   </div>
