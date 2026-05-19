@@ -69,9 +69,9 @@ jobs:
             RANGE="${PREV_TAG}..${CURRENT_TAG}"
           fi
 
-          FEATS=$(git log "$RANGE" --pretty=format:"%s" | grep -E '^feat' | sed 's/^feat[^:]*: //')
-          FIXES=$(git log "$RANGE" --pretty=format:"%s" | grep -E '^fix' | sed 's/^fix[^:]*: //')
-          OTHERS=$(git log "$RANGE" --pretty=format:"%s" | grep -vE '^(feat|fix|chore|ci|docs|style|test|build|refactor)' )
+          FEATS=$(git log "$RANGE" --pretty=format:"%s" | grep -E '^feat' | sed 's/^feat[^:]*: //' || true)
+          FIXES=$(git log "$RANGE" --pretty=format:"%s" | grep -E '^fix' | sed 's/^fix[^:]*: //' || true)
+          OTHERS=$(git log "$RANGE" --pretty=format:"%s" | grep -vE '^(feat|fix|chore|ci|docs|style|test|build|refactor)' || true)
 
           {
             echo "## What's Changed"
