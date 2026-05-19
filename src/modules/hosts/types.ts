@@ -1,3 +1,11 @@
+export interface TunnelConfig {
+  id: string;
+  type: "local";
+  local_port: number;
+  remote_host: string;
+  remote_port: number;
+}
+
 export interface Host {
   id: string;
   name: string;
@@ -18,6 +26,7 @@ export interface Host {
   keep_alive_interval?: number;
   keep_alive_tries?: number;
   sort_order: number;
+  tunnels?: string;
 }
 
 export interface Group {
@@ -45,6 +54,7 @@ export interface CreateHostPayload {
   keep_alive_interval?: number;
   keep_alive_tries?: number;
   sort_order?: number;
+  tunnels?: string;
 }
 
 export interface UpdateHostPayload extends Partial<CreateHostPayload> {
