@@ -104,13 +104,44 @@ async fn ping_host(host_address: String, port: u16) -> Result<bool, String> {
 }
 
 #[tauri::command]
+async fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+/// Calculates ideal settings window dimensions based on the monitor the main window lives on.
+/// Width is fixed at 860 logical px; height is 80% of monitor height, clamped [580, 900].
+fn settings_window_size(app: &tauri::AppHandle) -> (f64, f64) {
+    let monitor = app
+        .get_webview_window("main")
+        .and_then(|w| w.current_monitor().ok().flatten());
+    if let Some(m) = monitor {
+        let scale = m.scale_factor();
+        let logical_h = m.size().height as f64 / scale;
+        let h = (logical_h * 0.8).clamp(580.0, 900.0);
+        (860.0, h)
+    } else {
+        (860.0, 580.0)
+    }
+}
+
+#[tauri::command]
 async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Result<(), String> {
     let url_path = match tab.as_deref() {
         Some(t) if !t.is_empty() => format!("settings.html?tab={}", t),
         _ => "settings.html".to_string(),
     };
 
+    let (set_w, set_h) = settings_window_size(&app);
+
+    // Window already exists (hidden) — just resize, center and show it.
     if let Some(window) = app.get_webview_window("settings") {
+        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(set_w, set_h)));
+        let _ = window.center();
+        let _ = window.show();
         let _ = window.set_focus();
         if let Some(t) = tab.as_deref().filter(|s| !s.is_empty()) {
             // emit() serializes via JSON — no string-escape footgun, unlike
@@ -122,7 +153,7 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 
     let mut builder = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App(url_path.into()))
         .title("Settings")
-        .inner_size(860.0, 580.0)
+        .inner_size(set_w, set_h)
         .min_inner_size(720.0, 480.0)
         .max_inner_size(1400.0, 900.0)
         .resizable(true)
@@ -154,7 +185,20 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
     {
         let _ = window.set_decorations(false);
     }
-    let _ = window;
+
+    // Center the freshly-built window before the user sees it.
+    let _ = window.center();
+
+    // Intercept the close button: hide instead of destroying the webview so
+    // the next open() call is instant (React is already running in the background).
+    let window_clone = window.clone();
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            let _ = window_clone.hide();
+        }
+    });
+
     Ok(())
 }
 
@@ -403,6 +447,7 @@ pub fn run() {
             shell::shell_bg_logs,
             shell::shell_bg_kill,
             shell::shell_bg_list,
+            show_main_window,
             open_settings_window,
             secrets::secrets_get,
             secrets::secrets_set,
