@@ -89,6 +89,8 @@ export type Preferences = {
   sidebarPosition: "left" | "right";
   // --- Security ---
   credentialEncryption: boolean;
+  // --- Updates ---
+  checkForUpdates: boolean;
 };
 
 const STORE_PATH = "nexum-settings.json";
@@ -137,6 +139,7 @@ const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
 const KEY_SIDEBAR_POSITION = "sidebarPosition";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
+const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -184,6 +187,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
   sidebarPosition: "left",
   credentialEncryption: false,
+  checkForUpdates: true,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -293,6 +297,8 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.sidebarPosition,
     credentialEncryption:
       get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
+    checkForUpdates:
+      get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
   };
 }
 
@@ -506,6 +512,11 @@ export async function setCredentialEncryption(value: boolean): Promise<void> {
   await store.save();
 }
 
+export async function setCheckForUpdates(value: boolean): Promise<void> {
+  await store.set(KEY_CHECK_FOR_UPDATES, value);
+  await store.save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -557,6 +568,7 @@ export function onPreferencesChange(
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
+    [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
   };
   return store.onChange<unknown>((key, value) => {
     const mapped = map[key];

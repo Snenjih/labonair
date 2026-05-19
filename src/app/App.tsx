@@ -57,7 +57,6 @@ import {
 import { WorkspacePane, type TerminalPaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
 import { useThemeEngine } from "@/lib/useThemeEngine";
-import { UpdaterDialog } from "@/modules/updater";
 import { homeDir } from "@tauri-apps/api/path";
 import type { SearchAddon } from "@xterm/addon-search";
 import { AnimatePresence, motion } from "motion/react";
@@ -956,7 +955,6 @@ export default function App() {
             onOpenChange={setShortcutsOpen}
           />
 
-          <UpdaterDialog />
         </div>
       </TooltipProvider>
     </ThemeProvider>
