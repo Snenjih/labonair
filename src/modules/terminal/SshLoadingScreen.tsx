@@ -163,6 +163,10 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
           }).catch(console.error);
           pendingPasswordRef.current = null;
         }
+        // Start tunnels on a dedicated background SSH connection (non-blocking).
+        if (hostId) {
+          invoke("ssh_start_tunnels", { hostId }).catch(console.error);
+        }
         onConnected();
       }),
     ]).then((unlisteners) => {

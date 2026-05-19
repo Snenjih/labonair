@@ -3,7 +3,7 @@ mod modules;
 use modules::{
     fs, pty, secrets, shell,
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete}},
-    ssh::{SshState, TrustState, client::{ssh_connect, ssh_connect_quick, ssh_trust_host, ssh_remove_known_host, ssh_disconnect}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_rename, sftp_delete, sftp_mkdir, sftp_chmod, sftp_calculate_size, sftp_chown, sftp_deep_search, prepare_remote_edit, save_remote_edit}},
+    ssh::{SshState, TrustState, client::{ssh_connect, ssh_connect_quick, ssh_trust_host, ssh_remove_known_host, ssh_disconnect}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_rename, sftp_delete, sftp_mkdir, sftp_chmod, sftp_calculate_size, sftp_chown, sftp_deep_search, prepare_remote_edit, save_remote_edit}, tunnels::{TunnelState, ssh_start_tunnels, ssh_stop_tunnels}},
     sftp::{TransferWorkerState, commands::{enqueue_transfer, cancel_transfer, resolve_conflict}, worker::run_worker},
     themes::{themes_get_all, theme_import, theme_export, theme_delete, theme_fetch_index, theme_download},
 };
@@ -303,6 +303,7 @@ pub fn run() {
             let ssh_state_for_worker = ssh_state.clone();
             app.manage(ssh_state);
             app.manage(TrustState::default());
+            app.manage(TunnelState::default());
 
             let (tx, rx) = tokio::sync::mpsc::channel(100);
             let conflicts = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
@@ -423,6 +424,8 @@ pub fn run() {
             ssh_trust_host,
             ssh_remove_known_host,
             ssh_disconnect,
+            ssh_start_tunnels,
+            ssh_stop_tunnels,
             ssh_exec_command,
             ssh_pty_write,
             ssh_pty_resize,

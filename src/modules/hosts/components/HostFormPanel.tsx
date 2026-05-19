@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHostsStore } from "../store/hostsStore";
-import type { CreateHostPayload, Host } from "../types";
+import type { CreateHostPayload, Host, TunnelConfig } from "../types";
 
 interface Props {
   /** If null, panel is in "add new" mode */
@@ -80,6 +80,21 @@ const DEFAULT_FORM: FormState = {
   default_path_sftp: "",
 };
 
+function parseTunnels(raw?: string): TunnelConfig[] {
+  if (!raw) return [];
+  try { return JSON.parse(raw) as TunnelConfig[]; } catch { return []; }
+}
+
+function newTunnel(): TunnelConfig {
+  return {
+    id: crypto.randomUUID(),
+    type: "local",
+    local_port: 8080,
+    remote_host: "127.0.0.1",
+    remote_port: 8080,
+  };
+}
+
 export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props) {
   const isNew = hostId === "__new__" || hostId === null;
 
@@ -97,10 +112,12 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tunnels, setTunnels] = useState<TunnelConfig[]>(() => parseTunnels(host?.tunnels));
 
   useEffect(() => {
     if (!isNew && host) {
       setForm(hostToForm(host));
+      setTunnels(parseTunnels(host.tunnels));
     }
   }, [hostId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -127,6 +144,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
         if (form.default_path_sftp) payload.default_path_sftp = form.default_path_sftp;
         if (form.keep_alive_interval) payload.keep_alive_interval = parseInt(form.keep_alive_interval, 10);
         if (form.keep_alive_tries) payload.keep_alive_tries = parseInt(form.keep_alive_tries, 10);
+        payload.tunnels = JSON.stringify(tunnels);
         await updateHost(payload as unknown as import("../types").UpdateHostPayload);
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
@@ -134,7 +152,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
         setSaving(false);
       }
     }, 300);
-  }, [isNew, host, form, password, updateHost]);
+  }, [isNew, host, form, password, tunnels, updateHost]);
 
   const handleCreate = async () => {
     if (!form.name.trim() || !form.host_address.trim() || !form.username.trim()) return;
@@ -235,10 +253,11 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
 
       {/* Tabs */}
       <Tabs defaultValue="general" className="flex flex-col flex-1 overflow-hidden">
-        <TabsList className="mx-4 mt-3 mb-0 shrink-0 grid grid-cols-3">
+        <TabsList className="mx-4 mt-3 mb-0 shrink-0 grid grid-cols-4">
           <TabsTrigger value="general" className="text-xs">General</TabsTrigger>
           <TabsTrigger value="ssh" className="text-xs">SSH</TabsTrigger>
           <TabsTrigger value="sftp" className="text-xs">SFTP</TabsTrigger>
+          <TabsTrigger value="tunnels" className="text-xs">Tunnels</TabsTrigger>
         </TabsList>
 
         {/* GENERAL TAB */}
@@ -476,6 +495,106 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
               </p>
             </div>
           </section>
+        </TabsContent>
+
+        {/* TUNNELS TAB */}
+        <TabsContent value="tunnels" className="flex-1 overflow-y-auto px-4 py-4 space-y-3 mt-0">
+          {tunnels.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/50">
+                <path d="M12 5v14M5 12h14M3 3l18 18" />
+              </svg>
+              <p className="text-xs text-muted-foreground">No tunnels configured</p>
+              <p className="text-[11px] text-muted-foreground/60 max-w-[200px]">Local port forwarding routes traffic through this SSH connection</p>
+              {!isNew && (
+                <Button size="sm" variant="outline" className="h-7 text-xs mt-1" onClick={() => {
+                  const updated = [...tunnels, newTunnel()];
+                  setTunnels(updated);
+                  setTimeout(handleBlur, 0);
+                }}>
+                  Add Tunnel
+                </Button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {tunnels.map((tunnel, i) => (
+                  <div key={tunnel.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <div className="space-y-1 w-20">
+                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Local Port</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={65535}
+                          value={tunnel.local_port}
+                          onChange={(e) => {
+                            const updated = tunnels.map((t, idx) => idx === i ? { ...t, local_port: parseInt(e.target.value) || t.local_port } : t);
+                            setTunnels(updated);
+                          }}
+                          onBlur={handleBlur}
+                          className="h-7 text-xs bg-background"
+                        />
+                      </div>
+                      <div className="pt-5 text-muted-foreground text-sm select-none">→</div>
+                      <div className="space-y-1 flex-1">
+                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Remote Host</Label>
+                        <Input
+                          type="text"
+                          placeholder="127.0.0.1"
+                          value={tunnel.remote_host}
+                          onChange={(e) => {
+                            const updated = tunnels.map((t, idx) => idx === i ? { ...t, remote_host: e.target.value } : t);
+                            setTunnels(updated);
+                          }}
+                          onBlur={handleBlur}
+                          className="h-7 text-xs bg-background"
+                        />
+                      </div>
+                      <div className="space-y-1 w-20">
+                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Remote Port</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={65535}
+                          value={tunnel.remote_port}
+                          onChange={(e) => {
+                            const updated = tunnels.map((t, idx) => idx === i ? { ...t, remote_port: parseInt(e.target.value) || t.remote_port } : t);
+                            setTunnels(updated);
+                          }}
+                          onBlur={handleBlur}
+                          className="h-7 text-xs bg-background"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          const updated = tunnels.filter((_, idx) => idx !== i);
+                          setTunnels(updated);
+                          setTimeout(handleBlur, 0);
+                        }}
+                        className="pt-5 text-muted-foreground hover:text-destructive transition-colors"
+                        title="Remove tunnel"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {!isNew && (
+                <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={() => {
+                  const updated = [...tunnels, newTunnel()];
+                  setTunnels(updated);
+                  setTimeout(handleBlur, 0);
+                }}>
+                  + Add Tunnel
+                </Button>
+              )}
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>

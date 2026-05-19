@@ -20,6 +20,7 @@ pub struct Host {
     pub keep_alive_interval: Option<i64>,
     pub keep_alive_tries: Option<i64>,
     pub sort_order: i64,
+    pub tunnels: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
