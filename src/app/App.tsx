@@ -59,6 +59,7 @@ import { ThemeProvider } from "@/modules/theme";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { UpdaterDialog } from "@/modules/updater";
 import { homeDir } from "@tauri-apps/api/path";
+import { listen } from "@tauri-apps/api/event";
 import type { SearchAddon } from "@xterm/addon-search";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -591,6 +592,86 @@ export default function App() {
   );
 
   useGlobalShortcuts(shortcutHandlers);
+
+  // Native menu bar event bridge — Rust emits "menu:<id>" for every menu click
+  // that isn't handled directly in the backend (settings window, quit, etc.).
+  useEffect(() => {
+    const cleanups: Array<() => void> = [];
+    const on = (event: string, handler: () => void) => {
+      listen(event, handler).then((unlisten) => cleanups.push(unlisten));
+    };
+
+    on("menu:new_terminal_tab",   () => openNewTab());
+    on("menu:new_ssh_tab",        () => openHomeTab());
+    on("menu:new_sftp_tab",       () => openHomeTab());
+    on("menu:new_preview_tab",    () => openPreviewTab(""));
+    on("menu:new_editor_tab",     () => void openUntitledTab());
+    on("menu:close_tab",          () => handleClose(activeId));
+    on("menu:close_pane",         () => {
+      if (activeTab?.kind === "workspace") closePane(activeId, activeTab.activePaneId);
+    });
+    on("menu:toggle_sidebar",     () => toggleSidebar());
+    on("menu:toggle_ai",          () => togglePanelAndFocus());
+    on("menu:toggle_ai_2",        () => togglePanelAndFocus());
+    on("menu:zoom_in", () => {
+      const kind = activeTab?.kind;
+      if (kind === "workspace") void setTerminalFontSize(Math.min(usePreferencesStore.getState().terminalFontSize + 1, 32));
+      else if (kind === "editor") void setEditorFontSize(Math.min(usePreferencesStore.getState().editorFontSize + 1, 32));
+      else if (kind === "sftp")   void setSftpFontSize(Math.min(usePreferencesStore.getState().sftpFontSize + 1, 20));
+    });
+    on("menu:zoom_out", () => {
+      const kind = activeTab?.kind;
+      if (kind === "workspace") void setTerminalFontSize(Math.max(usePreferencesStore.getState().terminalFontSize - 1, 8));
+      else if (kind === "editor") void setEditorFontSize(Math.max(usePreferencesStore.getState().editorFontSize - 1, 8));
+      else if (kind === "sftp")   void setSftpFontSize(Math.max(usePreferencesStore.getState().sftpFontSize - 1, 10));
+    });
+    on("menu:zoom_reset", () => {
+      const kind = activeTab?.kind;
+      if (kind === "workspace") void setTerminalFontSize(DEFAULT_PREFERENCES.terminalFontSize);
+      else if (kind === "editor") void setEditorFontSize(DEFAULT_PREFERENCES.editorFontSize);
+      else if (kind === "sftp")   void setSftpFontSize(DEFAULT_PREFERENCES.sftpFontSize);
+    });
+    on("menu:split_pane_right",   () => {
+      if (activeTab?.kind === "workspace") splitPane(activeId, "horizontal");
+    });
+    on("menu:split_pane_down",    () => {
+      if (activeTab?.kind === "workspace") splitPane(activeId, "vertical");
+    });
+    on("menu:find",               () => searchInlineRef.current?.focus());
+    on("menu:open_shortcuts",     () => setShortcutsOpen(true));
+    on("menu:next_tab",           () => cycleTab(1));
+    on("menu:prev_tab",           () => cycleTab(-1));
+    on("menu:open_host_manager",  () => openHomeTab());
+    on("menu:new_ssh_connection", () => openHomeTab());
+    on("menu:new_quick_ssh",      () => openHomeTab());
+    on("menu:ask_selection",      () => askFromSelection());
+    on("menu:new_ai_session",     () => {
+      useChatStore.getState().newSession();
+      togglePanelAndFocus();
+    });
+    on("menu:clear_chat",         () => {
+      const { activeSessionId, deleteSession, newSession } = useChatStore.getState();
+      if (activeSessionId) deleteSession(activeSessionId);
+      newSession();
+    });
+
+    return () => cleanups.forEach((fn) => fn());
+  }, [
+    activeId,
+    activeTab,
+    openNewTab,
+    openHomeTab,
+    openPreviewTab,
+    openUntitledTab,
+    handleClose,
+    closePane,
+    toggleSidebar,
+    togglePanelAndFocus,
+    splitPane,
+    cycleTab,
+    askFromSelection,
+    searchInlineRef,
+  ]);
 
   const registerEditorHandle = useCallback(
     (id: number, h: EditorPaneHandle | null) => {
