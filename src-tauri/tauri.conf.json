@@ -22,7 +22,7 @@
         "maxHeight": 1600,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "visible": true
+        "visible": false
       }
     ],
     "security": {

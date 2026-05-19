@@ -8,6 +8,7 @@ use modules::{
     themes::{themes_get_all, theme_import, theme_export, theme_delete, theme_fetch_index, theme_download},
 };
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_window_state::StateFlags;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 
 /// Clamps the window position and size so it fits entirely within the current monitor.
@@ -273,7 +274,14 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                // Exclude VISIBLE so the plugin never forces the window visible
+                // before React has mounted — avoids the transparent shadow flash
+                // on Windows/Linux. The frontend calls show() after first paint.
+                .with_state_flags(StateFlags::all() & !StateFlags::VISIBLE)
+                .build(),
+        )
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_os::init())
@@ -305,13 +313,34 @@ pub fn run() {
             });
             app.manage(TransferWorkerState { sender: tx, conflicts });
 
-            // Clamp the main window to the monitor bounds after tauri_plugin_window_state
-            // has had a chance to restore the previous session's geometry (~1 frame later).
+            // Read the restoreWindowState preference directly from the store file.
+            // The window-state plugin has already applied the saved geometry by this point;
+            // if the user has disabled the feature we reset to defaults instead.
+            let settings_path = app.path().app_local_data_dir()
+                .map(|d| d.join("nexum-settings.json"));
+            let restore_window = settings_path
+                .ok()
+                .and_then(|p| std::fs::read_to_string(p).ok())
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                .and_then(|v| v.get("restoreWindowState").and_then(|b| b.as_bool()))
+                .unwrap_or(true);
+
+            // After the window-state plugin has restored geometry, either clamp to
+            // monitor bounds (restore enabled) or reset to the default 800×600 centered
+            // (restore disabled). A short sleep lets the plugin finish its async work.
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(150)).await;
                 if let Some(window) = app_handle.get_webview_window("main") {
-                    clamp_window_to_monitor(&window);
+                    if restore_window {
+                        clamp_window_to_monitor(&window);
+                    } else {
+                        let _ = window.set_size(tauri::Size::Physical(PhysicalSize {
+                            width: 800,
+                            height: 600,
+                        }));
+                        let _ = window.center();
+                    }
                 }
             });
 
