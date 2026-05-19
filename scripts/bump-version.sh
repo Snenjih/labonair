@@ -20,12 +20,17 @@ fi
 
 if [ $# -eq 0 ]; then
   echo -e "${YELLOW}Current version: ${CURRENT_VERSION}${NC}"
-  echo "Usage: $0 <new-version>"
+  echo "Usage: $0 <new-version> [-y]"
   echo "Example: $0 0.6.0"
+  echo "         $0 0.6.0 -y  (auto-commit, tag and push)"
   exit 1
 fi
 
 NEW_VERSION=$1
+AUTO_CONFIRM=false
+if [[ "$2" == "-y" ]]; then
+  AUTO_CONFIRM=true
+fi
 
 # Validate version format (simple check for X.Y.Z)
 if ! [[ $NEW_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -57,8 +62,17 @@ echo "  - package.json"
 echo "  - src-tauri/Cargo.toml"
 echo "  - src-tauri/tauri.conf.json"
 echo ""
-echo -e "${YELLOW}Next steps:${NC}"
-echo "  git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json"
-echo "  git commit -m \"chore: bump version to ${NEW_VERSION}\""
-echo "  git tag v${NEW_VERSION}"
-echo "  git push origin main --tags"
+if [ "$AUTO_CONFIRM" = true ]; then
+  echo -e "${YELLOW}Auto-committing changes...${NC}"
+  git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+  git commit -m "chore: bump version to ${NEW_VERSION}"
+  git tag "v${NEW_VERSION}"
+  git push origin main --tags
+  echo -e "${GREEN}🚀 Committed, tagged and pushed v${NEW_VERSION}${NC}"
+else
+  echo -e "${YELLOW}Next steps:${NC}"
+  echo "  git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json"
+  echo "  git commit -m \"chore: bump version to ${NEW_VERSION}\""
+  echo "  git tag v${NEW_VERSION}"
+  echo "  git push origin main --tags"
+fi
