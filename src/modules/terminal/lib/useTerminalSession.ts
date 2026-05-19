@@ -155,12 +155,14 @@ export function useTerminalSession({
       term.open(container.current);
       fit.fit();
 
-      try {
-        const webgl = new WebglAddon();
-        webgl.onContextLoss(() => webgl.dispose());
-        term.loadAddon(webgl);
-      } catch (e) {
-        console.warn("WebGL renderer unavailable:", e);
+      if (prefs.terminalUseWebGL) {
+        try {
+          const webgl = new WebglAddon();
+          webgl.onContextLoss(() => webgl.dispose());
+          term.loadAddon(webgl);
+        } catch (e) {
+          console.warn("WebGL renderer unavailable:", e);
+        }
       }
 
       const prompt = registerPromptTracker(term);

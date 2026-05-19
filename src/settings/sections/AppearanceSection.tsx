@@ -3,37 +3,52 @@ import {
   setAppFontFamily,
   setAppFontSize,
   setAppLineHeight,
+  setSidebarPosition,
 } from "@/modules/settings/store";
-import { type ThemeMeta } from "@/lib/useThemeEngine";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
-import { ThemePicker } from "../components/ThemePicker";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-type Props = {
-  themes: ThemeMeta[];
-  onThemesRefresh: () => void;
-};
-
-export function AppearanceSection({ themes, onThemesRefresh }: Props) {
+export function AppearanceSection() {
   const appFontFamily = usePreferencesStore((s) => s.appFontFamily);
   const appFontSize = usePreferencesStore((s) => s.appFontSize);
   const appLineHeight = usePreferencesStore((s) => s.appLineHeight);
+  const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
 
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
         title="Appearance"
-        description="Color themes and interface typography."
+        description="Interface typography and layout settings."
       />
 
       <div className="flex flex-col gap-2">
-        <Label>Theme</Label>
+        <Label>Layout</Label>
         <SettingRow
-          title="Color theme"
-          description="Choose or import a JSON color theme for the application."
+          title="Sidebar position"
+          description="Display the file explorer on the left or right side of the workspace."
         >
-          <ThemePicker themes={themes} onRefresh={onThemesRefresh} />
+          <Select
+            value={sidebarPosition}
+            onValueChange={(v) =>
+              void setSidebarPosition(v as "left" | "right")
+            }
+          >
+            <SelectTrigger className="h-7 w-24 text-[11.5px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="left" className="text-[11.5px]">Left</SelectItem>
+              <SelectItem value="right" className="text-[11.5px]">Right</SelectItem>
+            </SelectContent>
+          </Select>
         </SettingRow>
       </div>
 

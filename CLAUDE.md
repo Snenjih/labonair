@@ -16,12 +16,13 @@ When implementing complex tasks, use the tasks feature and make yourself plans f
 | TypeScript check | `pnpm exec tsc --noEmit` |
 | Rust check | `cd src-tauri && cargo check` |
 | Rust lint | `cd src-tauri && cargo clippy` |
+| Add shadcn component | `pnpm dlx shadcn add <name>` |
 
 Package manager: **pnpm**. Bundle id: `com.nexum.app`.
 
 ## Session START Protocol
 Whenever a new conversation/session starts, you MUST:
-1. Read `handshake.md` to understand exactly where the last session left off.
+1. Read `handshake.md` (repo root) to understand exactly where the last session left off.
 2. Check `tasks/README.md` to identify the current `in_progress` task.
 3. Read the specific active `tasks/TASK_*.md` file before writing any code.
 4. Briefly summarize to the user what you are going to do next based on this state.
@@ -35,7 +36,16 @@ Before working on any area, read the relevant context file:
 - **Host Manager UI** → [`hosts_manager_context.md`](./hosts_manager_context.md) — Master-Detail layout, TitleBar dropdown, Inspector pane, Zustand store shape
 - **Host Manager Overhaul** → [`host_manager_overhaul_context.md`](./host_manager_overhaul_context.md) — Full implementation reference: new data model, IPC contracts, HostFormPanel tabs, dnd-kit reorder, multi-select, context menu, loading fix, future work
 - **macOS TCP socket2 Fix** → [`macos_tcp_socket2_context.md`](./macos_tcp_socket2_context.md) — Local network SSH "No route to host" fix using socket2 + IPv4-only filtering; design decisions & rationale
-- **PRs** when i ask you to create a pr read .github/PULL_REQUEST_TEMPLATE.md and then create a pr using that template, with the "gh" command
+
+## Pull Requests
+Read `.github/PULL_REQUEST_TEMPLATE.md` and create PRs using that template via the `gh` command.
+
+### PR Creation Workflow (automatic)
+When asked to create a PR for current changes, always follow this sequence without asking:
+1. **Branch** — if currently on `main`, derive a branch name from the work (e.g. `feat/short-description`) and run `git checkout -b <branch>`.
+2. **Commit** — stage and commit all relevant changes with a conventional commit message.
+3. **Push** — `git push -u origin <branch>`.
+4. **Open PR** — `gh pr create` using the PR template, targeting `main`.
 
 ## Architecture Summary
 ```
@@ -52,13 +62,6 @@ Nexum (Tauri v2)
     ├── ssh2 → SSH + SFTP protocol
     └── tokio mpsc → background transfer queue worker
 ```
-
-## New Module Locations
-- `src/modules/hosts/` — Home Dashboard, HostInspector, Zustand hostsStore
-- `src/modules/sftp/` — SftpPane, VirtualizedFileList, transferStore
-- `src-tauri/src/modules/hosts/` — SQLite CRUD commands
-- `src-tauri/src/modules/ssh/` — SSH connect, PTY, SFTP backend
-- `src-tauri/src/modules/sftp/` — Transfer worker
 
 ## Critical Rules (NEVER Violate)
 1. **No Node.js in frontend** — All system calls via `invoke()` / Tauri events only
@@ -160,3 +163,10 @@ BYOK. Currently OpenAI-only via `@ai-sdk/openai`; default model in `config.ts` (
 ### Tauri capabilities
 
 `src-tauri/capabilities/default.json` is the allowlist for plugin APIs available to the webview. New plugins (dialog, keyring, store, opener, os, log are already wired in `lib.rs`) usually need both a `Cargo.toml` dep, a `.plugin(...)` line in `lib.rs`, and a capability entry.
+
+### Adding a new Tauri command
+
+1. Define an `async fn` in the relevant `src-tauri/src/modules/*/` file, annotated with `#[tauri::command]`.
+2. Register it in the `.invoke_handler(tauri::generate_handler![..., your_command])` call in `src-tauri/src/lib.rs`.
+3. Call it from the frontend via `invoke("your_command", { ...args })`.
+4. No capability entry is needed for custom commands (only for plugins).

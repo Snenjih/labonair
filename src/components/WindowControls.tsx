@@ -6,12 +6,22 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 export function WindowControls() {
   if (!USE_CUSTOM_WINDOW_CONTROLS) return null;
 
+  function handleClose() {
+    const win = getCurrentWindow();
+    // Settings window is hidden instead of destroyed so next open is instant.
+    if (win.label === "settings") {
+      void win.hide();
+    } else {
+      void win.close();
+    }
+  }
+
   return (
     <div className="flex h-full shrink-0 items-center">
       <button
         type="button"
         aria-label="Close"
-        onClick={() => void getCurrentWindow().close()}
+        onClick={handleClose}
         className="grid h-full w-10 place-items-center text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
       >
         <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />

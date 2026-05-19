@@ -65,6 +65,9 @@ export type Preferences = {
   terminalLetterSpacing: number;
   terminalLineHeight: number;
   terminalFontWeight: "normal" | "medium" | "bold";
+  terminalShowPaneHeader: boolean;
+  terminalShowPaneFooter: boolean;
+  terminalUseWebGL: boolean;
 
   // --- Editor ---
   editorFontSize: number;
@@ -82,6 +85,13 @@ export type Preferences = {
   sftpColumnModified: boolean;
   sftpColumnPermissions: boolean;
   sftpColumnType: boolean;
+
+  // --- Sidebar ---
+  sidebarPosition: "left" | "right";
+  // --- Security ---
+  credentialEncryption: boolean;
+  // --- Updates ---
+  checkForUpdates: boolean;
 };
 
 const STORE_PATH = "nexum-settings.json";
@@ -110,6 +120,9 @@ const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
 const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_LINE_HEIGHT = "terminalLineHeight";
 const KEY_TERMINAL_FONT_WEIGHT = "terminalFontWeight";
+const KEY_TERMINAL_SHOW_PANE_HEADER = "terminalShowPaneHeader";
+const KEY_TERMINAL_SHOW_PANE_FOOTER = "terminalShowPaneFooter";
+const KEY_TERMINAL_USE_WEBGL = "terminalUseWebGL";
 
 const KEY_EDITOR_FONT_SIZE = "editorFontSize";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
@@ -125,6 +138,10 @@ const KEY_SFTP_COLUMN_SIZE = "sftpColumnSize";
 const KEY_SFTP_COLUMN_MODIFIED = "sftpColumnModified";
 const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
 const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
+const KEY_SIDEBAR_POSITION = "sidebarPosition";
+
+const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
+const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -152,6 +169,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalLetterSpacing: 0,
   terminalLineHeight: 1.05,
   terminalFontWeight: "normal",
+  terminalShowPaneHeader: false,
+  terminalShowPaneFooter: false,
+  terminalUseWebGL: true,
 
   editorFontSize: 13,
   editorAutoSave: "off",
@@ -167,6 +187,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpColumnModified: true,
   sftpColumnPermissions: true,
   sftpColumnType: false,
+
+  sidebarPosition: "left",
+  credentialEncryption: false,
+  checkForUpdates: true,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -233,6 +257,15 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalFontWeight:
       get<"normal" | "medium" | "bold">(KEY_TERMINAL_FONT_WEIGHT) ??
       DEFAULT_PREFERENCES.terminalFontWeight,
+    terminalShowPaneHeader:
+      get<boolean>(KEY_TERMINAL_SHOW_PANE_HEADER) ??
+      DEFAULT_PREFERENCES.terminalShowPaneHeader,
+    terminalShowPaneFooter:
+      get<boolean>(KEY_TERMINAL_SHOW_PANE_FOOTER) ??
+      DEFAULT_PREFERENCES.terminalShowPaneFooter,
+    terminalUseWebGL:
+      get<boolean>(KEY_TERMINAL_USE_WEBGL) ??
+      DEFAULT_PREFERENCES.terminalUseWebGL,
 
     editorFontSize:
       get<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
@@ -264,6 +297,14 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_SFTP_COLUMN_PERMISSIONS) ?? DEFAULT_PREFERENCES.sftpColumnPermissions,
     sftpColumnType:
       get<boolean>(KEY_SFTP_COLUMN_TYPE) ?? DEFAULT_PREFERENCES.sftpColumnType,
+
+    sidebarPosition:
+      get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
+      DEFAULT_PREFERENCES.sidebarPosition,
+    credentialEncryption:
+      get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
+    checkForUpdates:
+      get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
   };
 }
 
@@ -388,6 +429,21 @@ export async function setTerminalFontWeight(
   await store.save();
 }
 
+export async function setTerminalShowPaneHeader(value: boolean): Promise<void> {
+  await store.set(KEY_TERMINAL_SHOW_PANE_HEADER, value);
+  await store.save();
+}
+
+export async function setTerminalShowPaneFooter(value: boolean): Promise<void> {
+  await store.set(KEY_TERMINAL_SHOW_PANE_FOOTER, value);
+  await store.save();
+}
+
+export async function setTerminalUseWebGL(value: boolean): Promise<void> {
+  await store.set(KEY_TERMINAL_USE_WEBGL, value);
+  await store.save();
+}
+
 export async function setEditorFontSize(value: number): Promise<void> {
   await store.set(KEY_EDITOR_FONT_SIZE, value);
   await store.save();
@@ -455,6 +511,23 @@ export async function setSftpColumnType(value: boolean): Promise<void> {
   await store.save();
 }
 
+export async function setSidebarPosition(
+  value: "left" | "right",
+): Promise<void> {
+  await store.set(KEY_SIDEBAR_POSITION, value);
+  await store.save();
+}
+
+export async function setCredentialEncryption(value: boolean): Promise<void> {
+  await store.set(KEY_CREDENTIAL_ENCRYPTION, value);
+  await store.save();
+}
+
+export async function setCheckForUpdates(value: boolean): Promise<void> {
+  await store.set(KEY_CHECK_FOR_UPDATES, value);
+  await store.save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -487,6 +560,9 @@ export function onPreferencesChange(
     [KEY_TERMINAL_LETTER_SPACING]: "terminalLetterSpacing",
     [KEY_TERMINAL_LINE_HEIGHT]: "terminalLineHeight",
     [KEY_TERMINAL_FONT_WEIGHT]: "terminalFontWeight",
+    [KEY_TERMINAL_SHOW_PANE_HEADER]: "terminalShowPaneHeader",
+    [KEY_TERMINAL_SHOW_PANE_FOOTER]: "terminalShowPaneFooter",
+    [KEY_TERMINAL_USE_WEBGL]: "terminalUseWebGL",
 
     [KEY_EDITOR_FONT_SIZE]: "editorFontSize",
     [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
@@ -502,6 +578,9 @@ export function onPreferencesChange(
     [KEY_SFTP_COLUMN_MODIFIED]: "sftpColumnModified",
     [KEY_SFTP_COLUMN_PERMISSIONS]: "sftpColumnPermissions",
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
+    [KEY_SIDEBAR_POSITION]: "sidebarPosition",
+    [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
+    [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
   };
   return store.onChange<unknown>((key, value) => {
     const mapped = map[key];

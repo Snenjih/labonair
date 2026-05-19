@@ -9,9 +9,9 @@ fn shell_quote(s: &str) -> String {
 /// Extract the SFTP Arc under a brief outer-lock, then release it so the
 /// PTY reader thread can acquire the same lock without waiting for I/O.
 macro_rules! get_sftp_arc {
-    ($state_inner:expr, $tab_id:expr) => {{
+    ($state_inner:expr, $session_id:expr) => {{
         let map = $state_inner.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get($tab_id).ok_or("no session for tab")?;
+        let entry = map.get($session_id).ok_or("no session for tab")?;
         entry
             .sftp
             .as_ref()
@@ -46,18 +46,18 @@ fn mode_to_string(mode: u32) -> String {
 
 #[tauri::command]
 pub async fn sftp_read_dir(
-    tab_id: String,
+    session_id: String,
     path: String,
     state: tauri::State<'_, SshState>,
 ) -> Result<Vec<FileNode>, String> {
     let state_inner = state.inner().clone();
 
     tokio::task::spawn_blocking(move || {
-        log::debug!("[SFTP] sftp_read_dir: tab={} path={}", tab_id, path);
+        log::debug!("[SFTP] sftp_read_dir: tab={} path={}", session_id, path);
 
         // Acquire Arc under brief lock, then release outer lock before I/O.
         let sftp_arc: Arc<std::sync::Mutex<crate::modules::ssh::SftpHandle>> =
-            get_sftp_arc!(state_inner, &tab_id);
+            get_sftp_arc!(state_inner, &session_id);
 
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
         log::debug!("[SFTP] readdir({})…", path);
@@ -127,14 +127,14 @@ pub async fn sftp_read_dir(
 
 #[tauri::command]
 pub async fn sftp_rename(
-    tab_id: String,
+    session_id: String,
     old_path: String,
     new_path: String,
     state: tauri::State<'_, SshState>,
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
         sftp.0.rename(
             std::path::Path::new(&old_path),
@@ -149,13 +149,13 @@ pub async fn sftp_rename(
 
 #[tauri::command]
 pub async fn sftp_delete(
-    tab_id: String,
+    session_id: String,
     paths: Vec<String>,
     state: tauri::State<'_, SshState>,
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
 
         for path in &paths {
@@ -175,13 +175,13 @@ pub async fn sftp_delete(
 
 #[tauri::command]
 pub async fn sftp_mkdir(
-    tab_id: String,
+    session_id: String,
     path: String,
     state: tauri::State<'_, SshState>,
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
         sftp.0.mkdir(std::path::Path::new(&path), 0o755)
             .map_err(|e| e.to_string())
@@ -192,14 +192,14 @@ pub async fn sftp_mkdir(
 
 #[tauri::command]
 pub async fn sftp_chmod(
-    tab_id: String,
+    session_id: String,
     path: String,
     permissions: u32,
     state: tauri::State<'_, SshState>,
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
         let mut stat = sftp.0
             .stat(std::path::Path::new(&path))
@@ -214,14 +214,14 @@ pub async fn sftp_chmod(
 
 #[tauri::command]
 pub async fn prepare_remote_edit(
-    tab_id: String,
+    session_id: String,
     remote_path: String,
     state: tauri::State<'_, SshState>,
 ) -> Result<String, String> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let file_data = {
-            let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+            let sftp_arc = get_sftp_arc!(state_inner, &session_id);
             let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
             let stat = sftp.0
                 .stat(std::path::Path::new(&remote_path))
@@ -257,7 +257,7 @@ pub async fn prepare_remote_edit(
 
 #[tauri::command]
 pub async fn save_remote_edit(
-    tab_id: String,
+    session_id: String,
     remote_path: String,
     local_temp_path: String,
     state: tauri::State<'_, SshState>,
@@ -273,7 +273,7 @@ pub async fn save_remote_edit(
             return Err("temp path is outside the allowed directory".to_string());
         }
         let data = std::fs::read(&canonical).map_err(|e| e.to_string())?;
-        let sftp_arc = get_sftp_arc!(state_inner, &tab_id);
+        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
         let mut remote_file = sftp.0
             .create(std::path::Path::new(&remote_path))
@@ -287,14 +287,14 @@ pub async fn save_remote_edit(
 /// Run `du -sh '<path>'` on the remote server and return the human-readable size.
 #[tauri::command]
 pub async fn sftp_calculate_size(
-    tab_id: String,
+    session_id: String,
     path: String,
     state: tauri::State<'_, SshState>,
 ) -> Result<String, String> {
     // Clone the session Arc first so we can release the outer SshState lock
     // before blocking on network I/O (avoids blocking sftp_read_dir).
     let state_inner = state.inner().clone();
-    let session_arc = crate::get_session_arc!(state_inner, &tab_id);
+    let session_arc = crate::get_session_arc!(state_inner, &session_id);
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
         let sess = session_arc.lock().map_err(|e| e.to_string())?;
@@ -312,7 +312,7 @@ pub async fn sftp_calculate_size(
 /// Execute `chown owner:group '<path>'` on the remote server.
 #[tauri::command]
 pub async fn sftp_chown(
-    tab_id: String,
+    session_id: String,
     path: String,
     owner: String,
     group: String,
@@ -325,7 +325,7 @@ pub async fn sftp_chown(
         (true, false)  => format!(":{}", shell_quote(&group)),
     };
     let state_inner = state.inner().clone();
-    let session_arc = crate::get_session_arc!(state_inner, &tab_id);
+    let session_arc = crate::get_session_arc!(state_inner, &session_id);
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
         let sess = session_arc.lock().map_err(|e| e.to_string())?;
@@ -349,13 +349,13 @@ pub async fn sftp_chown(
 /// Returns up to 200 matching paths.
 #[tauri::command]
 pub async fn sftp_deep_search(
-    tab_id: String,
+    session_id: String,
     start_path: String,
     query: String,
     state: tauri::State<'_, SshState>,
 ) -> Result<Vec<String>, String> {
     let state_inner = state.inner().clone();
-    let session_arc = crate::get_session_arc!(state_inner, &tab_id);
+    let session_arc = crate::get_session_arc!(state_inner, &session_id);
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
         let sess = session_arc.lock().map_err(|e| e.to_string())?;

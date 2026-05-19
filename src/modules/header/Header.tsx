@@ -17,13 +17,14 @@ import {
   Globe02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useRef, type RefObject } from "react";
 import {
   SearchInline,
   type SearchInlineHandle,
   type SearchTarget,
 } from "./SearchInline";
 import { TransferDropdown } from "./components/TransferDropdown";
+import { UpdaterButton } from "./components/UpdaterButton";
 
 type Props = {
   tabs: Tab[];
@@ -32,6 +33,8 @@ type Props = {
   onNew: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
+  onNewSsh: (hostId: string, title: string) => void;
+  onNewSftp: (hostId: string, title: string) => void;
   onClose: (id: number) => void;
   onToggleSidebar: () => void;
   onOpenShortcuts: () => void;
@@ -41,8 +44,6 @@ type Props = {
   searchRef: RefObject<SearchInlineHandle | null>;
 };
 
-const COMPACT_WIDTH = 720;
-
 export function Header({
   tabs,
   activeId,
@@ -50,6 +51,8 @@ export function Header({
   onNew,
   onNewPreview,
   onNewEditor,
+  onNewSsh,
+  onNewSftp,
   onClose,
   onToggleSidebar,
   onOpenShortcuts,
@@ -59,18 +62,6 @@ export function Header({
   searchRef,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [compact, setCompact] = useState(false);
-
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? 0;
-      setCompact(w < COMPACT_WIDTH);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const sideButtons = (
     <DropdownMenu>
@@ -143,13 +134,17 @@ export function Header({
           onNew={onNew}
           onNewPreview={onNewPreview}
           onNewEditor={onNewEditor}
+          onNewSsh={onNewSsh}
+          onNewSftp={onNewSftp}
+          onOpenHostManager={onOpenHostManager}
           onClose={onClose}
-          compact={compact}
+          compact={false}
         />
         <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
       </div>
 
-      <SearchInline ref={searchRef} target={searchTarget} compact={compact} />
+      <SearchInline ref={searchRef} target={searchTarget} compact={true} />
+      <UpdaterButton />
       <TransferDropdown />
 
       {IS_MAC && sideButtons}

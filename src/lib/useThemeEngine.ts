@@ -117,6 +117,11 @@ export function applyThemeColors(
   meta: ThemeMeta,
   target: HTMLElement = document.documentElement,
 ): void {
+  // Clear all previously injected vars first so no leftover values from a
+  // prior theme bleed through when the new theme omits certain color keys.
+  for (const cssVar of ALL_VARS) {
+    target.style.removeProperty(cssVar);
+  }
   for (const [key, cssVar] of Object.entries(COLOR_VAR_MAP)) {
     const hex = meta.colors[key];
     if (hex) {

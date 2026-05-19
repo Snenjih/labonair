@@ -2,6 +2,7 @@ pub mod client;
 pub mod exec;
 pub mod pty;
 pub mod sftp;
+pub mod tunnels;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};
@@ -36,10 +37,10 @@ pub struct SshSession {
 /// the outer lock before returning — analogous to get_sftp_arc!.
 #[macro_export]
 macro_rules! get_session_arc {
-    ($state_inner:expr, $tab_id:expr) => {{
+    ($state_inner:expr, $session_id:expr) => {{
         let map = $state_inner.0.lock().map_err(|e| e.to_string())?;
-        map.get($tab_id)
-            .ok_or_else(|| format!("no SSH session for tab {}", $tab_id))?
+        map.get($session_id)
+            .ok_or_else(|| format!("no SSH session for tab {}", $session_id))?
             .session
             .clone()
     }};
@@ -49,7 +50,7 @@ macro_rules! get_session_arc {
 unsafe impl Send for SshSession {}
 unsafe impl Sync for SshSession {}
 
-/// Global map of tab_id → SshSession, cloneable so the reader thread can hold a reference.
+/// Global map of session_id → SshSession, cloneable so the reader thread can hold a reference.
 #[derive(Clone)]
 pub struct SshState(pub Arc<Mutex<HashMap<String, SshSession>>>);
 
@@ -63,6 +64,6 @@ impl Default for SshState {
 /// The condvar is signalled by `ssh_trust_host` once the user acts.
 pub type TrustPair = Arc<(Mutex<Option<bool>>, Condvar)>;
 
-/// Global map of tab_id → pending trust confirmation pair.
+/// Global map of session_id → pending trust confirmation pair.
 #[derive(Clone, Default)]
 pub struct TrustState(pub Arc<Mutex<HashMap<String, TrustPair>>>);

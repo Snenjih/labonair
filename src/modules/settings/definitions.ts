@@ -54,6 +54,17 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Appearance ---
   {
+    id: "sidebarPosition",
+    label: "Sidebar position",
+    description: "Display the file explorer sidebar on the left or right side of the workspace.",
+    category: "Appearance",
+    controlType: "Select",
+    options: [
+      { value: "left", label: "Left" },
+      { value: "right", label: "Right" },
+    ],
+  },
+  {
     id: "appTheme",
     label: "Color theme",
     description: "Choose or import a JSON color theme for the application.",

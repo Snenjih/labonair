@@ -3,10 +3,12 @@ import { invoke } from "@tauri-apps/api/core";
 export type SettingsTab =
   | "general"
   | "appearance"
+  | "themes"
   | "terminal"
   | "editor"
   | "models"
   | "agents"
+  | "security"
   | "about";
 
 export async function openSettingsWindow(tab?: SettingsTab): Promise<void> {

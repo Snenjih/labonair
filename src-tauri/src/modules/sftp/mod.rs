@@ -26,7 +26,7 @@ pub enum TransferStatus {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TransferJob {
     pub id: String,
-    pub tab_id: String,
+    pub session_id: String,
     pub src_path: String,
     pub dest_path: String,
     pub direction: TransferDirection,

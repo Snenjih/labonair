@@ -16,7 +16,7 @@ export type TerminalPaneHandle = {
 };
 
 type Props = {
-  tabId: number;
+  tabId: string;
   visible: boolean;
   initialCwd?: string;
   onSearchReady?: (tabId: number, addon: SearchAddon) => void;
@@ -75,7 +75,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
         ref={containerRef}
         className="h-full w-full"
         style={{
-          visibility: visible ? "visible" : "hidden",
+          visibility: visible ? undefined : "hidden",
           pointerEvents: visible ? "auto" : "none",
         }}
         onDragOver={(e) => {

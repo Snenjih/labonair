@@ -15,6 +15,9 @@ export type ShortcutId =
   | "tab.next"
   | "tab.prev"
   | "tab.selectByIndex"
+  | "pane.splitRight"
+  | "pane.splitDown"
+  | "pane.close"
   | "search.focus"
   | "ai.toggle"
   | "ai.askSelection"
@@ -70,7 +73,7 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Close tab",
     keys: ["⌘", "W"],
     group: "Tabs",
-    match: (e) => isMod(e) && e.key.toLowerCase() === "w",
+    match: (e) => isMod(e) && !e.shiftKey && e.key.toLowerCase() === "w",
   },
   {
     id: "tab.next",
@@ -93,6 +96,27 @@ export const SHORTCUTS: Shortcut[] = [
     keys: ["⌘", "1…9"],
     group: "Tabs",
     match: (e) => isMod(e) && /^[1-9]$/.test(e.key),
+  },
+  {
+    id: "pane.splitRight",
+    label: "Split pane right",
+    keys: ["⌘", "D"],
+    group: "Tabs",
+    match: (e) => isMod(e) && !e.shiftKey && e.key.toLowerCase() === "d",
+  },
+  {
+    id: "pane.splitDown",
+    label: "Split pane down",
+    keys: ["⌘", "⇧", "D"],
+    group: "Tabs",
+    match: (e) => isMod(e) && e.shiftKey && e.key.toLowerCase() === "d",
+  },
+  {
+    id: "pane.close",
+    label: "Close pane",
+    keys: ["⌘", "⇧", "W"],
+    group: "Tabs",
+    match: (e) => isMod(e) && e.shiftKey && e.key.toLowerCase() === "w",
   },
   {
     id: "search.focus",
