@@ -8,6 +8,7 @@ use modules::{
     themes::{themes_get_all, theme_import, theme_export, theme_delete, theme_fetch_index, theme_download},
 };
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 
 /// Clamps the window position and size so it fits entirely within the current monitor.
 /// Called after tauri_plugin_window_state has restored the previous session's geometry —
@@ -148,6 +149,117 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
     Ok(())
 }
 
+fn build_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
+    // ── Nexum app menu ────────────────────────────────────────────────────────
+    let about       = PredefinedMenuItem::about(app, Some("About Nexum"), None)?;
+    let settings    = MenuItem::with_id(app, "settings", "Settings...", true, Some("CmdOrCtrl+,"))?;
+    let hide        = PredefinedMenuItem::hide(app, None)?;
+    let hide_others = PredefinedMenuItem::hide_others(app, None)?;
+    let show_all    = PredefinedMenuItem::show_all(app, None)?;
+    let quit        = PredefinedMenuItem::quit(app, None)?;
+    let app_menu    = Submenu::with_items(app, "Nexum", true, &[
+        &about, &settings,
+        &PredefinedMenuItem::separator(app)?,
+        &hide, &hide_others, &show_all,
+        &PredefinedMenuItem::separator(app)?,
+        &quit,
+    ])?;
+
+    // ── File ──────────────────────────────────────────────────────────────────
+    let new_terminal = MenuItem::with_id(app, "new_terminal_tab", "New Terminal Tab", true, Some("CmdOrCtrl+T"))?;
+    let new_ssh_tab  = MenuItem::with_id(app, "new_ssh_tab",      "New SSH Tab",      true, None::<&str>)?;
+    let new_sftp_tab = MenuItem::with_id(app, "new_sftp_tab",     "New SFTP Tab",     true, None::<&str>)?;
+    let new_preview  = MenuItem::with_id(app, "new_preview_tab",  "New Preview Tab",  true, Some("CmdOrCtrl+P"))?;
+    let new_editor   = MenuItem::with_id(app, "new_editor_tab",   "New Editor Tab",   true, Some("CmdOrCtrl+E"))?;
+    let close_tab    = MenuItem::with_id(app, "close_tab",        "Close Tab",        true, Some("CmdOrCtrl+W"))?;
+    let close_pane   = MenuItem::with_id(app, "close_pane",       "Close Pane",       true, Some("CmdOrCtrl+Shift+W"))?;
+    let file_menu    = Submenu::with_items(app, "File", true, &[
+        &new_terminal, &new_ssh_tab, &new_sftp_tab, &new_preview, &new_editor,
+        &PredefinedMenuItem::separator(app)?,
+        &close_tab, &close_pane,
+    ])?;
+
+    // ── Edit (PredefinedMenuItems enable copy/paste in text fields) ───────────
+    let edit_menu = Submenu::with_items(app, "Edit", true, &[
+        &PredefinedMenuItem::undo(app, None)?,
+        &PredefinedMenuItem::redo(app, None)?,
+        &PredefinedMenuItem::separator(app)?,
+        &PredefinedMenuItem::cut(app, None)?,
+        &PredefinedMenuItem::copy(app, None)?,
+        &PredefinedMenuItem::paste(app, None)?,
+        &PredefinedMenuItem::select_all(app, None)?,
+    ])?;
+
+    // ── View ──────────────────────────────────────────────────────────────────
+    let toggle_sidebar = MenuItem::with_id(app, "toggle_sidebar", "Toggle Sidebar",   true, Some("CmdOrCtrl+B"))?;
+    let toggle_ai      = MenuItem::with_id(app, "toggle_ai",      "Toggle AI Panel",  true, Some("CmdOrCtrl+I"))?;
+    let zoom_in        = MenuItem::with_id(app, "zoom_in",        "Zoom In",          true, Some("CmdOrCtrl+Plus"))?;
+    let zoom_out       = MenuItem::with_id(app, "zoom_out",       "Zoom Out",         true, Some("CmdOrCtrl+-"))?;
+    let zoom_reset     = MenuItem::with_id(app, "zoom_reset",     "Reset Zoom",       true, Some("CmdOrCtrl+0"))?;
+    let fullscreen     = PredefinedMenuItem::fullscreen(app, None)?;
+    let view_menu      = Submenu::with_items(app, "View", true, &[
+        &toggle_sidebar, &toggle_ai,
+        &PredefinedMenuItem::separator(app)?,
+        &zoom_in, &zoom_out, &zoom_reset,
+        &PredefinedMenuItem::separator(app)?,
+        &fullscreen,
+    ])?;
+
+    // ── Terminal ──────────────────────────────────────────────────────────────
+    let split_right = MenuItem::with_id(app, "split_pane_right", "Split Pane Right", true, Some("CmdOrCtrl+D"))?;
+    let split_down  = MenuItem::with_id(app, "split_pane_down",  "Split Pane Down",  true, Some("CmdOrCtrl+Shift+D"))?;
+    let find        = MenuItem::with_id(app, "find",             "Find...",          true, Some("CmdOrCtrl+F"))?;
+    let term_menu   = Submenu::with_items(app, "Terminal", true, &[
+        &split_right, &split_down,
+        &PredefinedMenuItem::separator(app)?,
+        &find,
+    ])?;
+
+    // ── Connections ───────────────────────────────────────────────────────────
+    let open_hosts   = MenuItem::with_id(app, "open_host_manager",  "Open Host Manager",      true, None::<&str>)?;
+    let new_ssh_conn = MenuItem::with_id(app, "new_ssh_connection",  "New SSH Connection...",  true, Some("CmdOrCtrl+Shift+N"))?;
+    let quick_ssh    = MenuItem::with_id(app, "new_quick_ssh",       "New Quick SSH...",       true, None::<&str>)?;
+    let conn_menu    = Submenu::with_items(app, "Connections", true, &[
+        &open_hosts,
+        &PredefinedMenuItem::separator(app)?,
+        &new_ssh_conn, &quick_ssh,
+    ])?;
+
+    // ── AI ────────────────────────────────────────────────────────────────────
+    let toggle_ai_2  = MenuItem::with_id(app, "toggle_ai_2",    "Toggle AI Panel",      true, Some("CmdOrCtrl+I"))?;
+    let new_ai_sess  = MenuItem::with_id(app, "new_ai_session",  "New AI Session",       true, None::<&str>)?;
+    let ask_select   = MenuItem::with_id(app, "ask_selection",   "Ask about Selection",  true, Some("CmdOrCtrl+L"))?;
+    let clear_chat   = MenuItem::with_id(app, "clear_chat",      "Clear Current Chat",   true, None::<&str>)?;
+    let ai_settings  = MenuItem::with_id(app, "ai_settings",     "AI Settings...",       true, None::<&str>)?;
+    let ai_menu      = Submenu::with_items(app, "AI", true, &[
+        &toggle_ai_2, &new_ai_sess, &ask_select,
+        &PredefinedMenuItem::separator(app)?,
+        &clear_chat,
+        &PredefinedMenuItem::separator(app)?,
+        &ai_settings,
+    ])?;
+
+    // ── Window ────────────────────────────────────────────────────────────────
+    let minimize    = PredefinedMenuItem::minimize(app, None)?;
+    let zoom_win    = PredefinedMenuItem::maximize(app, None)?;
+    let shortcuts   = MenuItem::with_id(app, "open_shortcuts",  "Keyboard Shortcuts",  true, Some("CmdOrCtrl+K"))?;
+    let settings_2  = MenuItem::with_id(app, "open_settings_2", "Settings",            true, Some("CmdOrCtrl+,"))?;
+    let next_tab    = MenuItem::with_id(app, "next_tab",         "Next Tab",            true, Some("Ctrl+Tab"))?;
+    let prev_tab    = MenuItem::with_id(app, "prev_tab",         "Previous Tab",        true, Some("Ctrl+Shift+Tab"))?;
+    let win_menu    = Submenu::with_items(app, "Window", true, &[
+        &minimize, &zoom_win,
+        &PredefinedMenuItem::separator(app)?,
+        &shortcuts, &settings_2,
+        &PredefinedMenuItem::separator(app)?,
+        &next_tab, &prev_tab,
+    ])?;
+
+    Menu::with_items(app, &[
+        &app_menu, &file_menu, &edit_menu, &view_menu,
+        &term_menu, &conn_menu, &ai_menu, &win_menu,
+    ])
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -192,6 +304,32 @@ pub fn run() {
                 tokio::time::sleep(std::time::Duration::from_millis(150)).await;
                 if let Some(window) = app_handle.get_webview_window("main") {
                     clamp_window_to_monitor(&window);
+                }
+            });
+
+            // Build and set the native macOS (and cross-platform) menu bar.
+            let menu = build_menu(app)?;
+            app.set_menu(menu)?;
+
+            app.on_menu_event(|app, event| {
+                match event.id().as_ref() {
+                    "settings" | "open_settings_2" => {
+                        let app = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = open_settings_window(app, None).await;
+                        });
+                    }
+                    "ai_settings" => {
+                        let app = app.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = open_settings_window(app, Some("ai".to_string())).await;
+                        });
+                    }
+                    other => {
+                        if let Some(win) = app.get_webview_window("main") {
+                            let _ = win.emit(&format!("menu:{}", other), ());
+                        }
+                    }
                 }
             });
 
