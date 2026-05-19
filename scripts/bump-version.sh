@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Get current version from package.json (using grep instead of jq)
-CURRENT_VERSION=$(grep -m1 '"version"' package.json | grep -oP '"version":\s*"\K[^"]+')
+CURRENT_VERSION=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' package.json | head -1)
 if [ -z "$CURRENT_VERSION" ]; then
   echo -e "${RED}Error: Could not read version from package.json${NC}"
   exit 1
