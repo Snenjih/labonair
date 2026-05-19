@@ -47,7 +47,7 @@
     "@streamdown/math": "^1.0.2",
     "@tailwindcss/vite": "^4.2.3",
     "@tanstack/react-virtual": "^3.13.24",
-    "@tauri-apps/api": "^2",
+    "@tauri-apps/api": "^2.11.0",
     "@tauri-apps/plugin-autostart": "~2.5.1",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-log": "~2.8.0",
