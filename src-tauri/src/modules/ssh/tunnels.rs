@@ -8,8 +8,10 @@ use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TunnelConfig {
+    #[allow(dead_code)]
     pub id: String,
     #[serde(rename = "type")]
+    #[allow(dead_code)]
     pub tunnel_type: String,
     pub local_port: u16,
     pub remote_host: String,
@@ -19,7 +21,7 @@ pub struct TunnelConfig {
 /// Per-host tunnel entry: shutdown sender + reference count of active SSH sessions.
 /// The tunnel runs as long as ref_count > 0; ssh_stop_tunnels decrements and only
 /// sends the shutdown signal when the count reaches zero.
-struct TunnelEntry {
+pub(crate) struct TunnelEntry {
     shutdown: tokio::sync::oneshot::Sender<()>,
     ref_count: usize,
 }
@@ -196,6 +198,7 @@ pub async fn ssh_start_tunnels(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_tunnel_loop(
     host_address: String,
     port: u32,
