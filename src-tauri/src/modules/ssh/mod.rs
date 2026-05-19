@@ -2,6 +2,7 @@ pub mod client;
 pub mod exec;
 pub mod pty;
 pub mod sftp;
+pub mod tunnels;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Condvar, Mutex};

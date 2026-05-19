@@ -230,6 +230,9 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         disposed = true;
         cleanups.forEach((fn) => fn());
         invoke("ssh_disconnect", { sessionId }).catch(console.error);
+        if (session.hostId) {
+          invoke("ssh_stop_tunnels", { hostId: session.hostId }).catch(console.error);
+        }
         termRef.current?.dispose();
         termRef.current = null;
         fitRef.current = null;

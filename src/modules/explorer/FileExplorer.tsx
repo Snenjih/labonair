@@ -37,6 +37,7 @@ type SearchHit = {
 type Props = {
   rootPath: string | null;
   onOpenFile: (path: string) => void;
+  onOpenPreview?: (path: string) => void;
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
@@ -51,6 +52,7 @@ function basename(path: string): string {
 export function FileExplorer({
   rootPath,
   onOpenFile,
+  onOpenPreview,
   onPathRenamed,
   onPathDeleted,
   onRevealInTerminal,
@@ -388,6 +390,7 @@ export function FileExplorer({
                       depth={0}
                       tree={tree}
                       onOpenFile={onOpenFile}
+                      onOpenPreview={onOpenPreview}
                       onRevealInTerminal={onRevealInTerminal}
                       onAttachToAgent={onAttachToAgent}
                       selectedPath={selectedPath}

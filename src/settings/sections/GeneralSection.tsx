@@ -4,6 +4,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
 import {
   setAutostart,
+  setCheckForUpdates,
   setRestoreWindowState,
   setVimMode,
 } from "@/modules/settings/store";
@@ -34,6 +35,7 @@ export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
   const vimMode = usePreferencesStore((s) => s.vimMode);
+  const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
 
   // Reconcile autostart pref with the actual OS state on mount — the user may
   // have toggled it from System Settings.
@@ -123,6 +125,15 @@ export function GeneralSection() {
             <Switch
               checked={restoreWindowState}
               onCheckedChange={(v) => void setRestoreWindowState(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Check for updates on launch"
+            description="Show an update button in the titlebar when a new version is available."
+          >
+            <Switch
+              checked={checkForUpdates}
+              onCheckedChange={(v) => void setCheckForUpdates(v)}
             />
           </SettingRow>
         </div>

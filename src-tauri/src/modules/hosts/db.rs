@@ -45,6 +45,7 @@ pub fn initialize_db(
         "ALTER TABLE hosts ADD COLUMN keep_alive_interval INTEGER",
         "ALTER TABLE hosts ADD COLUMN keep_alive_tries INTEGER",
         "ALTER TABLE hosts ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE hosts ADD COLUMN tunnels TEXT",
         // groups migrations
         "ALTER TABLE groups ADD COLUMN icon TEXT",
         "ALTER TABLE groups ADD COLUMN color TEXT",
@@ -83,13 +84,14 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<Host> {
         keep_alive_interval: row.get(15)?,
         keep_alive_tries: row.get(16)?,
         sort_order: row.get(17).unwrap_or(0),
+        tunnels: row.get(18)?,
     })
 }
 
 const SELECT_HOSTS: &str = "SELECT id, name, host_address, port, username, auth_method, \
     private_key_path, group_id, tags, created_at, last_connected_at, \
     default_path_ssh, default_path_sftp, pin_to_top, sudo_password_set, \
-    keep_alive_interval, keep_alive_tries, sort_order FROM hosts";
+    keep_alive_interval, keep_alive_tries, sort_order, tunnels FROM hosts";
 
 #[tauri::command]
 pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, String> {
@@ -127,6 +129,7 @@ pub async fn hosts_create(
     keep_alive_interval: Option<i64>,
     keep_alive_tries: Option<i64>,
     sort_order: Option<i64>,
+    tunnels: Option<String>,
 ) -> Result<Host, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let created_at = now_millis();
@@ -139,13 +142,13 @@ pub async fn hosts_create(
         conn.execute(
             "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
              private_key_path, group_id, tags, created_at, default_path_ssh, default_path_sftp, \
-             pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
+             pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order, tunnels) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
             rusqlite::params![
                 id, name, host_address, port, username, auth_method,
                 private_key_path, group_id, tags, created_at,
                 default_path_ssh, default_path_sftp, pin, sudo_set,
-                keep_alive_interval, keep_alive_tries, order
+                keep_alive_interval, keep_alive_tries, order, tunnels
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -192,6 +195,7 @@ pub async fn hosts_update(
     keep_alive_interval: Option<i64>,
     keep_alive_tries: Option<i64>,
     sort_order: Option<i64>,
+    tunnels: Option<String>,
 ) -> Result<Host, String> {
     {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -237,6 +241,9 @@ pub async fn hosts_update(
         }
         if let Some(v) = sort_order {
             conn.execute("UPDATE hosts SET sort_order=?1 WHERE id=?2", rusqlite::params![v, id]).map_err(|e| e.to_string())?;
+        }
+        if tunnels.is_some() {
+            conn.execute("UPDATE hosts SET tunnels=?1 WHERE id=?2", rusqlite::params![tunnels, id]).map_err(|e| e.to_string())?;
         }
     }
     if let Some(pw) = password {

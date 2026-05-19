@@ -21,6 +21,10 @@ import type { DirEntry, useFileTree } from "./lib/useFileTree";
 
 type Tree = ReturnType<typeof useFileTree>;
 
+const PREVIEW_EXTENSIONS = new Set([
+  "html", "htm", "png", "jpg", "jpeg", "gif", "webp", "svg", "pdf",
+]);
+
 type Props = {
   entry: DirEntry;
   parentPath: string;
@@ -28,6 +32,7 @@ type Props = {
   depth: number;
   tree: Tree;
   onOpenFile: (path: string) => void;
+  onOpenPreview?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
   selectedPath: string | null;
@@ -41,6 +46,7 @@ function FileTreeNodeImpl({
   depth,
   tree,
   onOpenFile,
+  onOpenPreview,
   onRevealInTerminal,
   onAttachToAgent,
   selectedPath,
@@ -49,6 +55,8 @@ function FileTreeNodeImpl({
   const path = tree.joinPath(parentPath, entry.name);
   const isDir = entry.kind === "dir";
   const isExpanded = isDir && tree.expanded.has(path);
+  const ext = entry.name.toLowerCase().split(".").pop() ?? "";
+  const canPreview = !isDir && PREVIEW_EXTENSIONS.has(ext);
   const children = isExpanded ? tree.nodes[path] : undefined;
   const isRenaming = tree.renaming === path;
 
@@ -138,6 +146,14 @@ function FileTreeNodeImpl({
               onSelect={() => onOpenFile(path)}
             >
               Open
+            </ContextMenuItem>
+          )}
+          {canPreview && onOpenPreview && (
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              onSelect={() => onOpenPreview(path)}
+            >
+              Open in Preview
             </ContextMenuItem>
           )}
           {isDir && onRevealInTerminal && (
@@ -258,6 +274,7 @@ function FileTreeNodeImpl({
             depth={depth + 1}
             tree={tree}
             onOpenFile={onOpenFile}
+            onOpenPreview={onOpenPreview}
             onRevealInTerminal={onRevealInTerminal}
             onAttachToAgent={onAttachToAgent}
             selectedPath={selectedPath}
