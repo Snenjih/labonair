@@ -7,7 +7,7 @@
 Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. It combines SSH terminal sessions, a full-featured SFTP file manager, an integrated code editor with remote editing support, and a first-class AI side-panel — all in a single lightweight app. API keys live in the OS keychain, no telemetry, no account required.
 
   <p>
-    <img src="https://img.shields.io/badge/version-0.6.0-blue" alt="version" />
+    <img src="https://img.shields.io/badge/version-0.7.0-blue" alt="version" />
     <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="license" />
     <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="platform" />
     <img src="https://img.shields.io/badge/built%20with-Tauri%202-orange" alt="tauri" />
@@ -21,6 +21,8 @@ Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. I
 **SSH Terminal**
 - Native PTY backend via `ssh2` + `portable-pty` — one tab per connection
 - xterm.js + WebGL renderer, multi-tab with background streaming
+- **Recursive split-pane workspace** — infinite horizontal (`⌘D`) and vertical (`⌘⇧D`) splits per tab; resize handles, click-to-focus, close pane with `⌘⇧W`
+- Terminal history survives split/close (no remounts — flat render layer architecture)
 - Shell integration (cwd reporting, prompt markers) via injected init scripts
 - Inline search, link detection, true-color, 2FA / keyboard-interactive auth
 - Known-host fingerprint verification with in-app warning flow
@@ -45,6 +47,7 @@ Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. I
 
 **Local Terminal**
 - Native PTY sessions for local shells (zsh, bash, …)
+- Supports the same recursive split-pane layout as SSH terminals
 - Auto-detects local dev servers and opens them in a web preview tab
 
 **AI (BYOK)**
