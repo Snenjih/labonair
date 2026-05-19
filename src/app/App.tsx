@@ -829,6 +829,7 @@ export default function App() {
                       <FileExplorer
                         rootPath={explorerRoot}
                         onOpenFile={handleOpenFile}
+                        onOpenPreview={openPreviewTab}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={cdInNewTab}
@@ -991,6 +992,7 @@ export default function App() {
                       <FileExplorer
                         rootPath={explorerRoot}
                         onOpenFile={handleOpenFile}
+                        onOpenPreview={openPreviewTab}
                         onPathRenamed={handlePathRenamed}
                         onPathDeleted={handlePathDeleted}
                         onRevealInTerminal={cdInNewTab}

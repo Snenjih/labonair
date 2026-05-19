@@ -1,6 +1,7 @@
 import { Alert02Icon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   PreviewAddressBar,
   type PreviewAddressBarHandle,
@@ -26,6 +27,13 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
     const [nonce, setNonce] = useState(0);
     const addressRef = useRef<PreviewAddressBarHandle>(null);
 
+    // Convert local absolute paths to asset:// protocol so the iframe can load them
+    const resolvedUrl = useMemo(() => {
+      if (!url) return url;
+      const isLocalPath = /^\//.test(url) || /^[a-zA-Z]:[\\/]/.test(url);
+      return isLocalPath ? convertFileSrc(url) : url;
+    }, [url]);
+
     useImperativeHandle(
       ref,
       () => ({
@@ -36,7 +44,8 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
       [url],
     );
 
-    const showXfoHint = url ? !isLocalUrl(url) : false;
+    const isLocalFilePath = url ? (/^\//.test(url) || /^[a-zA-Z]:[\\/]/.test(url)) : false;
+    const showXfoHint = url ? (!isLocalUrl(url) && !isLocalFilePath) : false;
 
     return (
       <div
@@ -76,7 +85,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
           {url ? (
             <iframe
               key={`${url}#${nonce}`}
-              src={url}
+              src={resolvedUrl}
               title="Preview"
               className="h-full w-full border-0"
               allow="clipboard-read; clipboard-write; fullscreen"

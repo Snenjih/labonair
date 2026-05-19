@@ -9,6 +9,11 @@ import { lineNumbers } from "@codemirror/view";
 import { keymap, EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import {
+  setEditorBracketMatching,
+  setEditorLineNumbers,
+  setEditorWordWrap,
+} from "@/modules/settings/store";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { EDITOR_THEME_EXT } from "./lib/themes";
 import {
@@ -18,7 +23,21 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
+  startTransition,
 } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Settings01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { Streamdown } from "streamdown";
 import { Prec } from "@codemirror/state";
 import { vim } from "@replit/codemirror-vim";
 import {
@@ -70,7 +89,8 @@ function formatBytes(n: number): string {
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
   function EditorPane({ path, isUntitled, onDirtyChange, onSaved, onSaveAs, onClose }, ref) {
-    const { doc, onChange, save, reload } = useDocument({ path, isUntitled, onDirtyChange, onSaveAs });
+    const { doc, dirty, onChange: _onChange, save, reload } = useDocument({ path, isUntitled, onDirtyChange, onSaveAs });
+    const isMarkdownRef = useRef(false);
     const reloadRef = useRef(reload);
     reloadRef.current = reload;
     const cmRef = useRef<ReactCodeMirrorRef>(null);
@@ -82,6 +102,24 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const editorTabSize = usePreferencesStore((s) => s.editorTabSize);
     const editorBracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
     const languageRef = useRef<string | null>(null);
+
+    const fileName = path.split("/").pop() ?? (isUntitled ? "Untitled" : path);
+    const ext = fileName.toLowerCase().split(".").pop() ?? "";
+    const isMarkdownFile = ext === "md" || ext === "markdown";
+    isMarkdownRef.current = isMarkdownFile;
+    const [markdownPreviewOpen, setMarkdownPreviewOpen] = useState(false);
+    const [previewContent, setPreviewContent] = useState("");
+    const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const onChange = useCallback((value: string) => {
+      _onChange(value);
+      if (isMarkdownRef.current) {
+        if (previewDebounceRef.current) clearTimeout(previewDebounceRef.current);
+        previewDebounceRef.current = setTimeout(() => {
+          startTransition(() => setPreviewContent(value));
+        }, 150);
+      }
+    }, [_onChange]);
     const apiKeyRef = useRef<string | null>(null);
 
     useEffect(() => {
@@ -174,6 +212,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const docContentRef = useRef(doc.status === "ready" ? doc.content : "");
     if (doc.status === "ready") docContentRef.current = doc.content;
+
+    // Seed previewContent when doc first loads
+    useEffect(() => {
+      if (doc.status === "ready" && isMarkdownFile) {
+        setPreviewContent(doc.content);
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [doc.status]);
 
     useEffect(() => {
       if (editorAutoSave !== "afterDelay") return;
@@ -374,28 +420,102 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       );
     }
 
+
+    const toolbar = (
+      <div className="h-8 bg-card border-b border-border px-3 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="truncate text-xs text-foreground/80 font-medium">{fileName}</span>
+          {dirty && (
+            <span className="size-2 rounded-full bg-foreground/60 animate-pulse shrink-0" title="Unsaved changes" />
+          )}
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={1.75} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-44">
+            <DropdownMenuCheckboxItem
+              checked={editorWordWrap}
+              onCheckedChange={(v) => void setEditorWordWrap(v)}
+            >
+              Word Wrap
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={editorLineNumbers}
+              onCheckedChange={(v) => void setEditorLineNumbers(v)}
+            >
+              Line Numbers
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={editorBracketMatching}
+              onCheckedChange={(v) => void setEditorBracketMatching(v)}
+            >
+              Bracket Matching
+            </DropdownMenuCheckboxItem>
+            {isMarkdownFile && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem
+                  checked={markdownPreviewOpen}
+                  onCheckedChange={setMarkdownPreviewOpen}
+                >
+                  Markdown Preview
+                </DropdownMenuCheckboxItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+
+    const codeMirrorEl = (
+      <CodeMirror
+        ref={cmRef}
+        value={doc.content}
+        onChange={onChange}
+        theme={themeExt}
+        extensions={extensions}
+        height="100%"
+        className="flex-1 min-h-0 overflow-hidden h-full"
+        basicSetup={{
+          lineNumbers: false,
+          highlightActiveLineGutter: true,
+          foldGutter: true,
+          bracketMatching: false,
+          closeBrackets: true,
+          autocompletion: true,
+          highlightActiveLine: true,
+          highlightSelectionMatches: true,
+          searchKeymap: true,
+        }}
+      />
+    );
+
     return (
       <div className="flex h-full min-h-0 flex-col" onBlur={handleBlur}>
-        <CodeMirror
-          ref={cmRef}
-          value={doc.content}
-          onChange={onChange}
-          theme={themeExt}
-          extensions={extensions}
-          height="100%"
-          className="flex-1 min-h-0 overflow-hidden"
-          basicSetup={{
-            lineNumbers: false,
-            highlightActiveLineGutter: true,
-            foldGutter: true,
-            bracketMatching: false,
-            closeBrackets: true,
-            autocompletion: true,
-            highlightActiveLine: true,
-            highlightSelectionMatches: true,
-            searchKeymap: true,
-          }}
-        />
+        {toolbar}
+        {isMarkdownFile && markdownPreviewOpen ? (
+          <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
+            <ResizablePanel defaultSize={50} minSize={20}>
+              <div className="h-full flex flex-col">{codeMirrorEl}</div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={50} minSize={20}>
+              <div className="h-full overflow-y-auto bg-card p-4 text-[13px] leading-relaxed text-foreground [&_h1]:text-lg [&_h1]:font-bold [&_h1]:mb-3 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mb-2 [&_h3]:font-semibold [&_h3]:mb-2 [&_p]:mb-3 [&_a]:text-blue-500 [&_a]:underline [&_code]:bg-muted/50 [&_code]:px-1 [&_code]:rounded [&_pre]:bg-muted/50 [&_pre]:p-3 [&_pre]:rounded [&_pre]:overflow-x-auto [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground">
+                <Streamdown>{previewContent}</Streamdown>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col">{codeMirrorEl}</div>
+        )}
       </div>
     );
   },

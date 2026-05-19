@@ -236,6 +236,8 @@ async function probeUrl(url: string): Promise<boolean> {
 function normalizeUrl(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
+  // Local absolute paths — return as-is, handled via convertFileSrc in PreviewPane
+  if (/^\//.test(trimmed) || /^[a-zA-Z]:[\\/]/.test(trimmed)) return trimmed;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (/^localhost(:|\/|$)/i.test(trimmed)) return `http://${trimmed}`;
   if (/^\d{1,3}(\.\d{1,3}){3}(:|\/|$)/.test(trimmed)) return `http://${trimmed}`;
