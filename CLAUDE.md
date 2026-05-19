@@ -40,6 +40,13 @@ Before working on any area, read the relevant context file:
 ## Pull Requests
 Read `.github/PULL_REQUEST_TEMPLATE.md` and create PRs using that template via the `gh` command.
 
+### PR Creation Workflow (automatic)
+When asked to create a PR for current changes, always follow this sequence without asking:
+1. **Branch** — if currently on `main`, derive a branch name from the work (e.g. `feat/short-description`) and run `git checkout -b <branch>`.
+2. **Commit** — stage and commit all relevant changes with a conventional commit message.
+3. **Push** — `git push -u origin <branch>`.
+4. **Open PR** — `gh pr create` using the PR template, targeting `main`.
+
 ## Architecture Summary
 ```
 Nexum (Tauri v2)
