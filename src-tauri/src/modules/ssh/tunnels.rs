@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-use std::io;
-use std::net::{TcpListener, TcpStream};
+use std::io::{self, Read, Write};
+use std::net::TcpListener;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
@@ -15,8 +16,15 @@ pub struct TunnelConfig {
     pub remote_port: u16,
 }
 
-/// Shutdown senders keyed by host_id. Dropping the sender signals the accept loop to stop.
-pub struct TunnelState(pub Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<()>>>>);
+/// Per-host tunnel entry: shutdown sender + reference count of active SSH sessions.
+/// The tunnel runs as long as ref_count > 0; ssh_stop_tunnels decrements and only
+/// sends the shutdown signal when the count reaches zero.
+struct TunnelEntry {
+    shutdown: tokio::sync::oneshot::Sender<()>,
+    ref_count: usize,
+}
+
+pub struct TunnelState(pub Arc<Mutex<HashMap<String, TunnelEntry>>>);
 
 impl Default for TunnelState {
     fn default() -> Self {
@@ -24,17 +32,21 @@ impl Default for TunnelState {
     }
 }
 
-/// Copy bytes from `reader` to `writer` on a dedicated thread.
-fn pump(mut reader: impl io::Read + Send + 'static, mut writer: impl io::Write + Send + 'static) {
-    std::thread::spawn(move || {
-        let _ = io::copy(&mut reader, &mut writer);
-    });
-}
+pub type TunnelMap = Arc<Mutex<HashMap<String, TunnelEntry>>>;
 
-/// Handles one accepted TCP connection by opening a direct-tcpip channel and
-/// pumping data bidirectionally.  Runs on its own thread.
-fn handle_connection(stream: TcpStream, session: Arc<Mutex<super::SessionHandle>>, remote_host: String, remote_port: u16) {
+/// Single-thread, non-blocking polling loop for one TCP↔SSH connection.
+/// No Arc<Mutex<Channel>> — this thread owns the channel exclusively, so
+/// there is no deadlock regardless of which side speaks first.
+/// The SSH session is set to non-blocking mode before this is called, so
+/// channel.read() returns immediately with WouldBlock when no data is ready.
+fn handle_connection(
+    stream: std::net::TcpStream,
+    session: Arc<Mutex<super::SessionHandle>>,
+    remote_host: String,
+    remote_port: u16,
+) {
     std::thread::spawn(move || {
+        // Open channel while briefly holding the session lock.
         let channel = {
             let sess = match session.lock() {
                 Ok(s) => s,
@@ -42,7 +54,7 @@ fn handle_connection(stream: TcpStream, session: Arc<Mutex<super::SessionHandle>
             };
             sess.0.channel_direct_tcpip(&remote_host, remote_port as u32, None)
         };
-        let channel = match channel {
+        let mut channel = match channel {
             Ok(c) => c,
             Err(e) => {
                 log::warn!("tunnel: channel_direct_tcpip failed: {e}");
@@ -50,62 +62,58 @@ fn handle_connection(stream: TcpStream, session: Arc<Mutex<super::SessionHandle>
             }
         };
 
-        let stream_clone = match stream.try_clone() {
-            Ok(s) => s,
-            Err(_) => return,
-        };
+        // Non-blocking TCP so reads return immediately with WouldBlock.
+        stream.set_nonblocking(true).ok();
 
-        // ssh2::Channel implements Read + Write but is not Clone, so we use a
-        // shared Arc<Mutex> to let two threads access it.
-        let chan = Arc::new(Mutex::new(channel));
-        let chan2 = chan.clone();
+        let mut tcp_buf = [0u8; 16384];
+        let mut ssh_buf = [0u8; 16384];
 
-        // TCP → SSH
-        {
-            let mut tcp_r = stream;
-            let chan_w = chan;
-            std::thread::spawn(move || {
-                let mut buf = [0u8; 8192];
-                loop {
-                    let n = match tcp_r.read(&mut buf) {
-                        Ok(0) | Err(_) => break,
-                        Ok(n) => n,
-                    };
-                    if let Ok(mut c) = chan_w.lock() {
-                        if c.write_all(&buf[..n]).is_err() { break; }
-                    } else { break; }
+        // Single-thread polling: alternates TCP→SSH and SSH→TCP.
+        // No two threads hold the channel — deadlock is structurally impossible.
+        loop {
+            let mut idle = true;
+
+            // TCP → SSH
+            match stream.read(&mut tcp_buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    if channel.write_all(&tcp_buf[..n]).is_err() {
+                        break;
+                    }
+                    idle = false;
                 }
-                // Signal EOF to the channel
-                if let Ok(mut c) = chan_w.lock() { let _ = c.send_eof(); }
-            });
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {}
+                Err(_) => break,
+            }
+
+            // SSH → TCP (non-blocking because session is set_blocking(false))
+            let n = match channel.read(&mut ssh_buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    idle = false;
+                    n
+                }
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => 0,
+                Err(_) => break,
+            };
+            if n > 0 && stream.write_all(&ssh_buf[..n]).is_err() {
+                break;
+            }
+
+            if channel.eof() {
+                break;
+            }
+            if idle {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
         }
 
-        // SSH → TCP
-        {
-            let mut tcp_w = stream_clone;
-            let chan_r = chan2;
-            std::thread::spawn(move || {
-                let mut buf = [0u8; 8192];
-                loop {
-                    let n = {
-                        let mut c = match chan_r.lock() {
-                            Ok(c) => c,
-                            Err(_) => break,
-                        };
-                        match c.read(&mut buf) {
-                            Ok(0) | Err(_) => break,
-                            Ok(n) => n,
-                        }
-                    };
-                    if tcp_w.write_all(&buf[..n]).is_err() { break; }
-                }
-            });
-        }
+        let _ = channel.send_eof();
+        let _ = channel.close();
+        let _ = channel.wait_close();
     });
 }
 
-/// `ssh_start_tunnels` establishes a *dedicated* secondary SSH connection for
-/// port forwarding so it never contends with the interactive terminal's Mutex.
 #[tauri::command]
 pub async fn ssh_start_tunnels(
     host_id: String,
@@ -114,15 +122,15 @@ pub async fn ssh_start_tunnels(
     secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    // Guard: if tunnels are already running for this host, do nothing.
+    // If tunnel already running for this host, just increment the ref count.
     {
-        let map = tunnel_state.0.lock().map_err(|e| e.to_string())?;
-        if map.contains_key(&host_id) {
+        let mut map = tunnel_state.0.lock().map_err(|e| e.to_string())?;
+        if let Some(entry) = map.get_mut(&host_id) {
+            entry.ref_count += 1;
             return Ok(());
         }
     }
 
-    // Fetch host row.
     let (host_address, port, username, auth_method, private_key_path, tunnels_json) = {
         let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
         conn.query_row(
@@ -143,11 +151,8 @@ pub async fn ssh_start_tunnels(
         .map_err(|e| e.to_string())?
     };
 
-    // Parse tunnels JSON; if empty or null, nothing to do.
     let tunnels: Vec<TunnelConfig> = match tunnels_json.as_deref() {
-        Some(j) if !j.is_empty() && j != "[]" => {
-            serde_json::from_str(j).unwrap_or_default()
-        }
+        Some(j) if !j.is_empty() && j != "[]" => serde_json::from_str(j).unwrap_or_default(),
         _ => return Ok(()),
     };
 
@@ -155,7 +160,6 @@ pub async fn ssh_start_tunnels(
         return Ok(());
     }
 
-    // Fetch password.
     let password: Option<String> = if auth_method == "password" {
         crate::modules::secrets::get_password(&app, &secrets, "nexum-app", &host_id)
             .ok()
@@ -166,20 +170,26 @@ pub async fn ssh_start_tunnels(
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
-    // Register the shutdown sender before spawning so stop can be called immediately.
     {
         let mut map = tunnel_state.0.lock().map_err(|e| e.to_string())?;
-        map.insert(host_id.clone(), shutdown_tx);
+        map.insert(host_id.clone(), TunnelEntry { shutdown: shutdown_tx, ref_count: 1 });
     }
 
-    let host_id_for_cleanup = host_id.clone();
-    let tunnel_state_arc = tunnel_state.0.clone();
+    let host_id_clone = host_id.clone();
+    let state_arc = tunnel_state.0.clone();
 
     tokio::task::spawn_blocking(move || {
         run_tunnel_loop(
-            host_address, port as u32, username, auth_method,
-            private_key_path, password, tunnels,
-            shutdown_rx, host_id_for_cleanup, tunnel_state_arc,
+            host_address,
+            port as u32,
+            username,
+            auth_method,
+            private_key_path,
+            password,
+            tunnels,
+            shutdown_rx,
+            host_id_clone,
+            state_arc,
         );
     });
 
@@ -194,11 +204,11 @@ fn run_tunnel_loop(
     private_key_path: Option<String>,
     password: Option<String>,
     tunnels: Vec<TunnelConfig>,
-    mut shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+    shutdown_rx: tokio::sync::oneshot::Receiver<()>,
     host_id: String,
-    tunnel_state: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<()>>>>,
+    tunnel_state: TunnelMap,
 ) {
-    // Build a dedicated SSH session.
+    // Build dedicated SSH session.
     let tcp = match std::net::TcpStream::connect(format!("{host_address}:{port}")) {
         Ok(t) => t,
         Err(e) => {
@@ -223,43 +233,55 @@ fn run_tunnel_loop(
         return;
     }
 
-    // Authenticate.
     let auth_ok = match auth_method.as_str() {
-        "password" => {
-            if let Some(pw) = &password {
-                session.userauth_password(&username, pw).is_ok()
-            } else {
-                false
-            }
-        }
+        "password" => password
+            .as_deref()
+            .map(|pw| session.userauth_password(&username, pw).is_ok())
+            .unwrap_or(false),
         "key" => {
-            let key_path = private_key_path.as_deref().map(std::path::Path::new);
-            session.userauth_pubkey_file(&username, None, key_path.unwrap_or(std::path::Path::new("")), None).is_ok()
+            let key = private_key_path.as_deref().unwrap_or("");
+            session
+                .userauth_pubkey_file(&username, None, std::path::Path::new(key), None)
+                .is_ok()
         }
         _ => false,
     };
 
     if !auth_ok || !session.authenticated() {
-        log::error!("tunnel: authentication failed for {username}@{host_address}");
+        log::error!("tunnel: auth failed for {username}@{host_address}");
         tunnel_state.lock().ok().map(|mut m| m.remove(&host_id));
         return;
     }
 
+    // Non-blocking mode so channel reads/writes return WouldBlock instead of blocking.
+    session.set_blocking(false);
+
     let session_arc = Arc::new(Mutex::new(super::SessionHandle(session)));
 
-    // Bind listeners for each tunnel; skip on port-in-use errors.
-    let mut listeners: Vec<(TcpListener, TunnelConfig)> = Vec::new();
+    // Bind listeners. Port-in-use errors are warned and skipped (§6.2).
+    // Set non-blocking so accept threads can poll for shutdown without blocking forever (§6.3 fix).
+    let mut listeners: Vec<(TcpListener, TunnelConfig, Arc<AtomicBool>)> = Vec::new();
     for tunnel in &tunnels {
         match TcpListener::bind(format!("127.0.0.1:{}", tunnel.local_port)) {
             Ok(listener) => {
-                if let Err(e) = listener.set_nonblocking(false) {
-                    log::warn!("tunnel: set_nonblocking failed for port {}: {e}", tunnel.local_port);
-                }
-                log::info!("tunnel: bound 127.0.0.1:{} → {}:{}", tunnel.local_port, tunnel.remote_host, tunnel.remote_port);
-                listeners.push((listener, tunnel.clone()));
+                // Non-blocking: accept() returns WouldBlock immediately when no client.
+                // This allows the loop to check the shutdown flag without hanging.
+                listener.set_nonblocking(true).ok();
+                log::info!(
+                    "tunnel: bound 127.0.0.1:{} → {}:{}",
+                    tunnel.local_port,
+                    tunnel.remote_host,
+                    tunnel.remote_port
+                );
+                let stop = Arc::new(AtomicBool::new(false));
+                listeners.push((listener, tunnel.clone(), stop));
             }
             Err(e) => {
-                log::warn!("tunnel: failed to bind port {}: {e} — skipping", tunnel.local_port);
+                log::warn!(
+                    "tunnel: port {} already in use ({}), skipping",
+                    tunnel.local_port,
+                    e
+                );
             }
         }
     }
@@ -269,35 +291,37 @@ fn run_tunnel_loop(
         return;
     }
 
-    // Accept loop — runs until shutdown signal is received.
-    let mut thread_handles: Vec<std::thread::JoinHandle<()>> = Vec::new();
+    // Spawn one accept thread per listener. Each thread polls a shared AtomicBool for shutdown.
+    let stop_flags: Vec<Arc<AtomicBool>> = listeners.iter().map(|(_, _, f)| f.clone()).collect();
 
-    for (listener, config) in listeners {
+    for (listener, config, stop_flag) in listeners {
         let sess = session_arc.clone();
         let remote_host = config.remote_host.clone();
         let remote_port = config.remote_port;
-        let handle = std::thread::spawn(move || {
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(s) => handle_connection(s, sess.clone(), remote_host.clone(), remote_port),
-                    Err(e) => {
-                        if e.kind() == io::ErrorKind::WouldBlock {
-                            std::thread::sleep(std::time::Duration::from_millis(10));
-                        } else {
-                            break;
-                        }
+
+        std::thread::spawn(move || {
+            loop {
+                if stop_flag.load(Ordering::Relaxed) {
+                    break;
+                }
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        handle_connection(stream, sess.clone(), remote_host.clone(), remote_port);
                     }
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        // No pending connection — check shutdown and yield.
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                    }
+                    Err(_) => break,
                 }
             }
         });
-        thread_handles.push(handle);
     }
 
-    // Block until shutdown signal.
-    let _ = shutdown_rx.try_recv();
-    // Poll until signal arrives; this is in a spawn_blocking context so blocking is fine.
+    // Block until shutdown signal arrives (oneshot from ssh_stop_tunnels).
+    let mut rx = shutdown_rx;
     loop {
-        match shutdown_rx.try_recv() {
+        match rx.try_recv() {
             Ok(_) | Err(tokio::sync::oneshot::error::TryRecvError::Closed) => break,
             Err(tokio::sync::oneshot::error::TryRecvError::Empty) => {
                 std::thread::sleep(std::time::Duration::from_millis(200));
@@ -305,20 +329,29 @@ fn run_tunnel_loop(
         }
     }
 
-    // Cleanup — listeners will be dropped when threads finish naturally.
+    // Signal all accept threads to exit cleanly.
+    for flag in &stop_flags {
+        flag.store(true, Ordering::Relaxed);
+    }
+
     tunnel_state.lock().ok().map(|mut m| m.remove(&host_id));
-    log::info!("tunnel: stopped tunnels for host {host_id}");
+    log::info!("tunnel: stopped for host {host_id}");
 }
 
-/// Stop all tunnels for a specific host by sending the shutdown signal.
 #[tauri::command]
 pub async fn ssh_stop_tunnels(
     host_id: String,
     tunnel_state: tauri::State<'_, TunnelState>,
 ) -> Result<(), String> {
     let mut map = tunnel_state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(tx) = map.remove(&host_id) {
-        let _ = tx.send(());
+    if let Some(entry) = map.get_mut(&host_id) {
+        entry.ref_count = entry.ref_count.saturating_sub(1);
+        if entry.ref_count == 0 {
+            // Last SSH session for this host closed — shut down the tunnel.
+            if let Some(entry) = map.remove(&host_id) {
+                let _ = entry.shutdown.send(());
+            }
+        }
     }
     Ok(())
 }
