@@ -40,7 +40,7 @@ pub type TunnelMap = Arc<Mutex<HashMap<String, TunnelEntry>>>;
 /// The SSH session is set to non-blocking mode before this is called, so
 /// channel.read() returns immediately with WouldBlock when no data is ready.
 fn handle_connection(
-    stream: std::net::TcpStream,
+    mut stream: std::net::TcpStream,
     session: Arc<Mutex<super::SessionHandle>>,
     remote_host: String,
     remote_port: u16,
