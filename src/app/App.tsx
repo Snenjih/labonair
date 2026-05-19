@@ -502,7 +502,12 @@ export default function App() {
     [tabs, disposeTab],
   );
 
-  const activeFilePath = activeTab?.kind === "editor" ? activeTab.path : null;
+  const activeFilePath =
+    activeTab?.kind === "editor"
+      ? activeTab.isUntitled
+        ? activeTab.path.split("/").pop() ?? "untitled.txt" // show just filename, not the system temp path
+        : activeTab.path
+      : null;
 
   const openPreviewTab = useCallback(
     (url: string) => {
