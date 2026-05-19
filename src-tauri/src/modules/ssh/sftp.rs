@@ -266,7 +266,8 @@ pub async fn save_remote_edit(
     tokio::task::spawn_blocking(move || {
         // Validate that the path is inside the expected temp directory to prevent
         // the frontend from reading arbitrary local files and uploading them.
-        let temp_dir = std::env::temp_dir().join("nexum_remote_edits");
+        let temp_dir = std::fs::canonicalize(std::env::temp_dir().join("nexum_remote_edits"))
+            .unwrap_or_else(|_| std::env::temp_dir().join("nexum_remote_edits"));
         let canonical = std::fs::canonicalize(&local_temp_path)
             .map_err(|e| format!("invalid temp path: {e}"))?;
         if !canonical.starts_with(&temp_dir) {
