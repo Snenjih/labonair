@@ -58,6 +58,7 @@ import { WorkspacePane, type TerminalPaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { UpdaterDialog } from "@/modules/updater";
+import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import type { SearchAddon } from "@xterm/addon-search";
 import { AnimatePresence, motion } from "motion/react";
@@ -178,6 +179,13 @@ export default function App() {
     void useAgentsStore.getState().hydrate();
     void useSnippetsStore.getState().hydrate();
   }, [hydrateSessions]);
+
+  // Show the main window once core stores are ready to avoid a white-flash on startup.
+  // tauri.conf.json starts the window hidden; this reveals it after hydration.
+  useEffect(() => {
+    if (!prefsHydrated || !keysLoaded) return;
+    void invoke("show_main_window");
+  }, [prefsHydrated, keysLoaded]);
 
   useEffect(() => {
     void bootstrapTransferListeners();
