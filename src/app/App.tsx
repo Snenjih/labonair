@@ -795,6 +795,8 @@ export default function App() {
             onNew={openNewTab}
             onNewPreview={() => openPreviewTab("")}
             onNewEditor={() => void openUntitledTab()}
+            onNewSsh={newSshTab}
+            onNewSftp={newSftpTab}
             onClose={handleClose}
             onToggleSidebar={toggleSidebar}
             onOpenShortcuts={() => setShortcutsOpen(true)}

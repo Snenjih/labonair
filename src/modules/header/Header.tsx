@@ -33,6 +33,8 @@ type Props = {
   onNew: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
+  onNewSsh: (hostId: string, title: string) => void;
+  onNewSftp: (hostId: string, title: string) => void;
   onClose: (id: number) => void;
   onToggleSidebar: () => void;
   onOpenShortcuts: () => void;
@@ -49,6 +51,8 @@ export function Header({
   onNew,
   onNewPreview,
   onNewEditor,
+  onNewSsh,
+  onNewSftp,
   onClose,
   onToggleSidebar,
   onOpenShortcuts,
@@ -130,6 +134,9 @@ export function Header({
           onNew={onNew}
           onNewPreview={onNewPreview}
           onNewEditor={onNewEditor}
+          onNewSsh={onNewSsh}
+          onNewSftp={onNewSftp}
+          onOpenHostManager={onOpenHostManager}
           onClose={onClose}
           compact={false}
         />

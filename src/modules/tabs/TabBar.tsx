@@ -3,8 +3,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
@@ -31,6 +36,9 @@ type Props = {
   onNew: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
+  onNewSsh: (hostId: string, title: string) => void;
+  onNewSftp: (hostId: string, title: string) => void;
+  onOpenHostManager: () => void;
   onClose: (id: number) => void;
   compact?: boolean;
 };
@@ -42,9 +50,16 @@ export function TabBar({
   onNew,
   onNewPreview,
   onNewEditor,
+  onNewSsh,
+  onNewSftp,
+  onOpenHostManager,
   onClose,
   compact,
 }: Props) {
+  const hosts = useHostsStore((s) => s.hosts);
+  const recentHosts = [...hosts]
+    .sort((a, b) => (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0))
+    .slice(0, 5);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Horizontal wheel scroll without holding shift.
@@ -162,6 +177,65 @@ export function TabBar({
               <span className="flex-1">Preview</span>
               <span className="text-xs text-muted-foreground">⌘P</span>
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <HugeiconsIcon icon={ComputerTerminal02Icon} size={14} strokeWidth={1.75} />
+                <span className="flex-1">SSH</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-48">
+                {recentHosts.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    <span>No hosts yet</span>
+                  </DropdownMenuItem>
+                ) : (
+                  recentHosts.map((host) => (
+                    <DropdownMenuItem
+                      key={host.id}
+                      onSelect={() => onNewSsh(host.id, host.name)}
+                    >
+                      <span className="flex-1 truncate">{host.name}</span>
+                      <span className="ml-2 text-xs text-muted-foreground truncate max-w-28">
+                        {host.host_address}
+                      </span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={onOpenHostManager}>
+                  <span>All hosts...</span>
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <HugeiconsIcon icon={CloudServerIcon} size={14} strokeWidth={1.75} />
+                <span className="flex-1">SFTP</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-48">
+                {recentHosts.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    <span>No hosts yet</span>
+                  </DropdownMenuItem>
+                ) : (
+                  recentHosts.map((host) => (
+                    <DropdownMenuItem
+                      key={host.id}
+                      onSelect={() => onNewSftp(host.id, host.name)}
+                    >
+                      <span className="flex-1 truncate">{host.name}</span>
+                      <span className="ml-2 text-xs text-muted-foreground truncate max-w-28">
+                        {host.host_address}
+                      </span>
+                    </DropdownMenuItem>
+                  ))
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={onOpenHostManager}>
+                  <span>All hosts...</span>
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
