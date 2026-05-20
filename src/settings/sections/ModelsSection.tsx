@@ -6,12 +6,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   AUTOCOMPLETE_PROVIDERS,
   DEFAULT_AUTOCOMPLETE_MODEL,
   MODELS,
+  OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
   PROVIDERS,
   getModel,
   getProvider,
@@ -29,8 +38,11 @@ import {
   setAutocompleteProvider,
   setDefaultModel,
   setLmstudioBaseURL,
+  setLmstudioChatModelId,
+  setOpenaiCompatibleBaseURL,
+  setOpenaiCompatibleModelId,
 } from "@/modules/settings/store";
-import { ArrowDown01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { ProviderIcon } from "../components/ProviderIcon";
@@ -64,9 +76,12 @@ export function ModelsSection() {
   }
 
   const defaultModelInfo = getModel(defaultModel);
-  const configuredCount = PROVIDERS.filter(
-    (p) => providerNeedsKey(p.id) && !!keys[p.id],
-  ).length;
+
+  // Only count cloud providers toward the "N of M configured" badge
+  const keyedProviders = PROVIDERS.filter(
+    (p) => providerNeedsKey(p.id) && p.id !== "openai-compatible",
+  );
+  const configuredCount = keyedProviders.filter((p) => !!keys[p.id]).length;
 
   return (
     <div className="flex flex-col gap-7">
@@ -75,6 +90,7 @@ export function ModelsSection() {
         description="Bring your own keys. They live in your OS keychain and are used only by Nexum."
       />
 
+      {/* Default model dropdown — includes all providers */}
       <div className="flex flex-col gap-2">
         <Label>Default model</Label>
         <DropdownMenu>
@@ -99,26 +115,33 @@ export function ModelsSection() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-[260px]">
-            {PROVIDERS.filter((p) => providerNeedsKey(p.id)).map((p) => {
+            {PROVIDERS.map((p) => {
               const models = MODELS.filter((m) => m.provider === p.id);
-              const hasKey = !!keys[p.id];
+              // Cloud providers need a key; local/compatible providers are always enabled
+              const hasKey = providerNeedsKey(p.id) ? !!keys[p.id] : true;
+              const isEnabled =
+                p.id === "openai-compatible" || p.id === "lmstudio"
+                  ? true
+                  : hasKey;
               return (
                 <div key={p.id} className="px-1 pt-1.5">
                   <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                     <ProviderIcon provider={p.id} size={11} />
                     <span>{p.label}</span>
-                    {!hasKey && (
-                      <span className="ml-auto text-[9.5px] normal-case tracking-normal text-muted-foreground/70">
-                        no key
-                      </span>
-                    )}
+                    {!hasKey &&
+                      p.id !== "lmstudio" &&
+                      p.id !== "openai-compatible" && (
+                        <span className="ml-auto text-[9.5px] normal-case tracking-normal text-muted-foreground/70">
+                          no key
+                        </span>
+                      )}
                   </div>
                   {models.map((m) => (
                     <DropdownMenuItem
                       key={m.id}
-                      disabled={!hasKey}
+                      disabled={!isEnabled}
                       onSelect={() =>
-                        hasKey && void setDefaultModel(m.id as ModelId)
+                        isEnabled && void setDefaultModel(m.id as ModelId)
                       }
                       className={cn(
                         "flex items-center justify-between gap-2 text-[12px]",
@@ -140,15 +163,18 @@ export function ModelsSection() {
         </DropdownMenu>
       </div>
 
+      {/* API keys grid — excludes openai-compatible (has its own block) */}
       <div className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between">
           <Label>API keys</Label>
           <span className="text-[10.5px] text-muted-foreground">
-            {configuredCount} of {PROVIDERS.filter((p) => providerNeedsKey(p.id)).length} configured
+            {configuredCount} of {keyedProviders.length} configured
           </span>
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {PROVIDERS.filter((p) => providerNeedsKey(p.id)).map((p) => (
+          {PROVIDERS.filter(
+            (p) => providerNeedsKey(p.id) && p.id !== "openai-compatible",
+          ).map((p) => (
             <ProviderKeyCard
               key={p.id}
               provider={p}
@@ -160,7 +186,286 @@ export function ModelsSection() {
         </div>
       </div>
 
+      {/* Local providers */}
+      <LmStudioChatBlock />
+      <OpenAICompatibleBlock
+        keys={keys}
+        onSaveKey={(v) => onSave("openai-compatible", v)}
+        onClearKey={() => onClear("openai-compatible")}
+      />
+
       <AutocompleteBlock keys={keys} />
+    </div>
+  );
+}
+
+function LmStudioChatBlock() {
+  const baseURL = usePreferencesStore((s) => s.lmstudioBaseURL);
+  const chatModelId = usePreferencesStore((s) => s.lmstudioChatModelId);
+
+  const [urlDraft, setUrlDraft] = useState(baseURL);
+  const [modelDraft, setModelDraft] = useState(chatModelId);
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "ok" | "fail">("idle");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => setUrlDraft(baseURL), [baseURL]);
+  useEffect(() => setModelDraft(chatModelId), [chatModelId]);
+  useEffect(() => setTestStatus("idle"), [urlDraft]);
+
+  const canSave = urlDraft.trim().length > 0 && modelDraft.trim().length > 0;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    await setLmstudioBaseURL(urlDraft.trim());
+    await setLmstudioChatModelId(modelDraft.trim());
+    setSaving(false);
+  };
+
+  const handleTest = async () => {
+    if (testStatus === "testing") return;
+    setTestStatus("testing");
+    try {
+      const url = urlDraft.replace(/\/$/, "") + "/models";
+      const res = await fetch(url, { method: "GET" });
+      setTestStatus(res.ok ? "ok" : "fail");
+    } catch {
+      setTestStatus("fail");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-0.5">
+        <Label>Local — LM Studio</Label>
+        <span className="text-[10.5px] leading-relaxed text-muted-foreground">
+          Run any GGUF model on your machine via LM Studio's HTTP server. Enable
+          the server in LM Studio → Developer tab.
+        </span>
+      </div>
+      <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+        <div className="flex flex-col gap-1.5">
+          <Label>Base URL</Label>
+          <Input
+            value={urlDraft}
+            onChange={(e) => setUrlDraft(e.target.value)}
+            placeholder="http://localhost:1234/v1"
+            spellCheck={false}
+            className="h-8 font-mono text-[11.5px]"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Model ID</Label>
+          <Input
+            value={modelDraft}
+            onChange={(e) => setModelDraft(e.target.value)}
+            placeholder="e.g. qwen2.5-coder-7b-instruct"
+            spellCheck={false}
+            className="h-8 font-mono text-[11.5px]"
+          />
+          <span className="text-[10.5px] text-muted-foreground">
+            Enter the model ID that's loaded in LM Studio — e.g. shown on the
+            server's /v1/models page.
+          </span>
+        </div>
+        {testStatus === "ok" && (
+          <span className="text-[10.5px] text-emerald-500">
+            Connected — server responded.
+          </span>
+        )}
+        {testStatus === "fail" && (
+          <span className="text-[10.5px] text-destructive">
+            Could not reach the server. Is LM Studio running?
+          </span>
+        )}
+        {testStatus === "testing" && (
+          <span className="text-[10.5px] text-muted-foreground">Testing…</span>
+        )}
+        <div className="flex justify-end gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void handleTest()}
+            disabled={!urlDraft.trim() || testStatus === "testing"}
+            className="h-8 px-2.5 text-[11px]"
+          >
+            Test
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => void handleSave()}
+            disabled={!canSave || saving}
+            className="h-8 px-2.5 text-[11px]"
+          >
+            {saving && <Spinner className="mr-1 size-3" />}
+            Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OpenAICompatibleBlock({
+  keys,
+  onSaveKey,
+  onClearKey,
+}: {
+  keys: KeysMap;
+  onSaveKey: (v: string) => Promise<void>;
+  onClearKey: () => Promise<void>;
+}) {
+  const baseURL = usePreferencesStore((s) => s.openaiCompatibleBaseURL);
+  const modelId = usePreferencesStore((s) => s.openaiCompatibleModelId);
+  const currentApiKey = keys["openai-compatible"];
+
+  const [urlDraft, setUrlDraft] = useState(baseURL);
+  const [modelDraft, setModelDraft] = useState(modelId);
+  const [keyDraft, setKeyDraft] = useState("");
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "ok" | "fail">("idle");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => setUrlDraft(baseURL), [baseURL]);
+  useEffect(() => setModelDraft(modelId), [modelId]);
+  useEffect(() => setTestStatus("idle"), [urlDraft]);
+
+  const canSave = urlDraft.trim().length > 0 && modelDraft.trim().length > 0;
+
+  const handleSave = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    await setOpenaiCompatibleBaseURL(urlDraft.trim());
+    await setOpenaiCompatibleModelId(modelDraft.trim());
+    if (keyDraft.trim()) {
+      await onSaveKey(keyDraft.trim());
+      setKeyDraft("");
+    }
+    setSaving(false);
+  };
+
+  const handleTest = async () => {
+    if (testStatus === "testing") return;
+    setTestStatus("testing");
+    try {
+      const headers: Record<string, string> = {};
+      const key = keyDraft.trim() || currentApiKey;
+      if (key) headers["Authorization"] = `Bearer ${key}`;
+      const url = urlDraft.replace(/\/$/, "") + "/models";
+      const res = await fetch(url, { method: "GET", headers });
+      setTestStatus(res.ok ? "ok" : "fail");
+    } catch {
+      setTestStatus("fail");
+    }
+  };
+
+  const handleClearKey = async () => {
+    setKeyDraft("");
+    await onClearKey();
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-0.5">
+        <Label>OpenAI-compatible endpoint</Label>
+        <span className="text-[10.5px] leading-relaxed text-muted-foreground">
+          Any OpenAI-compatible HTTPS endpoint — vLLM, Z.AI, Fireworks, hosted
+          Ollama, etc.
+        </span>
+      </div>
+      <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
+        <div className="flex flex-col gap-1.5">
+          <Label>Base URL</Label>
+          <Input
+            value={urlDraft}
+            onChange={(e) => setUrlDraft(e.target.value)}
+            placeholder={OPENAI_COMPATIBLE_DEFAULT_BASE_URL}
+            spellCheck={false}
+            className="h-8 font-mono text-[11.5px]"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Model ID</Label>
+          <Input
+            value={modelDraft}
+            onChange={(e) => setModelDraft(e.target.value)}
+            placeholder="e.g. Meta-Llama-3-8B-Instruct-4bit"
+            spellCheck={false}
+            className="h-8 font-mono text-[11.5px]"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>
+            API key{" "}
+            <span className="text-muted-foreground">(optional)</span>
+          </Label>
+          <div className="flex gap-1.5">
+            <Input
+              type="password"
+              value={keyDraft}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              placeholder={
+                currentApiKey ? "••••••••" : "Leave blank if not needed"
+              }
+              autoComplete="off"
+              spellCheck={false}
+              className="h-8 flex-1 font-mono text-[11.5px]"
+            />
+            {(keyDraft || currentApiKey) && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => void handleClearKey()}
+                className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
+                title="Clear API key"
+              >
+                <HugeiconsIcon
+                  icon={Cancel01Icon}
+                  size={12}
+                  strokeWidth={1.75}
+                />
+              </Button>
+            )}
+          </div>
+          {currentApiKey && !keyDraft && (
+            <span className="text-[10.5px] text-emerald-500">
+              API key stored in keychain.
+            </span>
+          )}
+        </div>
+        {testStatus === "ok" && (
+          <span className="text-[10.5px] text-emerald-500">
+            Connected — endpoint responded.
+          </span>
+        )}
+        {testStatus === "fail" && (
+          <span className="text-[10.5px] text-destructive">
+            Could not reach the endpoint. Check the URL and key.
+          </span>
+        )}
+        {testStatus === "testing" && (
+          <span className="text-[10.5px] text-muted-foreground">Testing…</span>
+        )}
+        <div className="flex justify-end gap-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void handleTest()}
+            disabled={!urlDraft.trim() || testStatus === "testing"}
+            className="h-8 px-2.5 text-[11px]"
+          >
+            Test
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => void handleSave()}
+            disabled={!canSave || saving}
+            className="h-8 px-2.5 text-[11px]"
+          >
+            {saving && <Spinner className="mr-1 size-3" />}
+            Save
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -221,28 +526,32 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
       <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5">
         <div className="flex flex-col gap-1.5">
           <Label>Provider</Label>
-          <div className="flex gap-1">
-            {AUTOCOMPLETE_PROVIDERS.map((id) => {
-              const info = getProvider(id);
-              const active = id === provider;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => onProviderChange(id)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11.5px] transition-colors",
-                    active
-                      ? "border-foreground/40 bg-accent/60"
-                      : "border-border/60 bg-transparent hover:bg-accent/30",
-                  )}
-                >
-                  <ProviderIcon provider={id} size={12} />
-                  <span>{info.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          <Select
+            value={provider}
+            onValueChange={(v) => onProviderChange(v as AutocompleteProviderId)}
+          >
+            <SelectTrigger className="h-8 w-full text-[11.5px]">
+              <SelectValue>
+                <span className="flex items-center gap-1.5">
+                  <ProviderIcon provider={provider} size={12} />
+                  <span>{providerInfo.label}</span>
+                </span>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {AUTOCOMPLETE_PROVIDERS.map((id) => {
+                const info = getProvider(id);
+                return (
+                  <SelectItem key={id} value={id}>
+                    <span className="flex items-center gap-1.5">
+                      <ProviderIcon provider={id} size={12} />
+                      <span>{info.label}</span>
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
           {!hasKey ? (
             <span className="text-[10.5px] text-amber-500">
               No API key configured for {providerInfo.label}. Add one above.
