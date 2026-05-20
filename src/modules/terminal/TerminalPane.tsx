@@ -19,6 +19,7 @@ type Props = {
   tabId: string;
   visible: boolean;
   initialCwd?: string;
+  initialCommand?: string;
   onSearchReady?: (tabId: string, addon: SearchAddon) => void;
   onExit?: (tabId: string, code: number) => void;
   onCwd?: (tabId: string, cwd: string) => void;
@@ -31,6 +32,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       tabId,
       visible,
       initialCwd,
+      initialCommand,
       onSearchReady,
       onExit,
       onCwd,
@@ -45,6 +47,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       container: containerRef,
       visible,
       initialCwd,
+      initialCommand,
       onSearchReady: (a) => onSearchReady?.(tabId, a),
       onExit: (c) => onExit?.(tabId, c),
       onCwd: (c) => onCwd?.(tabId, c),

@@ -831,8 +831,8 @@ export default function App() {
     tabs: workspaceTabs,
     activeTerminalRef: () =>
       activePaneId ? (terminalRefs.current.get(activePaneId) ?? null) : null,
-    onNewLocalTab: (cwd) => newTab(cwd ?? inheritedCwdForNewTab()),
-    onNewSshTab: (hostId, title, cwd) => newSshTab(hostId, title, cwd),
+    onNewLocalTab: (cwd, command) => newTab(cwd ?? inheritedCwdForNewTab(), command),
+    onNewSshTab: (hostId, title, cwd, command) => newSshTab(hostId, title, cwd, command),
     onOpenLogDrawer: () => setSnippetLogDrawerOpen(true),
   });
 

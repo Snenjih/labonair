@@ -14,6 +14,7 @@ type Options = {
   container: React.RefObject<HTMLDivElement | null>;
   visible: boolean;
   initialCwd?: string;
+  initialCommand?: string;
   onSearchReady?: (addon: SearchAddon) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
@@ -35,6 +36,7 @@ export function useTerminalSession({
   container,
   visible,
   initialCwd,
+  initialCommand,
   onSearchReady,
   onExit,
   onCwd,
@@ -210,6 +212,11 @@ export function useTerminalSession({
         return;
       }
       ptyRef.current = pty;
+
+      if (initialCommand) {
+        const cmd = initialCommand.endsWith("\n") ? initialCommand : initialCommand + "\n";
+        setTimeout(() => { if (!disposed) pty.write(cmd); }, 150);
+      }
 
       term.onData((data) => pty.write(data));
 

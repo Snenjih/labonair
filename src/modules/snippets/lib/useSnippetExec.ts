@@ -10,8 +10,8 @@ import { newRunId } from "./snippetUtils";
 interface UseSnippetExecOptions {
   tabs: WorkspaceTab[];
   activeTerminalRef: () => TerminalPaneHandle | null;
-  onNewLocalTab: (cwd?: string) => void;
-  onNewSshTab: (hostId: string, title: string, cwd?: string) => void;
+  onNewLocalTab: (cwd?: string, command?: string) => void;
+  onNewSshTab: (hostId: string, title: string, cwd?: string, command?: string) => void;
   onOpenLogDrawer: () => void;
 }
 
@@ -84,16 +84,12 @@ export function useSnippetExec({
         if (snippet.target === "ssh") {
           if (!snippet.hostId) {
             console.warn("Snippet has no hostId, falling back to local terminal");
-            onNewLocalTab(snippet.workingDir ?? undefined);
+            onNewLocalTab(snippet.workingDir ?? undefined, snippet.command);
           } else {
-            onNewSshTab(snippet.hostId, snippet.name);
+            onNewSshTab(snippet.hostId, snippet.name, undefined, snippet.command);
           }
-          // The command will be injected after the terminal session is ready.
-          // This is handled by the SnippetItem's onTerminalReady callback mechanism.
-          // For now, the tab opens and the user sees the prompt — future enhancement
-          // will auto-inject the command once session_established fires.
         } else {
-          onNewLocalTab(snippet.workingDir ?? undefined);
+          onNewLocalTab(snippet.workingDir ?? undefined, snippet.command);
         }
         return;
       }
