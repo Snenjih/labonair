@@ -46,6 +46,12 @@ export function CommandPalette({
   const recentIds = useCommandStore((s) => s.recentIds);
   const pushRecent = useCommandStore((s) => s.pushRecent);
   const blurAmount = usePreferencesStore((s) => s.commandPaletteBlur);
+  const opacity = usePreferencesStore((s) => s.commandPaletteOpacity);
+  const position = usePreferencesStore((s) => s.commandPalettePosition);
+  const animation = usePreferencesStore((s) => s.commandPaletteAnimation);
+  const showRecent = usePreferencesStore((s) => s.commandPaletteShowRecent);
+  const searchMode = usePreferencesStore((s) => s.commandPaletteSearchMode);
+  const closeOnOverlay = usePreferencesStore((s) => s.commandPaletteCloseOnOverlayClick);
 
   const [pages, setPages] = useState<string[]>(["root"]);
   const [search, setSearch] = useState("");
@@ -146,19 +152,47 @@ export function CommandPalette({
       .filter((a): a is CommandAction => !!a);
   }, [search, activePage, registry, recentIds]);
 
+  const animDuration =
+    animation === "none" ? "0ms" :
+    animation === "fast" ? "70ms" :
+    animation === "slow" ? "220ms" :
+    "130ms";
+
+  const motionDuration =
+    animation === "none" ? 0 :
+    animation === "fast" ? 0.07 :
+    animation === "slow" ? 0.22 :
+    0.13;
+
+  const positionStyle: React.CSSProperties = {
+    top: position === "high" ? "8%" : position === "center" ? "50%" : "15%",
+    transform: position === "center" ? "translateX(-50%) translateY(-50%)" : "translateX(-50%)",
+  };
+
+  const contentBg = `color-mix(in oklch, var(--color-card) ${opacity}%, transparent)`;
+
   if (!currentPage) return null;
 
   return (
-    <DialogPrimitive.Root open={isOpen} onOpenChange={(v) => !v && handleClose()}>
+    <DialogPrimitive.Root open={isOpen} onOpenChange={(v) => !v && closeOnOverlay && handleClose()}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay
           className="fixed inset-0 z-[100] bg-black/40 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
-          style={{ backdropFilter: blurAmount > 0 ? `blur(${blurAmount}px)` : undefined }}
+          style={{
+            backdropFilter: blurAmount > 0 ? `blur(${blurAmount}px)` : undefined,
+            animationDuration: animDuration,
+          }}
+          onClick={closeOnOverlay ? undefined : (e) => e.stopPropagation()}
         />
         <DialogPrimitive.Content
           onKeyDown={handleKeyDown}
           aria-describedby={undefined}
-          className="fixed left-1/2 top-[15%] z-[101] w-full max-w-[640px] -translate-x-1/2 overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-xl outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+          className="fixed left-1/2 z-[101] w-full max-w-[640px] overflow-hidden rounded-2xl border border-border/60 shadow-2xl backdrop-blur-xl outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+          style={{
+            ...positionStyle,
+            backgroundColor: contentBg,
+            animationDuration: animDuration,
+          }}
         >
           <DialogPrimitive.Title className="sr-only">Command Palette</DialogPrimitive.Title>
 
@@ -166,8 +200,18 @@ export function CommandPalette({
             shouldFilter={true}
             filter={(value: string, search: string) => {
               if (!search) return 1;
-              const lower = search.toLowerCase();
-              return value.toLowerCase().includes(lower) ? 1 : 0;
+              const v = value.toLowerCase();
+              const s = search.toLowerCase();
+              if (searchMode === "startsWith") return v.startsWith(s) ? 1 : 0;
+              if (searchMode === "fuzzy") {
+                let i = 0;
+                for (const ch of v) {
+                  if (ch === s[i]) i++;
+                  if (i === s.length) return 1;
+                }
+                return 0;
+              }
+              return v.includes(s) ? 1 : 0;
             }}
             className="flex flex-col"
           >
@@ -210,14 +254,14 @@ export function CommandPalette({
                 initial={{ x: slideDir === "forward" ? 20 : -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: slideDir === "forward" ? -20 : 20, opacity: 0 }}
-                transition={{ duration: 0.13, ease: "easeOut" }}
+                transition={{ duration: motionDuration, ease: "easeOut" }}
               >
                 <CommandPrimitive.List className="no-scrollbar max-h-96 overflow-y-auto overflow-x-hidden scroll-py-1 p-2 outline-none">
                   <CommandPrimitive.Empty className="py-10 text-center text-[13px] text-muted-foreground">
                     No results found.
                   </CommandPrimitive.Empty>
 
-                  {recentActions.length > 0 && (
+                  {showRecent && recentActions.length > 0 && (
                     <CommandPrimitive.Group
                       heading="Recently Used"
                       className="overflow-hidden **:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-[10px] **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-widest **:[[cmdk-group-heading]]:text-muted-foreground/70"

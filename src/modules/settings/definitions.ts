@@ -5,6 +5,7 @@ export type SettingCategory =
   | "Appearance"
   | "Terminal"
   | "Editor"
+  | "Command Palette"
   | "File Manager"
   | "Models"
   | "Agents"
@@ -52,14 +53,81 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "Switch",
   },
 
-  // --- Appearance ---
+  // --- Command Palette ---
   {
     id: "commandPaletteBlur",
-    label: "Command palette background blur",
-    description: "Blur strength (px) applied to the app behind the command palette overlay.",
-    category: "Appearance",
+    label: "Background blur",
+    description: "Blur strength (px) applied to the app behind the command palette overlay (0 = off).",
+    category: "Command Palette",
     controlType: "NumberInput",
   },
+  {
+    id: "commandPaletteOpacity",
+    label: "Palette opacity",
+    description: "Opacity of the command palette panel (60–100%).",
+    category: "Command Palette",
+    controlType: "NumberInput",
+  },
+  {
+    id: "commandPalettePosition",
+    label: "Open position",
+    description: "Vertical position of the palette when it opens.",
+    category: "Command Palette",
+    controlType: "Select",
+    options: [
+      { value: "top", label: "Top (15%)" },
+      { value: "high", label: "High (8%)" },
+      { value: "center", label: "Center" },
+    ],
+  },
+  {
+    id: "commandPaletteAnimation",
+    label: "Animation speed",
+    description: "Speed of open/close and page-slide animations.",
+    category: "Command Palette",
+    controlType: "Select",
+    options: [
+      { value: "fast", label: "Fast" },
+      { value: "normal", label: "Normal" },
+      { value: "slow", label: "Slow" },
+      { value: "none", label: "None" },
+    ],
+  },
+  {
+    id: "commandPaletteShowRecent",
+    label: "Show recent commands",
+    description: "Display recently used commands at the top of the palette.",
+    category: "Command Palette",
+    controlType: "Switch",
+  },
+  {
+    id: "commandPaletteHistorySize",
+    label: "Recent history size",
+    description: "How many recently used commands to remember (3–20).",
+    category: "Command Palette",
+    controlType: "NumberInput",
+  },
+  {
+    id: "commandPaletteSearchMode",
+    label: "Search mode",
+    description: "How search queries are matched against command names.",
+    category: "Command Palette",
+    controlType: "Select",
+    options: [
+      { value: "contains", label: "Contains" },
+      { value: "startsWith", label: "Starts with" },
+      { value: "fuzzy", label: "Fuzzy" },
+    ],
+  },
+  {
+    id: "commandPaletteCloseOnOverlayClick",
+    label: "Close on outside click",
+    description: "Close the palette when clicking outside of it.",
+    category: "Command Palette",
+    controlType: "Switch",
+  },
+
+  // --- Appearance ---
   {
     id: "sidebarPosition",
     label: "Sidebar position",
@@ -284,6 +352,7 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Appearance",
   "Terminal",
   "Editor",
+  "Command Palette",
   "File Manager",
   "Models",
   "Agents",

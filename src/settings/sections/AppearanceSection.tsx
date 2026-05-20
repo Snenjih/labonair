@@ -3,13 +3,11 @@ import {
   setAppFontFamily,
   setAppFontSize,
   setAppLineHeight,
-  setCommandPaletteBlur,
   setSidebarPosition,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -23,7 +21,6 @@ export function AppearanceSection() {
   const appFontSize = usePreferencesStore((s) => s.appFontSize);
   const appLineHeight = usePreferencesStore((s) => s.appLineHeight);
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
-  const commandPaletteBlur = usePreferencesStore((s) => s.commandPaletteBlur);
 
   return (
     <div className="flex flex-col gap-6">
@@ -52,28 +49,6 @@ export function AppearanceSection() {
               <SelectItem value="right" className="text-[11.5px]">Right</SelectItem>
             </SelectContent>
           </Select>
-        </SettingRow>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>Command Palette</Label>
-        <SettingRow
-          title="Background blur"
-          description="Blur strength applied to the app behind the command palette overlay (0 = off, 20 = strong)."
-        >
-          <div className="flex items-center gap-3">
-            <Slider
-              min={0}
-              max={20}
-              step={1}
-              value={[commandPaletteBlur]}
-              onValueChange={([v]) => void setCommandPaletteBlur(v)}
-              className="w-28"
-            />
-            <span className="w-8 text-right text-[11.5px] tabular-nums text-muted-foreground">
-              {commandPaletteBlur}px
-            </span>
-          </div>
         </SettingRow>
       </div>
 

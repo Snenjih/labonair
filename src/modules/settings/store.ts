@@ -93,6 +93,13 @@ export type Preferences = {
 
   // --- Command Palette ---
   commandPaletteBlur: number;
+  commandPaletteOpacity: number;
+  commandPalettePosition: "top" | "center" | "high";
+  commandPaletteAnimation: "fast" | "normal" | "slow" | "none";
+  commandPaletteShowRecent: boolean;
+  commandPaletteHistorySize: number;
+  commandPaletteSearchMode: "contains" | "startsWith" | "fuzzy";
+  commandPaletteCloseOnOverlayClick: boolean;
 
   // --- Sidebar ---
   sidebarPosition: "left" | "right";
@@ -151,6 +158,13 @@ const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
 const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
 const KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS = "sftpRemoteEditShowTransfers";
 const KEY_COMMAND_PALETTE_BLUR = "commandPaletteBlur";
+const KEY_COMMAND_PALETTE_OPACITY = "commandPaletteOpacity";
+const KEY_COMMAND_PALETTE_POSITION = "commandPalettePosition";
+const KEY_COMMAND_PALETTE_ANIMATION = "commandPaletteAnimation";
+const KEY_COMMAND_PALETTE_SHOW_RECENT = "commandPaletteShowRecent";
+const KEY_COMMAND_PALETTE_HISTORY_SIZE = "commandPaletteHistorySize";
+const KEY_COMMAND_PALETTE_SEARCH_MODE = "commandPaletteSearchMode";
+const KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY = "commandPaletteCloseOnOverlayClick";
 
 const KEY_SIDEBAR_POSITION = "sidebarPosition";
 
@@ -207,6 +221,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpRemoteEditShowTransfers: true,
 
   commandPaletteBlur: 4,
+  commandPaletteOpacity: 95,
+  commandPalettePosition: "top",
+  commandPaletteAnimation: "normal",
+  commandPaletteShowRecent: true,
+  commandPaletteHistorySize: 5,
+  commandPaletteSearchMode: "contains",
+  commandPaletteCloseOnOverlayClick: true,
 
   sidebarPosition: "left",
   credentialEncryption: false,
@@ -332,6 +353,27 @@ export async function loadPreferences(): Promise<Preferences> {
     commandPaletteBlur:
       get<number>(KEY_COMMAND_PALETTE_BLUR) ??
       DEFAULT_PREFERENCES.commandPaletteBlur,
+    commandPaletteOpacity:
+      get<number>(KEY_COMMAND_PALETTE_OPACITY) ??
+      DEFAULT_PREFERENCES.commandPaletteOpacity,
+    commandPalettePosition:
+      get<"top" | "center" | "high">(KEY_COMMAND_PALETTE_POSITION) ??
+      DEFAULT_PREFERENCES.commandPalettePosition,
+    commandPaletteAnimation:
+      get<"fast" | "normal" | "slow" | "none">(KEY_COMMAND_PALETTE_ANIMATION) ??
+      DEFAULT_PREFERENCES.commandPaletteAnimation,
+    commandPaletteShowRecent:
+      get<boolean>(KEY_COMMAND_PALETTE_SHOW_RECENT) ??
+      DEFAULT_PREFERENCES.commandPaletteShowRecent,
+    commandPaletteHistorySize:
+      get<number>(KEY_COMMAND_PALETTE_HISTORY_SIZE) ??
+      DEFAULT_PREFERENCES.commandPaletteHistorySize,
+    commandPaletteSearchMode:
+      get<"contains" | "startsWith" | "fuzzy">(KEY_COMMAND_PALETTE_SEARCH_MODE) ??
+      DEFAULT_PREFERENCES.commandPaletteSearchMode,
+    commandPaletteCloseOnOverlayClick:
+      get<boolean>(KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY) ??
+      DEFAULT_PREFERENCES.commandPaletteCloseOnOverlayClick,
 
     sidebarPosition:
       get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
@@ -571,6 +613,47 @@ export async function setCommandPaletteBlur(value: number): Promise<void> {
   await store.save();
 }
 
+export async function setCommandPaletteOpacity(value: number): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_OPACITY, value);
+  await store.save();
+}
+
+export async function setCommandPalettePosition(
+  value: "top" | "center" | "high",
+): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_POSITION, value);
+  await store.save();
+}
+
+export async function setCommandPaletteAnimation(
+  value: "fast" | "normal" | "slow" | "none",
+): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_ANIMATION, value);
+  await store.save();
+}
+
+export async function setCommandPaletteShowRecent(value: boolean): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_SHOW_RECENT, value);
+  await store.save();
+}
+
+export async function setCommandPaletteHistorySize(value: number): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_HISTORY_SIZE, value);
+  await store.save();
+}
+
+export async function setCommandPaletteSearchMode(
+  value: "contains" | "startsWith" | "fuzzy",
+): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_SEARCH_MODE, value);
+  await store.save();
+}
+
+export async function setCommandPaletteCloseOnOverlayClick(value: boolean): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY, value);
+  await store.save();
+}
+
 export async function setSidebarPosition(
   value: "left" | "right",
 ): Promise<void> {
@@ -643,6 +726,13 @@ export function onPreferencesChange(
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
     [KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS]: "sftpRemoteEditShowTransfers",
     [KEY_COMMAND_PALETTE_BLUR]: "commandPaletteBlur",
+    [KEY_COMMAND_PALETTE_OPACITY]: "commandPaletteOpacity",
+    [KEY_COMMAND_PALETTE_POSITION]: "commandPalettePosition",
+    [KEY_COMMAND_PALETTE_ANIMATION]: "commandPaletteAnimation",
+    [KEY_COMMAND_PALETTE_SHOW_RECENT]: "commandPaletteShowRecent",
+    [KEY_COMMAND_PALETTE_HISTORY_SIZE]: "commandPaletteHistorySize",
+    [KEY_COMMAND_PALETTE_SEARCH_MODE]: "commandPaletteSearchMode",
+    [KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY]: "commandPaletteCloseOnOverlayClick",
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
