@@ -6,6 +6,7 @@ export type SettingsTab =
   | "themes"
   | "terminal"
   | "editor"
+  | "command-palette"
   | "models"
   | "agents"
   | "security"
