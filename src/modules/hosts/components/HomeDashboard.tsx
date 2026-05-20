@@ -22,6 +22,7 @@ import { GroupCard } from "./GroupCard";
 import { HostCard } from "./HostCard";
 import { HostFormPanel } from "./HostFormPanel";
 import { useHostsStore } from "../store/hostsStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Host } from "../types";
 
 function SkeletonCard() {
@@ -120,6 +121,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
   const fetchData = useHostsStore((s) => s.fetchData);
   const startPingWorker = useHostsStore((s) => s.startPingWorker);
   const stopPingWorker = useHostsStore((s) => s.stopPingWorker);
+  const hostPingInterval = usePreferencesStore((s) => s.hostPingInterval);
   const createGroup = useHostsStore((s) => s.createGroup);
   const setSelectedHost = useHostsStore((s) => s.setSelectedHost);
   const selectHost = useHostsStore((s) => s.selectHost);
@@ -140,11 +142,11 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
   // Initial load
   useEffect(() => { void fetchData(); }, [fetchData]);
 
-  // Ping worker lifecycle
+  // Ping worker lifecycle — restarts whenever the interval preference changes
   useEffect(() => {
-    startPingWorker();
+    startPingWorker(hostPingInterval);
     return () => stopPingWorker();
-  }, [startPingWorker, stopPingWorker]);
+  }, [startPingWorker, stopPingWorker, hostPingInterval]);
 
   // Auto-refresh every 30 s
   useEffect(() => {

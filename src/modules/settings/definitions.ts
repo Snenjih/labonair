@@ -270,6 +270,21 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "File Manager",
     controlType: "Switch",
   },
+  {
+    id: "hostPingInterval",
+    label: "Ping interval",
+    description: "How often to check whether each host is reachable. Set to Never to disable availability checks.",
+    category: "General",
+    controlType: "Select",
+    options: [
+      { value: "10", label: "Every 10 seconds" },
+      { value: "30", label: "Every 30 seconds" },
+      { value: "60", label: "Every minute" },
+      { value: "120", label: "Every 2 minutes" },
+      { value: "300", label: "Every 5 minutes" },
+      { value: "0", label: "Never" },
+    ],
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [
