@@ -4,8 +4,9 @@ import { useThemeStore } from "@/modules/settings/useThemeStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { AlertCircleIcon, Upload02Icon } from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, GithubIcon, Upload02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ThemeCard } from "../components/ThemeCard";
@@ -121,15 +122,26 @@ export function ThemeMarketplace() {
             Install and manage color themes.
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 gap-1.5 px-2.5 text-[11.5px]"
-          onClick={() => void handleImport()}
-        >
-          <HugeiconsIcon icon={Upload02Icon} size={12} strokeWidth={2} />
-          Import JSON
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2.5 text-[11.5px]"
+            onClick={() => void openUrl("https://github.com/Snenjih/nexum-themes?tab=contributing-ov-file")}
+          >
+            <HugeiconsIcon icon={GithubIcon} size={12} strokeWidth={2} />
+            Contribute
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2.5 text-[11.5px]"
+            onClick={() => void handleImport()}
+          >
+            <HugeiconsIcon icon={Upload02Icon} size={12} strokeWidth={2} />
+            Import JSON
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
