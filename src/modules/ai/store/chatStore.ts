@@ -7,6 +7,7 @@ import { create } from "zustand";
 import {
   DEFAULT_MODEL_ID,
   getModel,
+  providerNeedsKey,
   type ModelId,
   type ProviderId,
 } from "../config";
@@ -217,6 +218,13 @@ function makeChat(sessionId: string): Chat<UIMessage> {
         activeFile: live.getActiveFile(),
       };
     },
+    getLmstudioBaseURL: () => usePreferencesStore.getState().lmstudioBaseURL,
+    getLmstudioChatModelId: () =>
+      usePreferencesStore.getState().lmstudioChatModelId || undefined,
+    getOpenaiCompatibleBaseURL: () =>
+      usePreferencesStore.getState().openaiCompatibleBaseURL || undefined,
+    getOpenaiCompatibleModelId: () =>
+      usePreferencesStore.getState().openaiCompatibleModelId || undefined,
     getPlanMode: () => usePlanStore.getState().active,
     onStep: (step) => {
       useChatStore.getState().patchAgentMeta({ step });
@@ -461,7 +469,10 @@ export function getActiveProviderKey(): string | null {
 
 export function hasKeyForModel(modelId: ModelId): boolean {
   const { apiKeys } = useChatStore.getState();
-  return !!apiKeys[getModel(modelId).provider];
+  const m = getModel(modelId);
+  // Keyless and optional-key providers are always considered "ready"
+  if (!providerNeedsKey(m.provider) || m.provider === "openai-compatible") return true;
+  return !!apiKeys[m.provider];
 }
 
 export function getOrCreateChat(sessionId: string): Chat<UIMessage> {
@@ -482,7 +493,12 @@ export async function sendMessage(text: string): Promise<boolean> {
   const state = useChatStore.getState();
   const sessionId = state.activeSessionId;
   if (!sessionId) return false;
-  if (!getActiveProviderKey()) return false;
+  const selectedModel = getModel(state.selectedModelId);
+  // Allow keyless (lmstudio) and optional-key (openai-compatible) providers
+  const requiresKey =
+    providerNeedsKey(selectedModel.provider) &&
+    selectedModel.provider !== "openai-compatible";
+  if (requiresKey && !getActiveProviderKey()) return false;
   const c = getOrCreateChat(sessionId);
   await c.sendMessage({ text });
   return true;

@@ -7,7 +7,8 @@ export type ProviderId =
   | "xai"
   | "cerebras"
   | "groq"
-  | "lmstudio";
+  | "lmstudio"
+  | "openai-compatible";
 
 export type ProviderInfo = {
   id: ProviderId;
@@ -66,6 +67,13 @@ export const PROVIDERS: readonly ProviderInfo[] = [
     keyringAccount: "",
     keyPrefix: null,
     consoleUrl: "https://lmstudio.ai/docs/basics/server",
+  },
+  {
+    id: "openai-compatible",
+    label: "OpenAI-compatible",
+    keyringAccount: "openai-compatible-api-key",
+    keyPrefix: null,
+    consoleUrl: "",
   },
 ] as const;
 
@@ -168,6 +176,13 @@ export const MODELS = [
     label: "LM Studio (local)",
     hint: "Custom local model",
   },
+  // OpenAI-compatible endpoint (model id is user-supplied at runtime)
+  {
+    id: "openai-compatible-custom",
+    provider: "openai-compatible",
+    label: "Custom Endpoint",
+    hint: "OpenAI-compatible",
+  },
 ] as const satisfies readonly ModelInfo[];
 
 export type ModelId = (typeof MODELS)[number]["id"];
@@ -197,6 +212,7 @@ export const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   "gpt-oss-120b": 128_000,
   "openai/gpt-oss-20b": 128_000,
   "lmstudio-local": 32_000,
+  "openai-compatible-custom": 128_000,
 };
 
 export function getModelContextLimit(modelId: string | undefined): number {
@@ -230,6 +246,7 @@ export const DEFAULT_AUTOCOMPLETE_MODEL: Record<
 };
 
 export const LMSTUDIO_DEFAULT_BASE_URL = "http://localhost:1234/v1";
+export const OPENAI_COMPATIBLE_DEFAULT_BASE_URL = "http://localhost:8080/v1";
 export const MAX_AGENT_STEPS = 24;
 export const TERMINAL_BUFFER_LINES = 300;
 
