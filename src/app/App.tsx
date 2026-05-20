@@ -31,7 +31,7 @@ import {
   type SearchTarget,
 } from "@/modules/header";
 import { PreviewStack, type PreviewPaneHandle } from "@/modules/preview";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { openSettingsWindow, type SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   onKeysChanged,
@@ -56,6 +56,7 @@ import {
 } from "@/modules/tabs";
 import { WorkspacePane, type TerminalPaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
+import { CommandPalette, useCommandStore, type RegistryCallbacks } from "@/modules/command-palette";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
@@ -130,6 +131,7 @@ export default function App() {
   }, []);
 
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const toggleCommandPalette = useCommandStore((s) => s.toggle);
   const miniOpen = useChatStore((s) => s.mini.open);
   const openMini = useChatStore((s) => s.openMini);
   const focusInput = useChatStore((s) => s.focusInput);
@@ -529,8 +531,90 @@ export default function App() {
     [newPreviewTab],
   );
 
+  const restoreFocus = useCallback(() => {
+    if (activeTab?.kind === "workspace" && activePaneId) {
+      terminalRefs.current.get(activePaneId)?.focus();
+    }
+  }, [activeTab, activePaneId]);
+
+  const paletteCallbacks = useMemo<RegistryCallbacks>(
+    () => ({
+      openSettings: (section) => void openSettingsWindow(section as SettingsTab | undefined),
+      openShortcuts: () => setShortcutsOpen(true),
+      newSshTab,
+      newSftpTab,
+      newTab: openNewTab,
+      openUntitledTab: () => void openUntitledTab(),
+      openHomeTab,
+      splitRight: () => {
+        if (activeTab?.kind === "workspace") splitPane(activeId, "horizontal");
+      },
+      splitDown: () => {
+        if (activeTab?.kind === "workspace") splitPane(activeId, "vertical");
+      },
+      closePane: () => {
+        if (activeTab?.kind === "workspace")
+          closePane(activeId, activeTab.activePaneId);
+      },
+      closeCurrentTab: () => handleClose(activeId),
+      toggleAi: togglePanelAndFocus,
+      askSelection: askFromSelection,
+      // Tab switcher
+      tabs: tabs.map((t) => ({ id: t.id, kind: t.kind, title: t.title })),
+      activeTabId: activeId,
+      switchTab: setActiveId,
+      // Snippets
+      injectIntoTerminal: (text) => {
+        if (!activePaneId) return;
+        terminalRefs.current.get(activePaneId)?.write(text);
+        terminalRefs.current.get(activePaneId)?.focus();
+      },
+      // AI sessions
+      newAiSession: () => {
+        useChatStore.getState().newSession();
+        togglePanelAndFocus();
+      },
+      clearAiChat: () => {
+        const { activeSessionId, deleteSession, newSession } = useChatStore.getState();
+        if (activeSessionId) deleteSession(activeSessionId);
+        newSession();
+      },
+      switchAiSession: (id) => {
+        useChatStore.getState().switchSession(id);
+        togglePanelAndFocus();
+      },
+    }),
+    [
+      activeId,
+      activeTab,
+      activePaneId,
+      tabs,
+      newSshTab,
+      newSftpTab,
+      openNewTab,
+      openUntitledTab,
+      openHomeTab,
+      splitPane,
+      closePane,
+      handleClose,
+      setActiveId,
+      togglePanelAndFocus,
+      askFromSelection,
+    ],
+  );
+
+  const activeContext = useMemo(() => {
+    if (!activeTab) return null;
+    if (activeTab.kind === "workspace") return "terminal" as const;
+    if (activeTab.kind === "editor") return "editor" as const;
+    if (activeTab.kind === "sftp") return "sftp" as const;
+    if (activeTab.kind === "home") return "home" as const;
+    return null;
+  }, [activeTab]);
+
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
+      "command.palette": () => toggleCommandPalette(),
       "tab.new": openNewTab,
       "tab.newPreview": () => openPreviewTab(""),
       "tab.newEditor": () => void openUntitledTab(),
@@ -601,6 +685,7 @@ export default function App() {
       askFromSelection,
       toggleSidebar,
       splitPane,
+      toggleCommandPalette,
     ],
   );
 
@@ -1052,6 +1137,13 @@ export default function App() {
           <ShortcutsDialog
             open={shortcutsOpen}
             onOpenChange={setShortcutsOpen}
+          />
+
+          <CommandPalette
+            callbacks={paletteCallbacks}
+            activeTabKind={activeTab?.kind}
+            activeContext={activeContext}
+            restoreFocus={restoreFocus}
           />
 
         </div>
