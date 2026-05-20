@@ -35,6 +35,7 @@ pub fn fs_search(
     root: String,
     query: String,
     limit: Option<usize>,
+    show_hidden: Option<bool>,
 ) -> Result<Vec<SearchHit>, String> {
     let q = query.trim().to_lowercase();
     if q.is_empty() {
@@ -49,7 +50,7 @@ pub fn fs_search(
     let mut out: Vec<SearchHit> = Vec::with_capacity(cap.min(64));
 
     let walker = WalkBuilder::new(&root_path)
-        .hidden(true)
+        .hidden(!show_hidden.unwrap_or(false))
         .git_ignore(true)
         .git_global(true)
         .git_exclude(true)

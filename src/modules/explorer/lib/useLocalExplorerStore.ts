@@ -12,21 +12,27 @@ type LocalExplorerStore = {
   rootPath: string | null;
   nodes: TreeState;
   expanded: Set<string>;
+  showHidden: boolean;
 
   setRootPath: (root: string | null) => void;
   setNode: (path: string, state: ChildrenState) => void;
   toggleExpanded: (path: string) => void;
   addExpanded: (path: string) => void;
   reset: () => void;
+  toggleShowHidden: () => void;
 };
 
 export const useLocalExplorerStore = create<LocalExplorerStore>((set) => ({
   rootPath: null,
   nodes: {},
   expanded: new Set(),
+  showHidden: false,
 
   setRootPath: (root) =>
     set({ rootPath: root, nodes: {}, expanded: new Set() }),
+
+  toggleShowHidden: () =>
+    set((s) => ({ showHidden: !s.showHidden, nodes: {}, expanded: new Set() })),
 
   setNode: (path, state) =>
     set((s) => ({ nodes: { ...s.nodes, [path]: state } })),
