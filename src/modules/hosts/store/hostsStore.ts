@@ -15,7 +15,7 @@ interface HostsState {
   fetchError: string | null;
 
   hostStatuses: Record<string, PingStatus>;
-  startPingWorker: () => void;
+  startPingWorker: (intervalSeconds?: number) => void;
   stopPingWorker: () => void;
 
   fetchData: () => Promise<void>;
@@ -80,10 +80,15 @@ export const useHostsStore = create<HostsState>((set, get) => ({
 
   hostStatuses: {},
 
-  startPingWorker: () => {
-    if (_pingIntervalId !== null) return;
+  startPingWorker: (intervalSeconds = 60) => {
+    if (_pingIntervalId !== null) {
+      clearInterval(_pingIntervalId);
+      _pingIntervalId = null;
+    }
     void runPingCycle(get, set);
-    _pingIntervalId = setInterval(() => void runPingCycle(get, set), 60_000);
+    if (intervalSeconds > 0) {
+      _pingIntervalId = setInterval(() => void runPingCycle(get, set), intervalSeconds * 1000);
+    }
   },
 
   stopPingWorker: () => {

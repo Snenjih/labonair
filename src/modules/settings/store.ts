@@ -97,6 +97,9 @@ export type Preferences = {
   credentialEncryption: boolean;
   // --- Updates ---
   checkForUpdates: boolean;
+
+  // --- Host Manager ---
+  hostPingInterval: number;
 };
 
 const STORE_PATH = "nexum-settings.json";
@@ -151,6 +154,7 @@ const KEY_SIDEBAR_POSITION = "sidebarPosition";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
+const KEY_HOST_PING_INTERVAL = "hostPingInterval";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -204,6 +208,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sidebarPosition: "left",
   credentialEncryption: false,
   checkForUpdates: true,
+
+  hostPingInterval: 60,
 };
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
@@ -329,6 +335,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
     checkForUpdates:
       get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
+
+    hostPingInterval:
+      get<number>(KEY_HOST_PING_INTERVAL) ?? DEFAULT_PREFERENCES.hostPingInterval,
   };
 }
 
@@ -572,6 +581,11 @@ export async function setCheckForUpdates(value: boolean): Promise<void> {
   await store.save();
 }
 
+export async function setHostPingInterval(value: number): Promise<void> {
+  await store.set(KEY_HOST_PING_INTERVAL, value);
+  await store.save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -629,6 +643,7 @@ export function onPreferencesChange(
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
+    [KEY_HOST_PING_INTERVAL]: "hostPingInterval",
   };
   return store.onChange<unknown>((key, value) => {
     const mapped = map[key];
