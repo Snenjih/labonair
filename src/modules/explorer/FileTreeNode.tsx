@@ -114,6 +114,7 @@ function FileTreeNodeImpl({
               className={cn(
                 "group flex w-full items-center gap-2 rounded-sm px-1.5 py-0.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70 cursor-pointer",
                 isSelected && "bg-accent text-foreground",
+                entry.name.startsWith(".") && "opacity-60",
               )}
               style={{ paddingLeft: 6 + depth * 12 }}
             >
