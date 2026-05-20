@@ -53,6 +53,7 @@ export type Preferences = {
   openaiCompatibleBaseURL: string;
   openaiCompatibleModelId: string;
   vimMode: boolean;
+  defaultStartupTab: "terminal" | "host-manager";
 
   // --- App Appearance ---
   appTheme: string;
@@ -114,6 +115,7 @@ const KEY_LMSTUDIO_CHAT_MODEL_ID = "lmstudioChatModelId";
 const KEY_OPENAI_COMPATIBLE_BASE_URL = "openaiCompatibleBaseURL";
 const KEY_OPENAI_COMPATIBLE_MODEL_ID = "openaiCompatibleModelId";
 const KEY_VIM_MODE = "vimMode";
+const KEY_DEFAULT_STARTUP_TAB = "defaultStartupTab";
 
 const KEY_APP_THEME = "appTheme";
 const KEY_APP_FONT_FAMILY = "appFontFamily";
@@ -167,6 +169,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   openaiCompatibleBaseURL: OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
   openaiCompatibleModelId: "",
   vimMode: false,
+  defaultStartupTab: "host-manager",
 
   appTheme: "default",
   appFontFamily: "system-ui",
@@ -247,6 +250,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<string>(KEY_OPENAI_COMPATIBLE_MODEL_ID) ??
       DEFAULT_PREFERENCES.openaiCompatibleModelId,
     vimMode: get<boolean>(KEY_VIM_MODE) ?? DEFAULT_PREFERENCES.vimMode,
+    defaultStartupTab:
+      get<"terminal" | "host-manager">(KEY_DEFAULT_STARTUP_TAB) ??
+      DEFAULT_PREFERENCES.defaultStartupTab,
 
     appTheme: get<string>(KEY_APP_THEME) ?? DEFAULT_PREFERENCES.appTheme,
     appFontFamily:
@@ -401,6 +407,13 @@ export async function setOpenaiCompatibleModelId(value: string): Promise<void> {
 
 export async function setVimMode(value: boolean): Promise<void> {
   await store.set(KEY_VIM_MODE, value);
+  await store.save();
+}
+
+export async function setDefaultStartupTab(
+  value: "terminal" | "host-manager",
+): Promise<void> {
+  await store.set(KEY_DEFAULT_STARTUP_TAB, value);
   await store.save();
 }
 
@@ -593,6 +606,7 @@ export function onPreferencesChange(
     [KEY_OPENAI_COMPATIBLE_BASE_URL]: "openaiCompatibleBaseURL",
     [KEY_OPENAI_COMPATIBLE_MODEL_ID]: "openaiCompatibleModelId",
     [KEY_VIM_MODE]: "vimMode",
+    [KEY_DEFAULT_STARTUP_TAB]: "defaultStartupTab",
 
     [KEY_APP_THEME]: "appTheme",
     [KEY_APP_FONT_FAMILY]: "appFontFamily",

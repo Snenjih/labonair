@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTransferStore } from "@/modules/sftp/store/transferStore";
 
@@ -175,11 +175,38 @@ function titleFromUrl(url: string): string {
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useTabs() {
-  const [tabs, setTabs] = useState<Tab[]>([
-    { id: 1, kind: "home", title: "Home" },
-  ]);
-  const [activeId, setActiveId] = useState(1);
-  const nextIdRef = useRef(2);
+  const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
+  const prefsHydrated = usePreferencesStore((s) => s.hydrated);
+
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeId, setActiveId] = useState(0);
+  const nextIdRef = useRef(1);
+  const initialTabOpened = useRef(false);
+
+  // Open the initial tab once preferences are hydrated, based on the user setting.
+  // The window stays hidden until hydration (see App.tsx), so the user never sees
+  // the brief empty state.
+  useEffect(() => {
+    if (!prefsHydrated || initialTabOpened.current) return;
+    initialTabOpened.current = true;
+    const id = nextIdRef.current++;
+    if (defaultStartupTab === "terminal") {
+      const sessionId = newSessionId();
+      const tab: WorkspaceTab = {
+        id,
+        kind: "workspace",
+        title: "shell",
+        activePaneId: sessionId,
+        layout: makeLeaf(sessionId),
+        sessions: { [sessionId]: { id: sessionId, kind: "local", title: "shell" } },
+      };
+      setTabs([tab]);
+      setActiveId(id);
+    } else {
+      setTabs([{ id, kind: "home", title: "Home" }]);
+      setActiveId(id);
+    }
+  }, [prefsHydrated, defaultStartupTab]);
 
   // ── Workspace / terminal tabs ────────────────────────────────────────────────
 
