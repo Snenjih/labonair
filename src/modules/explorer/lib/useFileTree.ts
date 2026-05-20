@@ -53,7 +53,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       try {
         const entries = await invoke<DirEntry[]>("fs_read_dir", {
           path,
-          show_hidden,
+          showHidden: show_hidden,
         });
         setNode(path, { status: "loaded", entries });
       } catch (e) {

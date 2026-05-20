@@ -10,12 +10,13 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Cancel01Icon,
-  EyeIcon,
   FileAddIcon,
   Folder01Icon,
   FolderAddIcon,
   Refresh01Icon,
   Search01Icon,
+  ViewIcon,
+  ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -107,7 +108,7 @@ export function FileExplorer({
           root: rootPath,
           query: q,
           limit: 200,
-          show_hidden: tree.showHidden,
+          showHidden: tree.showHidden,
         });
         if (alive) setResults(hits);
       } catch (e) {
@@ -283,7 +284,11 @@ export function FileExplorer({
           }}
           title={tree.showHidden ? "Hide hidden files" : "Show hidden files"}
         >
-          <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={2} />
+          <HugeiconsIcon
+            icon={tree.showHidden ? ViewIcon : ViewOffSlashIcon}
+            size={13}
+            strokeWidth={2}
+          />
         </Button>
       </div>
 
