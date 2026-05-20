@@ -30,10 +30,11 @@ interface Props {
   sessionId: string;
   session: TerminalSessionData;
   isActive: boolean;
+  tabVisible?: boolean;
 }
 
 export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
-  function SshTerminalPane({ sessionId, session, isActive }, ref) {
+  function SshTerminalPane({ sessionId, session, isActive, tabVisible = true }, ref) {
     const [isConnected, setIsConnected] = useState(false);
     const [hasError, setHasError] = useState(false);
     const { resolvedTheme } = useTheme();
@@ -249,10 +250,10 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     }, [isConnected]);
 
     useLayoutEffect(() => {
-      if (!isActive || !isConnected) return;
+      if (!isConnected) return;
       fitRef.current?.fit();
-      termRef.current?.focus();
-    }, [isActive, isConnected]);
+      if (isActive && tabVisible) termRef.current?.focus();
+    }, [isActive, isConnected, tabVisible]);
 
     if (!isConnected && !hasError) {
       const estCols = Math.max(80, Math.floor((window.innerWidth - 220) / 7.8));
