@@ -1,4 +1,5 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
+import { getStoragePaths } from "@/lib/paths";
 
 export type Snippet = {
   id: string;
@@ -9,16 +10,24 @@ export type Snippet = {
   content: string;
 };
 
-const STORE_PATH = "nexum-snippets.json";
 const KEY_LIST = "snippets";
 
-const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
+let _storePromise: Promise<LazyStore> | null = null;
+async function getStore(): Promise<LazyStore> {
+  if (!_storePromise) {
+    _storePromise = getStoragePaths().then(
+      (p) => new LazyStore(`${p.config}/nexum-snippets.json`, { defaults: {}, autoSave: 200 }),
+    );
+  }
+  return _storePromise;
+}
 
 export async function loadSnippets(): Promise<Snippet[]> {
-  return (await store.get<Snippet[]>(KEY_LIST)) ?? [];
+  return (await (await getStore()).get<Snippet[]>(KEY_LIST)) ?? [];
 }
 
 export async function saveSnippets(list: Snippet[]): Promise<void> {
+  const store = await getStore();
   await store.set(KEY_LIST, list);
   await store.save();
 }

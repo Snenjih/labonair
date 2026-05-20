@@ -1,5 +1,6 @@
 import { load } from "@tauri-apps/plugin-store";
 import { create } from "zustand";
+import { getStoragePaths } from "@/lib/paths";
 
 // Keyed by host_address (e.g. "192.168.1.1") or "local".
 type BookmarkMap = Record<string, string[]>;
@@ -22,7 +23,9 @@ let _storePromise: ReturnType<typeof load> | null = null;
 
 function getStore() {
   if (!_storePromise) {
-    _storePromise = load("nexum-bookmarks.json", { autoSave: true, defaults: {} });
+    _storePromise = getStoragePaths().then((p) =>
+      load(`${p.data}/nexum-bookmarks.json`, { autoSave: true, defaults: {} }),
+    );
   }
   return _storePromise;
 }

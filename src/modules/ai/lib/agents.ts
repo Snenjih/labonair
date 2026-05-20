@@ -1,4 +1,5 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
+import { getStoragePaths } from "@/lib/paths";
 
 export type AgentIconId =
   | "coder"
@@ -79,11 +80,18 @@ export const BUILTIN_AGENTS: readonly Agent[] = [
   },
 ] as const;
 
-const STORE_PATH = "nexum-agents.json";
 const KEY_CUSTOM = "customAgents";
 const KEY_ACTIVE = "activeAgentId";
 
-const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
+let _storePromise: Promise<LazyStore> | null = null;
+async function getStore(): Promise<LazyStore> {
+  if (!_storePromise) {
+    _storePromise = getStoragePaths().then(
+      (p) => new LazyStore(`${p.config}/nexum-agents.json`, { defaults: {}, autoSave: 200 }),
+    );
+  }
+  return _storePromise;
+}
 
 export type LoadedAgents = {
   custom: Agent[];
@@ -91,8 +99,7 @@ export type LoadedAgents = {
 };
 
 export async function loadAgents(): Promise<LoadedAgents> {
-  // One IPC roundtrip via entries() instead of two sequential get()s.
-  const entries = await store.entries();
+  const entries = await (await getStore()).entries();
   let custom: Agent[] | undefined;
   let activeId: string | undefined;
   for (const [k, v] of entries) {
@@ -103,11 +110,13 @@ export async function loadAgents(): Promise<LoadedAgents> {
 }
 
 export async function saveCustomAgents(custom: Agent[]): Promise<void> {
+  const store = await getStore();
   await store.set(KEY_CUSTOM, custom);
   await store.save();
 }
 
 export async function saveActiveAgentId(id: string): Promise<void> {
+  const store = await getStore();
   await store.set(KEY_ACTIVE, id);
   await store.save();
 }

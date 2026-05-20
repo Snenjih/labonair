@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 const PLAIN_FILE: &str = "secrets.json";
 const ENC_FILE: &str = "secrets.enc";
@@ -45,29 +45,20 @@ impl Default for SecretsState {
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 
-fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    let dir = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?;
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir)
+fn plain_path(_app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(crate::modules::fs::paths::data_dir().join(PLAIN_FILE))
 }
 
-fn plain_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(data_dir(app)?.join(PLAIN_FILE))
+fn enc_path(_app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(crate::modules::fs::paths::data_dir().join(ENC_FILE))
 }
 
-fn enc_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(data_dir(app)?.join(ENC_FILE))
+fn key_path(_app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(crate::modules::fs::paths::data_dir().join(KEY_FILE))
 }
 
-fn key_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(data_dir(app)?.join(KEY_FILE))
-}
-
-fn flag_path(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(data_dir(app)?.join(ENC_FLAG_FILE))
+fn flag_path(_app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(crate::modules::fs::paths::data_dir().join(ENC_FLAG_FILE))
 }
 
 // ── Encryption-key lifecycle ─────────────────────────────────────────────────
