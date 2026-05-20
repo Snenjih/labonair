@@ -29,6 +29,7 @@ export type TerminalSessionData = {
   cwd?: string;
   hostId?: string;
   quickConnect?: QuickConnectParams;
+  initialCommand?: string;
 };
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
@@ -183,7 +184,7 @@ export function useTabs() {
 
   // ── Workspace / terminal tabs ────────────────────────────────────────────────
 
-  const newTab = useCallback((cwd?: string) => {
+  const newTab = useCallback((cwd?: string, initialCommand?: string) => {
     const tabId = nextIdRef.current++;
     const sessionId = newSessionId();
     const tab: WorkspaceTab = {
@@ -193,7 +194,7 @@ export function useTabs() {
       activePaneId: sessionId,
       layout: makeLeaf(sessionId),
       sessions: {
-        [sessionId]: { id: sessionId, kind: "local", title: "shell", cwd },
+        [sessionId]: { id: sessionId, kind: "local", title: "shell", cwd, initialCommand },
       },
     };
     setTabs((t) => [...t, tab]);
@@ -201,7 +202,7 @@ export function useTabs() {
     return tabId;
   }, []);
 
-  const newSshTab = useCallback((hostId: string, title: string, cwd?: string) => {
+  const newSshTab = useCallback((hostId: string, title: string, cwd?: string, initialCommand?: string) => {
     const tabId = nextIdRef.current++;
     const sessionId = newSessionId();
     const tab: WorkspaceTab = {
@@ -211,7 +212,7 @@ export function useTabs() {
       activePaneId: sessionId,
       layout: makeLeaf(sessionId),
       sessions: {
-        [sessionId]: { id: sessionId, kind: "ssh", title, hostId, cwd },
+        [sessionId]: { id: sessionId, kind: "ssh", title, hostId, cwd, initialCommand },
       },
     };
     setTabs((t) => [...t, tab]);

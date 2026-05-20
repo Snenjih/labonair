@@ -186,6 +186,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
                     tabId={paneId}
                     visible
                     initialCwd={session.cwd}
+                    initialCommand={session.initialCommand}
                     ref={(h) => registerHandle(paneId, h)}
                     onSearchReady={(_, addon) => onSearchReady?.(paneId, addon)}
                     onCwd={(_, cwd) => onCwd(paneId, cwd)}

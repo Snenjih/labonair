@@ -26,6 +26,14 @@ import {
 import { FileExplorer } from "@/modules/explorer";
 import { HomeDashboard } from "@/modules/hosts";
 import {
+  SnippetLogDrawer,
+  SnippetsPanel,
+  useCommandSnippetsStore,
+  useSnippetExec,
+  type CommandSnippet,
+  type SnippetExecMode,
+} from "@/modules/snippets";
+import {
   Header,
   type SearchInlineHandle,
   type SearchTarget,
@@ -45,7 +53,7 @@ import {
   useGlobalShortcuts,
   type ShortcutHandlers,
 } from "@/modules/shortcuts";
-import { StatusBar } from "@/modules/statusbar";
+import { StatusBar, type SidebarPanel } from "@/modules/statusbar";
 import { SftpPane } from "@/modules/sftp";
 import { bootstrapTransferListeners } from "@/modules/sftp/store/transferStore";
 import {
@@ -116,12 +124,28 @@ export default function App() {
   const [activeEditorHandle, setActiveEditorHandle] =
     useState<EditorPaneHandle | null>(null);
   const sidebarRef = useRef<PanelImperativeHandle | null>(null);
+  const [activePanel, setActivePanel] = useState<SidebarPanel>("explorer");
+
   const toggleSidebar = useCallback(() => {
     const p = sidebarRef.current;
     if (!p) return;
     if (p.getSize().asPercentage <= 0) p.expand();
     else p.collapse();
   }, []);
+
+  const handlePanelToggle = useCallback((panel: SidebarPanel) => {
+    const p = sidebarRef.current;
+    if (!p) return;
+    if (activePanel === panel) {
+      // Same panel clicked → toggle sidebar open/close
+      if (p.getSize().asPercentage <= 0) p.expand();
+      else p.collapse();
+    } else {
+      // Different panel → switch panel and make sure sidebar is open
+      setActivePanel(panel);
+      if (p.getSize().asPercentage <= 0) p.expand();
+    }
+  }, [activePanel]);
 
   const [home, setHome] = useState<string | null>(null);
   useEffect(() => {
@@ -181,6 +205,7 @@ export default function App() {
     void hydrateSessions();
     void useAgentsStore.getState().hydrate();
     void useSnippetsStore.getState().hydrate();
+    void useCommandSnippetsStore.getState().hydrate();
   }, [hydrateSessions]);
 
   // Show the main window once core stores are ready to avoid a white-flash on startup.
@@ -883,6 +908,26 @@ export default function App() {
     [updatePaneSessionCwd],
   );
 
+  const [snippetLogDrawerOpen, setSnippetLogDrawerOpen] = useState(false);
+
+  const workspaceTabs = tabs.filter((t): t is WorkspaceTab => t.kind === "workspace");
+
+  const { execSnippet } = useSnippetExec({
+    tabs: workspaceTabs,
+    activeTerminalRef: () =>
+      activePaneId ? (terminalRefs.current.get(activePaneId) ?? null) : null,
+    onNewLocalTab: (cwd, command) => newTab(cwd ?? inheritedCwdForNewTab(), command),
+    onNewSshTab: (hostId, title, cwd, command) => newSshTab(hostId, title, cwd, command),
+    onOpenLogDrawer: () => setSnippetLogDrawerOpen(true),
+  });
+
+  const handleSnippetRun = useCallback(
+    (snippet: CommandSnippet, mode?: SnippetExecMode) => {
+      void execSnippet(snippet, mode);
+    },
+    [execSnippet],
+  );
+
   const shell = (
     <ThemeProvider>
       <TooltipProvider>
@@ -922,15 +967,19 @@ export default function App() {
                     collapsedSize={0}
                   >
                     <div className="h-full border-r border-border/60 bg-card">
-                      <FileExplorer
-                        rootPath={explorerRoot}
-                        onOpenFile={handleOpenFile}
-                        onOpenPreview={openPreviewTab}
-                        onPathRenamed={handlePathRenamed}
-                        onPathDeleted={handlePathDeleted}
-                        onRevealInTerminal={cdInNewTab}
-                        onAttachToAgent={handleAttachFileToAgent}
-                      />
+                      {activePanel === "snippets" ? (
+                        <SnippetsPanel onRun={handleSnippetRun} />
+                      ) : (
+                        <FileExplorer
+                          rootPath={explorerRoot}
+                          onOpenFile={handleOpenFile}
+                          onOpenPreview={openPreviewTab}
+                          onPathRenamed={handlePathRenamed}
+                          onPathDeleted={handlePathDeleted}
+                          onRevealInTerminal={cdInNewTab}
+                          onAttachToAgent={handleAttachFileToAgent}
+                        />
+                      )}
                     </div>
                   </ResizablePanel>
                   <ResizableHandle withHandle />
@@ -1085,21 +1134,30 @@ export default function App() {
                     collapsedSize={0}
                   >
                     <div className="h-full border-l border-border/60 bg-card">
-                      <FileExplorer
-                        rootPath={explorerRoot}
-                        onOpenFile={handleOpenFile}
-                        onOpenPreview={openPreviewTab}
-                        onPathRenamed={handlePathRenamed}
-                        onPathDeleted={handlePathDeleted}
-                        onRevealInTerminal={cdInNewTab}
-                        onAttachToAgent={handleAttachFileToAgent}
-                      />
+                      {activePanel === "snippets" ? (
+                        <SnippetsPanel onRun={handleSnippetRun} />
+                      ) : (
+                        <FileExplorer
+                          rootPath={explorerRoot}
+                          onOpenFile={handleOpenFile}
+                          onOpenPreview={openPreviewTab}
+                          onPathRenamed={handlePathRenamed}
+                          onPathDeleted={handlePathDeleted}
+                          onRevealInTerminal={cdInNewTab}
+                          onAttachToAgent={handleAttachFileToAgent}
+                        />
+                      )}
                     </div>
                   </ResizablePanel>
                 </>
               )}
             </ResizablePanelGroup>
           </main>
+
+          <SnippetLogDrawer
+            open={snippetLogDrawerOpen}
+            onClose={() => setSnippetLogDrawerOpen(false)}
+          />
 
           <StatusBar
             cwd={activeCwd}
@@ -1111,6 +1169,14 @@ export default function App() {
             detectedPreviewUrl={detectedPreviewUrl}
             onOpenPreview={() => {
               if (detectedPreviewUrl) openPreviewTab(detectedPreviewUrl);
+            }}
+            activePanel={activePanel}
+            onPanelToggle={(panel) => {
+              if (panel === "hosts") {
+                openHomeTab();
+                return;
+              }
+              handlePanelToggle(panel);
             }}
           />
 

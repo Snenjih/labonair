@@ -29,6 +29,29 @@ pub fn initialize_db(
             tags TEXT,
             created_at INTEGER NOT NULL,
             last_connected_at INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS snippet_groups (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            icon TEXT,
+            color TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS snippets (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            command TEXT NOT NULL,
+            target TEXT NOT NULL DEFAULT 'local',
+            host_id TEXT REFERENCES hosts(id) ON DELETE SET NULL,
+            default_exec_mode TEXT NOT NULL DEFAULT 'terminal',
+            working_dir TEXT,
+            group_id TEXT REFERENCES snippet_groups(id) ON DELETE SET NULL,
+            tags TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
         );",
     )
     .map_err(|e| e.to_string())?;
