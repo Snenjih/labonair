@@ -18,12 +18,12 @@ import {
 import {
   isValidHandle,
   normalizeHandle,
-  type Snippet,
+  type Directive,
 } from "@/modules/ai/lib/snippets";
 import { newAgentId, useAgentsStore } from "@/modules/ai/store/agentsStore";
 import {
-  newSnippetId,
-  useSnippetsStore,
+  newDirectiveId,
+  useDirectivesStore,
 } from "@/modules/ai/store/snippetsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setCustomInstructions } from "@/modules/settings/store";
@@ -56,24 +56,24 @@ export function AgentsSection() {
   const removeAgent = useAgentsStore((s) => s.remove);
   const hydrateAgents = useAgentsStore((s) => s.hydrate);
 
-  const snippets = useSnippetsStore((s) => s.snippets);
-  const upsertSnippet = useSnippetsStore((s) => s.upsert);
-  const removeSnippet = useSnippetsStore((s) => s.remove);
-  const hydrateSnippets = useSnippetsStore((s) => s.hydrate);
+  const directives = useDirectivesStore((s) => s.directives);
+  const upsertDirective = useDirectivesStore((s) => s.upsert);
+  const removeDirective = useDirectivesStore((s) => s.remove);
+  const hydrateDirectives = useDirectivesStore((s) => s.hydrate);
 
   useEffect(() => {
     void hydrateAgents();
-    void hydrateSnippets();
-  }, [hydrateAgents, hydrateSnippets]);
+    void hydrateDirectives();
+  }, [hydrateAgents, hydrateDirectives]);
 
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
+  const [editingDirective, setEditingDirective] = useState<Directive | null>(null);
 
   return (
     <div className="flex flex-col gap-7">
       <SectionHeader
         title="Agents"
-        description="Personas and snippets the AI uses. Switch agents from the input bar."
+        description="Personas and directives the AI uses. Switch agents from the input bar."
       />
 
       <CustomInstructionsBlock value={customInstructions} />
@@ -117,7 +117,7 @@ export function AgentsSection() {
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
-            <Label>Snippets</Label>
+            <Label>Directives</Label>
             <span className="text-[10.5px] text-muted-foreground">
               Reusable instructions you can drop into any prompt with{" "}
               <code className="rounded bg-muted/50 px-1 font-mono">
@@ -131,8 +131,8 @@ export function AgentsSection() {
             variant="outline"
             className="h-7 gap-1.5 px-2 text-[11px]"
             onClick={() =>
-              setEditingSnippet({
-                id: newSnippetId(),
+              setEditingDirective({
+                id: newDirectiveId(),
                 handle: "",
                 name: "",
                 description: "",
@@ -141,32 +141,32 @@ export function AgentsSection() {
             }
           >
             <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={1.75} />
-            New snippet
+            New directive
           </Button>
         </div>
 
-        {snippets.length === 0 ? (
+        {directives.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/60 bg-card/30 px-4 py-6 text-center text-[11px] text-muted-foreground">
-            No snippets yet. Create one and insert it with{" "}
+            No directives yet. Create one and insert it with{" "}
             <code className="font-mono">#handle</code> in the AI input.
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
-            {snippets.map((s) => (
+            {directives.map((d) => (
               <li
-                key={s.id}
+                key={d.id}
                 className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-2"
               >
                 <code className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                  #{s.handle}
+                  #{d.handle}
                 </code>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[12px] font-medium">
-                    {s.name}
+                    {d.name}
                   </span>
-                  {s.description ? (
+                  {d.description ? (
                     <span className="truncate text-[10.5px] text-muted-foreground">
-                      {s.description}
+                      {d.description}
                     </span>
                   ) : null}
                 </div>
@@ -174,7 +174,7 @@ export function AgentsSection() {
                   size="icon"
                   variant="ghost"
                   className="size-7"
-                  onClick={() => setEditingSnippet(s)}
+                  onClick={() => setEditingDirective(d)}
                   title="Edit"
                 >
                   <HugeiconsIcon
@@ -187,7 +187,7 @@ export function AgentsSection() {
                   size="icon"
                   variant="ghost"
                   className="size-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => removeSnippet(s.id)}
+                  onClick={() => removeDirective(d.id)}
                   title="Delete"
                 >
                   <HugeiconsIcon
@@ -211,13 +211,13 @@ export function AgentsSection() {
           setEditingAgent(null);
         }}
       />
-      <SnippetEditorDialog
-        snippet={editingSnippet}
-        existing={snippets}
-        onClose={() => setEditingSnippet(null)}
-        onSave={(s) => {
-          upsertSnippet(s);
-          setEditingSnippet(null);
+      <DirectiveEditorDialog
+        directive={editingDirective}
+        existing={directives}
+        onClose={() => setEditingDirective(null)}
+        onSave={(d) => {
+          upsertDirective(d);
+          setEditingDirective(null);
         }}
       />
     </div>
@@ -417,26 +417,26 @@ function AgentEditorDialog({
   );
 }
 
-function SnippetEditorDialog({
-  snippet,
+function DirectiveEditorDialog({
+  directive,
   existing,
   onClose,
   onSave,
 }: {
-  snippet: Snippet | null;
-  existing: Snippet[];
+  directive: Directive | null;
+  existing: Directive[];
   onClose: () => void;
-  onSave: (s: Snippet) => void;
+  onSave: (d: Directive) => void;
 }) {
-  const [draft, setDraft] = useState<Snippet | null>(snippet);
-  useEffect(() => setDraft(snippet), [snippet]);
+  const [draft, setDraft] = useState<Directive | null>(directive);
+  useEffect(() => setDraft(directive), [directive]);
   if (!draft) return null;
 
   const handleErr = !draft.handle
     ? "Required."
     : !isValidHandle(draft.handle)
       ? "Lowercase letters, digits, and dashes only."
-      : existing.some((s) => s.id !== draft.id && s.handle === draft.handle)
+      : existing.some((d) => d.id !== draft.id && d.handle === draft.handle)
         ? "Already in use."
         : null;
   const canSave =
@@ -445,13 +445,13 @@ function SnippetEditorDialog({
     draft.content.trim().length > 0;
 
   return (
-    <Dialog open={!!snippet} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={!!directive} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-[14px]">
-            {existing.some((s) => s.id === draft.id)
-              ? "Edit snippet"
-              : "New snippet"}
+            {existing.some((d) => d.id === draft.id)
+              ? "Edit directive"
+              : "New directive"}
           </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -506,7 +506,7 @@ function SnippetEditorDialog({
             <Textarea
               value={draft.content}
               onChange={(e) => setDraft({ ...draft, content: e.target.value })}
-              placeholder="Inserted into the prompt as a <snippet> block when you use #handle."
+              placeholder="Inserted into the prompt as a <directive> block when you use #handle."
               className="min-h-40 resize-y font-mono text-[11.5px] leading-relaxed"
             />
           </div>

@@ -1,48 +1,48 @@
 import { emit, listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import {
-  loadSnippets,
-  newSnippetId,
-  saveSnippets,
-  type Snippet,
+  loadDirectives,
+  newDirectiveId,
+  saveDirectives,
+  type Directive,
 } from "../lib/snippets";
 
-const CHANGED_EVENT = "nexum://ai-snippets-changed";
+const CHANGED_EVENT = "nexum://ai-directives-changed";
 
 type State = {
   hydrated: boolean;
-  snippets: Snippet[];
+  directives: Directive[];
   hydrate: () => Promise<void>;
-  upsert: (snippet: Snippet) => void;
+  upsert: (directive: Directive) => void;
   remove: (id: string) => void;
 };
 
 let initialized = false;
 
-export const useSnippetsStore = create<State>((set, get) => ({
+export const useDirectivesStore = create<State>((set, get) => ({
   hydrated: false,
-  snippets: [],
+  directives: [],
   hydrate: async () => {
     if (initialized) return;
     initialized = true;
-    set({ snippets: await loadSnippets(), hydrated: true });
+    set({ directives: await loadDirectives(), hydrated: true });
     void listen(CHANGED_EVENT, async () => {
-      set({ snippets: await loadSnippets() });
+      set({ directives: await loadDirectives() });
     });
   },
-  upsert: (snippet) => {
-    const list = get().snippets;
-    const idx = list.findIndex((s) => s.id === snippet.id);
+  upsert: (directive) => {
+    const list = get().directives;
+    const idx = list.findIndex((d) => d.id === directive.id);
     const next =
-      idx === -1 ? [...list, snippet] : list.map((s) => (s.id === snippet.id ? snippet : s));
-    set({ snippets: next });
-    void saveSnippets(next).then(() => emit(CHANGED_EVENT));
+      idx === -1 ? [...list, directive] : list.map((d) => (d.id === directive.id ? directive : d));
+    set({ directives: next });
+    void saveDirectives(next).then(() => emit(CHANGED_EVENT));
   },
   remove: (id) => {
-    const next = get().snippets.filter((s) => s.id !== id);
-    set({ snippets: next });
-    void saveSnippets(next).then(() => emit(CHANGED_EVENT));
+    const next = get().directives.filter((d) => d.id !== id);
+    set({ directives: next });
+    void saveDirectives(next).then(() => emit(CHANGED_EVENT));
   },
 }));
 
-export { newSnippetId };
+export { newDirectiveId };

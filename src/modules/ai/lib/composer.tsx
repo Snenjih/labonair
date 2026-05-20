@@ -7,10 +7,10 @@ import {
   useState,
 } from "react";
 import { useWhisperRecording } from "../hooks/useWhisperRecording";
-import { expandSnippetTokens, type Snippet } from "../lib/snippets";
+import { expandDirectiveTokens, type Directive } from "../lib/snippets";
 import { tryRunSlashCommand, type SlashCommandMeta } from "./slashCommands";
 import { getOrCreateChat, useChatStore } from "../store/chatStore";
-import { useSnippetsStore } from "../store/snippetsStore";
+import { useDirectivesStore } from "../store/snippetsStore";
 
 export type FileAttachment = {
   id: string;
@@ -43,9 +43,9 @@ type ComposerCtx = {
   /** Attach a file by absolute path — used by the file explorer's "Attach to Agent". */
   attachFileByPath: (path: string) => Promise<void>;
   removeFile: (id: string) => void;
-  pickedSnippets: Snippet[];
-  addSnippet: (s: Snippet) => void;
-  removeSnippet: (id: string) => void;
+  pickedDirectives: Directive[];
+  addDirective: (d: Directive) => void;
+  removeDirective: (id: string) => void;
   pickedCommands: SlashCommandMeta[];
   addCommand: (c: SlashCommandMeta) => void;
   removeCommand: (name: string) => void;
@@ -76,7 +76,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
 
   const [value, setValue] = useState("");
   const [files, setFiles] = useState<FileAttachment[]>([]);
-  const [pickedSnippets, setPickedSnippets] = useState<Snippet[]>([]);
+  const [pickedDirectives, setPickedDirectives] = useState<Directive[]>([]);
   const [pickedCommands, setPickedCommands] = useState<SlashCommandMeta[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -155,12 +155,12 @@ export function AiComposerProvider({ children }: ProviderProps) {
   const removeFile = (id: string) =>
     setFiles((prev) => prev.filter((f) => f.id !== id));
 
-  const addSnippet = (s: Snippet) =>
-    setPickedSnippets((prev) =>
-      prev.some((p) => p.id === s.id) ? prev : [...prev, s],
+  const addDirective = (d: Directive) =>
+    setPickedDirectives((prev) =>
+      prev.some((p) => p.id === d.id) ? prev : [...prev, d],
     );
-  const removeSnippet = (id: string) =>
-    setPickedSnippets((prev) => prev.filter((s) => s.id !== id));
+  const removeDirective = (id: string) =>
+    setPickedDirectives((prev) => prev.filter((d) => d.id !== id));
 
   const addCommand = (cmd: SlashCommandMeta) =>
     setPickedCommands((prev) =>
@@ -208,7 +208,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
     if (
       !trimmed &&
       files.length === 0 &&
-      pickedSnippets.length === 0 &&
+      pickedDirectives.length === 0 &&
       pickedCommands.length === 0
     )
       return;
@@ -249,28 +249,28 @@ export function AiComposerProvider({ children }: ProviderProps) {
         (f) =>
           `<selection source="${f.source ?? "terminal"}">\n${f.text ?? ""}\n</selection>`,
       );
-    const { body: bodyAfterTokens, blocks: snippetBlocks } = expandSnippetTokens(
+    const { body: bodyAfterTokens, blocks: directiveBlocks } = expandDirectiveTokens(
       effectiveText,
-      useSnippetsStore.getState().snippets,
+      useDirectivesStore.getState().directives,
     );
     const seenHandles = new Set<string>();
-    const allSnippetBlocks: string[] = [];
-    for (const s of pickedSnippets) {
-      if (seenHandles.has(s.handle)) continue;
-      seenHandles.add(s.handle);
-      allSnippetBlocks.push(
-        `<snippet name="${s.handle}">\n${s.content}\n</snippet>`,
+    const allDirectiveBlocks: string[] = [];
+    for (const d of pickedDirectives) {
+      if (seenHandles.has(d.handle)) continue;
+      seenHandles.add(d.handle);
+      allDirectiveBlocks.push(
+        `<directive name="${d.handle}">\n${d.content}\n</directive>`,
       );
     }
-    for (const block of snippetBlocks) {
-      const m = block.match(/^<snippet name="([^"]+)"/);
+    for (const block of directiveBlocks) {
+      const m = block.match(/^<directive name="([^"]+)"/);
       if (m && seenHandles.has(m[1])) continue;
       if (m) seenHandles.add(m[1]);
-      allSnippetBlocks.push(block);
+      allDirectiveBlocks.push(block);
     }
     const composed = [
       commandMarker ?? "",
-      allSnippetBlocks.join("\n\n"),
+      allDirectiveBlocks.join("\n\n"),
       selectionBlocks.join("\n\n"),
       fileBlocks.join("\n\n"),
       bodyAfterTokens,
@@ -297,7 +297,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
     >[0]);
     setValue("");
     setFiles([]);
-    setPickedSnippets([]);
+    setPickedDirectives([]);
     setPickedCommands([]);
   };
 
@@ -310,7 +310,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
     !isBusy &&
     (value.trim().length > 0 ||
       files.length > 0 ||
-      pickedSnippets.length > 0 ||
+      pickedDirectives.length > 0 ||
       pickedCommands.length > 0);
 
   const ctx: ComposerCtx = {
@@ -321,9 +321,9 @@ export function AiComposerProvider({ children }: ProviderProps) {
     addFiles,
     attachFileByPath,
     removeFile,
-    pickedSnippets,
-    addSnippet,
-    removeSnippet,
+    pickedDirectives,
+    addDirective,
+    removeDirective,
     pickedCommands,
     addCommand,
     removeCommand,

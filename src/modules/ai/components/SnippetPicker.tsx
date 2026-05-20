@@ -2,10 +2,10 @@ import { PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { SlashCommandMeta } from "../lib/slashCommands";
-import type { Snippet } from "../lib/snippets";
+import type { Directive } from "../lib/snippets";
 
 export type PickerItem =
-  | { kind: "snippet"; snippet: Snippet }
+  | { kind: "directive"; directive: Directive }
   | { kind: "command"; command: SlashCommandMeta };
 
 type Props = {
@@ -15,14 +15,14 @@ type Props = {
   onHover: (index: number) => void;
 };
 
-export function SnippetPickerContent({
+export function DirectivePickerContent({
   items,
   activeIndex,
   onPick,
   onHover,
 }: Props) {
   const commands = items.filter((it) => it.kind === "command");
-  const snippets = items.filter((it) => it.kind === "snippet");
+  const directives = items.filter((it) => it.kind === "directive");
   let cursor = -1;
 
   return (
@@ -37,13 +37,13 @@ export function SnippetPickerContent({
     >
       {items.length === 0 ? (
         <div className="px-3 py-2.5 text-[11px] text-muted-foreground">
-          No matches. Add snippets in Settings → Agents.
+          No matches. Add directives in Settings → Agents.
         </div>
       ) : (
         <div className="max-h-64 overflow-y-auto py-1">
           {commands.length > 0 && (
             <>
-              <SectionHeader label="Pre-built snippets" />
+              <SectionHeader label="Pre-built commands" />
               <ul>
                 {commands.map((it) => {
                   cursor += 1;
@@ -84,17 +84,17 @@ export function SnippetPickerContent({
               </ul>
             </>
           )}
-          {snippets.length > 0 && (
+          {directives.length > 0 && (
             <>
-              <SectionHeader label="Snippets" />
+              <SectionHeader label="Directives" />
               <ul>
-                {snippets.map((it) => {
+                {directives.map((it) => {
                   cursor += 1;
                   const i = cursor;
-                  if (it.kind !== "snippet") return null;
-                  const s = it.snippet;
+                  if (it.kind !== "directive") return null;
+                  const d = it.directive;
                   return (
-                    <li key={`sn-${s.id}`}>
+                    <li key={`dir-${d.id}`}>
                       <button
                         type="button"
                         onMouseEnter={() => onHover(i)}
@@ -108,13 +108,13 @@ export function SnippetPickerContent({
                       >
                         <span className="flex w-full items-center gap-1.5">
                           <span className="font-mono text-muted-foreground">
-                            #{s.handle}
+                            #{d.handle}
                           </span>
-                          <span className="font-medium">{s.name}</span>
+                          <span className="font-medium">{d.name}</span>
                         </span>
-                        {s.description ? (
+                        {d.description ? (
                           <span className="line-clamp-1 text-[10.5px] text-muted-foreground">
-                            {s.description}
+                            {d.description}
                           </span>
                         ) : null}
                       </button>

@@ -14,21 +14,21 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { useComposer, type FileAttachment } from "../lib/composer";
 import { SLASH_COMMANDS } from "../lib/slashCommands";
-import type { Snippet } from "../lib/snippets";
-import { useSnippetsStore } from "../store/snippetsStore";
+import type { Directive } from "../lib/snippets";
+import { useDirectivesStore } from "../store/snippetsStore";
 import { AgentSwitcher } from "./AgentSwitcher";
-import { SnippetPickerContent, type PickerItem } from "./SnippetPicker";
+import { DirectivePickerContent, type PickerItem } from "./SnippetPicker";
 
-type SnippetTrigger = {
+type DirectiveTrigger = {
   start: number;
   end: number;
   query: string;
 };
 
-function detectSnippetTrigger(
+function detectDirectiveTrigger(
   value: string,
   caret: number,
-): SnippetTrigger | null {
+): DirectiveTrigger | null {
   for (let i = caret - 1; i >= 0; i--) {
     const ch = value[i];
     if (ch === "#") {
@@ -46,9 +46,9 @@ function detectSnippetTrigger(
 
 export function AiInputBar() {
   const c = useComposer();
-  const snippets = useSnippetsStore((s) => s.snippets);
+  const directives = useDirectivesStore((s) => s.directives);
 
-  const [trigger, setTrigger] = useState<SnippetTrigger | null>(null);
+  const [trigger, setTrigger] = useState<DirectiveTrigger | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export function AiInputBar() {
       setTrigger(null);
       return;
     }
-    setTrigger(detectSnippetTrigger(c.value, el.selectionStart ?? 0));
+    setTrigger(detectDirectiveTrigger(c.value, el.selectionStart ?? 0));
   };
 
   useEffect(updateTrigger, [c.value, c.textareaRef]);
@@ -74,17 +74,17 @@ export function AiInputBar() {
         (c) => !q || c.name.includes(q) || c.label.toLowerCase().includes(q),
       )
       .map((command) => ({ kind: "command", command }));
-    const snipItems: PickerItem[] = snippets
+    const dirItems: PickerItem[] = directives
       .filter(
-        (s) =>
+        (d) =>
           !q ||
-          s.handle.includes(q) ||
-          s.name.toLowerCase().includes(q) ||
-          s.description.toLowerCase().includes(q),
+          d.handle.includes(q) ||
+          d.name.toLowerCase().includes(q) ||
+          d.description.toLowerCase().includes(q),
       )
-      .map((snippet) => ({ kind: "snippet", snippet }));
-    return [...cmdItems, ...snipItems];
-  }, [trigger, snippets]);
+      .map((directive) => ({ kind: "directive", directive }));
+    return [...cmdItems, ...dirItems];
+  }, [trigger, directives]);
 
   useEffect(() => {
     if (activeIndex >= filteredItems.length) setActiveIndex(0);
@@ -97,10 +97,10 @@ export function AiInputBar() {
     const before = c.value.slice(0, trigger.start);
     const afterRaw = c.value.slice(trigger.end);
     let insert = "";
-    if (item.kind === "snippet") {
+    if (item.kind === "directive") {
       const needsSpace = afterRaw.length === 0 || !/^\s/.test(afterRaw);
-      insert = `#${item.snippet.handle}${needsSpace ? " " : ""}`;
-      c.addSnippet(item.snippet);
+      insert = `#${item.directive.handle}${needsSpace ? " " : ""}`;
+      c.addDirective(item.directive);
     } else {
       c.addCommand(item.command);
     }
@@ -140,12 +140,12 @@ export function AiInputBar() {
         <ChipsRow
           files={c.files}
           onRemoveFile={c.removeFile}
-          snippets={c.pickedSnippets}
-          onRemoveSnippet={(id) => {
-            const snip = c.pickedSnippets.find((s) => s.id === id);
-            c.removeSnippet(id);
-            if (!snip) return;
-            const re = new RegExp(`(^|\\s)#${snip.handle}\\b ?`);
+          directives={c.pickedDirectives}
+          onRemoveDirective={(id) => {
+            const dir = c.pickedDirectives.find((d) => d.id === id);
+            c.removeDirective(id);
+            if (!dir) return;
+            const re = new RegExp(`(^|\\s)#${dir.handle}\\b ?`);
             c.setValue((v) => v.replace(re, (_m, lead: string) => lead));
           }}
           commands={c.pickedCommands}
@@ -194,7 +194,7 @@ export function AiInputBar() {
                     c.submit();
                   }
                 }}
-                placeholder="Ask Nexum anything   -   # for snippets and commands"
+                placeholder="Ask Nexum anything   -   # for directives and commands"
                 rows={1}
                 disabled={c.isBusy}
                 className={cn(
@@ -205,7 +205,7 @@ export function AiInputBar() {
               <AgentSwitcher />
             </div>
           </PopoverAnchor>
-          <SnippetPickerContent
+          <DirectivePickerContent
             items={filteredItems}
             activeIndex={activeIndex}
             onPick={onPickItem}
@@ -240,19 +240,19 @@ export function AiInputBar() {
 function ChipsRow({
   files,
   onRemoveFile,
-  snippets,
-  onRemoveSnippet,
+  directives,
+  onRemoveDirective,
   commands,
   onRemoveCommand,
 }: {
   files: FileAttachment[];
   onRemoveFile: (id: string) => void;
-  snippets: Snippet[];
-  onRemoveSnippet: (id: string) => void;
+  directives: Directive[];
+  onRemoveDirective: (id: string) => void;
   commands: { name: string; label: string; icon: typeof HashtagIcon }[];
   onRemoveCommand: (name: string) => void;
 }) {
-  if (files.length === 0 && snippets.length === 0 && commands.length === 0)
+  if (files.length === 0 && directives.length === 0 && commands.length === 0)
     return null;
   return (
     <div className="flex flex-wrap gap-1">
@@ -285,16 +285,16 @@ function ChipsRow({
             </button>
           </motion.div>
         ))}
-        {snippets.map((s) => (
+        {directives.map((d) => (
           <motion.div
-            key={`snip-${s.id}`}
+            key={`dir-${d.id}`}
             layout
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.92 }}
             transition={{ duration: 0.12 }}
             className="group flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary"
-            title={s.description || s.name}
+            title={d.description || d.name}
           >
             <HugeiconsIcon
               icon={HashtagIcon}
@@ -302,12 +302,12 @@ function ChipsRow({
               strokeWidth={2}
               className="opacity-80"
             />
-            <span className="font-medium">{s.handle}</span>
+            <span className="font-medium">{d.handle}</span>
             <button
               type="button"
-              onClick={() => onRemoveSnippet(s.id)}
+              onClick={() => onRemoveDirective(d.id)}
               className="ml-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-              aria-label="Remove snippet"
+              aria-label="Remove directive"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
             </button>
