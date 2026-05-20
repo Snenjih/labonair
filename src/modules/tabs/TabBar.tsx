@@ -1,5 +1,11 @@
 import { Button } from "@/components/ui/button";
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -9,8 +15,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { cn } from "@/lib/utils";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import {
@@ -40,6 +46,8 @@ type Props = {
   onNewSftp: (hostId: string, title: string) => void;
   onOpenHostManager: () => void;
   onClose: (id: number) => void;
+  onCloseOthers: (id: number) => void;
+  onCloseAll: () => void;
   compact?: boolean;
 };
 
@@ -54,6 +62,8 @@ export function TabBar({
   onNewSftp,
   onOpenHostManager,
   onClose,
+  onCloseOthers,
+  onCloseAll,
   compact,
 }: Props) {
   const hosts = useHostsStore((s) => s.hosts);
@@ -97,48 +107,62 @@ export function TabBar({
         >
           <TabsList className="h-7 w-max gap-0.5 bg-transparent p-0">
             {tabs.map((t) => (
-              <TabsTrigger
-                key={t.id}
-                value={String(t.id)}
-                data-tab-id={t.id}
-                className={cn(
-                  "group h-7 shrink-0 gap-1.5 rounded-md text-xs text-muted-foreground transition-colors data-[state=active]:bg-accent data-[state=active]:text-foreground hover:text-foreground/80 justify-between",
-                  compact ? "px-1.5!" : "ps-2! pe-1!"
-                )}
-              >
-                <span
-                  className={cn(
-                    "flex items-center gap-1.5 truncate",
-                    compact ? "max-w-32" : "max-w-56",
-                  )}
-                >
-                  <TabIcon tab={t} active={t.id === activeId} />
-                  <span className="truncate">{labelFor(t)}</span>
-                  {t.kind === "editor" && t.dirty ? (
-                    <span
-                      aria-label="Unsaved changes"
-                      className="size-1.5 shrink-0 rounded-full bg-foreground/70"
-                    />
-                  ) : null}
-                </span>
-                {tabs.length > 1 && (
-                  <span
-                    role="button"
-                    aria-label="Close tab"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClose(t.id);
-                    }}
-                    className="rounded p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
+              <ContextMenu key={t.id}>
+                <ContextMenuTrigger asChild>
+                  <TabsTrigger
+                    value={String(t.id)}
+                    data-tab-id={t.id}
+                    className={cn(
+                      "group h-7 shrink-0 gap-1.5 rounded-md text-xs text-muted-foreground transition-colors data-[state=active]:bg-accent data-[state=active]:text-foreground hover:text-foreground/80 justify-between",
+                      compact ? "px-1.5!" : "ps-2! pe-1!"
+                    )}
                   >
-                    <HugeiconsIcon
-                      icon={Cancel01Icon}
-                      size={11}
-                      strokeWidth={2}
-                    />
-                  </span>
-                )}
-              </TabsTrigger>
+                    <span
+                      className={cn(
+                        "flex items-center gap-1.5 truncate",
+                        compact ? "max-w-32" : "max-w-56",
+                      )}
+                    >
+                      <TabIcon tab={t} active={t.id === activeId} />
+                      <span className="truncate">{labelFor(t)}</span>
+                      {t.kind === "editor" && t.dirty ? (
+                        <span
+                          aria-label="Unsaved changes"
+                          className="size-1.5 shrink-0 rounded-full bg-foreground/70"
+                        />
+                      ) : null}
+                    </span>
+                    {tabs.length > 1 && (
+                      <span
+                        role="button"
+                        aria-label="Close tab"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClose(t.id);
+                        }}
+                        className="rounded p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
+                      >
+                        <HugeiconsIcon
+                          icon={Cancel01Icon}
+                          size={11}
+                          strokeWidth={2}
+                        />
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem onSelect={() => onClose(t.id)}>
+                    Close Tab
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>
+                    Close Others
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={onCloseAll}>
+                    Close All
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ))}
           </TabsList>
         </Tabs>

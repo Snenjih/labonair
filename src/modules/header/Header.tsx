@@ -36,6 +36,8 @@ type Props = {
   onNewSsh: (hostId: string, title: string) => void;
   onNewSftp: (hostId: string, title: string) => void;
   onClose: (id: number) => void;
+  onCloseOthers: (id: number) => void;
+  onCloseAll: () => void;
   onToggleSidebar: () => void;
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
@@ -54,6 +56,8 @@ export function Header({
   onNewSsh,
   onNewSftp,
   onClose,
+  onCloseOthers,
+  onCloseAll,
   onToggleSidebar,
   onOpenShortcuts,
   onOpenSettings,
@@ -138,6 +142,8 @@ export function Header({
           onNewSftp={onNewSftp}
           onOpenHostManager={onOpenHostManager}
           onClose={onClose}
+          onCloseOthers={onCloseOthers}
+          onCloseAll={onCloseAll}
           compact={false}
         />
         <div data-tauri-drag-region className="h-full min-w-2 flex-1" />

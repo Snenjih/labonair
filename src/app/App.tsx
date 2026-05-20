@@ -314,6 +314,18 @@ export default function App() {
     [tabs, disposeTab, closePane],
   );
 
+  const handleCloseOthers = useCallback(
+    (keepId: number) => {
+      tabs.filter((t) => t.id !== keepId).forEach((t) => handleClose(t.id));
+      setActiveId(keepId);
+    },
+    [tabs, handleClose, setActiveId],
+  );
+
+  const handleCloseAll = useCallback(() => {
+    tabs.forEach((t) => handleClose(t.id));
+  }, [tabs, handleClose]);
+
   const cycleTab = useCallback(
     (delta: 1 | -1) => {
       if (tabs.length < 2) return;
@@ -897,6 +909,8 @@ export default function App() {
             onNewSsh={newSshTab}
             onNewSftp={newSftpTab}
             onClose={handleClose}
+            onCloseOthers={handleCloseOthers}
+            onCloseAll={handleCloseAll}
             onToggleSidebar={toggleSidebar}
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onOpenSettings={() => void openSettingsWindow()}
