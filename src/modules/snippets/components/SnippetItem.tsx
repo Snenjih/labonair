@@ -84,9 +84,9 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
             {/* Footer: run + actions */}
             <div className="flex items-center gap-1.5">
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
-                className="h-[22px] gap-1 rounded px-2 text-[10px] font-semibold tracking-wide transition-all hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                className="h-[22px] gap-1 rounded px-2 text-[10px] font-semibold tracking-wide"
                 onClick={(e) => {
                   e.stopPropagation();
                   onRun(snippet);
