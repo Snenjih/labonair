@@ -1,7 +1,7 @@
 import { create } from "zustand";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 const RECENT_KEY = "nexum-palette-recent";
-const MAX_RECENT = 5;
 
 function loadRecent(): string[] {
   try {
@@ -37,10 +37,8 @@ export const useCommandStore = create<State>((set) => ({
   toggle: () => set((s) => ({ isOpen: !s.isOpen })),
   pushRecent: (id) =>
     set((s) => {
-      const next = [id, ...s.recentIds.filter((r) => r !== id)].slice(
-        0,
-        MAX_RECENT,
-      );
+      const max = usePreferencesStore.getState().commandPaletteHistorySize;
+      const next = [id, ...s.recentIds.filter((r) => r !== id)].slice(0, max);
       saveRecent(next);
       return { recentIds: next };
     }),

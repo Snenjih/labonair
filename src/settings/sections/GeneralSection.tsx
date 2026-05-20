@@ -13,6 +13,7 @@ import {
   setAutostart,
   setCheckForUpdates,
   setDefaultStartupTab,
+  setHostPingInterval,
   setRestoreWindowState,
   setVimMode,
 } from "@/modules/settings/store";
@@ -38,6 +39,15 @@ const APPEARANCE: {
   { id: "dark", label: "Dark", icon: Moon02Icon },
 ];
 
+const PING_INTERVAL_OPTIONS: { value: string; label: string }[] = [
+  { value: "10", label: "Every 10 seconds" },
+  { value: "30", label: "Every 30 seconds" },
+  { value: "60", label: "Every minute" },
+  { value: "120", label: "Every 2 minutes" },
+  { value: "300", label: "Every 5 minutes" },
+  { value: "0", label: "Never" },
+];
+
 export function GeneralSection() {
   const { theme, setTheme } = useTheme();
   const autostart = usePreferencesStore((s) => s.autostart);
@@ -45,6 +55,7 @@ export function GeneralSection() {
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
+  const hostPingInterval = usePreferencesStore((s) => s.hostPingInterval);
 
   // Reconcile autostart pref with the actual OS state on mount — the user may
   // have toggled it from System Settings.
@@ -165,6 +176,30 @@ export function GeneralSection() {
             </Select>
           </SettingRow>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Host Manager</Label>
+        <SettingRow
+          title="Ping interval"
+          description="How often to check whether each host is reachable. Set to Never to disable availability checks."
+        >
+          <Select
+            value={String(hostPingInterval)}
+            onValueChange={(v) => void setHostPingInterval(Number(v))}
+          >
+            <SelectTrigger className="h-7 w-44 text-[11.5px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PING_INTERVAL_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value} className="text-[11.5px]">
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
       </div>
     </div>
   );

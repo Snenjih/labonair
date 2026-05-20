@@ -1,5 +1,6 @@
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
+import { getStoragePaths } from "@/lib/paths";
 import {
   DEFAULT_AUTOCOMPLETE_MODEL,
   DEFAULT_MODEL_ID,
@@ -92,15 +93,27 @@ export type Preferences = {
   sftpColumnType: boolean;
   sftpRemoteEditShowTransfers: boolean;
 
+  // --- Command Palette ---
+  commandPaletteBlur: number;
+  commandPaletteOpacity: number;
+  commandPalettePosition: "top" | "center" | "high";
+  commandPaletteAnimation: "fast" | "normal" | "slow" | "none";
+  commandPaletteShowRecent: boolean;
+  commandPaletteHistorySize: number;
+  commandPaletteSearchMode: "contains" | "startsWith" | "fuzzy";
+  commandPaletteCloseOnOverlayClick: boolean;
+
   // --- Sidebar ---
   sidebarPosition: "left" | "right";
   // --- Security ---
   credentialEncryption: boolean;
   // --- Updates ---
   checkForUpdates: boolean;
+
+  // --- Host Manager ---
+  hostPingInterval: number;
 };
 
-const STORE_PATH = "nexum-settings.json";
 const KEY_THEME = "theme";
 const KEY_DEFAULT_MODEL = "defaultModelId";
 const KEY_EDITOR_THEME = "editorTheme";
@@ -149,10 +162,20 @@ const KEY_SFTP_COLUMN_MODIFIED = "sftpColumnModified";
 const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
 const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
 const KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS = "sftpRemoteEditShowTransfers";
+const KEY_COMMAND_PALETTE_BLUR = "commandPaletteBlur";
+const KEY_COMMAND_PALETTE_OPACITY = "commandPaletteOpacity";
+const KEY_COMMAND_PALETTE_POSITION = "commandPalettePosition";
+const KEY_COMMAND_PALETTE_ANIMATION = "commandPaletteAnimation";
+const KEY_COMMAND_PALETTE_SHOW_RECENT = "commandPaletteShowRecent";
+const KEY_COMMAND_PALETTE_HISTORY_SIZE = "commandPaletteHistorySize";
+const KEY_COMMAND_PALETTE_SEARCH_MODE = "commandPaletteSearchMode";
+const KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY = "commandPaletteCloseOnOverlayClick";
+
 const KEY_SIDEBAR_POSITION = "sidebarPosition";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
+const KEY_HOST_PING_INTERVAL = "hostPingInterval";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -204,15 +227,34 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpColumnType: false,
   sftpRemoteEditShowTransfers: true,
 
+  commandPaletteBlur: 4,
+  commandPaletteOpacity: 95,
+  commandPalettePosition: "top",
+  commandPaletteAnimation: "normal",
+  commandPaletteShowRecent: true,
+  commandPaletteHistorySize: 5,
+  commandPaletteSearchMode: "contains",
+  commandPaletteCloseOnOverlayClick: true,
+
   sidebarPosition: "left",
   credentialEncryption: false,
   checkForUpdates: true,
+
+  hostPingInterval: 60,
 };
 
-const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
+let _storePromise: Promise<LazyStore> | null = null;
+async function getStore(): Promise<LazyStore> {
+  if (!_storePromise) {
+    _storePromise = getStoragePaths().then(
+      (p) => new LazyStore(`${p.config}/nexum-settings.json`, { defaults: {}, autoSave: 200 }),
+    );
+  }
+  return _storePromise;
+}
 
 export async function loadPreferences(): Promise<Preferences> {
-  const entries = await store.entries();
+  const entries = await (await getStore()).entries();
   const map = new Map<string, unknown>(entries);
   const get = <T>(k: string): T | undefined => map.get(k) as T | undefined;
   return {
@@ -328,6 +370,31 @@ export async function loadPreferences(): Promise<Preferences> {
     sftpRemoteEditShowTransfers:
       get<boolean>(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS) ?? DEFAULT_PREFERENCES.sftpRemoteEditShowTransfers,
 
+    commandPaletteBlur:
+      get<number>(KEY_COMMAND_PALETTE_BLUR) ??
+      DEFAULT_PREFERENCES.commandPaletteBlur,
+    commandPaletteOpacity:
+      get<number>(KEY_COMMAND_PALETTE_OPACITY) ??
+      DEFAULT_PREFERENCES.commandPaletteOpacity,
+    commandPalettePosition:
+      get<"top" | "center" | "high">(KEY_COMMAND_PALETTE_POSITION) ??
+      DEFAULT_PREFERENCES.commandPalettePosition,
+    commandPaletteAnimation:
+      get<"fast" | "normal" | "slow" | "none">(KEY_COMMAND_PALETTE_ANIMATION) ??
+      DEFAULT_PREFERENCES.commandPaletteAnimation,
+    commandPaletteShowRecent:
+      get<boolean>(KEY_COMMAND_PALETTE_SHOW_RECENT) ??
+      DEFAULT_PREFERENCES.commandPaletteShowRecent,
+    commandPaletteHistorySize:
+      get<number>(KEY_COMMAND_PALETTE_HISTORY_SIZE) ??
+      DEFAULT_PREFERENCES.commandPaletteHistorySize,
+    commandPaletteSearchMode:
+      get<"contains" | "startsWith" | "fuzzy">(KEY_COMMAND_PALETTE_SEARCH_MODE) ??
+      DEFAULT_PREFERENCES.commandPaletteSearchMode,
+    commandPaletteCloseOnOverlayClick:
+      get<boolean>(KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY) ??
+      DEFAULT_PREFERENCES.commandPaletteCloseOnOverlayClick,
+
     sidebarPosition:
       get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
       DEFAULT_PREFERENCES.sidebarPosition,
@@ -335,79 +402,82 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
     checkForUpdates:
       get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
+
+    hostPingInterval:
+      get<number>(KEY_HOST_PING_INTERVAL) ?? DEFAULT_PREFERENCES.hostPingInterval,
   };
 }
 
 export async function setTheme(value: ThemePref): Promise<void> {
-  await store.set(KEY_THEME, value);
-  await store.save();
+  await (await getStore()).set(KEY_THEME, value);
+  await (await getStore()).save();
 }
 
 export async function setDefaultModel(value: ModelId): Promise<void> {
-  await store.set(KEY_DEFAULT_MODEL, value);
-  await store.save();
+  await (await getStore()).set(KEY_DEFAULT_MODEL, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorTheme(value: EditorThemeId): Promise<void> {
-  await store.set(KEY_EDITOR_THEME, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_THEME, value);
+  await (await getStore()).save();
 }
 
 export async function setCustomInstructions(value: string): Promise<void> {
-  await store.set(KEY_CUSTOM_INSTRUCTIONS, value);
-  await store.save();
+  await (await getStore()).set(KEY_CUSTOM_INSTRUCTIONS, value);
+  await (await getStore()).save();
 }
 
 export async function setAutostart(value: boolean): Promise<void> {
-  await store.set(KEY_AUTOSTART, value);
-  await store.save();
+  await (await getStore()).set(KEY_AUTOSTART, value);
+  await (await getStore()).save();
 }
 
 export async function setRestoreWindowState(value: boolean): Promise<void> {
-  await store.set(KEY_RESTORE_WINDOW, value);
-  await store.save();
+  await (await getStore()).set(KEY_RESTORE_WINDOW, value);
+  await (await getStore()).save();
 }
 
 export async function setAutocompleteEnabled(value: boolean): Promise<void> {
-  await store.set(KEY_AUTOCOMPLETE_ENABLED, value);
-  await store.save();
+  await (await getStore()).set(KEY_AUTOCOMPLETE_ENABLED, value);
+  await (await getStore()).save();
 }
 
 export async function setAutocompleteProvider(
   value: AutocompleteProviderId,
 ): Promise<void> {
-  await store.set(KEY_AUTOCOMPLETE_PROVIDER, value);
-  await store.save();
+  await (await getStore()).set(KEY_AUTOCOMPLETE_PROVIDER, value);
+  await (await getStore()).save();
 }
 
 export async function setAutocompleteModelId(value: string): Promise<void> {
-  await store.set(KEY_AUTOCOMPLETE_MODEL, value);
-  await store.save();
+  await (await getStore()).set(KEY_AUTOCOMPLETE_MODEL, value);
+  await (await getStore()).save();
 }
 
 export async function setLmstudioBaseURL(value: string): Promise<void> {
-  await store.set(KEY_LMSTUDIO_BASE_URL, value);
-  await store.save();
+  await (await getStore()).set(KEY_LMSTUDIO_BASE_URL, value);
+  await (await getStore()).save();
 }
 
 export async function setLmstudioChatModelId(value: string): Promise<void> {
-  await store.set(KEY_LMSTUDIO_CHAT_MODEL_ID, value);
-  await store.save();
+  await (await getStore()).set(KEY_LMSTUDIO_CHAT_MODEL_ID, value);
+  await (await getStore()).save();
 }
 
 export async function setOpenaiCompatibleBaseURL(value: string): Promise<void> {
-  await store.set(KEY_OPENAI_COMPATIBLE_BASE_URL, value);
-  await store.save();
+  await (await getStore()).set(KEY_OPENAI_COMPATIBLE_BASE_URL, value);
+  await (await getStore()).save();
 }
 
 export async function setOpenaiCompatibleModelId(value: string): Promise<void> {
-  await store.set(KEY_OPENAI_COMPATIBLE_MODEL_ID, value);
-  await store.save();
+  await (await getStore()).set(KEY_OPENAI_COMPATIBLE_MODEL_ID, value);
+  await (await getStore()).save();
 }
 
 export async function setVimMode(value: boolean): Promise<void> {
-  await store.set(KEY_VIM_MODE, value);
-  await store.save();
+  await (await getStore()).set(KEY_VIM_MODE, value);
+  await (await getStore()).save();
 }
 
 export async function setDefaultStartupTab(
@@ -418,177 +488,228 @@ export async function setDefaultStartupTab(
 }
 
 export async function setAppTheme(value: string): Promise<void> {
-  await store.set(KEY_APP_THEME, value);
-  await store.save();
+  await (await getStore()).set(KEY_APP_THEME, value);
+  await (await getStore()).save();
 }
 
 export async function setAppFontFamily(value: string): Promise<void> {
-  await store.set(KEY_APP_FONT_FAMILY, value);
-  await store.save();
+  await (await getStore()).set(KEY_APP_FONT_FAMILY, value);
+  await (await getStore()).save();
 }
 
 export async function setAppFontSize(value: number): Promise<void> {
-  await store.set(KEY_APP_FONT_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_APP_FONT_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setAppLineHeight(value: number): Promise<void> {
-  await store.set(KEY_APP_LINE_HEIGHT, value);
-  await store.save();
+  await (await getStore()).set(KEY_APP_LINE_HEIGHT, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalCursorBlink(value: boolean): Promise<void> {
-  await store.set(KEY_TERMINAL_CURSOR_BLINK, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_CURSOR_BLINK, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalCursorStyle(
   value: "block" | "underline" | "bar",
 ): Promise<void> {
-  await store.set(KEY_TERMINAL_CURSOR_STYLE, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_CURSOR_STYLE, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalFontFamily(value: string): Promise<void> {
-  await store.set(KEY_TERMINAL_FONT_FAMILY, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_FONT_FAMILY, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalFontSize(value: number): Promise<void> {
-  await store.set(KEY_TERMINAL_FONT_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_FONT_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalScrollback(value: number): Promise<void> {
-  await store.set(KEY_TERMINAL_SCROLLBACK, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_SCROLLBACK, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalLetterSpacing(value: number): Promise<void> {
-  await store.set(KEY_TERMINAL_LETTER_SPACING, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_LETTER_SPACING, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalLineHeight(value: number): Promise<void> {
-  await store.set(KEY_TERMINAL_LINE_HEIGHT, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_LINE_HEIGHT, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalFontWeight(
   value: "normal" | "medium" | "bold",
 ): Promise<void> {
-  await store.set(KEY_TERMINAL_FONT_WEIGHT, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_FONT_WEIGHT, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalShowPaneHeader(value: boolean): Promise<void> {
-  await store.set(KEY_TERMINAL_SHOW_PANE_HEADER, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_SHOW_PANE_HEADER, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalShowPaneFooter(value: boolean): Promise<void> {
-  await store.set(KEY_TERMINAL_SHOW_PANE_FOOTER, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_SHOW_PANE_FOOTER, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalUseWebGL(value: boolean): Promise<void> {
-  await store.set(KEY_TERMINAL_USE_WEBGL, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_USE_WEBGL, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorFontSize(value: number): Promise<void> {
-  await store.set(KEY_EDITOR_FONT_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_FONT_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorAutoSave(
   value: "off" | "afterDelay" | "onFocusChange",
 ): Promise<void> {
-  await store.set(KEY_EDITOR_AUTO_SAVE, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_AUTO_SAVE, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorLineNumbers(value: boolean): Promise<void> {
-  await store.set(KEY_EDITOR_LINE_NUMBERS, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_LINE_NUMBERS, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorWordWrap(value: boolean): Promise<void> {
-  await store.set(KEY_EDITOR_WORD_WRAP, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_WORD_WRAP, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorTabSize(value: 2 | 4 | 8): Promise<void> {
-  await store.set(KEY_EDITOR_TAB_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_TAB_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorBracketMatching(value: boolean): Promise<void> {
-  await store.set(KEY_EDITOR_BRACKET_MATCHING, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_BRACKET_MATCHING, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpFontSize(value: number): Promise<void> {
-  await store.set(KEY_SFTP_FONT_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_FONT_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpShowHiddenFiles(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_SHOW_HIDDEN, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_SHOW_HIDDEN, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpShowUpFolder(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_SHOW_UP_FOLDER, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_SHOW_UP_FOLDER, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpColumnSize(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_COLUMN_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_COLUMN_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpColumnModified(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_COLUMN_MODIFIED, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_COLUMN_MODIFIED, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpColumnPermissions(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_COLUMN_PERMISSIONS, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_COLUMN_PERMISSIONS, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpColumnType(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_COLUMN_TYPE, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_COLUMN_TYPE, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpRemoteEditShowTransfers(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS, value);
+  await (await getStore()).set(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS, value);
+  await (await getStore()).save();
+}
+
+export async function setCommandPaletteBlur(value: number): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_BLUR, value);
+  await store.save();
+}
+
+export async function setCommandPaletteOpacity(value: number): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_OPACITY, value);
+  await store.save();
+}
+
+export async function setCommandPalettePosition(
+  value: "top" | "center" | "high",
+): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_POSITION, value);
+  await store.save();
+}
+
+export async function setCommandPaletteAnimation(
+  value: "fast" | "normal" | "slow" | "none",
+): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_ANIMATION, value);
+  await store.save();
+}
+
+export async function setCommandPaletteShowRecent(value: boolean): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_SHOW_RECENT, value);
+  await store.save();
+}
+
+export async function setCommandPaletteHistorySize(value: number): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_HISTORY_SIZE, value);
+  await store.save();
+}
+
+export async function setCommandPaletteSearchMode(
+  value: "contains" | "startsWith" | "fuzzy",
+): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_SEARCH_MODE, value);
+  await store.save();
+}
+
+export async function setCommandPaletteCloseOnOverlayClick(value: boolean): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY, value);
   await store.save();
 }
 
 export async function setSidebarPosition(
   value: "left" | "right",
 ): Promise<void> {
-  await store.set(KEY_SIDEBAR_POSITION, value);
-  await store.save();
+  await (await getStore()).set(KEY_SIDEBAR_POSITION, value);
+  await (await getStore()).save();
 }
 
 export async function setCredentialEncryption(value: boolean): Promise<void> {
-  await store.set(KEY_CREDENTIAL_ENCRYPTION, value);
-  await store.save();
+  await (await getStore()).set(KEY_CREDENTIAL_ENCRYPTION, value);
+  await (await getStore()).save();
 }
 
 export async function setCheckForUpdates(value: boolean): Promise<void> {
-  await store.set(KEY_CHECK_FOR_UPDATES, value);
+  await (await getStore()).set(KEY_CHECK_FOR_UPDATES, value);
+  await (await getStore()).save();
+}
+
+export async function setHostPingInterval(value: number): Promise<void> {
+  await store.set(KEY_HOST_PING_INTERVAL, value);
   await store.save();
 }
 
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
-export function onPreferencesChange(
+export async function onPreferencesChange(
   cb: (key: PrefKey, value: unknown) => void,
 ): Promise<UnlistenFn> {
   const map: Record<string, PrefKey> = {
@@ -640,11 +761,20 @@ export function onPreferencesChange(
     [KEY_SFTP_COLUMN_PERMISSIONS]: "sftpColumnPermissions",
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
     [KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS]: "sftpRemoteEditShowTransfers",
+    [KEY_COMMAND_PALETTE_BLUR]: "commandPaletteBlur",
+    [KEY_COMMAND_PALETTE_OPACITY]: "commandPaletteOpacity",
+    [KEY_COMMAND_PALETTE_POSITION]: "commandPalettePosition",
+    [KEY_COMMAND_PALETTE_ANIMATION]: "commandPaletteAnimation",
+    [KEY_COMMAND_PALETTE_SHOW_RECENT]: "commandPaletteShowRecent",
+    [KEY_COMMAND_PALETTE_HISTORY_SIZE]: "commandPaletteHistorySize",
+    [KEY_COMMAND_PALETTE_SEARCH_MODE]: "commandPaletteSearchMode",
+    [KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY]: "commandPaletteCloseOnOverlayClick",
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
+    [KEY_HOST_PING_INTERVAL]: "hostPingInterval",
   };
-  return store.onChange<unknown>((key, value) => {
+  return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];
     if (mapped) cb(mapped, value);
   });

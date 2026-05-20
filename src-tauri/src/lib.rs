@@ -1,10 +1,13 @@
 mod modules;
 
 use modules::{
-    fs, pty, secrets, shell,
+    fs::{self, paths},
+    pty, secrets, shell,
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete}},
     ssh::{SshState, TrustState, client::{ssh_connect, ssh_connect_quick, ssh_trust_host, ssh_remove_known_host, ssh_disconnect}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_rename, sftp_delete, sftp_mkdir, sftp_chmod, sftp_calculate_size, sftp_chown, sftp_deep_search, prepare_remote_edit, save_remote_edit}, tunnels::{TunnelState, ssh_start_tunnels, ssh_stop_tunnels}},
     sftp::{TransferWorkerState, commands::{enqueue_transfer, cancel_transfer, resolve_conflict}, worker::run_worker},
+    snippets::db::{snippets_get_all, snippets_create, snippets_update, snippets_delete, snippets_reorder, snippet_groups_get_all, snippet_groups_create, snippet_groups_update, snippet_groups_delete},
+    snippets::exec::{snippet_run_local, snippet_run_ssh},
     themes::{themes_get_all, theme_import, theme_export, theme_delete, theme_fetch_index, theme_download},
 };
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
@@ -337,9 +340,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            let data_dir = app.path().app_local_data_dir()
-                .expect("failed to resolve app local data dir");
-            let conn = initialize_db(data_dir)
+            let conn = initialize_db(paths::data_dir())
                 .expect("failed to initialize database");
             app.manage(HostsDb(std::sync::Mutex::new(conn)));
 
@@ -361,11 +362,9 @@ pub fn run() {
             // Read the restoreWindowState preference directly from the store file.
             // The window-state plugin has already applied the saved geometry by this point;
             // if the user has disabled the feature we reset to defaults instead.
-            let settings_path = app.path().app_local_data_dir()
-                .map(|d| d.join("nexum-settings.json"));
-            let restore_window = settings_path
-                .ok()
-                .and_then(|p| std::fs::read_to_string(p).ok())
+            let restore_window = std::fs::read_to_string(
+                    paths::config_dir().join("nexum-settings.json")
+                ).ok()
                 .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
                 .and_then(|v| v.get("restoreWindowState").and_then(|b| b.as_bool()))
                 .unwrap_or(true);
@@ -487,6 +486,17 @@ pub fn run() {
             resolve_conflict,
             prepare_remote_edit,
             save_remote_edit,
+            snippets_get_all,
+            snippets_create,
+            snippets_update,
+            snippets_delete,
+            snippets_reorder,
+            snippet_groups_get_all,
+            snippet_groups_create,
+            snippet_groups_update,
+            snippet_groups_delete,
+            snippet_run_local,
+            snippet_run_ssh,
             themes_get_all,
             theme_import,
             theme_export,
@@ -494,6 +504,7 @@ pub fn run() {
             theme_fetch_index,
             theme_download,
             ping_host,
+            fs::paths::get_storage_paths,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

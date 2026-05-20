@@ -19,6 +19,7 @@ import {
   TerminalIcon,
   UserMultiple02Icon,
   LockPasswordIcon,
+  Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -29,6 +30,7 @@ import { AboutSection } from "./sections/AboutSection";
 import { SecuritySection } from "./sections/SecuritySection";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
+import { CommandPaletteSection } from "./sections/CommandPaletteSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { ModelsSection } from "./sections/ModelsSection";
@@ -58,6 +60,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "themes", category: null, label: "Themes", icon: PaintBrush01Icon },
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
+  { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
   { id: "models", category: "Models", label: "Models", icon: AiScanIcon },
   { id: "agents", category: "Agents", label: "Agents", icon: UserMultiple02Icon },
   { id: "security", category: null, label: "Security", icon: LockPasswordIcon },
@@ -181,6 +184,7 @@ export function SettingsApp() {
                 {active === "themes" && <ThemeMarketplace />}
                 {active === "terminal" && <TerminalSection />}
                 {active === "editor" && <EditorSection />}
+                {active === "command-palette" && <CommandPaletteSection />}
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
                 {active === "security" && <SecuritySection />}
@@ -215,6 +219,7 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "sftpColumnPermissions": void store.setSftpColumnPermissions(value as boolean); break;
     case "sftpColumnType": void store.setSftpColumnType(value as boolean); break;
     case "sftpRemoteEditShowTransfers": void store.setSftpRemoteEditShowTransfers(value as boolean); break;
+    case "hostPingInterval": void store.setHostPingInterval(Number(value)); break;
   }
 }
 

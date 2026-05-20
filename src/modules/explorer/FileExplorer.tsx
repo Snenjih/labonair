@@ -15,6 +15,8 @@ import {
   FolderAddIcon,
   Refresh01Icon,
   Search01Icon,
+  ViewIcon,
+  ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
@@ -106,6 +108,7 @@ export function FileExplorer({
           root: rootPath,
           query: q,
           limit: 200,
+          showHidden: tree.showHidden,
         });
         if (alive) setResults(hits);
       } catch (e) {
@@ -270,6 +273,22 @@ export function FileExplorer({
           title="Refresh"
         >
           <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`size-6 hover:text-foreground ${tree.showHidden ? "text-foreground" : "text-muted-foreground"}`}
+          onClick={() => {
+            tree.toggleShowHidden();
+            tree.refresh(rootPath);
+          }}
+          title={tree.showHidden ? "Hide hidden files" : "Show hidden files"}
+        >
+          <HugeiconsIcon
+            icon={tree.showHidden ? ViewIcon : ViewOffSlashIcon}
+            size={13}
+            strokeWidth={2}
+          />
         </Button>
       </div>
 
