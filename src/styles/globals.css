@@ -137,8 +137,8 @@
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.56 0.021 213.5);
     /* ANSI 16 terminal colors — fallback for the default dark theme */
-    --terminal-background: oklch(0.208 0.007 -130.4);
-    --terminal-foreground: oklch(0.795 0.027 -173.1);
+    --terminal-background: oklch(0.148 0.004 228.8);
+    --terminal-foreground: oklch(0.987 0.002 197.1);
     --terminal-black: #18181b;
     --terminal-red: #ef4444;
     --terminal-green: #22c55e;
