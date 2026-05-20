@@ -59,3 +59,9 @@ theme:
     - any-glob-to-any-file:
       - "src/styles/**"
       - "src/modules/theme/**"
+
+snippets:
+  - changed-files:
+    - any-glob-to-any-file:
+      - "src/modules/snippets/**"
+      - "src-tauri/src/modules/snippets/**"
