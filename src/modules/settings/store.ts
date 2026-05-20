@@ -91,6 +91,9 @@ export type Preferences = {
   sftpColumnType: boolean;
   sftpRemoteEditShowTransfers: boolean;
 
+  // --- Command Palette ---
+  commandPaletteBlur: number;
+
   // --- Sidebar ---
   sidebarPosition: "left" | "right";
   // --- Security ---
@@ -147,6 +150,8 @@ const KEY_SFTP_COLUMN_MODIFIED = "sftpColumnModified";
 const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
 const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
 const KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS = "sftpRemoteEditShowTransfers";
+const KEY_COMMAND_PALETTE_BLUR = "commandPaletteBlur";
+
 const KEY_SIDEBAR_POSITION = "sidebarPosition";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
@@ -200,6 +205,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpColumnPermissions: true,
   sftpColumnType: false,
   sftpRemoteEditShowTransfers: true,
+
+  commandPaletteBlur: 4,
 
   sidebarPosition: "left",
   credentialEncryption: false,
@@ -321,6 +328,10 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_SFTP_COLUMN_TYPE) ?? DEFAULT_PREFERENCES.sftpColumnType,
     sftpRemoteEditShowTransfers:
       get<boolean>(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS) ?? DEFAULT_PREFERENCES.sftpRemoteEditShowTransfers,
+
+    commandPaletteBlur:
+      get<number>(KEY_COMMAND_PALETTE_BLUR) ??
+      DEFAULT_PREFERENCES.commandPaletteBlur,
 
     sidebarPosition:
       get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
@@ -555,6 +566,11 @@ export async function setSftpRemoteEditShowTransfers(value: boolean): Promise<vo
   await store.save();
 }
 
+export async function setCommandPaletteBlur(value: number): Promise<void> {
+  await store.set(KEY_COMMAND_PALETTE_BLUR, value);
+  await store.save();
+}
+
 export async function setSidebarPosition(
   value: "left" | "right",
 ): Promise<void> {
@@ -626,6 +642,7 @@ export function onPreferencesChange(
     [KEY_SFTP_COLUMN_PERMISSIONS]: "sftpColumnPermissions",
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
     [KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS]: "sftpRemoteEditShowTransfers",
+    [KEY_COMMAND_PALETTE_BLUR]: "commandPaletteBlur",
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",

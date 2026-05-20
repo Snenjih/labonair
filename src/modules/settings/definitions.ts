@@ -54,6 +54,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Appearance ---
   {
+    id: "commandPaletteBlur",
+    label: "Command palette background blur",
+    description: "Blur strength (px) applied to the app behind the command palette overlay.",
+    category: "Appearance",
+    controlType: "NumberInput",
+  },
+  {
     id: "sidebarPosition",
     label: "Sidebar position",
     description: "Display the file explorer sidebar on the left or right side of the workspace.",

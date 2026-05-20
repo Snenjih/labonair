@@ -15,6 +15,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Badge } from "@/components/ui/badge";
 import { useCommandStore } from "./useCommandStore";
 import { useCommandRegistry } from "./useCommandRegistry";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { CommandAction, CommandContext, RegistryCallbacks } from "./types";
 
 type Props = {
@@ -44,6 +45,7 @@ export function CommandPalette({
   const close = useCommandStore((s) => s.close);
   const recentIds = useCommandStore((s) => s.recentIds);
   const pushRecent = useCommandStore((s) => s.pushRecent);
+  const blurAmount = usePreferencesStore((s) => s.commandPaletteBlur);
 
   const [pages, setPages] = useState<string[]>(["root"]);
   const [search, setSearch] = useState("");
@@ -149,7 +151,10 @@ export function CommandPalette({
   return (
     <DialogPrimitive.Root open={isOpen} onOpenChange={(v) => !v && handleClose()}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+        <DialogPrimitive.Overlay
+          className="fixed inset-0 z-[100] bg-black/40 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+          style={{ backdropFilter: blurAmount > 0 ? `blur(${blurAmount}px)` : undefined }}
+        />
         <DialogPrimitive.Content
           onKeyDown={handleKeyDown}
           aria-describedby={undefined}
