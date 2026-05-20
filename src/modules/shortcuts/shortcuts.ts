@@ -22,6 +22,7 @@ export type ShortcutId =
   | "ai.toggle"
   | "ai.askSelection"
   | "shortcuts.open"
+  | "command.palette"
   | "sidebar.toggle"
   | "view.zoomIn"
   | "view.zoomOut"
@@ -41,11 +42,20 @@ const isMod = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
 
 export const SHORTCUTS: Shortcut[] = [
   {
-    id: "shortcuts.open",
-    label: "Show keyboard shortcuts",
+    id: "command.palette",
+    label: "Open command palette",
     keys: ["⌘", "K"],
     group: "General",
-    match: (e) => isMod(e) && e.key.toLowerCase() === "k",
+    match: (e) =>
+      (isMod(e) && !e.shiftKey && e.key.toLowerCase() === "k") ||
+      (isMod(e) && e.shiftKey && e.key.toLowerCase() === "p"),
+  },
+  {
+    id: "shortcuts.open",
+    label: "Show keyboard shortcuts",
+    keys: ["⌘", "?"],
+    group: "General",
+    match: (e) => isMod(e) && e.key === "?",
   },
   {
     id: "tab.new",
