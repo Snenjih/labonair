@@ -556,12 +556,39 @@ export default function App() {
         if (activeTab?.kind === "workspace")
           closePane(activeId, activeTab.activePaneId);
       },
+      closeCurrentTab: () => handleClose(activeId),
       toggleAi: togglePanelAndFocus,
       askSelection: askFromSelection,
+      // Tab switcher
+      tabs: tabs.map((t) => ({ id: t.id, kind: t.kind, title: t.title })),
+      activeTabId: activeId,
+      switchTab: setActiveId,
+      // Snippets
+      injectIntoTerminal: (text) => {
+        if (!activePaneId) return;
+        terminalRefs.current.get(activePaneId)?.write(text);
+        terminalRefs.current.get(activePaneId)?.focus();
+      },
+      // AI sessions
+      newAiSession: () => {
+        useChatStore.getState().newSession();
+        togglePanelAndFocus();
+      },
+      clearAiChat: () => {
+        const { activeSessionId, deleteSession, newSession } = useChatStore.getState();
+        if (activeSessionId) deleteSession(activeSessionId);
+        newSession();
+      },
+      switchAiSession: (id) => {
+        useChatStore.getState().switchSession(id);
+        togglePanelAndFocus();
+      },
     }),
     [
       activeId,
       activeTab,
+      activePaneId,
+      tabs,
       newSshTab,
       newSftpTab,
       openNewTab,
@@ -569,6 +596,8 @@ export default function App() {
       openHomeTab,
       splitPane,
       closePane,
+      handleClose,
+      setActiveId,
       togglePanelAndFocus,
       askFromSelection,
     ],

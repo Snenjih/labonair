@@ -29,6 +29,7 @@ export function useSystemCommands(cb: RegistryCallbacks): CommandPage {
         id: "system.shortcuts",
         title: "Keyboard Shortcuts",
         section: "Application",
+        shortcut: ["⌘", "?"],
         icon: createElement(HugeiconsIcon, {
           icon: CheckListIcon,
           strokeWidth: 2,

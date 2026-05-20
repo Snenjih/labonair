@@ -21,6 +21,12 @@ export type CommandPage = {
   actions: CommandAction[];
 };
 
+export type TabEntry = {
+  id: number;
+  kind: string;
+  title: string;
+};
+
 export type RegistryCallbacks = {
   openSettings: (section?: string) => void;
   openShortcuts: () => void;
@@ -32,6 +38,17 @@ export type RegistryCallbacks = {
   splitRight: () => void;
   splitDown: () => void;
   closePane: () => void;
+  closeCurrentTab: () => void;
   toggleAi: () => void;
   askSelection: () => void;
+  // Tab switcher
+  tabs: TabEntry[];
+  activeTabId: number;
+  switchTab: (id: number) => void;
+  // Snippets
+  injectIntoTerminal: (text: string) => void;
+  // AI sessions
+  newAiSession: () => void;
+  clearAiChat: () => void;
+  switchAiSession: (id: string) => void;
 };

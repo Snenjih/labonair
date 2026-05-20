@@ -42,6 +42,8 @@ export function CommandPalette({
 }: Props) {
   const isOpen = useCommandStore((s) => s.isOpen);
   const close = useCommandStore((s) => s.close);
+  const recentIds = useCommandStore((s) => s.recentIds);
+  const pushRecent = useCommandStore((s) => s.pushRecent);
 
   const [pages, setPages] = useState<string[]>(["root"]);
   const [search, setSearch] = useState("");
@@ -114,13 +116,14 @@ export function CommandPalette({
         return;
       }
       if (action.perform) {
+        pushRecent(action.id);
         handleClose();
         requestAnimationFrame(() => {
           action.perform!();
         });
       }
     },
-    [navigateTo, handleClose],
+    [navigateTo, handleClose, pushRecent],
   );
 
   const breadcrumbLabel = useMemo(() => {
@@ -132,6 +135,14 @@ export function CommandPalette({
     () => groupBySection(currentPage?.actions ?? []),
     [currentPage],
   );
+
+  const recentActions = useMemo(() => {
+    if (search || activePage !== "root") return [];
+    const allRootActions = registry["root"]?.actions ?? [];
+    return recentIds
+      .map((id) => allRootActions.find((a) => a.id === id))
+      .filter((a): a is CommandAction => !!a);
+  }, [search, activePage, registry, recentIds]);
 
   if (!currentPage) return null;
 
@@ -200,6 +211,21 @@ export function CommandPalette({
                   <CommandPrimitive.Empty className="py-10 text-center text-[13px] text-muted-foreground">
                     No results found.
                   </CommandPrimitive.Empty>
+
+                  {recentActions.length > 0 && (
+                    <CommandPrimitive.Group
+                      heading="Recently Used"
+                      className="overflow-hidden **:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-[10px] **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-widest **:[[cmdk-group-heading]]:text-muted-foreground/70"
+                    >
+                      {recentActions.map((action) => (
+                        <PaletteItem
+                          key={`recent-${action.id}`}
+                          action={action}
+                          onExecute={executeAction}
+                        />
+                      ))}
+                    </CommandPrimitive.Group>
+                  )}
 
                   {groupedActions.map(([section, sectionActions]) => (
                     <CommandPrimitive.Group
