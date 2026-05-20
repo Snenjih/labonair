@@ -20,8 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
-  Cancel01Icon,
+  ArrowLeft01Icon,
   ComputerIcon,
   Delete02Icon,
   Logout01Icon,
@@ -79,6 +80,29 @@ const EXEC_MODES: Array<{ value: SnippetExecMode; icon: typeof Logout01Icon; lab
   { value: "silent", icon: SlidersHorizontalIcon, label: "Silent", description: "Runs in background, output visible in log drawer." },
   { value: "inject", icon: ComputerIcon, label: "Inject", description: "Pastes command into the active terminal without running." },
 ];
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <span className="font-mono text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/50">
+        {children}
+      </span>
+      <div className="flex-1 border-t border-border/30" />
+    </div>
+  );
+}
+
+function FieldRow({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+  return (
+    <div className="space-y-1">
+      <Label className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
+        {label}
+      </Label>
+      {children}
+      {hint && <p className="text-[10px] leading-relaxed text-muted-foreground/50">{hint}</p>}
+    </div>
+  );
+}
 
 export function SnippetFormPanel({ snippetId, onClose }: Props) {
   const snippets = useCommandSnippetsStore((s) => s.snippets);
@@ -138,208 +162,224 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
   const activeExecMode = EXEC_MODES.find((m) => m.value === form.defaultExecMode);
 
   return (
-    <div className="flex h-full flex-col border-l border-border/60 bg-card">
-      {/* Header */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-semibold text-foreground">
-            {isNew ? "New Snippet" : (existing?.name ?? "Edit Snippet")}
-          </p>
-          {isNew && <p className="text-[11px] text-muted-foreground">New snippet</p>}
-        </div>
+    <div className="flex h-full flex-col bg-background">
+      {/* Header — matches sidebar toolbar chrome exactly */}
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border/30 px-2">
         <button
           onClick={onClose}
-          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
         >
-          <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
+          <HugeiconsIcon icon={ArrowLeft01Icon} size={13} strokeWidth={2} />
         </button>
+        <span className="min-w-0 flex-1 truncate font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+          {isNew ? "New Snippet" : "Edit Snippet"}
+        </span>
       </div>
 
-      {/* Scrollable content */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {/* General section */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">General</p>
+      {/* Scrollable form body */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="space-y-5 px-3 py-3">
 
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Name *</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => set("name", e.target.value)}
-              placeholder="e.g. Deploy to production"
-              className="h-8 bg-background text-sm"
-            />
-          </div>
+          {/* ── General ── */}
+          <div>
+            <SectionLabel>General</SectionLabel>
+            <div className="space-y-2.5">
+              <FieldRow label="Name *">
+                <Input
+                  value={form.name}
+                  onChange={(e) => set("name", e.target.value)}
+                  placeholder="e.g. Deploy to production"
+                  className="h-7 border-border/50 bg-background/60 text-[12px] placeholder:text-muted-foreground/30 focus-visible:ring-1"
+                />
+              </FieldRow>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Description</Label>
-            <Input
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
-              placeholder="Optional description"
-              className="h-8 bg-background text-sm"
-            />
-          </div>
+              <FieldRow label="Description">
+                <Input
+                  value={form.description}
+                  onChange={(e) => set("description", e.target.value)}
+                  placeholder="Optional short description"
+                  className="h-7 border-border/50 bg-background/60 text-[12px] placeholder:text-muted-foreground/30 focus-visible:ring-1"
+                />
+              </FieldRow>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Group</Label>
-            <Select
-              value={form.groupId || "none"}
-              onValueChange={(v) => set("groupId", v === "none" ? "" : v)}
-            >
-              <SelectTrigger className="h-8 bg-background text-sm">
-                <SelectValue placeholder="No group" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No group</SelectItem>
-                {groups.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>
-                    {g.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </section>
-
-        {/* Command section */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Command</p>
-          <Textarea
-            value={form.command}
-            onChange={(e) => set("command", e.target.value)}
-            placeholder="Enter command or script..."
-            className="min-h-[120px] bg-background font-mono text-xs"
-            spellCheck={false}
-          />
-        </section>
-
-        {/* Execution section */}
-        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Execution</p>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Target</Label>
-            <div className="flex gap-1.5">
-              {(["local", "ssh"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => set("target", t)}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md border py-1.5 text-xs font-medium transition-all ${
-                    form.target === t
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-background text-muted-foreground hover:bg-accent"
-                  }`}
+              <FieldRow label="Group">
+                <Select
+                  value={form.groupId || "none"}
+                  onValueChange={(v) => set("groupId", v === "none" ? "" : v)}
                 >
-                  <HugeiconsIcon
-                    icon={t === "local" ? ComputerIcon : ServerStack01Icon}
-                    size={12}
-                    strokeWidth={1.5}
-                  />
-                  {t === "local" ? "Local" : "SSH"}
-                </button>
-              ))}
+                  <SelectTrigger className="h-7 border-border/50 bg-background/60 text-[12px] focus:ring-1">
+                    <SelectValue placeholder="No group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No group</SelectItem>
+                    {groups.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FieldRow>
             </div>
           </div>
 
-          {form.target === "ssh" && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Host</Label>
-              <Select
-                value={form.hostId || "ask"}
-                onValueChange={(v) => set("hostId", v === "ask" ? "" : v)}
-              >
-                <SelectTrigger className="h-8 bg-background text-sm">
-                  <SelectValue placeholder="Ask at runtime" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ask">Ask at runtime</SelectItem>
-                  {hosts.map((h) => (
-                    <SelectItem key={h.id} value={h.id}>
-                      {h.name} ({h.host_address})
-                    </SelectItem>
+          {/* ── Command ── */}
+          <div>
+            <SectionLabel>Command</SectionLabel>
+            <Textarea
+              value={form.command}
+              onChange={(e) => set("command", e.target.value)}
+              placeholder="Enter command or script…"
+              className="min-h-[100px] resize-y border-border/50 bg-background/60 font-mono text-[11px] leading-relaxed placeholder:text-muted-foreground/30 focus-visible:ring-1"
+              spellCheck={false}
+            />
+          </div>
+
+          {/* ── Execution ── */}
+          <div>
+            <SectionLabel>Execution</SectionLabel>
+            <div className="space-y-2.5">
+
+              {/* Target toggle */}
+              <FieldRow label="Target">
+                <div className="flex gap-1">
+                  {(["local", "ssh"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => set("target", t)}
+                      className={cn(
+                        "flex flex-1 items-center justify-center gap-1.5 rounded border py-1.5 text-[11px] font-medium transition-all",
+                        form.target === t
+                          ? "border-primary/60 bg-primary/10 text-primary"
+                          : "border-border/40 bg-background/60 text-muted-foreground/60 hover:border-border/70 hover:text-foreground"
+                      )}
+                    >
+                      <HugeiconsIcon
+                        icon={t === "local" ? ComputerIcon : ServerStack01Icon}
+                        size={11}
+                        strokeWidth={1.5}
+                      />
+                      {t === "local" ? "Local" : "SSH"}
+                    </button>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+                </div>
+              </FieldRow>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Default execution mode</Label>
-            <Select
-              value={form.defaultExecMode}
-              onValueChange={(v) => set("defaultExecMode", v as SnippetExecMode)}
-            >
-              <SelectTrigger className="h-8 bg-background text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EXEC_MODES.map(({ value, label }) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {activeExecMode && (
-              <p className="text-[10px] text-muted-foreground">{activeExecMode.description}</p>
-            )}
+              {form.target === "ssh" && (
+                <FieldRow label="Host">
+                  <Select
+                    value={form.hostId || "ask"}
+                    onValueChange={(v) => set("hostId", v === "ask" ? "" : v)}
+                  >
+                    <SelectTrigger className="h-7 border-border/50 bg-background/60 text-[12px] focus:ring-1">
+                      <SelectValue placeholder="Ask at runtime" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ask">Ask at runtime</SelectItem>
+                      {hosts.map((h) => (
+                        <SelectItem key={h.id} value={h.id}>
+                          {h.name} ({h.host_address})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FieldRow>
+              )}
+
+              {/* Exec mode — 3-way button group */}
+              <FieldRow
+                label="Default Mode"
+                hint={activeExecMode?.description}
+              >
+                <div className="flex gap-1">
+                  {EXEC_MODES.map(({ value, icon, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => set("defaultExecMode", value)}
+                      className={cn(
+                        "flex flex-1 flex-col items-center gap-1 rounded border px-1 py-1.5 transition-all",
+                        form.defaultExecMode === value
+                          ? "border-primary/60 bg-primary/10 text-primary"
+                          : "border-border/40 bg-background/60 text-muted-foreground/50 hover:border-border/70 hover:text-foreground"
+                      )}
+                    >
+                      <HugeiconsIcon icon={icon} size={12} strokeWidth={1.5} />
+                      <span className="font-mono text-[9px] font-semibold uppercase tracking-wider">
+                        {label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </FieldRow>
+
+              {form.target === "local" && (
+                <FieldRow label="Working Dir">
+                  <Input
+                    value={form.workingDir}
+                    onChange={(e) => set("workingDir", e.target.value)}
+                    placeholder="Inherit from terminal"
+                    className="h-7 border-border/50 bg-background/60 font-mono text-[11px] placeholder:text-muted-foreground/30 focus-visible:ring-1"
+                  />
+                </FieldRow>
+              )}
+            </div>
           </div>
 
-          {form.target === "local" && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Working Directory</Label>
-              <Input
-                value={form.workingDir}
-                onChange={(e) => set("workingDir", e.target.value)}
-                placeholder="Default: inherit from terminal"
-                className="h-8 bg-background font-mono text-xs"
-              />
+          {/* Delete zone (edit only) */}
+          {!isNew && (
+            <div className="border-t border-border/30 pt-3">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-center gap-1.5 rounded border border-destructive/25 py-1.5 text-[11px] text-destructive/70 transition-colors hover:border-destructive/50 hover:bg-destructive/8 hover:text-destructive"
+                  >
+                    <HugeiconsIcon icon={Delete02Icon} size={11} strokeWidth={1.5} />
+                    Delete snippet
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete snippet?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      "{existing?.name}" will be permanently deleted.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           )}
-        </section>
-
-        {/* Delete (edit mode) */}
-        {!isNew && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm" className="w-full h-8 text-xs">
-                <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={1.5} className="mr-1.5" />
-                Delete Snippet
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete snippet?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  "{existing?.name}" will be permanently deleted.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
+        </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-4 py-3">
-        <Button variant="outline" size="sm" className="h-8" onClick={onClose}>
+      {/* Sticky footer */}
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border/30 px-3 py-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-[11px] text-muted-foreground hover:text-foreground"
+          onClick={onClose}
+        >
           Cancel
         </Button>
         <Button
           size="sm"
-          className="h-8"
+          className="h-7 text-[11px]"
           disabled={saving || !form.name.trim() || !form.command.trim()}
           onClick={handleSave}
         >
-          {saving ? "Saving…" : isNew ? "Create" : "Save"}
+          {saving ? "Saving…" : isNew ? "Create" : "Save changes"}
         </Button>
       </div>
     </div>
