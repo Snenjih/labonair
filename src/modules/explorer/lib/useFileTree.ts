@@ -31,8 +31,16 @@ type Options = {
 };
 
 export function useFileTree(rootPath: string | null, options?: Options) {
-  const { nodes, expanded, setRootPath, setNode, toggleExpanded, addExpanded } =
-    useLocalExplorerStore();
+  const {
+    nodes,
+    expanded,
+    showHidden,
+    setRootPath,
+    setNode,
+    toggleExpanded,
+    addExpanded,
+    toggleShowHidden,
+  } = useLocalExplorerStore();
 
   // Ephemeral UI states — don't need to survive sidebar hide/show.
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
@@ -40,9 +48,13 @@ export function useFileTree(rootPath: string | null, options?: Options) {
 
   const fetchChildren = useCallback(
     async (path: string) => {
+      const show_hidden = useLocalExplorerStore.getState().showHidden;
       setNode(path, { status: "loading" });
       try {
-        const entries = await invoke<DirEntry[]>("fs_read_dir", { path });
+        const entries = await invoke<DirEntry[]>("fs_read_dir", {
+          path,
+          show_hidden,
+        });
         setNode(path, { status: "loaded", entries });
       } catch (e) {
         setNode(path, { status: "error", message: String(e) });
@@ -188,6 +200,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   return {
     nodes,
     expanded,
+    showHidden,
+    toggleShowHidden,
     pendingCreate,
     renaming,
     toggle,

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Cancel01Icon,
+  EyeIcon,
   FileAddIcon,
   Folder01Icon,
   FolderAddIcon,
@@ -106,6 +107,7 @@ export function FileExplorer({
           root: rootPath,
           query: q,
           limit: 200,
+          show_hidden: tree.showHidden,
         });
         if (alive) setResults(hits);
       } catch (e) {
@@ -270,6 +272,18 @@ export function FileExplorer({
           title="Refresh"
         >
           <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`size-6 hover:text-foreground ${tree.showHidden ? "text-foreground" : "text-muted-foreground"}`}
+          onClick={() => {
+            tree.toggleShowHidden();
+            tree.refresh(rootPath);
+          }}
+          title={tree.showHidden ? "Hide hidden files" : "Show hidden files"}
+        >
+          <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={2} />
         </Button>
       </div>
 
