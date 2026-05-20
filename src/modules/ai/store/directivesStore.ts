@@ -5,7 +5,7 @@ import {
   newDirectiveId,
   saveDirectives,
   type Directive,
-} from "../lib/snippets";
+} from "../lib/directives";
 
 const CHANGED_EVENT = "nexum://ai-directives-changed";
 

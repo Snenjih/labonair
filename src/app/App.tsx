@@ -17,7 +17,7 @@ import {
 import { AiInputBarConnect } from "@/modules/ai/components/AiInputBar";
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { useAgentsStore } from "@/modules/ai/store/agentsStore";
-import { useDirectivesStore } from "@/modules/ai/store/snippetsStore";
+import { useDirectivesStore } from "@/modules/ai/store/directivesStore";
 import {
   AiDiffStack,
   EditorStack,

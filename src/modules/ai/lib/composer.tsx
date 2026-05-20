@@ -7,10 +7,10 @@ import {
   useState,
 } from "react";
 import { useWhisperRecording } from "../hooks/useWhisperRecording";
-import { expandDirectiveTokens, type Directive } from "../lib/snippets";
+import { expandDirectiveTokens, type Directive } from "../lib/directives";
 import { tryRunSlashCommand, type SlashCommandMeta } from "./slashCommands";
 import { getOrCreateChat, useChatStore } from "../store/chatStore";
-import { useDirectivesStore } from "../store/snippetsStore";
+import { useDirectivesStore } from "../store/directivesStore";
 
 export type FileAttachment = {
   id: string;

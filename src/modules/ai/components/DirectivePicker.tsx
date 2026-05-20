@@ -2,7 +2,7 @@ import { PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { SlashCommandMeta } from "../lib/slashCommands";
-import type { Directive } from "../lib/snippets";
+import type { Directive } from "../lib/directives";
 
 export type PickerItem =
   | { kind: "directive"; directive: Directive }

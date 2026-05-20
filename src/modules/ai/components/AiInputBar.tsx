@@ -14,10 +14,10 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { useComposer, type FileAttachment } from "../lib/composer";
 import { SLASH_COMMANDS } from "../lib/slashCommands";
-import type { Directive } from "../lib/snippets";
-import { useDirectivesStore } from "../store/snippetsStore";
+import type { Directive } from "../lib/directives";
+import { useDirectivesStore } from "../store/directivesStore";
 import { AgentSwitcher } from "./AgentSwitcher";
-import { DirectivePickerContent, type PickerItem } from "./SnippetPicker";
+import { DirectivePickerContent, type PickerItem } from "./DirectivePicker";
 
 type DirectiveTrigger = {
   start: number;

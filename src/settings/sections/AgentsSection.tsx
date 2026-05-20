@@ -19,12 +19,12 @@ import {
   isValidHandle,
   normalizeHandle,
   type Directive,
-} from "@/modules/ai/lib/snippets";
+} from "@/modules/ai/lib/directives";
 import { newAgentId, useAgentsStore } from "@/modules/ai/store/agentsStore";
 import {
   newDirectiveId,
   useDirectivesStore,
-} from "@/modules/ai/store/snippetsStore";
+} from "@/modules/ai/store/directivesStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setCustomInstructions } from "@/modules/settings/store";
 import {
