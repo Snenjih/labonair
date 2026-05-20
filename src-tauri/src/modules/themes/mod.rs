@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tauri::Manager;
 
 /// A single JSON theme file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,12 +34,8 @@ pub struct ThemeMeta {
 
 const DEFAULT_DARK_JSON: &str = include_str!("default-dark.json");
 
-fn themes_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let base = app
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?;
-    let dir = base.join("themes");
+fn themes_dir(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = crate::modules::fs::paths::config_dir().join("themes");
     if !dir.exists() {
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     }

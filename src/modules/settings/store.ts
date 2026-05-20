@@ -1,5 +1,6 @@
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
+import { getStoragePaths } from "@/lib/paths";
 import {
   DEFAULT_AUTOCOMPLETE_MODEL,
   DEFAULT_MODEL_ID,
@@ -99,7 +100,6 @@ export type Preferences = {
   checkForUpdates: boolean;
 };
 
-const STORE_PATH = "nexum-settings.json";
 const KEY_THEME = "theme";
 const KEY_DEFAULT_MODEL = "defaultModelId";
 const KEY_EDITOR_THEME = "editorTheme";
@@ -206,10 +206,18 @@ export const DEFAULT_PREFERENCES: Preferences = {
   checkForUpdates: true,
 };
 
-const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
+let _storePromise: Promise<LazyStore> | null = null;
+async function getStore(): Promise<LazyStore> {
+  if (!_storePromise) {
+    _storePromise = getStoragePaths().then(
+      (p) => new LazyStore(`${p.config}/nexum-settings.json`, { defaults: {}, autoSave: 200 }),
+    );
+  }
+  return _storePromise;
+}
 
 export async function loadPreferences(): Promise<Preferences> {
-  const entries = await store.entries();
+  const entries = await (await getStore()).entries();
   const map = new Map<string, unknown>(entries);
   const get = <T>(k: string): T | undefined => map.get(k) as T | undefined;
   return {
@@ -333,249 +341,249 @@ export async function loadPreferences(): Promise<Preferences> {
 }
 
 export async function setTheme(value: ThemePref): Promise<void> {
-  await store.set(KEY_THEME, value);
-  await store.save();
+  await (await getStore()).set(KEY_THEME, value);
+  await (await getStore()).save();
 }
 
 export async function setDefaultModel(value: ModelId): Promise<void> {
-  await store.set(KEY_DEFAULT_MODEL, value);
-  await store.save();
+  await (await getStore()).set(KEY_DEFAULT_MODEL, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorTheme(value: EditorThemeId): Promise<void> {
-  await store.set(KEY_EDITOR_THEME, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_THEME, value);
+  await (await getStore()).save();
 }
 
 export async function setCustomInstructions(value: string): Promise<void> {
-  await store.set(KEY_CUSTOM_INSTRUCTIONS, value);
-  await store.save();
+  await (await getStore()).set(KEY_CUSTOM_INSTRUCTIONS, value);
+  await (await getStore()).save();
 }
 
 export async function setAutostart(value: boolean): Promise<void> {
-  await store.set(KEY_AUTOSTART, value);
-  await store.save();
+  await (await getStore()).set(KEY_AUTOSTART, value);
+  await (await getStore()).save();
 }
 
 export async function setRestoreWindowState(value: boolean): Promise<void> {
-  await store.set(KEY_RESTORE_WINDOW, value);
-  await store.save();
+  await (await getStore()).set(KEY_RESTORE_WINDOW, value);
+  await (await getStore()).save();
 }
 
 export async function setAutocompleteEnabled(value: boolean): Promise<void> {
-  await store.set(KEY_AUTOCOMPLETE_ENABLED, value);
-  await store.save();
+  await (await getStore()).set(KEY_AUTOCOMPLETE_ENABLED, value);
+  await (await getStore()).save();
 }
 
 export async function setAutocompleteProvider(
   value: AutocompleteProviderId,
 ): Promise<void> {
-  await store.set(KEY_AUTOCOMPLETE_PROVIDER, value);
-  await store.save();
+  await (await getStore()).set(KEY_AUTOCOMPLETE_PROVIDER, value);
+  await (await getStore()).save();
 }
 
 export async function setAutocompleteModelId(value: string): Promise<void> {
-  await store.set(KEY_AUTOCOMPLETE_MODEL, value);
-  await store.save();
+  await (await getStore()).set(KEY_AUTOCOMPLETE_MODEL, value);
+  await (await getStore()).save();
 }
 
 export async function setLmstudioBaseURL(value: string): Promise<void> {
-  await store.set(KEY_LMSTUDIO_BASE_URL, value);
-  await store.save();
+  await (await getStore()).set(KEY_LMSTUDIO_BASE_URL, value);
+  await (await getStore()).save();
 }
 
 export async function setLmstudioChatModelId(value: string): Promise<void> {
-  await store.set(KEY_LMSTUDIO_CHAT_MODEL_ID, value);
-  await store.save();
+  await (await getStore()).set(KEY_LMSTUDIO_CHAT_MODEL_ID, value);
+  await (await getStore()).save();
 }
 
 export async function setOpenaiCompatibleBaseURL(value: string): Promise<void> {
-  await store.set(KEY_OPENAI_COMPATIBLE_BASE_URL, value);
-  await store.save();
+  await (await getStore()).set(KEY_OPENAI_COMPATIBLE_BASE_URL, value);
+  await (await getStore()).save();
 }
 
 export async function setOpenaiCompatibleModelId(value: string): Promise<void> {
-  await store.set(KEY_OPENAI_COMPATIBLE_MODEL_ID, value);
-  await store.save();
+  await (await getStore()).set(KEY_OPENAI_COMPATIBLE_MODEL_ID, value);
+  await (await getStore()).save();
 }
 
 export async function setVimMode(value: boolean): Promise<void> {
-  await store.set(KEY_VIM_MODE, value);
-  await store.save();
+  await (await getStore()).set(KEY_VIM_MODE, value);
+  await (await getStore()).save();
 }
 
 export async function setAppTheme(value: string): Promise<void> {
-  await store.set(KEY_APP_THEME, value);
-  await store.save();
+  await (await getStore()).set(KEY_APP_THEME, value);
+  await (await getStore()).save();
 }
 
 export async function setAppFontFamily(value: string): Promise<void> {
-  await store.set(KEY_APP_FONT_FAMILY, value);
-  await store.save();
+  await (await getStore()).set(KEY_APP_FONT_FAMILY, value);
+  await (await getStore()).save();
 }
 
 export async function setAppFontSize(value: number): Promise<void> {
-  await store.set(KEY_APP_FONT_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_APP_FONT_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setAppLineHeight(value: number): Promise<void> {
-  await store.set(KEY_APP_LINE_HEIGHT, value);
-  await store.save();
+  await (await getStore()).set(KEY_APP_LINE_HEIGHT, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalCursorBlink(value: boolean): Promise<void> {
-  await store.set(KEY_TERMINAL_CURSOR_BLINK, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_CURSOR_BLINK, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalCursorStyle(
   value: "block" | "underline" | "bar",
 ): Promise<void> {
-  await store.set(KEY_TERMINAL_CURSOR_STYLE, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_CURSOR_STYLE, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalFontFamily(value: string): Promise<void> {
-  await store.set(KEY_TERMINAL_FONT_FAMILY, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_FONT_FAMILY, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalFontSize(value: number): Promise<void> {
-  await store.set(KEY_TERMINAL_FONT_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_FONT_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalScrollback(value: number): Promise<void> {
-  await store.set(KEY_TERMINAL_SCROLLBACK, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_SCROLLBACK, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalLetterSpacing(value: number): Promise<void> {
-  await store.set(KEY_TERMINAL_LETTER_SPACING, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_LETTER_SPACING, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalLineHeight(value: number): Promise<void> {
-  await store.set(KEY_TERMINAL_LINE_HEIGHT, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_LINE_HEIGHT, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalFontWeight(
   value: "normal" | "medium" | "bold",
 ): Promise<void> {
-  await store.set(KEY_TERMINAL_FONT_WEIGHT, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_FONT_WEIGHT, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalShowPaneHeader(value: boolean): Promise<void> {
-  await store.set(KEY_TERMINAL_SHOW_PANE_HEADER, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_SHOW_PANE_HEADER, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalShowPaneFooter(value: boolean): Promise<void> {
-  await store.set(KEY_TERMINAL_SHOW_PANE_FOOTER, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_SHOW_PANE_FOOTER, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalUseWebGL(value: boolean): Promise<void> {
-  await store.set(KEY_TERMINAL_USE_WEBGL, value);
-  await store.save();
+  await (await getStore()).set(KEY_TERMINAL_USE_WEBGL, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorFontSize(value: number): Promise<void> {
-  await store.set(KEY_EDITOR_FONT_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_FONT_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorAutoSave(
   value: "off" | "afterDelay" | "onFocusChange",
 ): Promise<void> {
-  await store.set(KEY_EDITOR_AUTO_SAVE, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_AUTO_SAVE, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorLineNumbers(value: boolean): Promise<void> {
-  await store.set(KEY_EDITOR_LINE_NUMBERS, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_LINE_NUMBERS, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorWordWrap(value: boolean): Promise<void> {
-  await store.set(KEY_EDITOR_WORD_WRAP, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_WORD_WRAP, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorTabSize(value: 2 | 4 | 8): Promise<void> {
-  await store.set(KEY_EDITOR_TAB_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_TAB_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setEditorBracketMatching(value: boolean): Promise<void> {
-  await store.set(KEY_EDITOR_BRACKET_MATCHING, value);
-  await store.save();
+  await (await getStore()).set(KEY_EDITOR_BRACKET_MATCHING, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpFontSize(value: number): Promise<void> {
-  await store.set(KEY_SFTP_FONT_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_FONT_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpShowHiddenFiles(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_SHOW_HIDDEN, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_SHOW_HIDDEN, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpShowUpFolder(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_SHOW_UP_FOLDER, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_SHOW_UP_FOLDER, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpColumnSize(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_COLUMN_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_COLUMN_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpColumnModified(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_COLUMN_MODIFIED, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_COLUMN_MODIFIED, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpColumnPermissions(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_COLUMN_PERMISSIONS, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_COLUMN_PERMISSIONS, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpColumnType(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_COLUMN_TYPE, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_COLUMN_TYPE, value);
+  await (await getStore()).save();
 }
 
 export async function setSftpRemoteEditShowTransfers(value: boolean): Promise<void> {
-  await store.set(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS, value);
-  await store.save();
+  await (await getStore()).set(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS, value);
+  await (await getStore()).save();
 }
 
 export async function setSidebarPosition(
   value: "left" | "right",
 ): Promise<void> {
-  await store.set(KEY_SIDEBAR_POSITION, value);
-  await store.save();
+  await (await getStore()).set(KEY_SIDEBAR_POSITION, value);
+  await (await getStore()).save();
 }
 
 export async function setCredentialEncryption(value: boolean): Promise<void> {
-  await store.set(KEY_CREDENTIAL_ENCRYPTION, value);
-  await store.save();
+  await (await getStore()).set(KEY_CREDENTIAL_ENCRYPTION, value);
+  await (await getStore()).save();
 }
 
 export async function setCheckForUpdates(value: boolean): Promise<void> {
-  await store.set(KEY_CHECK_FOR_UPDATES, value);
-  await store.save();
+  await (await getStore()).set(KEY_CHECK_FOR_UPDATES, value);
+  await (await getStore()).save();
 }
 
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
-export function onPreferencesChange(
+export async function onPreferencesChange(
   cb: (key: PrefKey, value: unknown) => void,
 ): Promise<UnlistenFn> {
   const map: Record<string, PrefKey> = {
@@ -630,7 +638,7 @@ export function onPreferencesChange(
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
   };
-  return store.onChange<unknown>((key, value) => {
+  return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];
     if (mapped) cb(mapped, value);
   });

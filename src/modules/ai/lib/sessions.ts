@@ -1,5 +1,6 @@
 import type { UIMessage } from "@ai-sdk/react";
 import { LazyStore } from "@tauri-apps/plugin-store";
+import { getStoragePaths } from "@/lib/paths";
 
 export type SessionMeta = {
   id: string;
@@ -8,12 +9,19 @@ export type SessionMeta = {
   updatedAt: number;
 };
 
-const STORE_PATH = "nexum-sessions.json";
 const KEY_SESSIONS = "sessions";
 const KEY_ACTIVE = "activeId";
 const messagesKey = (id: string) => `messages:${id}`;
 
-const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
+let _storePromise: Promise<LazyStore> | null = null;
+async function getStore(): Promise<LazyStore> {
+  if (!_storePromise) {
+    _storePromise = getStoragePaths().then(
+      (p) => new LazyStore(`${p.data}/nexum-sessions.json`, { defaults: {}, autoSave: 200 }),
+    );
+  }
+  return _storePromise;
+}
 
 export type LoadedSessions = {
   sessions: SessionMeta[];
@@ -24,7 +32,7 @@ export async function loadAll(): Promise<LoadedSessions> {
   // One IPC roundtrip via entries() rather than two parallel get()s. Per-
   // session messages are loaded lazily via `loadMessages` only when a
   // session is opened, so cold boot stays at a single store call.
-  const entries = await store.entries();
+  const entries = await (await getStore()).entries();
   let sessions: SessionMeta[] | undefined;
   let activeId: string | null | undefined;
   for (const [k, v] of entries) {
@@ -35,26 +43,26 @@ export async function loadAll(): Promise<LoadedSessions> {
 }
 
 export async function loadMessages(id: string): Promise<UIMessage[] | null> {
-  return (await store.get<UIMessage[]>(messagesKey(id))) ?? null;
+  return (await (await getStore()).get<UIMessage[]>(messagesKey(id))) ?? null;
 }
 
 export async function saveSessionsList(sessions: SessionMeta[]): Promise<void> {
-  await store.set(KEY_SESSIONS, sessions);
+  await (await getStore()).set(KEY_SESSIONS, sessions);
 }
 
 export async function saveActiveId(id: string | null): Promise<void> {
-  await store.set(KEY_ACTIVE, id);
+  await (await getStore()).set(KEY_ACTIVE, id);
 }
 
 export async function saveMessages(
   id: string,
   messages: UIMessage[],
 ): Promise<void> {
-  await store.set(messagesKey(id), messages);
+  await (await getStore()).set(messagesKey(id), messages);
 }
 
 export async function deleteSessionData(id: string): Promise<void> {
-  await store.delete(messagesKey(id));
+  await (await getStore()).delete(messagesKey(id));
 }
 
 export function newSessionId(): string {
