@@ -67,8 +67,8 @@ export function StatusBar({
               className={cn(
                 "flex h-5 w-5 items-center justify-center rounded transition-colors",
                 activePanel === panel
-                  ? "text-foreground"
-                  : "text-muted-foreground/60 hover:text-muted-foreground"
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground/60 hover:bg-primary/10 hover:text-primary/80"
               )}
             >
               <HugeiconsIcon icon={icon} size={12} strokeWidth={1.75} />

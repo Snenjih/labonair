@@ -19,9 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Cancel01Icon,
   ComputerIcon,
@@ -76,6 +74,12 @@ function snippetToForm(s: CommandSnippet): FormState {
   };
 }
 
+const EXEC_MODES: Array<{ value: SnippetExecMode; icon: typeof Logout01Icon; label: string; description: string }> = [
+  { value: "terminal", icon: Logout01Icon, label: "Terminal", description: "Opens a new terminal tab and runs the command." },
+  { value: "silent", icon: SlidersHorizontalIcon, label: "Silent", description: "Runs in background, output visible in log drawer." },
+  { value: "inject", icon: ComputerIcon, label: "Inject", description: "Pastes command into the active terminal without running." },
+];
+
 export function SnippetFormPanel({ snippetId, onClose }: Props) {
   const snippets = useCommandSnippetsStore((s) => s.snippets);
   const groups = useCommandSnippetsStore((s) => s.groups);
@@ -87,9 +91,7 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
   const isNew = snippetId === null;
   const existing = snippetId ? snippets.find((s) => s.id === snippetId) : null;
 
-  const [form, setForm] = useState<FormState>(
-    existing ? snippetToForm(existing) : EMPTY_FORM
-  );
+  const [form, setForm] = useState<FormState>(existing ? snippetToForm(existing) : EMPTY_FORM);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -133,174 +135,176 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
     onClose();
   }
 
+  const activeExecMode = EXEC_MODES.find((m) => m.value === form.defaultExecMode);
+
   return (
     <div className="flex h-full flex-col border-l border-border/60 bg-card">
       {/* Header */}
-      <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border/60 px-3">
-        <span className="text-sm font-semibold">
-          {isNew ? "New Snippet" : "Edit Snippet"}
-        </span>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+      <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-foreground">
+            {isNew ? "New Snippet" : (existing?.name ?? "Edit Snippet")}
+          </p>
+          {isNew && <p className="text-[11px] text-muted-foreground">New snippet</p>}
+        </div>
+        <button
+          onClick={onClose}
+          className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
           <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={2} />
-        </Button>
+        </button>
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="general" className="flex min-h-0 flex-1 flex-col">
-        <TabsList className="mx-3 mt-2 w-auto justify-start">
-          <TabsTrigger value="general" className="text-xs">General</TabsTrigger>
-          <TabsTrigger value="execution" className="text-xs">Execution</TabsTrigger>
-        </TabsList>
+      {/* Scrollable content */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* General section */}
+        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">General</p>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* General Tab */}
-          <TabsContent value="general" className="m-0 space-y-3 px-3 py-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Name *</Label>
-              <Input
-                value={form.name}
-                onChange={(e) => set("name", e.target.value)}
-                placeholder="e.g. Deploy to production"
-                className="h-8 text-sm"
-              />
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Name *</Label>
+            <Input
+              value={form.name}
+              onChange={(e) => set("name", e.target.value)}
+              placeholder="e.g. Deploy to production"
+              className="h-8 bg-background text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Description</Label>
+            <Input
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+              placeholder="Optional description"
+              className="h-8 bg-background text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Group</Label>
+            <Select
+              value={form.groupId || "none"}
+              onValueChange={(v) => set("groupId", v === "none" ? "" : v)}
+            >
+              <SelectTrigger className="h-8 bg-background text-sm">
+                <SelectValue placeholder="No group" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No group</SelectItem>
+                {groups.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
+
+        {/* Command section */}
+        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Command</p>
+          <Textarea
+            value={form.command}
+            onChange={(e) => set("command", e.target.value)}
+            placeholder="Enter command or script..."
+            className="min-h-[120px] bg-background font-mono text-xs"
+            spellCheck={false}
+          />
+        </section>
+
+        {/* Execution section */}
+        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Execution</p>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Target</Label>
+            <div className="flex gap-1.5">
+              {(["local", "ssh"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => set("target", t)}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md border py-1.5 text-xs font-medium transition-all ${
+                    form.target === t
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  <HugeiconsIcon
+                    icon={t === "local" ? ComputerIcon : ServerStack01Icon}
+                    size={12}
+                    strokeWidth={1.5}
+                  />
+                  {t === "local" ? "Local" : "SSH"}
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs">Description</Label>
-              <Input
-                value={form.description}
-                onChange={(e) => set("description", e.target.value)}
-                placeholder="Optional description"
-                className="h-8 text-sm"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Command *</Label>
-              <Textarea
-                value={form.command}
-                onChange={(e) => set("command", e.target.value)}
-                placeholder="Enter command or script..."
-                className="min-h-[120px] font-mono text-xs"
-                spellCheck={false}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Group</Label>
+          {form.target === "ssh" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Host</Label>
               <Select
-                value={form.groupId || "none"}
-                onValueChange={(v) => set("groupId", v === "none" ? "" : v)}
+                value={form.hostId || "ask"}
+                onValueChange={(v) => set("hostId", v === "ask" ? "" : v)}
               >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="No group" />
+                <SelectTrigger className="h-8 bg-background text-sm">
+                  <SelectValue placeholder="Ask at runtime" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No group</SelectItem>
-                  {groups.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.name}
+                  <SelectItem value="ask">Ask at runtime</SelectItem>
+                  {hosts.map((h) => (
+                    <SelectItem key={h.id} value={h.id}>
+                      {h.name} ({h.host_address})
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </TabsContent>
+          )}
 
-          {/* Execution Tab */}
-          <TabsContent value="execution" className="m-0 space-y-4 px-3 py-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Target</Label>
-              <ToggleGroup
-                type="single"
-                value={form.target}
-                onValueChange={(v) => v && set("target", v as SnippetTarget)}
-                className="justify-start"
-              >
-                <ToggleGroupItem value="local" className="gap-1.5 text-xs">
-                  <HugeiconsIcon icon={ComputerIcon} size={12} strokeWidth={1.5} />
-                  Local
-                </ToggleGroupItem>
-                <ToggleGroupItem value="ssh" className="gap-1.5 text-xs">
-                  <HugeiconsIcon icon={ServerStack01Icon} size={12} strokeWidth={1.5} />
-                  SSH
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-
-            {form.target === "ssh" && (
-              <div className="space-y-1">
-                <Label className="text-xs">Host</Label>
-                <Select
-                  value={form.hostId || "ask"}
-                  onValueChange={(v) => set("hostId", v === "ask" ? "" : v)}
-                >
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="Ask at runtime" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ask">Ask at runtime</SelectItem>
-                    {hosts.map((h) => (
-                      <SelectItem key={h.id} value={h.id}>
-                        {h.name} ({h.host_address})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Default execution mode</Label>
+            <Select
+              value={form.defaultExecMode}
+              onValueChange={(v) => set("defaultExecMode", v as SnippetExecMode)}
+            >
+              <SelectTrigger className="h-8 bg-background text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EXEC_MODES.map(({ value, label }) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {activeExecMode && (
+              <p className="text-[10px] text-muted-foreground">{activeExecMode.description}</p>
             )}
+          </div>
 
+          {form.target === "local" && (
             <div className="space-y-1.5">
-              <Label className="text-xs">Default execution mode</Label>
-              <ToggleGroup
-                type="single"
-                value={form.defaultExecMode}
-                onValueChange={(v) => v && set("defaultExecMode", v as SnippetExecMode)}
-                className="justify-start"
-              >
-                <ToggleGroupItem value="terminal" className="gap-1.5 text-xs">
-                  <HugeiconsIcon icon={Logout01Icon} size={12} strokeWidth={1.5} />
-                  Terminal
-                </ToggleGroupItem>
-                <ToggleGroupItem value="silent" className="gap-1.5 text-xs">
-                  <HugeiconsIcon icon={SlidersHorizontalIcon} size={12} strokeWidth={1.5} />
-                  Silent
-                </ToggleGroupItem>
-                <ToggleGroupItem value="inject" className="gap-1.5 text-xs">
-                  <HugeiconsIcon icon={ComputerIcon} size={12} strokeWidth={1.5} />
-                  Inject
-                </ToggleGroupItem>
-              </ToggleGroup>
-              <p className="text-[10px] text-muted-foreground">
-                {form.defaultExecMode === "terminal" && "Opens a new terminal tab and runs the command."}
-                {form.defaultExecMode === "silent" && "Runs in background, output visible in log drawer."}
-                {form.defaultExecMode === "inject" && "Pastes command into the active terminal without running."}
-              </p>
+              <Label className="text-xs text-muted-foreground">Working Directory</Label>
+              <Input
+                value={form.workingDir}
+                onChange={(e) => set("workingDir", e.target.value)}
+                placeholder="Default: inherit from terminal"
+                className="h-8 bg-background font-mono text-xs"
+              />
             </div>
+          )}
+        </section>
 
-            {form.target === "local" && (
-              <div className="space-y-1">
-                <Label className="text-xs">Working Directory</Label>
-                <Input
-                  value={form.workingDir}
-                  onChange={(e) => set("workingDir", e.target.value)}
-                  placeholder="Default: inherit from terminal"
-                  className="h-8 font-mono text-xs"
-                />
-              </div>
-            )}
-          </TabsContent>
-        </div>
-      </Tabs>
-
-      {/* Footer */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border/60 px-3 py-2">
-        {!isNew ? (
+        {/* Delete (edit mode) */}
+        {!isNew && (
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive">
-                <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={1.5} className="mr-1" />
-                Delete
+              <Button variant="destructive" size="sm" className="w-full h-8 text-xs">
+                <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={1.5} className="mr-1.5" />
+                Delete Snippet
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -312,28 +316,31 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        ) : (
-          <div />
         )}
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="h-7" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            className="h-7"
-            disabled={saving || !form.name.trim() || !form.command.trim()}
-            onClick={handleSave}
-          >
-            {saving ? "Saving…" : isNew ? "Create" : "Save"}
-          </Button>
-        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-4 py-3">
+        <Button variant="outline" size="sm" className="h-8" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          className="h-8"
+          disabled={saving || !form.name.trim() || !form.command.trim()}
+          onClick={handleSave}
+        >
+          {saving ? "Saving…" : isNew ? "Create" : "Save"}
+        </Button>
       </div>
     </div>
   );
