@@ -387,6 +387,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor }: SftpPan
                     onSelect={handleLocalSelect}
                     onDoubleClick={handleLocalDoubleClick}
                     isLoading={tabState?.isLoadingLocal}
+                    onMarqueeSelect={(paths, additive) => {
+                      const base = additive ? new Set(tabState?.selectedLocalPaths) : new Set<string>();
+                      paths.forEach((p) => base.add(p));
+                      setSelectedLocal(tabId, base);
+                    }}
                     draggable
                     onDragStart={(paths) => startDrag("local", paths)}
                     dropDirection={activeDragSource === "remote" ? "download" : undefined}
@@ -505,6 +510,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor }: SftpPan
                       onSelect={handleRemoteSelect}
                       onDoubleClick={handleRemoteDoubleClick}
                       isLoading={tabState?.isLoadingRemote}
+                      onMarqueeSelect={(paths, additive) => {
+                        const base = additive ? new Set(tabState?.selectedRemotePaths) : new Set<string>();
+                        paths.forEach((p) => base.add(p));
+                        setSelectedRemote(tabId, base);
+                      }}
                       draggable
                       onDragStart={(paths) => startDrag("remote", paths)}
                       dropDirection={activeDragSource === "local" ? "upload" : undefined}

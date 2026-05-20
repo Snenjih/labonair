@@ -28,6 +28,8 @@ interface VirtualizedFileListProps {
   onSelect: (path: string, multiSelect: boolean) => void;
   onDoubleClick: (file: FileNode) => void;
   isLoading?: boolean;
+  /** Called when a marquee drag selects a set of files */
+  onMarqueeSelect?: (paths: string[], additive: boolean) => void;
   /** When set, rows are pointer-draggable; fires onDragStart with the dragged paths */
   draggable?: boolean;
   onDragStart?: (paths: string[]) => void;
@@ -42,12 +44,24 @@ interface VirtualizedFileListProps {
   onRenameCancel?: () => void;
 }
 
+interface MarqueeRect {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  containerTop: number;
+  containerLeft: number;
+  containerRight: number;
+  additive: boolean;
+}
+
 export function VirtualizedFileList({
   files,
   selectedPaths,
   onSelect,
   onDoubleClick,
   isLoading = false,
+  onMarqueeSelect,
   draggable,
   onDragStart,
   dropDirection,
@@ -60,6 +74,8 @@ export function VirtualizedFileList({
 }: VirtualizedFileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [colWidths, setColWidths] = useState<ColWidths>(DEFAULT_COL_WIDTHS);
+  const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<React.Key | null>(null);
 
   const showSize = usePreferencesStore((s) => s.sftpColumnSize);
   const showModified = usePreferencesStore((s) => s.sftpColumnModified);
@@ -100,6 +116,88 @@ export function VirtualizedFileList({
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
   }, [colWidths]);
+
+  // Marquee selection: track highlighted paths during drag for live feedback
+  const [marqueeHighlight, setMarqueeHighlight] = useState<Set<string>>(new Set());
+
+  function computeMarqueeHits(rect: MarqueeRect): string[] {
+    if (!parentRef.current) return [];
+    const scrollTop = parentRef.current.scrollTop;
+
+    const top = Math.min(rect.startY, rect.currentY) - rect.containerTop + scrollTop;
+    const bottom = Math.max(rect.startY, rect.currentY) - rect.containerTop + scrollTop;
+
+    return virtualizer.getVirtualItems()
+      .filter((vr) => {
+        const file = files[vr.index];
+        if (!file || file.name === "..") return false;
+        return vr.start < bottom && (vr.start + vr.size) > top;
+      })
+      .map((vr) => files[vr.index].path);
+  }
+
+  function handleScrollAreaPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    // Only start marquee on left-click on empty space (not on a file row)
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-file-path]")) return;
+    if (!onMarqueeSelect) return;
+
+    const container = parentRef.current;
+    if (!container) return;
+    const cr = container.getBoundingClientRect();
+
+    const rect: MarqueeRect = {
+      startX: e.clientX,
+      startY: e.clientY,
+      currentX: e.clientX,
+      currentY: e.clientY,
+      containerTop: cr.top,
+      containerLeft: cr.left,
+      containerRight: cr.right,
+      additive: e.shiftKey || e.metaKey || e.ctrlKey,
+    };
+    setMarquee(rect);
+    setMarqueeHighlight(new Set());
+
+    e.preventDefault();
+    let didDrag = false;
+
+    function onMove(ev: PointerEvent) {
+      const dist = Math.hypot(ev.clientX - rect.startX, ev.clientY - rect.startY);
+      if (dist > DRAG_THRESHOLD_PX) didDrag = true;
+      if (!didDrag) return;
+      setMarquee((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev, currentX: ev.clientX, currentY: ev.clientY };
+        const hits = computeMarqueeHits(next);
+        setMarqueeHighlight(new Set(hits));
+        return next;
+      });
+    }
+
+    function onUp() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      if (!didDrag) {
+        // Plain click on empty space — clear selection
+        if (!rect.additive) onMarqueeSelect?.([], false);
+        setMarquee(null);
+        setMarqueeHighlight(new Set());
+        return;
+      }
+      setMarquee((prev) => {
+        if (!prev) return null;
+        const hits = computeMarqueeHits({ ...prev });
+        onMarqueeSelect?.(hits, prev.additive);
+        setMarqueeHighlight(new Set());
+        return null;
+      });
+    }
+
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
 
   const visibleCols = { showSize, showModified, showPermissions, showType };
   const showOverlay = !!dropDirection;
@@ -184,8 +282,26 @@ export function VirtualizedFileList({
         )}
       </div>
 
+      {/* Marquee selection overlay (fixed over the list) */}
+      {marquee && (() => {
+        const top = Math.min(marquee.startY, marquee.currentY);
+        const left = marquee.containerLeft;
+        const width = marquee.containerRight - marquee.containerLeft;
+        const height = Math.abs(marquee.currentY - marquee.startY);
+        return (
+          <div
+            className="pointer-events-none fixed z-30 border border-primary/60 bg-primary/10"
+            style={{ top, left, width, height }}
+          />
+        );
+      })()}
+
       {/* Scrollable virtual list */}
-      <div ref={parentRef} className="flex-1 min-h-0 overflow-auto">
+      <div
+        ref={parentRef}
+        className="flex-1 min-h-0 overflow-auto"
+        onPointerDown={handleScrollAreaPointerDown}
+      >
         {isLoading ? (
           <div>
             {Array.from({ length: 10 }).map((_, i) => (
@@ -211,14 +327,17 @@ export function VirtualizedFileList({
           >
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const file = files[virtualRow.index];
-              const isSelected = selectedPaths.has(file.path);
+              const isSelected = selectedPaths.has(file.path) || marqueeHighlight.has(file.path);
               const isEven = virtualRow.index % 2 === 0;
 
               return (
                 <FileRow
                   key={virtualRow.key}
+                  rowKey={virtualRow.key}
                   file={file}
                   isSelected={isSelected}
+                  isHovered={hoveredKey === virtualRow.key}
+                  onHoverChange={(k) => setHoveredKey(k)}
                   isEven={isEven}
                   draggable={draggable && file.name !== ".."}
                   onDragStart={onDragStart ? (paths) => onDragStart(paths) : undefined}
@@ -282,8 +401,11 @@ function ResizableHeaderCell({ label, width, onResizeStart, align = "left" }: Re
 }
 
 interface FileRowProps {
+  rowKey: React.Key;
   file: FileNode;
   isSelected: boolean;
+  isHovered: boolean;
+  onHoverChange: (key: React.Key | null) => void;
   isEven: boolean;
   style: React.CSSProperties;
   onClick: (e: React.MouseEvent) => void;
@@ -301,8 +423,11 @@ interface FileRowProps {
 }
 
 function FileRow({
+  rowKey,
   file,
   isSelected,
+  isHovered,
+  onHoverChange,
   isEven,
   style,
   onClick,
@@ -361,15 +486,17 @@ function FileRow({
       style={style}
       data-file-path={file.path}
       className={cn(
-        "h-7 flex items-center px-2 gap-1 cursor-default select-none transition-colors duration-75 overflow-hidden",
-        isEven && !isSelected && "bg-muted/10",
+        "h-7 flex items-center px-2 gap-1 cursor-default select-none overflow-hidden",
+        isEven && !isSelected && !isHovered && "bg-muted/10",
         isSelected
           ? "bg-primary/20 ring-1 ring-inset ring-primary/40"
-          : "hover:bg-accent/20",
+          : isHovered && "bg-accent/20",
         draggable && !isUpEntry && "cursor-grab",
         isUpEntry && "opacity-60",
         !isUpEntry && !isSelected && file.name.startsWith(".") && "opacity-50",
       )}
+      onPointerEnter={() => onHoverChange(rowKey)}
+      onPointerLeave={() => onHoverChange(null)}
       onPointerDown={draggable && !isUpEntry ? handlePointerDown : undefined}
       onClick={isRenaming ? undefined : onClick}
       onDoubleClick={isRenaming ? undefined : onDoubleClick}
