@@ -1,5 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { Tab } from "@/modules/tabs";
 import {
@@ -54,8 +60,11 @@ function EmptyState({ onNew }: { onNew: () => void }) {
       animate={{ opacity: 1, y: 0 }}
       className="flex h-full flex-col items-center justify-center gap-4 text-center px-8"
     >
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-3xl">
-        🖥️
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" />
+          <path d="M8 21h8M12 17v4" />
+        </svg>
       </div>
       <div className="space-y-1">
         <h3 className="text-base font-semibold text-foreground">No hosts yet</h3>
@@ -193,6 +202,14 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
     return list;
   }, [localHosts, activeGroupId, search]);
 
+  const filteredCredentials = useMemo(() => {
+    if (!search.trim()) return credentials;
+    const q = search.toLowerCase();
+    return credentials.filter(
+      (c) => c.name.toLowerCase().includes(q) || c.cred_type.includes(q)
+    );
+  }, [credentials, search]);
+
   const quickConnectMatch = useMemo(() => {
     const q = search.trim();
     const m = q.match(/^([^@\s]+)@([^:\s]+)(?::(\d+))?$/);
@@ -248,25 +265,22 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         {/* Toolbar */}
         <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-          {/* Search — only shown in hosts view */}
-          {viewMode === "hosts" && (
-            <div className="relative flex-1">
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                width="13" height="13" viewBox="0 0 13 13" fill="none"
-              >
-                <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2" />
-                <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
-              <Input
-                className="h-9 pl-9 text-sm bg-muted border-0 focus-visible:ring-1"
-                placeholder="Find a host or ssh user@hostname…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          )}
-          {viewMode === "credentials" && <div className="flex-1" />}
+          {/* Universal search */}
+          <div className="relative flex-1">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              width="13" height="13" viewBox="0 0 13 13" fill="none"
+            >
+              <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            <Input
+              className="h-9 pl-9 text-sm bg-muted border-0 focus-visible:ring-1"
+              placeholder={viewMode === "hosts" ? "Find a host or ssh user@hostname…" : "Find a credential…"}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
 
           {/* View toggle */}
           <div className="flex rounded-md border border-input overflow-hidden shrink-0">
@@ -275,6 +289,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
                 key={v}
                 onClick={() => {
                   setViewMode(v);
+                  setSearch("");
                   if (v === "hosts") setSelectedCredential(null);
                   else setSelectedHost(null);
                 }}
@@ -290,29 +305,47 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
             ))}
           </div>
 
-          {/* Contextual New button */}
-          <Button
-            size="sm"
-            className="h-8 px-3 text-xs shrink-0"
-            onClick={() => {
-              if (viewMode === "hosts") setSelectedHost("__new__");
-              else setSelectedCredential("__new__");
-            }}
-          >
-            + New
-          </Button>
-
-          {/* Group button — hosts view only */}
-          {viewMode === "hosts" && (
+          {/* Split New button */}
+          <div className="flex shrink-0">
             <Button
               size="sm"
-              variant="outline"
-              className="h-8 px-3 text-xs shrink-0"
-              onClick={() => setAddingGroup(true)}
+              className="h-8 rounded-r-none border-r border-primary-foreground/20 text-xs px-3"
+              onClick={() => {
+                if (viewMode === "hosts") setSelectedHost("__new__");
+                else setSelectedCredential("__new__");
+              }}
             >
-              + Group
+              {viewMode === "hosts" ? "NEW HOST" : "NEW CREDENTIAL"}
             </Button>
-          )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="h-8 rounded-l-none px-2 text-xs">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => { setViewMode("hosts"); setSelectedHost("__new__"); }}>
+                  New Host
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setViewMode("credentials"); setSelectedCredential("__new__"); }}>
+                  New Credential
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Group button — always visible, disabled in credentials view */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 px-3 text-xs shrink-0"
+            disabled={viewMode === "credentials"}
+            onClick={() => setAddingGroup(true)}
+          >
+            + Group
+          </Button>
         </div>
 
         {/* Error banner */}
@@ -433,7 +466,13 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex h-full flex-col items-center justify-center gap-4 text-center px-8 py-16"
                 >
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-3xl">🔑</div>
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="7.5" cy="15.5" r="5.5"/>
+                      <path d="m21 2-9.6 9.6"/>
+                      <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                    </svg>
+                  </div>
                   <div className="space-y-1">
                     <h3 className="text-base font-semibold text-foreground">No credentials yet</h3>
                     <p className="text-sm text-muted-foreground max-w-xs">
@@ -444,9 +483,13 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
                     Add First Credential
                   </Button>
                 </motion.div>
+              ) : filteredCredentials.length === 0 ? (
+                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                  No credentials match your search
+                </div>
               ) : (
                 <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-                  {credentials.map((cred) => (
+                  {filteredCredentials.map((cred) => (
                     <CredentialListItem
                       key={cred.id}
                       credential={cred}

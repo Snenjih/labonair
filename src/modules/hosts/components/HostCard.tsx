@@ -192,8 +192,26 @@ export function HostCard({
                     </Badge>
                   )}
                 </div>
-                <span className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
-                  {host.auth_method === "credential" && credential ? `[🔑 ${credential.name}]` : host.auth_method === "key" ? "🔑" : "ssh"} • {host.username}@{host.host_address}
+                <span className="mt-0.5 flex items-center gap-1 font-mono text-[11px] text-muted-foreground min-w-0">
+                  {host.auth_method === "credential" && credential ? (
+                    <>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                        <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                      </svg>
+                      <span className="truncate">{credential.name}</span>
+                      <span className="shrink-0">•</span>
+                    </>
+                  ) : host.auth_method === "key" ? (
+                    <>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                        <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                      </svg>
+                      <span className="shrink-0">•</span>
+                    </>
+                  ) : (
+                    <span className="shrink-0">ssh •</span>
+                  )}
+                  <span className="truncate">{host.username}@{host.host_address}</span>
                 </span>
                 <span className="mt-1.5 text-[10px] text-muted-foreground/70">
                   {host.last_connected_at

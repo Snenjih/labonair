@@ -392,7 +392,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   <option value="">— Select a credential —</option>
                   {credentials.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.cred_type === "key" ? "🔑" : "🔒"} {c.name}
+                      {c.name} ({c.cred_type === "key" ? "SSH Key" : "Password"})
                     </option>
                   ))}
                 </select>

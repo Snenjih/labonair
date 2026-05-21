@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { useHostsStore } from "../store/hostsStore";
@@ -75,6 +76,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submittedOnce, setSubmittedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usedByHosts, setUsedByHosts] = useState<HostRef[]>([]);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -120,7 +122,10 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
   }, [isNew, cred, form, updateCredential]);
 
   const handleCreate = async () => {
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) {
+      setSubmittedOnce(true);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -207,6 +212,26 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        {/* Name */}
+        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Name</p>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Credential Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              placeholder="e.g. Production SSH Key"
+              value={form.name}
+              onChange={(e) => { setForm((d) => ({ ...d, name: e.target.value })); if (submittedOnce) setSubmittedOnce(false); }}
+              onBlur={handleBlur}
+              className={cn("h-8 text-sm bg-background", submittedOnce && !form.name.trim() && "border-destructive")}
+            />
+            {submittedOnce && !form.name.trim() && (
+              <p className="text-[11px] text-destructive">Name is required</p>
+            )}
+          </div>
+        </section>
+
         {/* Type */}
         <section className="rounded-lg border border-border bg-card p-4 space-y-3">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Credential Type</p>
