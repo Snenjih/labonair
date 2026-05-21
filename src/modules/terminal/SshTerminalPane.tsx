@@ -31,12 +31,12 @@ interface Props {
   sessionId: string;
   session: TerminalSessionData;
   isActive: boolean;
+  tabVisible?: boolean;
   onSearchReady?: (addon: SearchAddon) => void;
 }
 
 export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
   function SshTerminalPane({ sessionId, session, isActive, tabVisible = true, onSearchReady}, ref) {
-    tabVisible?: boolean;
     const [isConnected, setIsConnected] = useState(false);
     const [hasError, setHasError] = useState(false);
     const { resolvedTheme } = useTheme();
