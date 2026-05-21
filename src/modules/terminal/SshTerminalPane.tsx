@@ -251,6 +251,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     useLayoutEffect(() => {
       if (!isConnected) return;
+      // fit() runs on all panes (not just isActive) so that when tabVisible
+      // transitions true, every pane in the workspace is already correctly sized.
       fitRef.current?.fit();
       if (isActive && tabVisible) termRef.current?.focus();
     }, [isActive, isConnected, tabVisible]);
