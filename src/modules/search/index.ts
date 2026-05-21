@@ -1,1 +1,1 @@
-export { FindWidget, type FindWidgetHandle } from "./FindWidget";
+export { FindWidget } from "./FindWidget";

@@ -104,8 +104,12 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
 
     const registerHandle = useCallback(
       (paneId: string, handle: TerminalPaneHandle | null) => {
-        if (handle) handleRefs.current.set(paneId, handle);
-        else handleRefs.current.delete(paneId);
+        if (handle) {
+          handleRefs.current.set(paneId, handle);
+        } else {
+          handleRefs.current.delete(paneId);
+          addonMap.current.delete(paneId);
+        }
         onRegisterHandle(paneId, handle);
       },
       [onRegisterHandle],

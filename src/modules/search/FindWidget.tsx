@@ -19,23 +19,21 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { SearchAddon } from "@xterm/addon-search";
 import { AnimatePresence, motion } from "motion/react";
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-const TERM_DECORATIONS = {
-  matchBackground: "#515c6a",
-  activeMatchBackground: "#d18616",
-  matchOverviewRuler: "#d18616",
-  activeMatchColorOverviewRuler: "#d18616",
-};
+function getTermDecorations() {
+  const style = getComputedStyle(document.documentElement);
+  const muted = style.getPropertyValue("--muted-foreground").trim() || "#515c6a";
+  const primary = style.getPropertyValue("--primary").trim() || "#d18616";
+  return {
+    matchBackground: muted,
+    activeMatchBackground: primary,
+    matchOverviewRuler: primary,
+    activeMatchColorOverviewRuler: primary,
+  };
+}
 
-export type FindWidgetHandle = { open: () => void; close: () => void };
+const MAX_MATCH_COUNT = 999;
 
 type Props = {
   isOpen: boolean;
@@ -45,27 +43,22 @@ type Props = {
   showReplace?: boolean;
 };
 
-export const FindWidget = forwardRef<FindWidgetHandle, Props>(
-  function FindWidget({ isOpen, onClose, searchAddon, editorView, showReplace }, ref) {
+export function FindWidget({ isOpen, onClose, searchAddon, editorView, showReplace }: Props) {
     const [query, setQuery] = useState("");
     const [replaceText, setReplaceText] = useState("");
     const [caseSensitive, setCaseSensitive] = useState(false);
     const [wholeWord, setWholeWord] = useState(false);
     const [useRegex, setUseRegex] = useState(false);
     const [replaceOpen, setReplaceOpen] = useState(false);
+    // matchIndex for editor is approximate (CM6 has no built-in match-index event).
+    // It increments/decrements with goNext/goPrev but can desync on direct clicks.
     const [matchIndex, setMatchIndex] = useState(0);
     const [matchCount, setMatchCount] = useState(0);
+    const [matchCountCapped, setMatchCountCapped] = useState(false);
     const [regexError, setRegexError] = useState(false);
 
     const inputRef = useRef<HTMLInputElement>(null);
     const replaceRef = useRef<HTMLInputElement>(null);
-
-    useImperativeHandle(ref, () => ({
-      open: () => {
-        requestAnimationFrame(() => inputRef.current?.focus());
-      },
-      close: onClose,
-    }));
 
     // Focus input when widget opens
     useEffect(() => {
@@ -113,7 +106,7 @@ export const FindWidget = forwardRef<FindWidgetHandle, Props>(
           wholeWord: ww,
           regex: rx,
           incremental: true,
-          decorations: TERM_DECORATIONS,
+          decorations: getTermDecorations(),
         });
       },
       [searchAddon],
@@ -146,19 +139,22 @@ export const FindWidget = forwardRef<FindWidgetHandle, Props>(
         });
         if (q) {
           findNext(view);
-          // Count all matches via SearchQuery cursor
+          setMatchIndex(1); // approximate — CM6 doesn't expose current match index
           try {
             const sq = new SearchQuery({ search: q, caseSensitive: cs, wholeWord: ww, regexp: rx });
             const cursor = sq.getCursor(view.state.doc);
             let count = 0;
-            while (cursor.next()) count++;
+            while (cursor.next() && count < MAX_MATCH_COUNT) count++;
             setMatchCount(count);
+            setMatchCountCapped(count >= MAX_MATCH_COUNT);
           } catch {
             setMatchCount(0);
+            setMatchCountCapped(false);
           }
         } else {
           setMatchIndex(0);
           setMatchCount(0);
+          setMatchCountCapped(false);
         }
       },
       [editorView, replaceText],
@@ -198,7 +194,7 @@ export const FindWidget = forwardRef<FindWidgetHandle, Props>(
           caseSensitive,
           wholeWord,
           regex: useRegex,
-          decorations: TERM_DECORATIONS,
+          decorations: getTermDecorations(),
         });
       } else if (editorView) {
         findNext(editorView);
@@ -213,7 +209,7 @@ export const FindWidget = forwardRef<FindWidgetHandle, Props>(
           caseSensitive,
           wholeWord,
           regex: useRegex,
-          decorations: TERM_DECORATIONS,
+          decorations: getTermDecorations(),
         });
       } else if (editorView) {
         findPrevious(editorView);
@@ -274,7 +270,9 @@ export const FindWidget = forwardRef<FindWidgetHandle, Props>(
         ? query
           ? "0/0"
           : ""
-        : `${matchIndex}/${matchCount}`;
+        : matchCountCapped
+          ? `${matchIndex}/999+`
+          : `${matchIndex}/${matchCount}`;
 
     return (
       <AnimatePresence>
@@ -479,5 +477,4 @@ export const FindWidget = forwardRef<FindWidgetHandle, Props>(
         )}
       </AnimatePresence>
     );
-  },
-);
+}
