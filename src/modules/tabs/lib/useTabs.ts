@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTransferStore } from "@/modules/sftp/store/transferStore";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
+import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
 
 // ─── Pane tree ────────────────────────────────────────────────────────────────
 
@@ -30,6 +32,7 @@ export type TerminalSessionData = {
   hostId?: string;
   quickConnect?: QuickConnectParams;
   initialCommand?: string;
+  startupSnippet?: { command: string; mode: "execute" | "inject" } | null;
 };
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
@@ -205,6 +208,19 @@ export function useTabs() {
   const newSshTab = useCallback((hostId: string, title: string, cwd?: string, initialCommand?: string) => {
     const tabId = nextIdRef.current++;
     const sessionId = newSessionId();
+
+    const host = useHostsStore.getState().hosts.find((h) => h.id === hostId);
+    let startupSnippet: { command: string; mode: "execute" | "inject" } | null = null;
+    if (host?.startup_snippet_id) {
+      const snippet = useCommandSnippetsStore.getState().snippets.find((s) => s.id === host.startup_snippet_id);
+      if (snippet) {
+        startupSnippet = {
+          command: snippet.command,
+          mode: (host.startup_snippet_mode as "execute" | "inject") ?? "execute",
+        };
+      }
+    }
+
     const tab: WorkspaceTab = {
       id: tabId,
       kind: "workspace",
@@ -212,7 +228,7 @@ export function useTabs() {
       activePaneId: sessionId,
       layout: makeLeaf(sessionId),
       sessions: {
-        [sessionId]: { id: sessionId, kind: "ssh", title, hostId, cwd, initialCommand },
+        [sessionId]: { id: sessionId, kind: "ssh", title, hostId, cwd, initialCommand, startupSnippet },
       },
     };
     setTabs((t) => [...t, tab]);

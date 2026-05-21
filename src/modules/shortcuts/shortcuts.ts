@@ -130,7 +130,7 @@ export const SHORTCUTS: Shortcut[] = [
   },
   {
     id: "search.focus",
-    label: "Find in terminal",
+    label: "Find in current pane",
     keys: ["⌘", "F"],
     group: "Search",
     match: (e) => isMod(e) && e.key.toLowerCase() === "f",

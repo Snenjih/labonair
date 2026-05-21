@@ -4,6 +4,7 @@ import {
   SearchQuery,
   setSearchQuery,
 } from "@codemirror/search";
+import { FindWidget } from "@/modules/search";
 import { bracketMatching } from "@codemirror/language";
 import { lineNumbers } from "@codemirror/view";
 import { keymap, EditorView } from "@codemirror/view";
@@ -70,6 +71,8 @@ export type EditorPaneHandle = {
   reload: () => boolean;
   /** Save the current buffer (triggers save-as dialog for untitled files). */
   save: () => Promise<void>;
+  openFind: () => void;
+  closeFind: () => void;
 };
 
 type Props = {
@@ -109,6 +112,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     isMarkdownRef.current = isMarkdownFile;
     const [markdownPreviewOpen, setMarkdownPreviewOpen] = useState(false);
     const [previewContent, setPreviewContent] = useState("");
+    const [findOpen, setFindOpen] = useState(false);
     const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const onChange = useCallback((value: string) => {
@@ -381,6 +385,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           await saveRef.current();
           onSavedRef.current?.();
         },
+        openFind: () => setFindOpen(true),
+        closeFind: () => setFindOpen(false),
       }),
       [path],
     );
@@ -501,6 +507,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     return (
       <div className="flex h-full min-h-0 flex-col" onBlur={handleBlur}>
         {toolbar}
+        <FindWidget
+          isOpen={findOpen}
+          onClose={() => setFindOpen(false)}
+          editorView={cmRef.current?.view ?? null}
+          showReplace={true}
+        />
         {isMarkdownFile && markdownPreviewOpen ? (
           <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
             <ResizablePanel defaultSize={50} minSize={20}>

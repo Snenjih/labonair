@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets/types";
 
 export type CommandContext = "terminal" | "editor" | "sftp" | "home";
 
@@ -47,6 +48,8 @@ export type RegistryCallbacks = {
   switchTab: (id: number) => void;
   // Snippets
   injectIntoTerminal: (text: string) => void;
+  runSnippet: (snippet: CommandSnippet, modeOverride?: SnippetExecMode) => void;
+  openSnippetsPanel: () => void;
   // AI sessions
   newAiSession: () => void;
   clearAiChat: () => void;

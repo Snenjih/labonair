@@ -1,46 +1,66 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { CheckListIcon } from "@hugeicons/core-free-icons";
+import { CommandIcon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { createElement } from "react";
-import { useSnippetsStore } from "@/modules/ai/store/snippetsStore";
-import type { CommandAction, CommandPage } from "../types";
-import type { RegistryCallbacks } from "../types";
+import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
+import type { SnippetExecMode } from "@/modules/snippets/types";
+import type { CommandAction, CommandPage, RegistryCallbacks } from "../types";
+
+function execModeLabel(mode: SnippetExecMode): string {
+  switch (mode) {
+    case "terminal": return "Terminal";
+    case "silent":   return "Silent";
+    case "inject":   return "Inject";
+  }
+}
 
 export function useSnippetCommands(cb: RegistryCallbacks): {
   rootActions: CommandAction[];
   snippetsPage: CommandPage;
 } {
-  const snippets = useSnippetsStore((s) => s.snippets);
+  const snippets = useCommandSnippetsStore((s) => s.snippets);
+  const groups = useCommandSnippetsStore((s) => s.groups);
+
+  const groupNameMap = new Map(groups.map((g) => [g.id, g.name]));
 
   const snippetActions: CommandAction[] = snippets.map((s) => ({
     id: `snippet.${s.id}`,
     title: s.name,
-    subtitle: s.description || `#${s.handle}`,
-    section: "Snippets",
+    subtitle: s.description ?? s.command,
+    section: (s.groupId ? groupNameMap.get(s.groupId) : undefined) ?? "General",
     icon: createElement(HugeiconsIcon, {
-      icon: CheckListIcon,
+      icon: CommandIcon,
       strokeWidth: 2,
       className: "size-4",
     }),
-    perform: () => cb.injectIntoTerminal(s.content),
+    rightLabel: execModeLabel(s.defaultExecMode),
+    perform: () => cb.runSnippet(s),
   }));
 
-  const rootActions: CommandAction[] = snippets.length > 0
-    ? [
-        {
-          id: "snippets.open",
-          title: "Insert Snippet...",
-          subtitle: `${snippets.length} saved`,
-          section: "Tools",
-          contexts: ["terminal"],
-          icon: createElement(HugeiconsIcon, {
-            icon: CheckListIcon,
-            strokeWidth: 2,
-            className: "size-4",
-          }),
-          subPageId: "snippets",
-        },
-      ]
-    : [];
+  const rootActions: CommandAction[] = [
+    {
+      id: "snippets.open",
+      title: "Snippets...",
+      subtitle: snippets.length > 0 ? `${snippets.length} saved` : undefined,
+      section: "Tools",
+      icon: createElement(HugeiconsIcon, {
+        icon: CommandIcon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      subPageId: "snippets",
+    },
+    {
+      id: "snippets.manage",
+      title: "Manage Snippets",
+      section: "Tools",
+      icon: createElement(HugeiconsIcon, {
+        icon: Settings01Icon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      perform: () => cb.openSnippetsPanel(),
+    },
+  ];
 
   return {
     rootActions,

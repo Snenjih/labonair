@@ -27,6 +27,8 @@ export interface Host {
   keep_alive_tries?: number;
   sort_order: number;
   tunnels?: string;
+  startup_snippet_id?: string | null;
+  startup_snippet_mode?: "execute" | "inject" | null;
   credential_id?: string;
 }
 
@@ -96,6 +98,8 @@ export interface CreateHostPayload {
   keep_alive_tries?: number;
   sort_order?: number;
   tunnels?: string;
+  startup_snippet_id?: string | null;
+  startup_snippet_mode?: string;
   credential_id?: string;
 }
 

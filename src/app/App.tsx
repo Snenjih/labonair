@@ -17,7 +17,7 @@ import {
 import { AiInputBarConnect } from "@/modules/ai/components/AiInputBar";
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { useAgentsStore } from "@/modules/ai/store/agentsStore";
-import { useSnippetsStore } from "@/modules/ai/store/snippetsStore";
+import { useDirectivesStore } from "@/modules/ai/store/directivesStore";
 import {
   AiDiffStack,
   EditorStack,
@@ -33,11 +33,7 @@ import {
   type CommandSnippet,
   type SnippetExecMode,
 } from "@/modules/snippets";
-import {
-  Header,
-  type SearchInlineHandle,
-  type SearchTarget,
-} from "@/modules/header";
+import { Header } from "@/modules/header";
 import { PreviewStack, type PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow, type SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -62,14 +58,13 @@ import {
   type SftpTab,
   type WorkspaceTab,
 } from "@/modules/tabs";
-import { WorkspacePane, type TerminalPaneHandle } from "@/modules/terminal";
+import { WorkspacePane, type TerminalPaneHandle, type WorkspacePaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
 import { CommandPalette, useCommandStore, type RegistryCallbacks } from "@/modules/command-palette";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { listen } from "@tauri-apps/api/event";
-import type { SearchAddon } from "@xterm/addon-search";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
@@ -109,10 +104,7 @@ export default function App() {
     closePane,
   } = useTabs();
 
-  const searchAddons = useRef<Map<string, SearchAddon>>(new Map());
-  const [activeSearchAddon, setActiveSearchAddon] =
-    useState<SearchAddon | null>(null);
-  const searchInlineRef = useRef<SearchInlineHandle | null>(null);
+  const workspacePaneRefs = useRef<Map<number, WorkspacePaneHandle>>(new Map());
   // Keyed by session_id (pane UUID) for workspace tabs
   const terminalRefs = useRef<Map<string, TerminalPaneHandle>>(new Map());
   const editorRefs = useRef<Map<number, EditorPaneHandle>>(new Map());
@@ -204,7 +196,7 @@ export default function App() {
   useEffect(() => {
     void hydrateSessions();
     void useAgentsStore.getState().hydrate();
-    void useSnippetsStore.getState().hydrate();
+    void useDirectivesStore.getState().hydrate();
     void useCommandSnippetsStore.getState().hydrate();
   }, [hydrateSessions]);
 
@@ -252,10 +244,6 @@ export default function App() {
   );
 
   useEffect(() => {
-    const currentSearchAddon = activePaneId
-      ? (searchAddons.current.get(activePaneId) ?? null)
-      : null;
-    setActiveSearchAddon(currentSearchAddon);
     setActiveEditorHandle(editorRefs.current.get(activeId) ?? null);
     const url = activePaneId ? (detectedUrls.current.get(activePaneId) ?? null) : null;
     setActiveDetectedUrl(url);
@@ -277,14 +265,6 @@ export default function App() {
     return alreadyOpen ? null : activeDetectedUrl;
   }, [isWorkspaceTab, activeDetectedUrl, tabs]);
 
-  const handleSearchReady = useCallback(
-    (sessionId: string, addon: SearchAddon) => {
-      searchAddons.current.set(sessionId, addon);
-      if (sessionId === activePaneId) setActiveSearchAddon(addon);
-    },
-    [activePaneId],
-  );
-
   const disposeTab = useCallback(
     (id: number) => {
       // Clean up session refs for workspace tabs
@@ -292,9 +272,9 @@ export default function App() {
       if (tab?.kind === "workspace") {
         for (const sessionId of Object.keys(tab.sessions)) {
           terminalRefs.current.delete(sessionId);
-          searchAddons.current.delete(sessionId);
           detectedUrls.current.delete(sessionId);
         }
+        workspacePaneRefs.current.delete(id);
       }
       editorRefs.current.delete(id);
       previewRefs.current.delete(id);
@@ -574,6 +554,17 @@ export default function App() {
     }
   }, [activeTab, activePaneId]);
 
+  const [snippetLogDrawerOpen, setSnippetLogDrawerOpen] = useState(false);
+  const workspaceTabs = tabs.filter((t): t is WorkspaceTab => t.kind === "workspace");
+  const { execSnippet } = useSnippetExec({
+    tabs: workspaceTabs,
+    activeTerminalRef: () =>
+      activePaneId ? (terminalRefs.current.get(activePaneId) ?? null) : null,
+    onNewLocalTab: (cwd, command) => newTab(cwd ?? inheritedCwdForNewTab(), command),
+    onNewSshTab: (hostId, title, cwd, command) => newSshTab(hostId, title, cwd, command),
+    onOpenLogDrawer: () => setSnippetLogDrawerOpen(true),
+  });
+
   const paletteCallbacks = useMemo<RegistryCallbacks>(
     () => ({
       openSettings: (section) => void openSettingsWindow(section as SettingsTab | undefined),
@@ -606,6 +597,11 @@ export default function App() {
         terminalRefs.current.get(activePaneId)?.write(text);
         terminalRefs.current.get(activePaneId)?.focus();
       },
+      runSnippet: (snippet, mode) => void execSnippet(snippet, mode),
+      openSnippetsPanel: () => {
+        setActivePanel("snippets");
+        sidebarRef.current?.expand();
+      },
       // AI sessions
       newAiSession: () => {
         useChatStore.getState().newSession();
@@ -637,6 +633,8 @@ export default function App() {
       setActiveId,
       togglePanelAndFocus,
       askFromSelection,
+      execSnippet,
+      setActivePanel,
     ],
   );
 
@@ -659,7 +657,10 @@ export default function App() {
       "tab.next": () => cycleTab(1),
       "tab.prev": () => cycleTab(-1),
       "tab.selectByIndex": (e) => selectByIndex(parseInt(e.key, 10) - 1),
-      "search.focus": () => searchInlineRef.current?.focus(),
+      "search.focus": () => {
+        if (isWorkspaceTab) workspacePaneRefs.current.get(activeId)?.openFind();
+        else if (isEditorTab) activeEditorHandle?.openFind();
+      },
       "ai.toggle": togglePanelAndFocus,
       "ai.askSelection": askFromSelection,
       "shortcuts.open": () => setShortcutsOpen((v) => !v),
@@ -772,7 +773,10 @@ export default function App() {
     on("menu:split_pane_down",    () => {
       if (activeTab?.kind === "workspace") splitPane(activeId, "vertical");
     });
-    on("menu:find",               () => searchInlineRef.current?.focus());
+    on("menu:find", () => {
+      if (isWorkspaceTab) workspacePaneRefs.current.get(activeId)?.openFind();
+      else if (isEditorTab) activeEditorHandle?.openFind();
+    });
     on("menu:open_shortcuts",     () => setShortcutsOpen(true));
     on("menu:next_tab",           () => cycleTab(1));
     on("menu:prev_tab",           () => cycleTab(-1));
@@ -805,7 +809,10 @@ export default function App() {
     splitPane,
     cycleTab,
     askFromSelection,
-    searchInlineRef,
+    isWorkspaceTab,
+    isEditorTab,
+    activeId,
+    activeEditorHandle,
   ]);
 
   const registerEditorHandle = useCallback(
@@ -842,14 +849,6 @@ export default function App() {
     },
     [updateTab],
   );
-
-  const searchTarget = useMemo<SearchTarget>(() => {
-    if (isWorkspaceTab && activeSearchAddon)
-      return { kind: "terminal", addon: activeSearchAddon };
-    if (isEditorTab && activeEditorHandle)
-      return { kind: "editor", handle: activeEditorHandle };
-    return null;
-  }, [isWorkspaceTab, isEditorTab, activeSearchAddon, activeEditorHandle]);
 
   const activeCwd = useMemo<string | null>(() => {
     if (activeTab?.kind !== "workspace") return null;
@@ -920,19 +919,6 @@ export default function App() {
     [updatePaneSessionCwd],
   );
 
-  const [snippetLogDrawerOpen, setSnippetLogDrawerOpen] = useState(false);
-
-  const workspaceTabs = tabs.filter((t): t is WorkspaceTab => t.kind === "workspace");
-
-  const { execSnippet } = useSnippetExec({
-    tabs: workspaceTabs,
-    activeTerminalRef: () =>
-      activePaneId ? (terminalRefs.current.get(activePaneId) ?? null) : null,
-    onNewLocalTab: (cwd, command) => newTab(cwd ?? inheritedCwdForNewTab(), command),
-    onNewSshTab: (hostId, title, cwd, command) => newSshTab(hostId, title, cwd, command),
-    onOpenLogDrawer: () => setSnippetLogDrawerOpen(true),
-  });
-
   const handleSnippetRun = useCallback(
     (snippet: CommandSnippet, mode?: SnippetExecMode) => {
       void execSnippet(snippet, mode);
@@ -960,8 +946,6 @@ export default function App() {
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onOpenSettings={() => void openSettingsWindow()}
             onOpenHostManager={onOpenHostManager}
-            searchTarget={searchTarget}
-            searchRef={searchInlineRef}
           />
 
           <main className="flex min-h-0 flex-1 flex-col">
@@ -1017,7 +1001,12 @@ export default function App() {
                           aria-hidden={!isActive}
                         >
                           <WorkspacePane
+                            ref={(h) => {
+                              if (h) workspacePaneRefs.current.set(t.id, h);
+                              else workspacePaneRefs.current.delete(t.id);
+                            }}
                             tab={wt}
+                            tabVisible={isActive}
                             onSetActivePane={(paneId) =>
                               setActivePaneId(t.id, paneId)
                             }
@@ -1030,9 +1019,6 @@ export default function App() {
                               handleWorkspaceCwd(t.id, sessionId, cwd)
                             }
                             onClosePane={(paneId) => closePane(t.id, paneId)}
-                            onSearchReady={(sessionId, addon) =>
-                              handleSearchReady(sessionId, addon)
-                            }
                             onDetectedLocalUrl={(sessionId, url) =>
                               handleDetectedLocalUrl(sessionId, url)
                             }
