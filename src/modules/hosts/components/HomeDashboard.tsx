@@ -305,7 +305,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
           <div className="flex shrink-0">
             <Button
               size="sm"
-              className="h-8 rounded-r-none border-r border-primary-foreground/20 text-xs px-3"
+              className="h-8 rounded-l-2xl rounded-r-none border-r border-primary-foreground/20 text-xs px-3"
               onClick={() => {
                 if (viewMode === "hosts") setSelectedHost("__new__");
                 else setSelectedCredential("__new__");
@@ -315,7 +315,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" className="h-8 rounded-l-none px-2 text-xs">
+                <Button size="sm" className="h-8 rounded-l-none rounded-r-2xl px-2 text-xs">
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                     <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -336,7 +336,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
           <Button
             size="sm"
             variant="outline"
-            className="h-8 px-3 text-xs shrink-0"
+            className="h-8 px-3 text-xs shrink-0 rounded-2xl"
             disabled={viewMode === "credentials"}
             onClick={() => setAddingGroup(true)}
           >
