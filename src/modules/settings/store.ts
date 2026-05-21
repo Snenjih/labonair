@@ -73,6 +73,7 @@ export type Preferences = {
   terminalShowPaneHeader: boolean;
   terminalShowPaneFooter: boolean;
   terminalUseWebGL: boolean;
+  terminalBell: boolean;
 
   // --- Editor ---
   editorFontSize: number;
@@ -144,6 +145,7 @@ const KEY_TERMINAL_FONT_WEIGHT = "terminalFontWeight";
 const KEY_TERMINAL_SHOW_PANE_HEADER = "terminalShowPaneHeader";
 const KEY_TERMINAL_SHOW_PANE_FOOTER = "terminalShowPaneFooter";
 const KEY_TERMINAL_USE_WEBGL = "terminalUseWebGL";
+const KEY_TERMINAL_BELL = "terminalBell";
 
 const KEY_EDITOR_FONT_SIZE = "editorFontSize";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
@@ -207,6 +209,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalShowPaneHeader: false,
   terminalShowPaneFooter: false,
   terminalUseWebGL: true,
+  terminalBell: false,
 
   editorFontSize: 13,
   editorAutoSave: "off",
@@ -330,6 +333,8 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalUseWebGL:
       get<boolean>(KEY_TERMINAL_USE_WEBGL) ??
       DEFAULT_PREFERENCES.terminalUseWebGL,
+    terminalBell:
+      get<boolean>(KEY_TERMINAL_BELL) ?? DEFAULT_PREFERENCES.terminalBell,
 
     editorFontSize:
       get<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
@@ -553,6 +558,11 @@ export async function setTerminalUseWebGL(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setTerminalBell(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_BELL, value);
+  await (await getStore()).save();
+}
+
 export async function setEditorFontSize(value: number): Promise<void> {
   await (await getStore()).set(KEY_EDITOR_FONT_SIZE, value);
   await (await getStore()).save();
@@ -731,6 +741,7 @@ export async function onPreferencesChange(
     [KEY_TERMINAL_SHOW_PANE_HEADER]: "terminalShowPaneHeader",
     [KEY_TERMINAL_SHOW_PANE_FOOTER]: "terminalShowPaneFooter",
     [KEY_TERMINAL_USE_WEBGL]: "terminalUseWebGL",
+    [KEY_TERMINAL_BELL]: "terminalBell",
 
     [KEY_EDITOR_FONT_SIZE]: "editorFontSize",
     [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",

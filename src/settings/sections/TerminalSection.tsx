@@ -20,6 +20,7 @@ import {
   setTerminalShowPaneHeader,
   setTerminalShowPaneFooter,
   setTerminalUseWebGL,
+  setTerminalBell,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -36,6 +37,7 @@ export function TerminalSection() {
   const terminalShowPaneHeader = usePreferencesStore((s) => s.terminalShowPaneHeader);
   const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
   const terminalUseWebGL = usePreferencesStore((s) => s.terminalUseWebGL);
+  const terminalBell = usePreferencesStore((s) => s.terminalBell);
 
   return (
     <div className="flex flex-col gap-6">
@@ -182,6 +184,19 @@ export function TerminalSection() {
           <Switch
             checked={terminalUseWebGL}
             onCheckedChange={(v) => void setTerminalUseWebGL(v)}
+          />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Bell</Label>
+        <SettingRow
+          title="Terminal bell"
+          description="Play a sound when the terminal bell character (BEL) is received."
+        >
+          <Switch
+            checked={terminalBell}
+            onCheckedChange={(v) => void setTerminalBell(v)}
           />
         </SettingRow>
       </div>
