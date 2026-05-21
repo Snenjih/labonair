@@ -626,49 +626,49 @@ export async function setSftpRemoteEditShowTransfers(value: boolean): Promise<vo
 }
 
 export async function setCommandPaletteBlur(value: number): Promise<void> {
-  await store.set(KEY_COMMAND_PALETTE_BLUR, value);
-  await store.save();
+  await (await getStore()).set(KEY_COMMAND_PALETTE_BLUR, value);
+  await (await getStore()).save();
 }
 
 export async function setCommandPaletteOpacity(value: number): Promise<void> {
-  await store.set(KEY_COMMAND_PALETTE_OPACITY, value);
-  await store.save();
+  await (await getStore()).set(KEY_COMMAND_PALETTE_OPACITY, value);
+  await (await getStore()).save();
 }
 
 export async function setCommandPalettePosition(
   value: "top" | "center" | "high",
 ): Promise<void> {
-  await store.set(KEY_COMMAND_PALETTE_POSITION, value);
-  await store.save();
+  await (await getStore()).set(KEY_COMMAND_PALETTE_POSITION, value);
+  await (await getStore()).save();
 }
 
 export async function setCommandPaletteAnimation(
   value: "fast" | "normal" | "slow" | "none",
 ): Promise<void> {
-  await store.set(KEY_COMMAND_PALETTE_ANIMATION, value);
-  await store.save();
+  await (await getStore()).set(KEY_COMMAND_PALETTE_ANIMATION, value);
+  await (await getStore()).save();
 }
 
 export async function setCommandPaletteShowRecent(value: boolean): Promise<void> {
-  await store.set(KEY_COMMAND_PALETTE_SHOW_RECENT, value);
-  await store.save();
+  await (await getStore()).set(KEY_COMMAND_PALETTE_SHOW_RECENT, value);
+  await (await getStore()).save();
 }
 
 export async function setCommandPaletteHistorySize(value: number): Promise<void> {
-  await store.set(KEY_COMMAND_PALETTE_HISTORY_SIZE, value);
-  await store.save();
+  await (await getStore()).set(KEY_COMMAND_PALETTE_HISTORY_SIZE, value);
+  await (await getStore()).save();
 }
 
 export async function setCommandPaletteSearchMode(
   value: "contains" | "startsWith" | "fuzzy",
 ): Promise<void> {
-  await store.set(KEY_COMMAND_PALETTE_SEARCH_MODE, value);
-  await store.save();
+  await (await getStore()).set(KEY_COMMAND_PALETTE_SEARCH_MODE, value);
+  await (await getStore()).save();
 }
 
 export async function setCommandPaletteCloseOnOverlayClick(value: boolean): Promise<void> {
-  await store.set(KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY, value);
-  await store.save();
+  await (await getStore()).set(KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY, value);
+  await (await getStore()).save();
 }
 
 export async function setSidebarPosition(
@@ -689,8 +689,8 @@ export async function setCheckForUpdates(value: boolean): Promise<void> {
 }
 
 export async function setHostPingInterval(value: number): Promise<void> {
-  await store.set(KEY_HOST_PING_INTERVAL, value);
-  await store.save();
+  await (await getStore()).set(KEY_HOST_PING_INTERVAL, value);
+  await (await getStore()).save();
 }
 
 export type PrefKey = keyof Preferences;

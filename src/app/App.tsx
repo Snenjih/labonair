@@ -17,7 +17,7 @@ import {
 import { AiInputBarConnect } from "@/modules/ai/components/AiInputBar";
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { useAgentsStore } from "@/modules/ai/store/agentsStore";
-import { useSnippetsStore } from "@/modules/ai/store/snippetsStore";
+import { useDirectivesStore } from "@/modules/ai/store/directivesStore";
 import {
   AiDiffStack,
   EditorStack,
@@ -196,7 +196,7 @@ export default function App() {
   useEffect(() => {
     void hydrateSessions();
     void useAgentsStore.getState().hydrate();
-    void useSnippetsStore.getState().hydrate();
+    void useDirectivesStore.getState().hydrate();
     void useCommandSnippetsStore.getState().hydrate();
   }, [hydrateSessions]);
 
@@ -554,6 +554,17 @@ export default function App() {
     }
   }, [activeTab, activePaneId]);
 
+  const [snippetLogDrawerOpen, setSnippetLogDrawerOpen] = useState(false);
+  const workspaceTabs = tabs.filter((t): t is WorkspaceTab => t.kind === "workspace");
+  const { execSnippet } = useSnippetExec({
+    tabs: workspaceTabs,
+    activeTerminalRef: () =>
+      activePaneId ? (terminalRefs.current.get(activePaneId) ?? null) : null,
+    onNewLocalTab: (cwd, command) => newTab(cwd ?? inheritedCwdForNewTab(), command),
+    onNewSshTab: (hostId, title, cwd, command) => newSshTab(hostId, title, cwd, command),
+    onOpenLogDrawer: () => setSnippetLogDrawerOpen(true),
+  });
+
   const paletteCallbacks = useMemo<RegistryCallbacks>(
     () => ({
       openSettings: (section) => void openSettingsWindow(section as SettingsTab | undefined),
@@ -586,6 +597,11 @@ export default function App() {
         terminalRefs.current.get(activePaneId)?.write(text);
         terminalRefs.current.get(activePaneId)?.focus();
       },
+      runSnippet: (snippet, mode) => void execSnippet(snippet, mode),
+      openSnippetsPanel: () => {
+        setActivePanel("snippets");
+        sidebarRef.current?.expand();
+      },
       // AI sessions
       newAiSession: () => {
         useChatStore.getState().newSession();
@@ -617,6 +633,8 @@ export default function App() {
       setActiveId,
       togglePanelAndFocus,
       askFromSelection,
+      execSnippet,
+      setActivePanel,
     ],
   );
 
@@ -901,19 +919,6 @@ export default function App() {
     [updatePaneSessionCwd],
   );
 
-  const [snippetLogDrawerOpen, setSnippetLogDrawerOpen] = useState(false);
-
-  const workspaceTabs = tabs.filter((t): t is WorkspaceTab => t.kind === "workspace");
-
-  const { execSnippet } = useSnippetExec({
-    tabs: workspaceTabs,
-    activeTerminalRef: () =>
-      activePaneId ? (terminalRefs.current.get(activePaneId) ?? null) : null,
-    onNewLocalTab: (cwd, command) => newTab(cwd ?? inheritedCwdForNewTab(), command),
-    onNewSshTab: (hostId, title, cwd, command) => newSshTab(hostId, title, cwd, command),
-    onOpenLogDrawer: () => setSnippetLogDrawerOpen(true),
-  });
-
   const handleSnippetRun = useCallback(
     (snippet: CommandSnippet, mode?: SnippetExecMode) => {
       void execSnippet(snippet, mode);
@@ -1001,6 +1006,7 @@ export default function App() {
                               else workspacePaneRefs.current.delete(t.id);
                             }}
                             tab={wt}
+                            tabVisible={isActive}
                             onSetActivePane={(paneId) =>
                               setActivePaneId(t.id, paneId)
                             }

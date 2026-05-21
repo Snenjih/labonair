@@ -35,7 +35,8 @@ interface Props {
 }
 
 export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
-  function SshTerminalPane({ sessionId, session, isActive, onSearchReady }, ref) {
+  function SshTerminalPane({ sessionId, session, isActive, tabVisible = true, onSearchReady}, ref) {
+    tabVisible?: boolean;
     const [isConnected, setIsConnected] = useState(false);
     const [hasError, setHasError] = useState(false);
     const { resolvedTheme } = useTheme();
@@ -258,10 +259,12 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     }, [isConnected]);
 
     useLayoutEffect(() => {
-      if (!isActive || !isConnected) return;
+      if (!isConnected) return;
+      // fit() runs on all panes (not just isActive) so that when tabVisible
+      // transitions true, every pane in the workspace is already correctly sized.
       fitRef.current?.fit();
-      termRef.current?.focus();
-    }, [isActive, isConnected]);
+      if (isActive && tabVisible) termRef.current?.focus();
+    }, [isActive, isConnected, tabVisible]);
 
     if (!isConnected && !hasError) {
       const estCols = Math.max(80, Math.floor((window.innerWidth - 220) / 7.8));
