@@ -21,10 +21,27 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+function resolveThemeColor(cssVar: string, fallback: string): string {
+  try {
+    const raw = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+    if (!raw) return fallback;
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return fallback;
+    ctx.fillStyle = raw;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+  } catch {
+    return fallback;
+  }
+}
+
 function getTermDecorations() {
-  const style = getComputedStyle(document.documentElement);
-  const muted = style.getPropertyValue("--muted-foreground").trim() || "#515c6a";
-  const primary = style.getPropertyValue("--primary").trim() || "#d18616";
+  const muted = resolveThemeColor("--muted-foreground", "#515c6a");
+  const primary = resolveThemeColor("--primary", "#d18616");
   return {
     matchBackground: muted,
     activeMatchBackground: primary,
