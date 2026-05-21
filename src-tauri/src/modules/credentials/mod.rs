@@ -1,5 +1,5 @@
 use crate::modules::hosts::HostsDb;
-use crate::modules::secrets::{delete_password, get_password, store_password, SecretsState};
+use crate::modules::secrets::{delete_password, store_password, SecretsState};
 use base64::Engine as _;
 
 const CRED_SERVICE: &str = "nexum-cred";
