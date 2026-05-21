@@ -6,9 +6,11 @@ import type { SnippetExecMode } from "@/modules/snippets/types";
 import type { CommandAction, CommandPage, RegistryCallbacks } from "../types";
 
 function execModeLabel(mode: SnippetExecMode): string {
-  if (mode === "terminal") return "Terminal";
-  if (mode === "silent") return "Silent";
-  return "Inject";
+  switch (mode) {
+    case "terminal": return "Terminal";
+    case "silent":   return "Silent";
+    case "inject":   return "Inject";
+  }
 }
 
 export function useSnippetCommands(cb: RegistryCallbacks): {

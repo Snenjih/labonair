@@ -22,8 +22,29 @@ async function getStore(): Promise<LazyStore> {
   return _storePromise;
 }
 
+async function migrateFromSnippets(): Promise<Directive[]> {
+  try {
+    const p = await getStoragePaths();
+    const oldStore = new LazyStore(`${p.config}/nexum-snippets.json`, { defaults: {}, autoSave: false });
+    const old = await oldStore.get<Directive[]>("snippets");
+    return old ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function loadDirectives(): Promise<Directive[]> {
-  return (await (await getStore()).get<Directive[]>(KEY_LIST)) ?? [];
+  const store = await getStore();
+  const list = await store.get<Directive[]>(KEY_LIST);
+  if (!list) {
+    const migrated = await migrateFromSnippets();
+    if (migrated.length > 0) {
+      await saveDirectives(migrated);
+      return migrated;
+    }
+    return [];
+  }
+  return list;
 }
 
 export async function saveDirectives(list: Directive[]): Promise<void> {
