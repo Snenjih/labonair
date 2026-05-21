@@ -12,7 +12,7 @@ export interface Host {
   host_address: string;
   port: number;
   username: string;
-  auth_method: "password" | "key" | "none";
+  auth_method: "password" | "key" | "none" | "credential";
   private_key_path?: string;
   group_id?: string;
   tags?: string;
@@ -27,6 +27,47 @@ export interface Host {
   keep_alive_tries?: number;
   sort_order: number;
   tunnels?: string;
+  credential_id?: string;
+}
+
+export interface Credential {
+  id: string;
+  name: string;
+  cred_type: "password" | "key";
+  key_path?: string;
+  key_type?: string;
+  public_key?: string;
+  has_secret: boolean;
+  created_at: number;
+}
+
+export interface CreateCredentialPayload {
+  name: string;
+  credType: "password" | "key";
+  keyPath?: string;
+  keyType?: string;
+  publicKey?: string;
+  secret?: string;
+}
+
+export interface UpdateCredentialPayload {
+  id: string;
+  name?: string;
+  credType?: "password" | "key";
+  keyPath?: string;
+  keyType?: string;
+  publicKey?: string;
+  secret?: string;
+}
+
+export interface HostRef {
+  id: string;
+  name: string;
+}
+
+export interface GenerateKeypairResult {
+  key_path: string;
+  public_key: string;
 }
 
 export interface Group {
@@ -42,7 +83,7 @@ export interface CreateHostPayload {
   host_address: string;
   port: number;
   username: string;
-  auth_method: "password" | "key" | "none";
+  auth_method: "password" | "key" | "none" | "credential";
   private_key_path?: string;
   group_id?: string;
   tags?: string;
@@ -55,6 +96,7 @@ export interface CreateHostPayload {
   keep_alive_tries?: number;
   sort_order?: number;
   tunnels?: string;
+  credential_id?: string;
 }
 
 export interface UpdateHostPayload extends Partial<CreateHostPayload> {

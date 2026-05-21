@@ -130,6 +130,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       ...(payload.keep_alive_interval !== undefined && { keepAliveInterval: payload.keep_alive_interval }),
       ...(payload.keep_alive_tries !== undefined && { keepAliveTries: payload.keep_alive_tries }),
       ...(payload.sort_order !== undefined && { sortOrder: payload.sort_order }),
+      ...(payload.credential_id !== undefined && { credentialId: payload.credential_id }),
     });
     set((s) => ({ hosts: [...s.hosts, host] }));
     return host;
@@ -154,6 +155,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       ...(payload.keep_alive_interval !== undefined && { keepAliveInterval: payload.keep_alive_interval }),
       ...(payload.keep_alive_tries !== undefined && { keepAliveTries: payload.keep_alive_tries }),
       ...(payload.sort_order !== undefined && { sortOrder: payload.sort_order }),
+      ...(payload.credential_id !== undefined && { credentialId: payload.credential_id }),
     });
     set((s) => ({
       hosts: s.hosts.map((h) => (h.id === host.id ? host : h)),
@@ -200,6 +202,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       pin_to_top: false,
       keep_alive_interval: src.keep_alive_interval,
       keep_alive_tries: src.keep_alive_tries,
+      credential_id: src.credential_id,
     };
     return get().createHost(payload);
   },

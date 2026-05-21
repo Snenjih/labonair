@@ -38,12 +38,12 @@ pub async fn ssh_connect(
 ) -> Result<(), String> {
     // Step 1: Fetch host from SQLite (fast, sync — do before spawn_blocking)
     log_step!(app, session_id, "Reading host configuration…");
-    let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh) = {
+    let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh, credential_id) = {
         let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
             .prepare(
                 "SELECT host_address, port, username, auth_method, private_key_path, \
-                 keep_alive_interval, keep_alive_tries, default_path_ssh \
+                 keep_alive_interval, keep_alive_tries, default_path_ssh, credential_id \
                  FROM hosts WHERE id = ?1",
             )
             .map_err(|e| e.to_string())?;
@@ -57,21 +57,56 @@ pub async fn ssh_connect(
                 row.get::<_, Option<i64>>(5)?,
                 row.get::<_, Option<i64>>(6)?,
                 row.get::<_, Option<String>>(7)?,
+                row.get::<_, Option<String>>(8)?,
             ))
         })
         .map_err(|e| e.to_string())?
     };
 
+    // Step 1b: Resolve credential — if the host references a credential, override auth fields.
+    let (auth_method, private_key_path) = if let Some(cid) = &credential_id {
+        log_step!(app, session_id, "Resolving credential…");
+        let (cred_type, cred_key_path, cred_has_secret): (String, Option<String>, bool) = {
+            let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
+            conn.query_row(
+                "SELECT cred_type, key_path, has_secret FROM credentials WHERE id=?1",
+                rusqlite::params![cid],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2).map(|v| v != 0).unwrap_or(false))),
+            )
+            .map_err(|_| format!("Credential '{}' not found — it may have been deleted. Please update the host's auth settings.", cid))?
+        };
+        let _ = cred_has_secret; // used below for password fetch
+        (cred_type, cred_key_path)
+    } else {
+        (auth_method, private_key_path)
+    };
+
     // Step 2: Fetch password — use override if provided, else local store.
+    // When using a credential, fetch the credential's secret instead of the host's.
     let password: Option<String> = if auth_method == "password" {
         if password_override.is_some() {
             password_override.clone()
         } else {
             log_step!(app, session_id, "Retrieving credentials from local store…");
-            crate::modules::secrets::get_password(&app, &secrets, "nexum-app", &host_id).ok().flatten()
+            if let Some(cid) = &credential_id {
+                crate::modules::secrets::get_password(&app, &secrets, "nexum-cred", cid).ok().flatten()
+            } else {
+                crate::modules::secrets::get_password(&app, &secrets, "nexum-app", &host_id).ok().flatten()
+            }
         }
     } else {
         None
+    };
+
+    // For key auth via credential, the passphrase may be stored in the credential's secret.
+    let passphrase = if credential_id.is_some() && auth_method == "key" && passphrase.is_none() {
+        if let Some(cid) = &credential_id {
+            crate::modules::secrets::get_password(&app, &secrets, "nexum-cred", cid).ok().flatten()
+        } else {
+            passphrase
+        }
+    } else {
+        passphrase
     };
 
     // All blocking I/O (TCP, SSH, SFTP) runs on a dedicated thread so the

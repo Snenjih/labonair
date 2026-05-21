@@ -28,6 +28,7 @@ import {
 import { useState } from "react";
 import type { Group, Host } from "../types";
 import { useHostsStore } from "../store/hostsStore";
+import { useCredentialsStore } from "../store/credentialsStore";
 import type { Tab } from "@/modules/tabs";
 
 interface HostCardProps {
@@ -79,6 +80,7 @@ export function HostCard({
   const selectedHostIds = useHostsStore((s) => s.selectedHostIds);
   const hosts = useHostsStore((s) => s.hosts);
   const deleteHost = useHostsStore((s) => s.deleteHost);
+  const credential = useCredentialsStore((s) => s.credentials.find((c) => c.id === host.credential_id));
   const deleteManyHosts = useHostsStore((s) => s.deleteManyHosts);
   const duplicateHost = useHostsStore((s) => s.duplicateHost);
   const togglePin = useHostsStore((s) => s.togglePin);
@@ -191,7 +193,7 @@ export function HostCard({
                   )}
                 </div>
                 <span className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
-                  {host.auth_method === "key" ? "🔑" : "ssh"} • {host.username}@{host.host_address}
+                  {host.auth_method === "credential" && credential ? `[🔑 ${credential.name}]` : host.auth_method === "key" ? "🔑" : "ssh"} • {host.username}@{host.host_address}
                 </span>
                 <span className="mt-1.5 text-[10px] text-muted-foreground/70">
                   {host.last_connected_at
