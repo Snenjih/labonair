@@ -23,6 +23,7 @@ pub struct Host {
     pub tunnels: Option<String>,
     pub startup_snippet_id: Option<String>,
     pub startup_snippet_mode: Option<String>,
+    pub credential_id: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

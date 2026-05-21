@@ -75,6 +75,19 @@ pub fn initialize_db(
         "ALTER TABLE groups ADD COLUMN icon TEXT",
         "ALTER TABLE groups ADD COLUMN color TEXT",
         "ALTER TABLE groups ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0",
+        // credentials table
+        "CREATE TABLE IF NOT EXISTS credentials (\
+            id TEXT PRIMARY KEY,\
+            name TEXT NOT NULL,\
+            cred_type TEXT NOT NULL DEFAULT 'password',\
+            key_path TEXT,\
+            key_type TEXT,\
+            public_key TEXT,\
+            has_secret INTEGER NOT NULL DEFAULT 0,\
+            created_at INTEGER NOT NULL\
+        )",
+        // hosts: reference to a credential
+        "ALTER TABLE hosts ADD COLUMN credential_id TEXT REFERENCES credentials(id) ON DELETE SET NULL",
     ] {
         let _ = conn.execute_batch(sql);
     }
@@ -112,6 +125,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<Host> {
         tunnels: row.get(18)?,
         startup_snippet_id: row.get(19)?,
         startup_snippet_mode: row.get(20)?,
+        credential_id: row.get(21)?,
     })
 }
 
@@ -119,7 +133,7 @@ const SELECT_HOSTS: &str = "SELECT id, name, host_address, port, username, auth_
     private_key_path, group_id, tags, created_at, last_connected_at, \
     default_path_ssh, default_path_sftp, pin_to_top, sudo_password_set, \
     keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
-    startup_snippet_id, startup_snippet_mode FROM hosts";
+    startup_snippet_id, startup_snippet_mode, credential_id FROM hosts";
 
 #[tauri::command]
 pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, String> {
@@ -160,6 +174,7 @@ pub async fn hosts_create(
     tunnels: Option<String>,
     startup_snippet_id: Option<String>,
     startup_snippet_mode: Option<String>,
+    credential_id: Option<String>,
 ) -> Result<Host, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let created_at = now_millis();
@@ -174,14 +189,14 @@ pub async fn hosts_create(
             "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
              private_key_path, group_id, tags, created_at, default_path_ssh, default_path_sftp, \
              pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
-             startup_snippet_id, startup_snippet_mode) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
+             startup_snippet_id, startup_snippet_mode, credential_id) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)",
             rusqlite::params![
                 id, name, host_address, port, username, auth_method,
                 private_key_path, group_id, tags, created_at,
                 default_path_ssh, default_path_sftp, pin, sudo_set,
                 keep_alive_interval, keep_alive_tries, order, tunnels,
-                snippet_id, startup_snippet_mode
+                snippet_id, startup_snippet_mode, credential_id
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -231,6 +246,7 @@ pub async fn hosts_update(
     tunnels: Option<String>,
     startup_snippet_id: Option<String>,
     startup_snippet_mode: Option<String>,
+    credential_id: Option<String>,
 ) -> Result<Host, String> {
     {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -286,6 +302,10 @@ pub async fn hosts_update(
         }
         if startup_snippet_mode.is_some() {
             conn.execute("UPDATE hosts SET startup_snippet_mode=?1 WHERE id=?2", rusqlite::params![startup_snippet_mode, id]).map_err(|e| e.to_string())?;
+        }
+        if credential_id.is_some() {
+            let val: Option<String> = credential_id.filter(|s| !s.is_empty());
+            conn.execute("UPDATE hosts SET credential_id=?1 WHERE id=?2", rusqlite::params![val, id]).map_err(|e| e.to_string())?;
         }
     }
     if let Some(pw) = password {

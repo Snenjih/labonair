@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHostsStore } from "../store/hostsStore";
+import { useCredentialsStore } from "../store/credentialsStore";
 import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
 import type { CreateHostPayload, Host, TunnelConfig } from "../types";
 
@@ -25,9 +26,10 @@ interface Props {
   onClose: () => void;
   newSshTab: (hostId: string, title: string) => void;
   newSftpTab: (hostId: string, title: string) => void;
+  onNavigateToCredentials?: () => void;
 }
 
-type AuthMethod = "password" | "key" | "none";
+type AuthMethod = "password" | "key" | "credential" | "none";
 
 interface FormState {
   name: string;
@@ -36,6 +38,7 @@ interface FormState {
   username: string;
   auth_method: AuthMethod;
   private_key_path: string;
+  credential_id: string;
   group_id: string;
   pin_to_top: boolean;
   // SSH tab
@@ -58,6 +61,7 @@ function hostToForm(host: Host): FormState {
     username: host.username,
     auth_method: host.auth_method as AuthMethod,
     private_key_path: host.private_key_path ?? "",
+    credential_id: host.credential_id ?? "",
     group_id: host.group_id ?? "",
     pin_to_top: host.pin_to_top,
     default_path_ssh: host.default_path_ssh ?? "",
@@ -77,6 +81,7 @@ const DEFAULT_FORM: FormState = {
   username: "",
   auth_method: "password",
   private_key_path: "",
+  credential_id: "",
   group_id: "",
   pin_to_top: false,
   default_path_ssh: "",
@@ -103,7 +108,7 @@ function newTunnel(): TunnelConfig {
   };
 }
 
-export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props) {
+export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNavigateToCredentials }: Props) {
   const isNew = hostId === "__new__" || hostId === null;
 
   const host = useHostsStore((s) => (isNew ? null : s.hosts.find((h) => h.id === hostId) ?? null));
@@ -113,6 +118,11 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
   const updateHost = useHostsStore((s) => s.updateHost);
   const deleteHost = useHostsStore((s) => s.deleteHost);
   const setSelectedHost = useHostsStore((s) => s.setSelectedHost);
+
+  const credentials = useCredentialsStore((s) => s.credentials);
+  const credsFetched = useCredentialsStore((s) => s.hasFetched);
+  const fetchCredentials = useCredentialsStore((s) => s.fetchCredentials);
+  useEffect(() => { if (!credsFetched) void fetchCredentials(); }, [credsFetched, fetchCredentials]);
 
   const [form, setForm] = useState<FormState>(isNew ? DEFAULT_FORM : (host ? hostToForm(host) : DEFAULT_FORM));
   const [password, setPassword] = useState("");
@@ -154,6 +164,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
         if (form.keep_alive_interval) payload.keep_alive_interval = parseInt(form.keep_alive_interval, 10);
         if (form.keep_alive_tries) payload.keep_alive_tries = parseInt(form.keep_alive_tries, 10);
         payload.tunnels = JSON.stringify(tunnels);
+        payload.credential_id = form.auth_method === "credential" ? form.credential_id : "";
         payload.startup_snippet_id = form.startup_snippet_id || "";
         payload.startup_snippet_mode = form.startup_snippet_mode;
         await updateHost(payload as unknown as import("../types").UpdateHostPayload);
@@ -186,6 +197,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
       if (form.default_path_sftp) payload.default_path_sftp = form.default_path_sftp;
       if (form.keep_alive_interval) payload.keep_alive_interval = parseInt(form.keep_alive_interval, 10);
       if (form.keep_alive_tries) payload.keep_alive_tries = parseInt(form.keep_alive_tries, 10);
+      if (form.auth_method === "credential" && form.credential_id) payload.credential_id = form.credential_id;
       if (form.startup_snippet_id) {
         payload.startup_snippet_id = form.startup_snippet_id;
         payload.startup_snippet_mode = form.startup_snippet_mode;
@@ -334,8 +346,8 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
             {f("Username", "username", "text", "root")}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Auth Method</Label>
-              <div className="flex gap-1.5">
-                {(["password", "key", "none"] as const).map((method) => (
+              <div className="flex gap-1.5 flex-wrap">
+                {(["password", "key", "credential", "none"] as const).map((method) => (
                   <button
                     key={method}
                     onClick={() => { setForm((d) => ({ ...d, auth_method: method })); setTimeout(handleBlur, 0); }}
@@ -345,7 +357,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
                         : "border-border bg-background text-muted-foreground hover:bg-accent"
                     }`}
                   >
-                    {method === "password" ? "Password" : method === "key" ? "SSH Key" : "None"}
+                    {method === "password" ? "Password" : method === "key" ? "SSH Key" : method === "credential" ? "Credential" : "None"}
                   </button>
                 ))}
               </div>
@@ -366,6 +378,36 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
                     onBlur={handleBlur}
                     className="h-8 text-sm bg-background"
                   />
+              </div>
+            )}
+
+            {form.auth_method === "credential" && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Credential</Label>
+                <select
+                  value={form.credential_id}
+                  onChange={(e) => { setForm((d) => ({ ...d, credential_id: e.target.value })); setTimeout(handleBlur, 0); }}
+                  className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">— Select a credential —</option>
+                  {credentials.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.cred_type === "key" ? "🔑" : "🔒"} {c.name}
+                    </option>
+                  ))}
+                </select>
+                {onNavigateToCredentials && (
+                  <button
+                    type="button"
+                    onClick={onNavigateToCredentials}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    + Create new credential
+                  </button>
+                )}
+                {credentials.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground/70">No credentials yet. Create one first.</p>
+                )}
               </div>
             )}
 

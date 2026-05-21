@@ -1,3 +1,4 @@
+pub mod credentials;
 pub mod fs;
 pub mod hosts;
 pub mod pty;

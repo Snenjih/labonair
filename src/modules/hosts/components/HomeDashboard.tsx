@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import type { Tab } from "@/modules/tabs";
 import {
   DndContext,
@@ -21,7 +22,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { GroupCard } from "./GroupCard";
 import { HostCard } from "./HostCard";
 import { HostFormPanel } from "./HostFormPanel";
+import { CredentialFormPanel } from "./CredentialFormPanel";
+import { CredentialListItem } from "./CredentialListItem";
 import { useHostsStore } from "../store/hostsStore";
+import { useCredentialsStore } from "../store/credentialsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Host } from "../types";
 
@@ -128,6 +132,14 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
   const reorderHosts = useHostsStore((s) => s.reorderHosts);
   const hostStatuses = useHostsStore((s) => s.hostStatuses);
 
+  const credentials = useCredentialsStore((s) => s.credentials);
+  const selectedCredentialId = useCredentialsStore((s) => s.selectedCredentialId);
+  const setSelectedCredential = useCredentialsStore((s) => s.setSelectedCredential);
+  const fetchCredentials = useCredentialsStore((s) => s.fetchCredentials);
+  const credsFetched = useCredentialsStore((s) => s.hasFetched);
+  const duplicateCredential = useCredentialsStore((s) => s.duplicateCredential);
+
+  const [viewMode, setViewMode] = useState<"hosts" | "credentials">("hosts");
   const [search, setSearch] = useState("");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
 
@@ -141,6 +153,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
 
   // Initial load
   useEffect(() => { void fetchData(); }, [fetchData]);
+  useEffect(() => { if (!credsFetched) void fetchCredentials(); }, [fetchCredentials, credsFetched]);
 
   // Ping worker lifecycle — restarts whenever the interval preference changes
   useEffect(() => {
@@ -214,8 +227,10 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
     await reorderHosts(items);
   };
 
-  const panelHostId = selectedHostId; // null or a real id or "__new__"
-  const showPanel = panelHostId !== null;
+  const panelHostId = selectedHostId;
+  const showPanel =
+    (viewMode === "hosts" && panelHostId !== null) ||
+    (viewMode === "credentials" && selectedCredentialId !== null);
 
   const handleCardSelect = (host: Host) => (e: React.MouseEvent) => {
     if (e.metaKey || e.ctrlKey) {
@@ -233,36 +248,71 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         {/* Toolbar */}
         <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-          <div className="relative flex-1">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              width="13" height="13" viewBox="0 0 13 13" fill="none"
-            >
-              <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2" />
-              <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-            <Input
-              className="h-9 pl-9 text-sm bg-muted border-0 focus-visible:ring-1"
-              placeholder="Find a host or ssh user@hostname…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          {/* Search — only shown in hosts view */}
+          {viewMode === "hosts" && (
+            <div className="relative flex-1">
+              <svg
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                width="13" height="13" viewBox="0 0 13 13" fill="none"
+              >
+                <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              <Input
+                className="h-9 pl-9 text-sm bg-muted border-0 focus-visible:ring-1"
+                placeholder="Find a host or ssh user@hostname…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          )}
+          {viewMode === "credentials" && <div className="flex-1" />}
+
+          {/* View toggle */}
+          <div className="flex rounded-md border border-input overflow-hidden shrink-0">
+            {(["hosts", "credentials"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => {
+                  setViewMode(v);
+                  if (v === "hosts") setSelectedCredential(null);
+                  else setSelectedHost(null);
+                }}
+                className={cn(
+                  "px-3 h-8 text-xs font-medium transition-colors",
+                  viewMode === v
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent"
+                )}
+              >
+                {v === "hosts" ? "Hosts" : "Credentials"}
+              </button>
+            ))}
           </div>
+
+          {/* Contextual New button */}
           <Button
             size="sm"
-            className="h-9 px-3 text-xs shrink-0"
-            onClick={() => setSelectedHost("__new__")}
+            className="h-8 px-3 text-xs shrink-0"
+            onClick={() => {
+              if (viewMode === "hosts") setSelectedHost("__new__");
+              else setSelectedCredential("__new__");
+            }}
           >
-            + New Host
+            + New
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-9 px-3 text-xs shrink-0"
-            onClick={() => setAddingGroup(true)}
-          >
-            + Group
-          </Button>
+
+          {/* Group button — hosts view only */}
+          {viewMode === "hosts" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 px-3 text-xs shrink-0"
+              onClick={() => setAddingGroup(true)}
+            >
+              + Group
+            </Button>
+          )}
         </div>
 
         {/* Error banner */}
@@ -285,8 +335,8 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
           </div>
         )}
 
-        {/* Groups row */}
-        {(groups.length > 0 || addingGroup) && (
+        {/* Groups row — hosts view only */}
+        {viewMode === "hosts" && (groups.length > 0 || addingGroup) && (
           <div className="flex items-center gap-2 overflow-x-auto border-b border-border px-4 py-2 scrollbar-none">
             {groups.map((g) => (
               <GroupCard
@@ -311,66 +361,109 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
           </div>
         )}
 
-        {/* Host grid */}
+        {/* Main content — switches between hosts grid and credentials list */}
         <div className="flex-1 overflow-y-auto p-4">
-          {/* Quick connect suggestion */}
-          {quickConnectMatch && (
-            <button
-              onClick={() => {
-                newQuickSshTab(quickConnectMatch.username, quickConnectMatch.hostAddress, quickConnectMatch.port);
-                setSearch("");
-              }}
-              className="mb-4 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left hover:bg-primary/10 transition-colors"
-            >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="text-primary">
-                  <rect x="1" y="3" width="12" height="8" rx="1.5" />
-                  <path d="M4 7l1.5 1.5L4 10M8 9.5h2" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">Quick Connect</p>
-                <p className="font-mono text-xs text-muted-foreground truncate">
-                  {quickConnectMatch.username}@{quickConnectMatch.hostAddress}:{quickConnectMatch.port}
-                </p>
-              </div>
-              <span className="text-xs text-muted-foreground shrink-0">↵ Connect</span>
-            </button>
-          )}
+          {viewMode === "hosts" ? (
+            <>
+              {/* Quick connect suggestion */}
+              {quickConnectMatch && (
+                <button
+                  onClick={() => {
+                    newQuickSshTab(quickConnectMatch.username, quickConnectMatch.hostAddress, quickConnectMatch.port);
+                    setSearch("");
+                  }}
+                  className="mb-4 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left hover:bg-primary/10 transition-colors"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="text-primary">
+                      <rect x="1" y="3" width="12" height="8" rx="1.5" />
+                      <path d="M4 7l1.5 1.5L4 10M8 9.5h2" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground">Quick Connect</p>
+                    <p className="font-mono text-xs text-muted-foreground truncate">
+                      {quickConnectMatch.username}@{quickConnectMatch.hostAddress}:{quickConnectMatch.port}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">↵ Connect</span>
+                </button>
+              )}
 
-          {!hasFetched || isLoading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
-            </div>
-          ) : filteredHosts.length === 0 && !search && !activeGroupId ? (
-            <EmptyState onNew={() => setSelectedHost("__new__")} />
-          ) : filteredHosts.length === 0 && !quickConnectMatch ? (
-            <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-              No hosts match your search
-            </div>
-          ) : filteredHosts.length > 0 ? (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={filteredHosts.map((h) => h.id)} strategy={rectSortingStrategy}>
+              {!hasFetched || isLoading ? (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {filteredHosts.map((host) => (
-                    <SortableHostCard
-                      key={host.id}
-                      host={host}
-                      isSelected={selectedHostId === host.id}
-                      isMultiSelected={selectedHostIds.has(host.id)}
-                      onSelect={handleCardSelect(host)}
-                      onEdit={() => setSelectedHost(host.id)}
-                      group={groups.find((g) => g.id === host.group_id)}
-                      newSshTab={newSshTab}
-                      newSftpTab={newSftpTab}
-                      tabs={tabs}
-                      pingStatus={hostStatuses[host.id]}
+                  {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
+                </div>
+              ) : filteredHosts.length === 0 && !search && !activeGroupId ? (
+                <EmptyState onNew={() => setSelectedHost("__new__")} />
+              ) : filteredHosts.length === 0 && !quickConnectMatch ? (
+                <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+                  No hosts match your search
+                </div>
+              ) : filteredHosts.length > 0 ? (
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={filteredHosts.map((h) => h.id)} strategy={rectSortingStrategy}>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {filteredHosts.map((host) => (
+                        <SortableHostCard
+                          key={host.id}
+                          host={host}
+                          isSelected={selectedHostId === host.id}
+                          isMultiSelected={selectedHostIds.has(host.id)}
+                          onSelect={handleCardSelect(host)}
+                          onEdit={() => setSelectedHost(host.id)}
+                          group={groups.find((g) => g.id === host.group_id)}
+                          newSshTab={newSshTab}
+                          newSftpTab={newSftpTab}
+                          tabs={tabs}
+                          pingStatus={hostStatuses[host.id]}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              ) : null}
+            </>
+          ) : (
+            /* Credentials list */
+            <div className="flex flex-col">
+              {credentials.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex h-full flex-col items-center justify-center gap-4 text-center px-8 py-16"
+                >
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-3xl">🔑</div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-semibold text-foreground">No credentials yet</h3>
+                    <p className="text-sm text-muted-foreground max-w-xs">
+                      Store reusable passwords or SSH keys here and reference them from multiple hosts.
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={() => setSelectedCredential("__new__")} className="mt-2">
+                    Add First Credential
+                  </Button>
+                </motion.div>
+              ) : (
+                <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+                  {credentials.map((cred) => (
+                    <CredentialListItem
+                      key={cred.id}
+                      credential={cred}
+                      hostsCount={hosts.filter((h) => h.credential_id === cred.id).length}
+                      isSelected={selectedCredentialId === cred.id}
+                      onClick={() => setSelectedCredential(selectedCredentialId === cred.id ? null : cred.id)}
+                      onEdit={() => setSelectedCredential(cred.id)}
+                      onDuplicate={async () => {
+                        const dup = await duplicateCredential(cred.id);
+                        setSelectedCredential(dup.id);
+                      }}
                     />
                   ))}
                 </div>
-              </SortableContext>
-            </DndContext>
-          ) : null}
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -378,19 +471,30 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
       <AnimatePresence>
         {showPanel && (
           <motion.div
-            key={panelHostId ?? "__new__"}
+            key={viewMode === "hosts" ? (panelHostId ?? "__new__") : (selectedCredentialId ?? "__new__cred")}
             initial={{ x: 340, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 340, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="w-[340px] shrink-0 border-l border-border overflow-hidden bg-background flex flex-col"
           >
-            <HostFormPanel
-              hostId={panelHostId}
-              onClose={() => setSelectedHost(null)}
-              newSshTab={newSshTab}
-              newSftpTab={newSftpTab}
-            />
+            {viewMode === "hosts" ? (
+              <HostFormPanel
+                hostId={panelHostId}
+                onClose={() => setSelectedHost(null)}
+                newSshTab={newSshTab}
+                newSftpTab={newSftpTab}
+                onNavigateToCredentials={() => {
+                  setViewMode("credentials");
+                  setSelectedCredential("__new__");
+                }}
+              />
+            ) : (
+              <CredentialFormPanel
+                credentialId={selectedCredentialId}
+                onClose={() => setSelectedCredential(null)}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
