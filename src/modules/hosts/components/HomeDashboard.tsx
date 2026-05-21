@@ -279,7 +279,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
           </div>
 
           {/* View toggle */}
-          <div className="flex rounded-md border border-input overflow-hidden shrink-0">
+          <div className="flex rounded-2xl border border-input overflow-hidden shrink-0">
             {(["hosts", "credentials"] as const).map((v) => (
               <button
                 key={v}
