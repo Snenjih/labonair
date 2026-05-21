@@ -78,8 +78,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
         if (state.terminalCursorBlink !== prev.terminalCursorBlink)
           term.options.cursorBlink = state.terminalCursorBlink;
-        if (state.terminalBell !== prev.terminalBell)
-          term.options.bellStyle = state.terminalBell ? "sound" : "none";
+        // bellStyle was removed in xterm v6; bell is handled via onBell listener
         if (state.terminalCursorStyle !== prev.terminalCursorStyle)
           term.options.cursorStyle = state.terminalCursorStyle;
         if (state.terminalFontFamily !== prev.terminalFontFamily) {
@@ -151,7 +150,6 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           cursorStyle: prefs.terminalCursorStyle,
           cursorInactiveStyle: "outline",
           scrollback: prefs.terminalScrollback,
-          bellStyle: prefs.terminalBell ? "sound" : "none",
           fontWeight: FONT_WEIGHT_MAP[prefs.terminalFontWeight] as
             | "normal" | "bold" | "100" | "200" | "300" | "400"
             | "500" | "600" | "700" | "800" | "900" | undefined,
@@ -159,6 +157,22 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         });
         term = t;
         termRef.current = t;
+        t.onBell(() => {
+          if (!usePreferencesStore.getState().terminalBell) return;
+          try {
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = 800;
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.15);
+            osc.onended = () => ctx.close();
+          } catch { /* ignore AudioContext errors */ }
+        });
 
         const fit = new FitAddon();
         fitRef.current = fit;
