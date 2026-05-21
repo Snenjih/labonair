@@ -12,6 +12,7 @@ import type { ThemePref } from "@/modules/settings/store";
 import {
   setAutostart,
   setCheckForUpdates,
+  setDefaultStartupTab,
   setHostPingInterval,
   setRestoreWindowState,
   setVimMode,
@@ -53,6 +54,7 @@ export function GeneralSection() {
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
+  const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
   const hostPingInterval = usePreferencesStore((s) => s.hostPingInterval);
 
   // Reconcile autostart pref with the actual OS state on mount — the user may
@@ -153,6 +155,25 @@ export function GeneralSection() {
               checked={checkForUpdates}
               onCheckedChange={(v) => void setCheckForUpdates(v)}
             />
+          </SettingRow>
+          <SettingRow
+            title="Default opening tab"
+            description="Which tab opens when Nexum launches. Takes effect on next launch."
+          >
+            <Select
+              value={defaultStartupTab}
+              onValueChange={(v) =>
+                void setDefaultStartupTab(v as "terminal" | "host-manager")
+              }
+            >
+              <SelectTrigger className="h-7 w-40 text-[11.5px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="host-manager">Host Manager</SelectItem>
+                <SelectItem value="terminal">Local Terminal</SelectItem>
+              </SelectContent>
+            </Select>
           </SettingRow>
         </div>
       </div>
