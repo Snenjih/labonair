@@ -1018,6 +1018,7 @@ export default function App() {
                         >
                           <WorkspacePane
                             tab={wt}
+                            tabVisible={isActive}
                             onSetActivePane={(paneId) =>
                               setActivePaneId(t.id, paneId)
                             }
