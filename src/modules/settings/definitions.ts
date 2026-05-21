@@ -55,7 +55,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "defaultStartupTab",
     label: "Default opening tab",
-    description: "Which tab opens when Nexum launches.",
+    description: "Which tab opens when Nexum launches. Takes effect on next launch.",
     category: "General",
     controlType: "Select",
     options: [

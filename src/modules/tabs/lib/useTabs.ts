@@ -180,7 +180,7 @@ export function useTabs() {
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
 
   const [tabs, setTabs] = useState<Tab[]>([]);
-  const [activeId, setActiveId] = useState(0);
+  const [activeId, setActiveId] = useState(-1);
   const nextIdRef = useRef(1);
   const initialTabOpened = useRef(false);
 

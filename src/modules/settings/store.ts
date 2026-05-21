@@ -483,8 +483,8 @@ export async function setVimMode(value: boolean): Promise<void> {
 export async function setDefaultStartupTab(
   value: "terminal" | "host-manager",
 ): Promise<void> {
-  await store.set(KEY_DEFAULT_STARTUP_TAB, value);
-  await store.save();
+  await (await getStore()).set(KEY_DEFAULT_STARTUP_TAB, value);
+  await (await getStore()).save();
 }
 
 export async function setAppTheme(value: string): Promise<void> {
