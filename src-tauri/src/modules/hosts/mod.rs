@@ -21,6 +21,8 @@ pub struct Host {
     pub keep_alive_tries: Option<i64>,
     pub sort_order: i64,
     pub tunnels: Option<String>,
+    pub startup_snippet_id: Option<String>,
+    pub startup_snippet_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

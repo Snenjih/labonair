@@ -181,6 +181,15 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             if (!disposed) invoke("ssh_pty_write", { sessionId, data: cmd }).catch(console.error);
           }, 300);
         }
+        if (session.startupSnippet) {
+          const { command, mode } = session.startupSnippet;
+          const data = mode === "execute"
+            ? (command.endsWith("\n") ? command : command + "\n")
+            : command;
+          setTimeout(() => {
+            if (!disposed) invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
+          }, 300);
+        }
 
         t.onData((data) => {
           invoke("ssh_pty_write", { sessionId, data }).catch(console.error);

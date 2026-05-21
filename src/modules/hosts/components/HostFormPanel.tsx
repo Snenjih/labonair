@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHostsStore } from "../store/hostsStore";
+import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
 import type { CreateHostPayload, Host, TunnelConfig } from "../types";
 
 interface Props {
@@ -44,6 +45,9 @@ interface FormState {
   keep_alive_tries: string;
   // SFTP tab
   default_path_sftp: string;
+  // Startup snippet
+  startup_snippet_id: string;
+  startup_snippet_mode: "execute" | "inject";
 }
 
 function hostToForm(host: Host): FormState {
@@ -61,6 +65,8 @@ function hostToForm(host: Host): FormState {
     keep_alive_interval: host.keep_alive_interval != null ? String(host.keep_alive_interval) : "",
     keep_alive_tries: host.keep_alive_tries != null ? String(host.keep_alive_tries) : "",
     default_path_sftp: host.default_path_sftp ?? "",
+    startup_snippet_id: host.startup_snippet_id ?? "",
+    startup_snippet_mode: (host.startup_snippet_mode as "execute" | "inject") ?? "execute",
   };
 }
 
@@ -78,6 +84,8 @@ const DEFAULT_FORM: FormState = {
   keep_alive_interval: "60",
   keep_alive_tries: "3",
   default_path_sftp: "",
+  startup_snippet_id: "",
+  startup_snippet_mode: "execute",
 };
 
 function parseTunnels(raw?: string): TunnelConfig[] {
@@ -100,6 +108,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
 
   const host = useHostsStore((s) => (isNew ? null : s.hosts.find((h) => h.id === hostId) ?? null));
   const groups = useHostsStore((s) => s.groups);
+  const snippets = useCommandSnippetsStore((s) => s.snippets);
   const createHost = useHostsStore((s) => s.createHost);
   const updateHost = useHostsStore((s) => s.updateHost);
   const deleteHost = useHostsStore((s) => s.deleteHost);
@@ -145,6 +154,8 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
         if (form.keep_alive_interval) payload.keep_alive_interval = parseInt(form.keep_alive_interval, 10);
         if (form.keep_alive_tries) payload.keep_alive_tries = parseInt(form.keep_alive_tries, 10);
         payload.tunnels = JSON.stringify(tunnels);
+        payload.startup_snippet_id = form.startup_snippet_id || "";
+        payload.startup_snippet_mode = form.startup_snippet_mode;
         await updateHost(payload as unknown as import("../types").UpdateHostPayload);
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
@@ -175,6 +186,10 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
       if (form.default_path_sftp) payload.default_path_sftp = form.default_path_sftp;
       if (form.keep_alive_interval) payload.keep_alive_interval = parseInt(form.keep_alive_interval, 10);
       if (form.keep_alive_tries) payload.keep_alive_tries = parseInt(form.keep_alive_tries, 10);
+      if (form.startup_snippet_id) {
+        payload.startup_snippet_id = form.startup_snippet_id;
+        payload.startup_snippet_mode = form.startup_snippet_mode;
+      }
 
       const newHost = await createHost(payload as unknown as CreateHostPayload);
       setSelectedHost(newHost.id);
@@ -474,6 +489,59 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab }: Props)
                 Automatically fills sudo password prompts. Stored in macOS Keychain.
               </p>
             </div>
+          </section>
+
+          <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Startup Snippet</p>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Snippet</Label>
+              <select
+                value={form.startup_snippet_id}
+                onChange={(e) => {
+                  setForm((d) => ({ ...d, startup_snippet_id: e.target.value }));
+                  setTimeout(handleBlur, 0);
+                }}
+                className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">None (disabled)</option>
+                {snippets.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground/70">
+                Runs automatically when this host connects via SSH.
+              </p>
+            </div>
+            {form.startup_snippet_id && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Mode</Label>
+                <div className="flex gap-1.5">
+                  {(["execute", "inject"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => {
+                        setForm((d) => ({ ...d, startup_snippet_mode: mode }));
+                        setTimeout(handleBlur, 0);
+                      }}
+                      className={`flex-1 rounded-md border py-1.5 text-xs font-medium transition-all ${
+                        form.startup_snippet_mode === mode
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-background text-muted-foreground hover:bg-accent"
+                      }`}
+                    >
+                      {mode === "execute" ? "Execute" : "Inject"}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground/70">
+                  {form.startup_snippet_mode === "execute"
+                    ? "Command runs immediately on connect."
+                    : "Command is typed into the terminal without running — you confirm with Enter."}
+                </p>
+              </div>
+            )}
           </section>
         </TabsContent>
 
