@@ -55,7 +55,7 @@ function SkeletonCard() {
 
 function EmptyState({ onNew }: { onNew: () => void }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 text-center px-8">
+    <div className="flex h-full flex-col items-center justify-start gap-4 text-center px-8 pt-12">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2" />
