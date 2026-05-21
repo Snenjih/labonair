@@ -19,7 +19,7 @@ export function GroupCard({ group, isSelected, onClick, hostCount }: GroupCardPr
         "flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-all shrink-0",
         isSelected
           ? "ring-2 ring-primary border-primary/40 bg-accent/30"
-          : "hover:bg-accent/20 hover:border-border",
+          : "hover:bg-accent/60 hover:border-border",
       )}
     >
       {group.icon ? (

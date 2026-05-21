@@ -358,7 +358,7 @@ function AgentEditorDialog({
                         "flex size-7 items-center justify-center rounded-md border transition-colors",
                         active
                           ? "border-foreground/40 bg-accent"
-                          : "border-border/60 hover:bg-accent/40",
+                          : "border-border/60 hover:bg-accent/60",
                       )}
                     >
                       <HugeiconsIcon icon={Icon} size={13} strokeWidth={1.75} />

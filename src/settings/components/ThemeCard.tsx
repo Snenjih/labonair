@@ -64,7 +64,7 @@ function InstalledCard({
         "group relative flex items-start justify-between rounded-lg border border-transparent px-4 py-3 transition-colors",
         isActive
           ? "border-primary/30 bg-primary/5"
-          : "hover:bg-accent/20",
+          : "hover:bg-accent/50",
         isPreviewing && "border-accent/50 bg-accent/10",
       )}
     >
@@ -157,7 +157,7 @@ function CommunityCard({
   }
 
   return (
-    <div className="group flex items-start justify-between rounded-lg px-4 py-3 transition-colors hover:bg-accent/20">
+    <div className="group flex items-start justify-between rounded-lg px-4 py-3 transition-colors hover:bg-accent/60">
       {/* Left: metadata */}
       <div className="flex min-w-0 flex-col gap-0.5 pr-4">
         <div className="flex items-center gap-2">
@@ -188,7 +188,7 @@ function CommunityCard({
             target="_blank"
             rel="noreferrer"
             title="View theme source JSON"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent/40 hover:text-foreground group-hover:opacity-100"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent/60 hover:text-foreground group-hover:opacity-100"
           >
             <HugeiconsIcon icon={SourceCodeIcon} size={13} strokeWidth={2} />
           </a>

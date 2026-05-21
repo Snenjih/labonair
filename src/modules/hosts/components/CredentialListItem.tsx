@@ -70,7 +70,7 @@ export function CredentialListItem({ credential, hostsCount, isSelected, onClick
         onClick={onClick}
         className={cn(
           "flex items-center gap-3 px-4 py-3 cursor-pointer select-none transition-colors",
-          isSelected ? "bg-accent/60 ring-1 ring-inset ring-accent" : "hover:bg-accent/30"
+          isSelected ? "bg-accent/60 ring-1 ring-inset ring-accent" : "hover:bg-accent/60"
         )}
       >
         {/* Icon */}

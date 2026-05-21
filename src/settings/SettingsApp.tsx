@@ -162,7 +162,7 @@ export function SettingsApp() {
                   "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12px] transition-colors",
                   active === item.id && !isSearching
                     ? "bg-accent/50 text-foreground"
-                    : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",
+                    : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                 )}
               >
                 <HugeiconsIcon icon={item.icon} size={13} strokeWidth={1.75} />
