@@ -78,6 +78,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
         if (state.terminalCursorBlink !== prev.terminalCursorBlink)
           term.options.cursorBlink = state.terminalCursorBlink;
+        if (state.terminalBell !== prev.terminalBell)
+          term.options.bellStyle = state.terminalBell ? "sound" : "none";
         if (state.terminalCursorStyle !== prev.terminalCursorStyle)
           term.options.cursorStyle = state.terminalCursorStyle;
         if (state.terminalFontFamily !== prev.terminalFontFamily) {
@@ -149,6 +151,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           cursorStyle: prefs.terminalCursorStyle,
           cursorInactiveStyle: "outline",
           scrollback: prefs.terminalScrollback,
+          bellStyle: prefs.terminalBell ? "sound" : "none",
           fontWeight: FONT_WEIGHT_MAP[prefs.terminalFontWeight] as
             | "normal" | "bold" | "100" | "200" | "300" | "400"
             | "500" | "600" | "700" | "800" | "900" | undefined,

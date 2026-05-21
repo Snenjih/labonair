@@ -67,6 +67,9 @@ export function useTerminalSession({
       if (state.terminalCursorBlink !== prev.terminalCursorBlink) {
         term.options.cursorBlink = state.terminalCursorBlink;
       }
+      if (state.terminalBell !== prev.terminalBell) {
+        term.options.bellStyle = state.terminalBell ? "sound" : "none";
+      }
       if (state.terminalCursorStyle !== prev.terminalCursorStyle) {
         term.options.cursorStyle = state.terminalCursorStyle;
       }
@@ -127,6 +130,7 @@ export function useTerminalSession({
         cursorStyle: prefs.terminalCursorStyle,
         cursorInactiveStyle: "outline",
         scrollback: prefs.terminalScrollback,
+        bellStyle: prefs.terminalBell ? "sound" : "none",
         fontWeight: FONT_WEIGHT_MAP[prefs.terminalFontWeight] as
           | "normal"
           | "bold"

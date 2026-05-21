@@ -215,6 +215,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "Switch",
   },
   {
+    id: "terminalBell",
+    label: "Terminal bell",
+    description: "Play a sound when the terminal bell character (BEL) is received.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
     id: "terminalFontWeight",
     label: "Font weight",
     description: "Weight of the text rendered in the terminal.",
