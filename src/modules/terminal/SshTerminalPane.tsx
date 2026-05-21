@@ -6,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
+import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
@@ -30,11 +31,12 @@ interface Props {
   sessionId: string;
   session: TerminalSessionData;
   isActive: boolean;
-  tabVisible?: boolean;
+  onSearchReady?: (addon: SearchAddon) => void;
 }
 
 export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
-  function SshTerminalPane({ sessionId, session, isActive, tabVisible = true }, ref) {
+  function SshTerminalPane({ sessionId, session, isActive, tabVisible = true, onSearchReady}, ref) {
+    tabVisible?: boolean;
     const [isConnected, setIsConnected] = useState(false);
     const [hasError, setHasError] = useState(false);
     const { resolvedTheme } = useTheme();
@@ -42,6 +44,9 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const containerRef = useRef<HTMLDivElement>(null);
     const termRef = useRef<Terminal | null>(null);
     const fitRef = useRef<FitAddon | null>(null);
+    const searchRef = useRef<SearchAddon | null>(null);
+    const onSearchReadyRef = useRef(onSearchReady);
+    onSearchReadyRef.current = onSearchReady;
 
     useImperativeHandle(ref, () => ({
       write: (data: string) => {
@@ -155,9 +160,13 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         const fit = new FitAddon();
         fitRef.current = fit;
         t.loadAddon(fit);
+        const search = new SearchAddon();
+        searchRef.current = search;
+        t.loadAddon(search);
         t.loadAddon(new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)));
         t.open(containerRef.current);
         fit.fit();
+        onSearchReadyRef.current?.(search);
 
         if (prefs.terminalUseWebGL) {
           try {

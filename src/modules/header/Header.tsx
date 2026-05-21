@@ -17,12 +17,7 @@ import {
   Globe02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useRef, type RefObject } from "react";
-import {
-  SearchInline,
-  type SearchInlineHandle,
-  type SearchTarget,
-} from "./SearchInline";
+import { useRef } from "react";
 import { TransferDropdown } from "./components/TransferDropdown";
 import { UpdaterButton } from "./components/UpdaterButton";
 
@@ -42,8 +37,6 @@ type Props = {
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
   onOpenHostManager: () => void;
-  searchTarget: SearchTarget;
-  searchRef: RefObject<SearchInlineHandle | null>;
 };
 
 export function Header({
@@ -62,8 +55,6 @@ export function Header({
   onOpenShortcuts,
   onOpenSettings,
   onOpenHostManager,
-  searchTarget,
-  searchRef,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -149,7 +140,6 @@ export function Header({
         <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
       </div>
 
-      <SearchInline ref={searchRef} target={searchTarget} compact={true} />
       <UpdaterButton />
       <TransferDropdown />
 

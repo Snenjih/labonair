@@ -1,8 +1,7 @@
 import { indentUnit } from "@codemirror/language";
 import { lintGutter } from "@codemirror/lint";
-import { search } from "@codemirror/search";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
-import { EditorView } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 
 // Compartments allow runtime reconfiguration without rebuilding state.
 export const fontSizeCompartment = new Compartment();
@@ -22,7 +21,7 @@ export function buildSharedExtensions(fontSize = 13): Extension[] {
   return [
     indentUnit.of("  "),
     EditorState.tabSize.of(2),
-    search({ top: true }),
+    keymap.of([{ key: "Mod-f", run: () => true }]),
     lintGutter(),
     fontSizeCompartment.of(
       EditorView.theme({

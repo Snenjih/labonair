@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { FindWidget } from "@/modules/search";
 import type { PaneNode, TerminalSessionData, WorkspaceTab } from "@/modules/tabs";
 import {
   forwardRef,
@@ -21,6 +22,7 @@ import type { SearchAddon } from "@xterm/addon-search";
 
 export type WorkspacePaneHandle = {
   getSessionHandle: (sessionId: string) => TerminalPaneHandle | null;
+  openFind: () => void;
 };
 
 interface Props {
@@ -30,7 +32,6 @@ interface Props {
   onRegisterHandle: (sessionId: string, handle: TerminalPaneHandle | null) => void;
   onCwd: (sessionId: string, cwd: string) => void;
   onClosePane: (paneId: string) => void;
-  onSearchReady?: (sessionId: string, addon: SearchAddon) => void;
   onDetectedLocalUrl?: (sessionId: string, url: string) => void;
 }
 
@@ -38,7 +39,7 @@ type PaneRect = { x: number; y: number; w: number; h: number };
 
 export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
   function WorkspacePane(
-    { tab, tabVisible, onSetActivePane, onRegisterHandle, onCwd, onClosePane, onSearchReady, onDetectedLocalUrl },
+    { tab, tabVisible, onSetActivePane, onRegisterHandle, onCwd, onClosePane, onDetectedLocalUrl },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -47,9 +48,14 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
     const [paneRects, setPaneRects] = useState<Map<string, PaneRect>>(new Map());
     const showPaneHeader = usePreferencesStore((s) => s.terminalShowPaneHeader);
 
+    const [findOpen, setFindOpen] = useState(false);
+    const [activeAddon, setActiveAddon] = useState<SearchAddon | null>(null);
+    const addonMap = useRef<Map<string, SearchAddon>>(new Map());
+
     useImperativeHandle(ref, () => ({
       getSessionHandle: (sessionId: string) =>
         handleRefs.current.get(sessionId) ?? null,
+      openFind: () => setFindOpen(true),
     }), []);
 
     // Sync slot element rects → terminal absolute positions
@@ -82,10 +88,29 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
       };
     }, [tab.sessions, tab.layout]);
 
+    // Keep activeAddon in sync with the active pane
+    useEffect(() => {
+      setActiveAddon(addonMap.current.get(tab.activePaneId) ?? null);
+    }, [tab.activePaneId]);
+
+    // Close find widget when switching active pane
+    useEffect(() => {
+      setFindOpen(false);
+    }, [tab.activePaneId]);
+
+    const handleSearchReady = useCallback((paneId: string, addon: SearchAddon) => {
+      addonMap.current.set(paneId, addon);
+      if (paneId === tab.activePaneId) setActiveAddon(addon);
+    }, [tab.activePaneId]);
+
     const registerHandle = useCallback(
       (paneId: string, handle: TerminalPaneHandle | null) => {
-        if (handle) handleRefs.current.set(paneId, handle);
-        else handleRefs.current.delete(paneId);
+        if (handle) {
+          handleRefs.current.set(paneId, handle);
+        } else {
+          handleRefs.current.delete(paneId);
+          addonMap.current.delete(paneId);
+        }
         onRegisterHandle(paneId, handle);
       },
       [onRegisterHandle],
@@ -138,6 +163,15 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
 
     return (
       <div ref={containerRef} className="relative h-full w-full overflow-hidden">
+        {/* Find widget — floats above terminals */}
+        <div className="absolute left-0 right-0 top-0 z-20">
+          <FindWidget
+            isOpen={findOpen}
+            onClose={() => setFindOpen(false)}
+            searchAddon={activeAddon ?? undefined}
+          />
+        </div>
+
         {/* Sizing layer: pointer-events-none so clicks fall through to terminals;
             ResizableHandle restores pointer-events-auto for dragging. */}
         <div className="absolute inset-0 z-10 pointer-events-none">
@@ -189,7 +223,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
                     initialCwd={session.cwd}
                     initialCommand={session.initialCommand}
                     ref={(h) => registerHandle(paneId, h)}
-                    onSearchReady={(_, addon) => onSearchReady?.(paneId, addon)}
+                    onSearchReady={(_, addon) => handleSearchReady(paneId, addon)}
                     onCwd={(_, cwd) => onCwd(paneId, cwd)}
                     onDetectedLocalUrl={(_, url) => onDetectedLocalUrl?.(paneId, url)}
                   />
@@ -201,6 +235,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
                     isActive={isActive}
                     tabVisible={tabVisible}
                     ref={(h) => registerHandle(paneId, h)}
+                    onSearchReady={(addon) => handleSearchReady(paneId, addon)}
                   />
                 )}
               </div>
