@@ -113,7 +113,7 @@ export function TabBar({
                     value={String(t.id)}
                     data-tab-id={t.id}
                     className={cn(
-                      "group h-7 shrink-0 gap-1.5 rounded-md text-xs text-muted-foreground transition-colors data-[state=active]:bg-accent data-[state=active]:text-foreground hover:bg-accent/60 hover:text-foreground justify-between",
+                      "group h-7 shrink-0 gap-1.5 rounded-xl text-xs text-muted-foreground transition-colors data-[state=active]:bg-accent data-[state=active]:text-foreground hover:bg-accent/60 hover:text-foreground justify-between",
                       compact ? "px-1.5!" : "ps-2! pe-1!"
                     )}
                   >
