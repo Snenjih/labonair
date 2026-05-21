@@ -27,6 +27,8 @@ export interface Host {
   keep_alive_tries?: number;
   sort_order: number;
   tunnels?: string;
+  startup_snippet_id?: string | null;
+  startup_snippet_mode?: "execute" | "inject" | null;
 }
 
 export interface Group {
@@ -55,6 +57,8 @@ export interface CreateHostPayload {
   keep_alive_tries?: number;
   sort_order?: number;
   tunnels?: string;
+  startup_snippet_id?: string | null;
+  startup_snippet_mode?: string;
 }
 
 export interface UpdateHostPayload extends Partial<CreateHostPayload> {

@@ -69,6 +69,8 @@ pub fn initialize_db(
         "ALTER TABLE hosts ADD COLUMN keep_alive_tries INTEGER",
         "ALTER TABLE hosts ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE hosts ADD COLUMN tunnels TEXT",
+        "ALTER TABLE hosts ADD COLUMN startup_snippet_id TEXT",
+        "ALTER TABLE hosts ADD COLUMN startup_snippet_mode TEXT",
         // groups migrations
         "ALTER TABLE groups ADD COLUMN icon TEXT",
         "ALTER TABLE groups ADD COLUMN color TEXT",
@@ -108,13 +110,16 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<Host> {
         keep_alive_tries: row.get(16)?,
         sort_order: row.get(17).unwrap_or(0),
         tunnels: row.get(18)?,
+        startup_snippet_id: row.get(19)?,
+        startup_snippet_mode: row.get(20)?,
     })
 }
 
 const SELECT_HOSTS: &str = "SELECT id, name, host_address, port, username, auth_method, \
     private_key_path, group_id, tags, created_at, last_connected_at, \
     default_path_ssh, default_path_sftp, pin_to_top, sudo_password_set, \
-    keep_alive_interval, keep_alive_tries, sort_order, tunnels FROM hosts";
+    keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
+    startup_snippet_id, startup_snippet_mode FROM hosts";
 
 #[tauri::command]
 pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, String> {
@@ -153,6 +158,8 @@ pub async fn hosts_create(
     keep_alive_tries: Option<i64>,
     sort_order: Option<i64>,
     tunnels: Option<String>,
+    startup_snippet_id: Option<String>,
+    startup_snippet_mode: Option<String>,
 ) -> Result<Host, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let created_at = now_millis();
@@ -162,16 +169,19 @@ pub async fn hosts_create(
 
     {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let snippet_id: Option<&str> = startup_snippet_id.as_deref().filter(|s| !s.is_empty());
         conn.execute(
             "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
              private_key_path, group_id, tags, created_at, default_path_ssh, default_path_sftp, \
-             pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order, tunnels) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
+             pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
+             startup_snippet_id, startup_snippet_mode) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
             rusqlite::params![
                 id, name, host_address, port, username, auth_method,
                 private_key_path, group_id, tags, created_at,
                 default_path_ssh, default_path_sftp, pin, sudo_set,
-                keep_alive_interval, keep_alive_tries, order, tunnels
+                keep_alive_interval, keep_alive_tries, order, tunnels,
+                snippet_id, startup_snippet_mode
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -219,6 +229,8 @@ pub async fn hosts_update(
     keep_alive_tries: Option<i64>,
     sort_order: Option<i64>,
     tunnels: Option<String>,
+    startup_snippet_id: Option<String>,
+    startup_snippet_mode: Option<String>,
 ) -> Result<Host, String> {
     {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -267,6 +279,13 @@ pub async fn hosts_update(
         }
         if tunnels.is_some() {
             conn.execute("UPDATE hosts SET tunnels=?1 WHERE id=?2", rusqlite::params![tunnels, id]).map_err(|e| e.to_string())?;
+        }
+        if let Some(ref v) = startup_snippet_id {
+            let db_val: Option<&str> = if v.is_empty() { None } else { Some(v.as_str()) };
+            conn.execute("UPDATE hosts SET startup_snippet_id=?1 WHERE id=?2", rusqlite::params![db_val, id]).map_err(|e| e.to_string())?;
+        }
+        if startup_snippet_mode.is_some() {
+            conn.execute("UPDATE hosts SET startup_snippet_mode=?1 WHERE id=?2", rusqlite::params![startup_snippet_mode, id]).map_err(|e| e.to_string())?;
         }
     }
     if let Some(pw) = password {
