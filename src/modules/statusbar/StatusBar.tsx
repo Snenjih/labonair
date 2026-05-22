@@ -8,7 +8,6 @@ import {
   CodeIcon,
   FlashIcon,
   Globe02Icon,
-  ServerStack01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
@@ -35,7 +34,6 @@ type Props = {
 const PANEL_BUTTONS: Array<{ panel: SidebarPanel; icon: typeof CodeIcon; title: string }> = [
   { panel: "explorer", icon: CodeIcon, title: "Explorer (Cmd+B)" },
   { panel: "snippets", icon: FlashIcon, title: "Snippets" },
-  { panel: "hosts", icon: ServerStack01Icon, title: "Hosts" },
 ];
 
 export function StatusBar({
