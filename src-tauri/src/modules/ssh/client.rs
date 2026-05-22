@@ -11,8 +11,14 @@ macro_rules! log_step {
 
 /// Returns true if the ssh2 error message indicates the private key is
 /// passphrase-protected and we attempted to load it without one.
+/// Note: "unable to open private key file" is a file-not-found error, NOT a
+/// passphrase error — exclude it so we don't show a passphrase dialog for
+/// a missing/inaccessible key file.
 fn is_passphrase_error(msg: &str) -> bool {
     let lower = msg.to_lowercase();
+    if lower.contains("unable to open") || lower.contains("no such file") {
+        return false;
+    }
     lower.contains("passphrase")
         || lower.contains("bad passphrase")
         || lower.contains("failed getting public key")
@@ -456,18 +462,30 @@ fn ssh_connect_blocking(
             .map(std::path::Path::new)
             .ok_or("private_key_path not set for key auth")?;
 
+        // Guard: verify the key file is accessible before trying auth.
+        if !key_path.exists() {
+            return Err(format!(
+                "Private key file not found: {}",
+                key_path.display()
+            ));
+        }
+
         // 6a. Try ssh-agent first (works for keys loaded via `ssh-add`).
         let agent_ok = try_agent_auth(&session, &username, &session_id, &app);
         if agent_ok {
             true
         } else {
             // 6b. Direct key file auth — use provided passphrase if any.
+            // Pass "" instead of NULL for no-passphrase OpenSSH-format keys:
+            // libssh2 requires an empty string (not NULL) to successfully
+            // load unencrypted OpenSSH-format keys (BEGIN OPENSSH PRIVATE KEY).
+            let passphrase_str = passphrase.as_deref().unwrap_or("");
             log_step!(app, session_id, "Authenticating with public key file…");
             match session.userauth_pubkey_file(
                 &username,
                 None,
                 key_path,
-                passphrase.as_deref(),
+                Some(passphrase_str),
             ) {
                 Ok(_) => true,
                 Err(e) => {
