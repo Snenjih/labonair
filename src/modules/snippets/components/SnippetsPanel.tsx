@@ -127,29 +127,31 @@ export function SnippetsPanel({ onRun }: Props) {
             className="flex h-full flex-col"
           >
             {/* Toolbar header */}
-            <div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border/30 px-2">
-              <span className="flex-1 pl-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+            <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-2">
+              <span className="flex-1 pl-1 text-xs font-medium text-foreground/80">
                 Snippets
               </span>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon"
                 className={cn(
-                  "flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
+                  "size-6 text-muted-foreground hover:text-foreground",
                   searchOpen && "bg-muted text-foreground"
                 )}
                 onClick={toggleSearch}
                 title="Search snippets"
               >
-                <HugeiconsIcon icon={Search01Icon} size={12} strokeWidth={2} />
-              </button>
-              <button
-                type="button"
-                className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                <HugeiconsIcon icon={Search01Icon} size={13} strokeWidth={2} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 text-muted-foreground hover:text-foreground"
                 onClick={() => setEditingId("new")}
                 title="New snippet"
               >
                 <HugeiconsIcon icon={Add01Icon} size={13} strokeWidth={2} />
-              </button>
+              </Button>
             </div>
 
             {/* Search bar */}
@@ -197,15 +199,15 @@ export function SnippetsPanel({ onRun }: Props) {
 
                 {/* Empty state */}
                 {filtered.length === 0 && (
-                  <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border/40 bg-muted/30">
-                      <HugeiconsIcon icon={CommandIcon} size={16} strokeWidth={1.5} className="text-muted-foreground/40" />
+                  <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border/40 bg-muted/30">
+                      <HugeiconsIcon icon={CommandIcon} size={22} strokeWidth={1.5} className="text-muted-foreground/40" />
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-[11px] font-medium text-muted-foreground">
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">
                         {query ? "No results" : "No snippets yet"}
                       </p>
-                      <p className="text-[10px] text-muted-foreground/50">
+                      <p className="text-[11px] text-muted-foreground/50">
                         {query ? "Try a different search term" : "Create reusable commands"}
                       </p>
                     </div>
@@ -213,10 +215,10 @@ export function SnippetsPanel({ onRun }: Props) {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-7 border-border/50 text-[11px]"
+                        className="h-8 border-border/50 text-xs"
                         onClick={() => setEditingId("new")}
                       >
-                        <HugeiconsIcon icon={Add01Icon} size={11} strokeWidth={2} className="mr-1.5" />
+                        <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={2} className="mr-1.5" />
                         New snippet
                       </Button>
                     )}
