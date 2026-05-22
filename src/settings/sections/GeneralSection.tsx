@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -6,38 +7,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import type { ThemePref } from "@/modules/settings/store";
 import {
   setAutostart,
   setCheckForUpdates,
+  setCredentialEncryption,
   setDefaultStartupTab,
   setHostPingInterval,
   setRestoreWindowState,
   setVimMode,
 } from "@/modules/settings/store";
-import { useTheme } from "@/modules/theme";
+import { useUpdater } from "@/modules/updater";
 import {
-  ComputerIcon,
-  Moon02Icon,
-  Sun03Icon,
+  AlertDiamondIcon,
+  GithubIcon,
+  Globe02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { getName, getVersion } from "@tauri-apps/api/app";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { arch, platform } from "@tauri-apps/plugin-os";
+import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
-const APPEARANCE: {
-  id: ThemePref;
-  label: string;
-  icon: typeof ComputerIcon;
-}[] = [
-  { id: "system", label: "System", icon: ComputerIcon },
-  { id: "light", label: "Light", icon: Sun03Icon },
-  { id: "dark", label: "Dark", icon: Moon02Icon },
-];
+const REPO_URL = "https://github.com/Snenjih/nexum";
+const WEBSITE = "https://nexum.app";
+
+const PLATFORM_LABEL: Record<string, string> = {
+  macos: "macOS",
+  windows: "Windows",
+  linux: "Linux",
+  ios: "iOS",
+  android: "Android",
+  freebsd: "FreeBSD",
+};
 
 const PING_INTERVAL_OPTIONS: { value: string; label: string }[] = [
   { value: "10", label: "Every 10 seconds" },
@@ -48,17 +54,85 @@ const PING_INTERVAL_OPTIONS: { value: string; label: string }[] = [
   { value: "0", label: "Never" },
 ];
 
+const LINKS: {
+  icon: typeof AlertDiamondIcon;
+  label: string;
+  description: string;
+  href: string;
+}[] = [
+  {
+    icon: AlertDiamondIcon,
+    label: "Report a problem",
+    description: "Generate a pre-filled GitHub issue",
+    href: `${REPO_URL}/issues/new`,
+  },
+  {
+    icon: GithubIcon,
+    label: "GitHub",
+    description: "Source code",
+    href: REPO_URL,
+  },
+  {
+    icon: Globe02Icon,
+    label: "Website",
+    description: WEBSITE.replace("https://", ""),
+    href: WEBSITE,
+  },
+];
+
 export function GeneralSection() {
-  const { theme, setTheme } = useTheme();
+  const [version, setVersion] = useState("");
+  const [name, setName] = useState("Nexum");
+  const [build, setBuild] = useState("");
+  const [pendingEncryption, setPendingEncryption] = useState(false);
+
   const autostart = usePreferencesStore((s) => s.autostart);
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
   const hostPingInterval = usePreferencesStore((s) => s.hostPingInterval);
+  const credentialEncryption = usePreferencesStore((s) => s.credentialEncryption);
 
-  // Reconcile autostart pref with the actual OS state on mount — the user may
-  // have toggled it from System Settings.
+  const { status, check, install } = useUpdater({ autoCheck: false });
+  const checking = status.kind === "checking";
+  const downloading = status.kind === "downloading";
+  const available = status.kind === "available";
+  const ready = status.kind === "ready";
+  const checkLabel =
+    status.kind === "uptodate"
+      ? "You're up to date"
+      : status.kind === "error"
+        ? "Check failed — retry"
+        : checking
+          ? "Checking…"
+          : downloading
+            ? "Downloading…"
+            : ready
+              ? "Restart to install"
+              : available
+                ? `Install v${status.update.version}`
+                : "Check for updates";
+
+  const onUpdateClick = () => {
+    if (available) void install();
+    else void check({ manual: true });
+  };
+
+  useEffect(() => {
+    void getVersion().then(setVersion);
+    void getName().then(setName);
+    try {
+      const p = platform();
+      const a = arch();
+      const platformLabel = PLATFORM_LABEL[p] ?? p;
+      setBuild(`${platformLabel} · ${a}`);
+    } catch {
+      setBuild("");
+    }
+  }, []);
+
+  // Reconcile autostart pref with the actual OS state on mount.
   useEffect(() => {
     let alive = true;
     void isEnabled()
@@ -84,30 +158,91 @@ export function GeneralSection() {
     }
   };
 
+  async function handleEncryptionToggle(enabled: boolean) {
+    setPendingEncryption(true);
+    try {
+      await invoke("secrets_set_encryption_enabled", { enabled });
+      await setCredentialEncryption(enabled);
+    } catch (err) {
+      console.error("Failed to toggle credential encryption:", err);
+    } finally {
+      setPendingEncryption(false);
+    }
+  }
+
+  const buildString = build ? `${build} · v${version || "—"}` : `v${version || "—"}`;
+
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
         title="General"
-        description="Appearance, editor, and startup."
+        description="Editor, startup, and security."
       />
 
-      <div className="flex flex-col gap-2">
-        <Label>Appearance</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {APPEARANCE.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => setTheme(o.id)}
-              className={cn(
-                "group flex h-20 flex-col items-center justify-center gap-1.5 rounded-lg border bg-card transition-all",
-                theme === o.id
-                  ? "border-foreground/60 ring-1 ring-foreground/20"
-                  : "border-border/60 hover:border-border",
-              )}
+      {/* About hero */}
+      <div className="flex items-start gap-8 rounded-xl border border-border/60 bg-card/40 px-5 py-5">
+        {/* Left: identity + updater */}
+        <div className="flex flex-1 flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="" className="size-14" draggable={false} />
+            <div className="flex flex-col">
+              <span className="text-[21px] font-semibold tracking-tight leading-tight">
+                {name}
+              </span>
+              <span className="font-mono text-[10.5px] text-muted-foreground mt-0.5">
+                {buildString}
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Button
+              size="sm"
+              onClick={onUpdateClick}
+              disabled={checking || downloading || ready}
+              className="w-fit"
             >
-              <HugeiconsIcon icon={o.icon} size={18} strokeWidth={1.5} />
-              <span className="text-[11.5px]">{o.label}</span>
+              {checkLabel}
+            </Button>
+            {status.kind === "error" && (
+              <p className="font-mono text-[10.5px] break-all text-destructive/80">
+                {status.message}
+              </p>
+            )}
+            {downloading && status.contentLength ? (
+              <p className="text-[11px] text-muted-foreground">
+                {Math.min(
+                  100,
+                  Math.round((status.downloaded / status.contentLength) * 100),
+                )}
+                %
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Right: links */}
+        <div className="flex flex-col gap-0.5">
+          {LINKS.map((link) => (
+            <button
+              key={link.href}
+              type="button"
+              onClick={() => void openUrl(link.href)}
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent/50"
+            >
+              <HugeiconsIcon
+                icon={link.icon}
+                size={16}
+                strokeWidth={1.75}
+                className="shrink-0 text-muted-foreground"
+              />
+              <div className="flex flex-col">
+                <span className="text-[12px] font-medium leading-tight">
+                  {link.label}
+                </span>
+                <span className="text-[10.5px] text-muted-foreground leading-tight">
+                  {link.description}
+                </span>
+              </div>
             </button>
           ))}
         </div>
@@ -199,6 +334,20 @@ export function GeneralSection() {
               ))}
             </SelectContent>
           </Select>
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Security</Label>
+        <SettingRow
+          title="Encrypt stored credentials"
+          description="Credentials are encrypted on disk using an app-managed AES-256-GCM key. No master password required — encryption and decryption happen automatically."
+        >
+          <Switch
+            checked={credentialEncryption}
+            onCheckedChange={handleEncryptionToggle}
+            disabled={pendingEncryption}
+          />
         </SettingRow>
       </div>
     </div>

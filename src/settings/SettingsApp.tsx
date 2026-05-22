@@ -11,14 +11,12 @@ import {
 } from "@/modules/settings/definitions";
 import {
   AiScanIcon,
-  InformationCircleIcon,
   KeyboardIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
   Settings01Icon,
   SourceCodeIcon,
   TerminalIcon,
-  LockPasswordIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -26,8 +24,6 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useState } from "react";
 import * as store from "@/modules/settings/store";
 import type { PrefKey } from "@/modules/settings/store";
-import { AboutSection } from "./sections/AboutSection";
-import { SecuritySection } from "./sections/SecuritySection";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { CommandPaletteSection } from "./sections/CommandPaletteSection";
@@ -66,8 +62,6 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
   { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
-  { id: "security", category: null, label: "Security", icon: LockPasswordIcon },
-  { id: "about", category: "About", label: "About", icon: InformationCircleIcon },
 ];
 
 const VALID_TABS = SIDEBAR_ITEMS.map((s) => s.id);
@@ -196,8 +190,6 @@ export function SettingsApp() {
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
                 {active === "ai" && <AiSection />}
-                {active === "security" && <SecuritySection />}
-                {active === "about" && <AboutSection />}
               </>
             )}
           </div>
