@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { SHORTCUTS, type ShortcutId } from "../shortcuts";
+import { useKeybindsStore } from "./useKeybindsStore";
 
 export type ShortcutHandler = (e: KeyboardEvent) => void;
 export type ShortcutHandlers = Partial<Record<ShortcutId, ShortcutHandler>>;
@@ -15,11 +16,14 @@ export function useGlobalShortcuts(
   const latest = useRef({ handlers, options });
   latest.current = { handlers, options };
 
+  const matchesShortcut = useKeybindsStore((s) => s.matchesShortcut);
+  const overrides = useKeybindsStore((s) => s.overrides);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const { handlers, options } = latest.current;
       for (const s of SHORTCUTS) {
-        if (!s.match(e)) continue;
+        if (!matchesShortcut(s.id, s.match, e)) continue;
         if (options?.isDisabled?.(s.id, e)) return;
         const h = handlers[s.id];
         if (!h) return;
@@ -30,7 +34,7 @@ export function useGlobalShortcuts(
       }
     };
     window.addEventListener("keydown", onKey, { capture: true });
-    return () =>
-      window.removeEventListener("keydown", onKey, { capture: true });
-  }, []);
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overrides]);
 }

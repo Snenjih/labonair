@@ -39,6 +39,8 @@ export type Shortcut = {
 };
 
 const isMod = (e: KeyboardEvent) => e.metaKey || e.ctrlKey;
+// Split shortcuts are macOS-only (Cmd key) — Ctrl+D must not trigger them.
+const isMeta = (e: KeyboardEvent) => e.metaKey && !e.ctrlKey;
 
 export const SHORTCUTS: Shortcut[] = [
   {
@@ -112,14 +114,14 @@ export const SHORTCUTS: Shortcut[] = [
     label: "Split pane right",
     keys: ["⌘", "D"],
     group: "Tabs",
-    match: (e) => isMod(e) && !e.shiftKey && e.key.toLowerCase() === "d",
+    match: (e) => isMeta(e) && !e.shiftKey && e.key.toLowerCase() === "d",
   },
   {
     id: "pane.splitDown",
     label: "Split pane down",
     keys: ["⌘", "⇧", "D"],
     group: "Tabs",
-    match: (e) => isMod(e) && e.shiftKey && e.key.toLowerCase() === "d",
+    match: (e) => isMeta(e) && e.shiftKey && e.key.toLowerCase() === "d",
   },
   {
     id: "pane.close",

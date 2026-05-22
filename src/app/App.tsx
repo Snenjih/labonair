@@ -47,6 +47,7 @@ import {
 import {
   ShortcutsDialog,
   useGlobalShortcuts,
+  useKeybindsStore,
   type ShortcutHandlers,
 } from "@/modules/shortcuts";
 import { StatusBar, type SidebarPanel } from "@/modules/statusbar";
@@ -186,6 +187,11 @@ export default function App() {
   useEffect(() => {
     void initPrefs();
   }, [initPrefs]);
+
+  const initKeybinds = useKeybindsStore((s) => s.init);
+  useEffect(() => {
+    void initKeybinds();
+  }, [initKeybinds]);
   useThemeEngine();
   useEffect(() => {
     if (!prefsHydrated) return;

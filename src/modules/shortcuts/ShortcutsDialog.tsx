@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { SHORTCUTS, SHORTCUT_GROUPS } from "./shortcuts";
+import { useKeybindsStore } from "./lib/useKeybindsStore";
 
 type Props = {
   open: boolean;
@@ -14,6 +15,8 @@ type Props = {
 };
 
 export function ShortcutsDialog({ open, onOpenChange }: Props) {
+  const getEffectiveDisplayKeys = useKeybindsStore((s) => s.getEffectiveDisplayKeys);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -34,21 +37,28 @@ export function ShortcutsDialog({ open, onOpenChange }: Props) {
                   {group}
                 </h3>
                 <ul className="flex flex-col divide-y divide-border/60">
-                  {items.map((s) => (
-                    <li
-                      key={s.id}
-                      className="flex items-center justify-between py-2"
-                    >
-                      <span className="text-sm text-foreground/90">
-                        {s.label}
-                      </span>
-                      <KbdGroup>
-                        {s.keys.map((k, i) => (
-                          <Kbd key={i}>{k}</Kbd>
-                        ))}
-                      </KbdGroup>
-                    </li>
-                  ))}
+                  {items.map((s) => {
+                    const displayKeys = getEffectiveDisplayKeys(s.id, s.keys);
+                    return (
+                      <li
+                        key={s.id}
+                        className="flex items-center justify-between py-2"
+                      >
+                        <span className="text-sm text-foreground/90">
+                          {s.label}
+                        </span>
+                        {displayKeys.length === 0 ? (
+                          <span className="text-xs text-muted-foreground/50">—</span>
+                        ) : (
+                          <KbdGroup>
+                            {displayKeys.map((k, i) => (
+                              <Kbd key={i}>{k}</Kbd>
+                            ))}
+                          </KbdGroup>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             );

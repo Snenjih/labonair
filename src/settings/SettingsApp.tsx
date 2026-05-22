@@ -12,6 +12,7 @@ import {
 import {
   AiScanIcon,
   InformationCircleIcon,
+  KeyboardIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
   Settings01Icon,
@@ -33,6 +34,7 @@ import { AppearanceSection } from "./sections/AppearanceSection";
 import { CommandPaletteSection } from "./sections/CommandPaletteSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
+import { KeyboardShortcutsSection } from "./sections/KeyboardShortcutsSection";
 import { ModelsSection } from "./sections/ModelsSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemeMarketplace } from "./sections/ThemeMarketplace";
@@ -46,6 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { usePreferencesStore as usePrefs } from "@/modules/settings/preferences";
+import { useKeybindsStore } from "@/modules/shortcuts";
 
 type SidebarItem = {
   id: SettingsTab;
@@ -61,6 +64,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
+  { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
   { id: "models", category: "Models", label: "Models", icon: AiScanIcon },
   { id: "agents", category: "Agents", label: "Agents", icon: UserMultiple02Icon },
   { id: "security", category: null, label: "Security", icon: LockPasswordIcon },
@@ -82,10 +86,14 @@ export function SettingsApp() {
   const [active, setActive] = useState<SettingsTab>(readInitialTab);
   const [searchQuery, setSearchQuery] = useState("");
   const init = usePreferencesStore((s) => s.init);
+  const initKeybinds = useKeybindsStore((s) => s.init);
 
   useEffect(() => {
     void init();
   }, [init]);
+  useEffect(() => {
+    void initKeybinds();
+  }, [initKeybinds]);
   useThemeEngine();
 
   useEffect(() => {
@@ -185,6 +193,7 @@ export function SettingsApp() {
                 {active === "terminal" && <TerminalSection />}
                 {active === "editor" && <EditorSection />}
                 {active === "command-palette" && <CommandPaletteSection />}
+                {active === "shortcuts" && <KeyboardShortcutsSection />}
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
                 {active === "security" && <SecuritySection />}

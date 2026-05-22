@@ -7,6 +7,7 @@ export type SettingsTab =
   | "terminal"
   | "editor"
   | "command-palette"
+  | "shortcuts"
   | "models"
   | "agents"
   | "security"
