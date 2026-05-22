@@ -7,7 +7,24 @@ on:
   workflow_dispatch:
 
 jobs:
+  create-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: "Nexum ${{ github.ref_name }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
   publish-tauri:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -21,7 +38,7 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       - name: Install Linux build dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -40,11 +57,11 @@ jobs:
           rustup target add aarch64-apple-darwin
           rustup target add x86_64-apple-darwin
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v4
         with:
           version: 10
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
@@ -58,59 +75,6 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate changelog
-        id: changelog
-        run: |
-          CURRENT_TAG="${{ github.ref_name }}"
-          PREV_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]' | sed -n '2p')
-
-          if [ -z "$PREV_TAG" ]; then
-            RANGE="$CURRENT_TAG"
-          else
-            RANGE="${PREV_TAG}..${CURRENT_TAG}"
-          fi
-
-          FEATS=$(git log "$RANGE" --pretty=format:"%s" | grep -E '^feat' | sed 's/^feat[^:]*: //' || true)
-          FIXES=$(git log "$RANGE" --pretty=format:"%s" | grep -E '^fix' | sed 's/^fix[^:]*: //' || true)
-          OTHERS=$(git log "$RANGE" --pretty=format:"%s" | grep -vE '^(feat|fix|chore|ci|docs|style|test|build|refactor)' || true)
-
-          {
-            echo "## What's Changed"
-            echo ""
-
-            if [ -n "$FEATS" ]; then
-              echo "### Features"
-              echo "$FEATS" | while IFS= read -r line; do echo "- $line"; done
-              echo ""
-            fi
-
-            if [ -n "$FIXES" ]; then
-              echo "### Bug Fixes"
-              echo "$FIXES" | while IFS= read -r line; do echo "- $line"; done
-              echo ""
-            fi
-
-            if [ -n "$OTHERS" ]; then
-              echo "### Other Changes"
-              echo "$OTHERS" | while IFS= read -r line; do echo "- $line"; done
-              echo ""
-            fi
-
-            if [ -n "$PREV_TAG" ]; then
-              echo "**Full Changelog:** https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${CURRENT_TAG}"
-              echo ""
-            fi
-
-            echo "---"
-            echo "_See the assets below to download and install. Auto-update is built in._"
-          } > CHANGELOG_BODY.md
-
-          {
-            echo "body<<EOF"
-            cat CHANGELOG_BODY.md
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -119,7 +83,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Nexum ${{ github.ref_name }}"
-          releaseBody: ${{ steps.changelog.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
