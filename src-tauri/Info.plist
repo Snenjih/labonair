@@ -4,5 +4,7 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Nexum uses your microphone for AI voice input.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Nexum needs access to your local network to connect to SSH servers and devices like Raspberry Pis on your local network.</string>
 </dict>
 </plist>
