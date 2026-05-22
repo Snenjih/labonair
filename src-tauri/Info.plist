@@ -6,5 +6,42 @@
 	<string>Nexum uses your microphone for AI voice input.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Nexum needs access to your local network to connect to SSH servers and devices like Raspberry Pis on your local network.</string>
+
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 Snenjih. All rights reserved.</string>
+
+	<key>NSApplicationSupportsSecureRestorableState</key>
+	<true/>
+
+	<key>LSMultipleInstancesProhibited</key>
+	<true/>
+
+	<key>NSSupportsSuddenTermination</key>
+	<true/>
+
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>sh</string>
+				<string>zsh</string>
+				<string>bash</string>
+				<string>fish</string>
+				<string>env</string>
+				<string>conf</string>
+				<string>toml</string>
+				<string>yaml</string>
+				<string>yml</string>
+				<string>ini</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>Script &amp; Config File</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+		</dict>
+	</array>
 </dict>
 </plist>

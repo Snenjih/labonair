@@ -405,6 +405,9 @@ pub fn run() {
             let menu = build_menu(app)?;
             app.set_menu(menu)?;
 
+            #[cfg(target_os = "macos")]
+            modules::dock_menu::setup(&app.app_handle());
+
             app.on_menu_event(|app, event| {
                 match event.id().as_ref() {
                     "settings" | "open_settings_2" => {
