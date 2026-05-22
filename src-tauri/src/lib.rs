@@ -13,7 +13,7 @@ use modules::{
 };
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_window_state::StateFlags;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
 
 /// Clamps the window position and size so it fits entirely within the current monitor.
 /// Called after tauri_plugin_window_state has restored the previous session's geometry —
@@ -213,7 +213,14 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 
 fn build_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
     // ── Nexum app menu ────────────────────────────────────────────────────────
-    let about       = PredefinedMenuItem::about(app, Some("About Nexum"), None)?;
+    let about_meta = AboutMetadata {
+        version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        copyright: Some("© 2026 Snenjih".to_string()),
+        credits: Some("A modern terminal, SSH & SFTP client with integrated AI for developers.\n\nnexum.app".to_string()),
+        icon: Some(tauri::include_image!("icons/128x128@2x.png")),
+        ..Default::default()
+    };
+    let about       = PredefinedMenuItem::about(app, Some("About Nexum"), Some(about_meta))?;
     let settings    = MenuItem::with_id(app, "settings", "Settings...", true, Some("CmdOrCtrl+,"))?;
     let hide        = PredefinedMenuItem::hide(app, None)?;
     let hide_others = PredefinedMenuItem::hide_others(app, None)?;
