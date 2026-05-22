@@ -7,8 +7,8 @@ export type SettingCategory =
   | "Editor"
   | "Command Palette"
   | "File Manager"
-  | "Models"
-  | "Agents"
+  | "AI"
+  | "Directives"
   | "About";
 
 export type ControlType =
@@ -378,6 +378,29 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
       { value: "0", label: "Never" },
     ],
   },
+
+  // --- AI ---
+  {
+    id: "aiEnabled",
+    label: "AI features",
+    description: "Enable or disable all AI features in the app.",
+    category: "AI",
+    controlType: "Switch",
+  },
+  {
+    id: "showEditPrediction",
+    label: "Show edit completion",
+    description: "Show inline ghost-text edit predictions in the code editor.",
+    category: "AI",
+    controlType: "Switch",
+  },
+  {
+    id: "autocompleteEnabled",
+    label: "Editor autocomplete",
+    description: "Enable ultra-fast inline suggestions powered by Cerebras, Groq, or a local model.",
+    category: "AI",
+    controlType: "Switch",
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [
@@ -387,7 +410,7 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Editor",
   "Command Palette",
   "File Manager",
-  "Models",
-  "Agents",
+  "AI",
+  "Directives",
   "About",
 ];

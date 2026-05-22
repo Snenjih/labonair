@@ -18,7 +18,6 @@ import {
   Settings01Icon,
   SourceCodeIcon,
   TerminalIcon,
-  UserMultiple02Icon,
   LockPasswordIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons";
@@ -38,6 +37,7 @@ import { KeyboardShortcutsSection } from "./sections/KeyboardShortcutsSection";
 import { ModelsSection } from "./sections/ModelsSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemeMarketplace } from "./sections/ThemeMarketplace";
+import { AiSection } from "./sections/AiSection";
 import { SettingRow } from "./components/SettingRow";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -65,8 +65,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
-  { id: "models", category: "Models", label: "Models", icon: AiScanIcon },
-  { id: "agents", category: "Agents", label: "Agents", icon: UserMultiple02Icon },
+  { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
   { id: "security", category: null, label: "Security", icon: LockPasswordIcon },
   { id: "about", category: "About", label: "About", icon: InformationCircleIcon },
 ];
@@ -77,7 +76,7 @@ function readInitialTab(): SettingsTab {
   if (typeof window === "undefined") return "general";
   const url = new URL(window.location.href);
   const t = url.searchParams.get("tab");
-  if (t === "ai" || t === "connections") return "models";
+  if (t === "models" || t === "agents" || t === "connections" || t === "directives") return "ai";
   if (t && (VALID_TABS as string[]).includes(t)) return t as SettingsTab;
   return "general";
 }
@@ -98,8 +97,8 @@ export function SettingsApp() {
 
   useEffect(() => {
     const apply = (detail: string) => {
-      if (detail === "ai" || detail === "connections") {
-        setActive("models");
+      if (detail === "models" || detail === "agents" || detail === "connections" || detail === "directives") {
+        setActive("ai");
         return;
       }
       if ((VALID_TABS as string[]).includes(detail)) {
@@ -196,6 +195,7 @@ export function SettingsApp() {
                 {active === "shortcuts" && <KeyboardShortcutsSection />}
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
+                {active === "ai" && <AiSection />}
                 {active === "security" && <SecuritySection />}
                 {active === "about" && <AboutSection />}
               </>
@@ -229,6 +229,9 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "sftpColumnType": void store.setSftpColumnType(value as boolean); break;
     case "sftpRemoteEditShowTransfers": void store.setSftpRemoteEditShowTransfers(value as boolean); break;
     case "hostPingInterval": void store.setHostPingInterval(Number(value)); break;
+    case "aiEnabled": void store.setAiEnabled(value as boolean); break;
+    case "showEditPrediction": void store.setShowEditPrediction(value as boolean); break;
+    case "autocompleteEnabled": void store.setAutocompleteEnabled(value as boolean); break;
   }
 }
 

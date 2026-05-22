@@ -184,6 +184,7 @@ export default function App() {
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
   const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
+  const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   useEffect(() => {
     void initPrefs();
   }, [initPrefs]);
@@ -1116,13 +1117,13 @@ export default function App() {
                       className="overflow-hidden"
                       aria-hidden={!panelOpen}
                     >
-                      {hasComposer ? (
+                      {aiEnabled && (hasComposer ? (
                         <AiInputBar />
                       ) : (
                         <AiInputBarConnect
-                          onAdd={() => void openSettingsWindow("models")}
+                          onAdd={() => void openSettingsWindow("ai")}
                         />
-                      )}
+                      ))}
                     </motion.div>
                   ) : null}
                 </div>
@@ -1171,7 +1172,7 @@ export default function App() {
             home={home}
             onCd={sendCd}
             onOpenMini={openMini}
-            hasComposer={hasComposer}
+            hasComposer={aiEnabled && hasComposer}
             detectedPreviewUrl={detectedPreviewUrl}
             onOpenPreview={() => {
               if (detectedPreviewUrl) openPreviewTab(detectedPreviewUrl);
@@ -1186,7 +1187,7 @@ export default function App() {
             }}
           />
 
-          {hasComposer ? (
+          {aiEnabled && hasComposer ? (
             <AgentRunBridge
               openAiDiffTab={openAiDiffTab}
               setAiDiffStatus={setAiDiffStatus}
@@ -1194,8 +1195,8 @@ export default function App() {
           ) : null}
 
           <AnimatePresence>
-            {miniOpen && hasComposer ? <AiMiniWindow key="ai-mini" /> : null}
-            {askPopup ? (
+            {aiEnabled && miniOpen && hasComposer ? <AiMiniWindow key="ai-mini" /> : null}
+            {aiEnabled && askPopup ? (
               <SelectionAskAi
                 key="ask-ai-popup"
                 x={askPopup.x}
@@ -1223,7 +1224,7 @@ export default function App() {
     </ThemeProvider>
   );
 
-  if (hasComposer) {
+  if (aiEnabled && hasComposer) {
     return <AiComposerProvider>{shell}</AiComposerProvider>;
   }
   return shell;

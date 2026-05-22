@@ -113,6 +113,10 @@ export type Preferences = {
 
   // --- Host Manager ---
   hostPingInterval: number;
+
+  // --- AI ---
+  aiEnabled: boolean;
+  showEditPrediction: boolean;
 };
 
 const KEY_THEME = "theme";
@@ -178,6 +182,8 @@ const KEY_SIDEBAR_POSITION = "sidebarPosition";
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 const KEY_HOST_PING_INTERVAL = "hostPingInterval";
+const KEY_AI_ENABLED = "aiEnabled";
+const KEY_SHOW_EDIT_PREDICTION = "showEditPrediction";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -244,6 +250,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   checkForUpdates: true,
 
   hostPingInterval: 60,
+
+  aiEnabled: true,
+  showEditPrediction: true,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -410,6 +419,11 @@ export async function loadPreferences(): Promise<Preferences> {
 
     hostPingInterval:
       get<number>(KEY_HOST_PING_INTERVAL) ?? DEFAULT_PREFERENCES.hostPingInterval,
+
+    aiEnabled:
+      get<boolean>(KEY_AI_ENABLED) ?? DEFAULT_PREFERENCES.aiEnabled,
+    showEditPrediction:
+      get<boolean>(KEY_SHOW_EDIT_PREDICTION) ?? DEFAULT_PREFERENCES.showEditPrediction,
   };
 }
 
@@ -716,6 +730,16 @@ export async function setHostPingInterval(value: number): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setAiEnabled(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_AI_ENABLED, value);
+  await (await getStore()).save();
+}
+
+export async function setShowEditPrediction(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_SHOW_EDIT_PREDICTION, value);
+  await (await getStore()).save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -784,6 +808,8 @@ export async function onPreferencesChange(
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_HOST_PING_INTERVAL]: "hostPingInterval",
+    [KEY_AI_ENABLED]: "aiEnabled",
+    [KEY_SHOW_EDIT_PREDICTION]: "showEditPrediction",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];

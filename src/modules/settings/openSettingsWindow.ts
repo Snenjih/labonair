@@ -10,6 +10,8 @@ export type SettingsTab =
   | "shortcuts"
   | "models"
   | "agents"
+  | "ai"
+  | "directives"
   | "security"
   | "about";
 
