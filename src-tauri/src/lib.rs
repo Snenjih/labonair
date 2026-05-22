@@ -108,6 +108,11 @@ async fn ping_host(host_address: String, port: u16) -> Result<bool, String> {
 }
 
 #[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+#[tauri::command]
 async fn show_main_window(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -448,6 +453,7 @@ pub fn run() {
             shell::shell_bg_logs,
             shell::shell_bg_kill,
             shell::shell_bg_list,
+            quit_app,
             show_main_window,
             open_settings_window,
             secrets::secrets_get,

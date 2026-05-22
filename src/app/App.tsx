@@ -265,13 +265,19 @@ export default function App() {
     }
   }, [prefsHydrated, sessionRestore]);
 
-  // Periodic auto-save (every 30 s)
+  // Debounced save on tab state change (3 s after last change) + periodic fallback (30 s)
   useEffect(() => {
     if (!sessionRestore || !prefsHydrated) return;
-    const id = setInterval(() => {
+    const debounce = setTimeout(() => {
+      void captureAndSave(tabs, activeId);
+    }, 3_000);
+    const periodic = setInterval(() => {
       void captureAndSave(tabs, activeId);
     }, 30_000);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(debounce);
+      clearInterval(periodic);
+    };
   }, [sessionRestore, prefsHydrated, tabs, activeId]);
 
   // Keep a ref to latest tabs/activeId for the close handler (avoids re-registering)
@@ -286,9 +292,12 @@ export default function App() {
     let cleanup: (() => void) | undefined;
     void getCurrentWindow().onCloseRequested(async (event) => {
       event.preventDefault();
-      const { tabs: t, activeId: aid } = sessionSaveRef.current;
-      await captureAndSave(t, aid);
-      await getCurrentWindow().destroy();
+      try {
+        const { tabs: t, activeId: aid } = sessionSaveRef.current;
+        await captureAndSave(t, aid);
+      } finally {
+        await invoke("quit_app");
+      }
     }).then((unlisten) => {
       cleanup = unlisten;
     });
