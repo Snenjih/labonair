@@ -4,6 +4,7 @@ import {
   AiStatusBarControls,
 } from "@/modules/ai/components/AiStatusBarControls";
 import { useChatStore } from "@/modules/ai";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   CodeIcon,
   FlashIcon,
@@ -50,6 +51,7 @@ export function StatusBar({
 }: Props) {
   const panelOpen = useChatStore((s) => s.panelOpen);
   const openPanel = useChatStore((s) => s.openPanel);
+  const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
 
   return (
     <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-card/60 px-3 text-[11px]">
@@ -100,12 +102,12 @@ export function StatusBar({
             </span>
           </button>
         ) : null}
-        <AgentStatusPill onClick={onOpenMini} />
-        {panelOpen && hasComposer ? (
+        {aiEnabled && <AgentStatusPill onClick={onOpenMini} />}
+        {aiEnabled && (panelOpen && hasComposer ? (
           <AiStatusBarControls />
         ) : (
           <AiOpenButton onOpen={openPanel} />
-        )}
+        ))}
       </div>
     </footer>
   );
