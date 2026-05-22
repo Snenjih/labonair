@@ -63,9 +63,11 @@ import { WorkspacePane, type TerminalPaneHandle, type WorkspacePaneHandle } from
 import { ThemeProvider } from "@/modules/theme";
 import { CommandPalette, useCommandStore, type RegistryCallbacks } from "@/modules/command-palette";
 import { useThemeEngine } from "@/lib/useThemeEngine";
+import { captureAndSave, clearSnapshot, restoreIfEnabled } from "@/modules/session";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
@@ -97,12 +99,14 @@ export default function App() {
     newSshTab,
     newQuickSshTab,
     newSftpTab,
+    updateSftpPaths,
     openRemoteEditorTab,
     openUntitledTab,
     setActivePaneId,
     updatePaneSessionCwd,
     splitPane,
     closePane,
+    openDefaultTab,
   } = useTabs();
 
   const workspacePaneRefs = useRef<Map<number, WorkspacePaneHandle>>(new Map());
@@ -185,6 +189,9 @@ export default function App() {
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
   const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
+  const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
+
+  const [sessionRestored, setSessionRestored] = useState(false);
   useEffect(() => {
     void initPrefs();
   }, [initPrefs]);
@@ -209,14 +216,84 @@ export default function App() {
 
   // Show the main window once core stores are ready to avoid a white-flash on startup.
   // tauri.conf.json starts the window hidden; this reveals it after hydration.
+  // sessionRestored gates this so restore completes before the window appears.
   useEffect(() => {
-    if (!prefsHydrated || !keysLoaded) return;
+    if (!prefsHydrated || !keysLoaded || !sessionRestored) return;
     void invoke("show_main_window");
-  }, [prefsHydrated, keysLoaded]);
+  }, [prefsHydrated, keysLoaded, sessionRestored]);
 
   useEffect(() => {
     void bootstrapTransferListeners();
   }, []);
+
+  // ── Session restore ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!prefsHydrated) return;
+    if (!sessionRestore) {
+      setSessionRestored(true);
+      return;
+    }
+    let alive = true;
+    void restoreIfEnabled({
+      tabs,
+      setActiveId,
+      newTab,
+      newSshTab,
+      newQuickSshTab,
+      openFileTab,
+      newPreviewTab,
+      openHomeTab,
+      newSftpTab,
+      splitPane,
+      setActivePaneId,
+    }).then((result) => {
+      if (!alive) return;
+      if (!result || result.restoredCount === 0) {
+        openDefaultTab();
+      }
+      setSessionRestored(true);
+    });
+    return () => { alive = false; };
+  // Only run once on startup — intentionally omit tabs/callbacks from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefsHydrated, sessionRestore]);
+
+  // Clear snapshot when session restore is toggled off
+  useEffect(() => {
+    if (prefsHydrated && !sessionRestore) {
+      void clearSnapshot();
+    }
+  }, [prefsHydrated, sessionRestore]);
+
+  // Periodic auto-save (every 30 s)
+  useEffect(() => {
+    if (!sessionRestore || !prefsHydrated) return;
+    const id = setInterval(() => {
+      void captureAndSave(tabs, activeId);
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [sessionRestore, prefsHydrated, tabs, activeId]);
+
+  // Keep a ref to latest tabs/activeId for the close handler (avoids re-registering)
+  const sessionSaveRef = useRef<{ tabs: typeof tabs; activeId: number }>({ tabs, activeId });
+  useEffect(() => {
+    sessionSaveRef.current = { tabs, activeId };
+  }, [tabs, activeId]);
+
+  // Save on clean app close (registered once, reads latest state via ref)
+  useEffect(() => {
+    if (!sessionRestore) return;
+    let cleanup: (() => void) | undefined;
+    void getCurrentWindow().onCloseRequested(async (event) => {
+      event.preventDefault();
+      const { tabs: t, activeId: aid } = sessionSaveRef.current;
+      await captureAndSave(t, aid);
+      await getCurrentWindow().destroy();
+    }).then((unlisten) => {
+      cleanup = unlisten;
+    });
+    return () => cleanup?.();
+  }, [sessionRestore]);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const isWorkspaceTab = activeTab?.kind === "workspace";
@@ -1100,7 +1177,7 @@ export default function App() {
                         )}
                         aria-hidden={activeId !== t.id}
                       >
-                        <SftpPane tab={t as SftpTab} onOpenSshTerminal={newSshTab} onOpenRemoteEditor={openRemoteEditorTab} />
+                        <SftpPane tab={t as SftpTab} onOpenSshTerminal={newSshTab} onOpenRemoteEditor={openRemoteEditorTab} onPathsChange={updateSftpPaths} />
                       </div>
                     ))}
                   </div>

@@ -55,6 +55,7 @@ export type Preferences = {
   openaiCompatibleModelId: string;
   vimMode: boolean;
   defaultStartupTab: "terminal" | "host-manager";
+  sessionRestore: boolean;
 
   // --- App Appearance ---
   appTheme: string;
@@ -134,6 +135,7 @@ const KEY_OPENAI_COMPATIBLE_BASE_URL = "openaiCompatibleBaseURL";
 const KEY_OPENAI_COMPATIBLE_MODEL_ID = "openaiCompatibleModelId";
 const KEY_VIM_MODE = "vimMode";
 const KEY_DEFAULT_STARTUP_TAB = "defaultStartupTab";
+const KEY_SESSION_RESTORE = "sessionRestore";
 
 const KEY_APP_THEME = "appTheme";
 const KEY_APP_FONT_FAMILY = "appFontFamily";
@@ -201,6 +203,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   openaiCompatibleModelId: "",
   vimMode: false,
   defaultStartupTab: "host-manager",
+  sessionRestore: false,
 
   appTheme: "default",
   appFontFamily: "system-ui",
@@ -307,6 +310,8 @@ export async function loadPreferences(): Promise<Preferences> {
     defaultStartupTab:
       get<"terminal" | "host-manager">(KEY_DEFAULT_STARTUP_TAB) ??
       DEFAULT_PREFERENCES.defaultStartupTab,
+    sessionRestore:
+      get<boolean>(KEY_SESSION_RESTORE) ?? DEFAULT_PREFERENCES.sessionRestore,
 
     appTheme: get<string>(KEY_APP_THEME) ?? DEFAULT_PREFERENCES.appTheme,
     appFontFamily:
@@ -503,6 +508,11 @@ export async function setDefaultStartupTab(
   value: "terminal" | "host-manager",
 ): Promise<void> {
   await (await getStore()).set(KEY_DEFAULT_STARTUP_TAB, value);
+  await (await getStore()).save();
+}
+
+export async function setSessionRestore(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_SESSION_RESTORE, value);
   await (await getStore()).save();
 }
 
@@ -762,6 +772,7 @@ export async function onPreferencesChange(
     [KEY_OPENAI_COMPATIBLE_MODEL_ID]: "openaiCompatibleModelId",
     [KEY_VIM_MODE]: "vimMode",
     [KEY_DEFAULT_STARTUP_TAB]: "defaultStartupTab",
+    [KEY_SESSION_RESTORE]: "sessionRestore",
 
     [KEY_APP_THEME]: "appTheme",
     [KEY_APP_FONT_FAMILY]: "appFontFamily",

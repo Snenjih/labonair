@@ -161,3 +161,22 @@ pub async fn fs_stat(path: String) -> Result<FileStat, String> {
     .await
     .map_err(|e| e.to_string())?
 }
+
+#[tauri::command]
+pub async fn fs_file_exists(path: String) -> bool {
+    tokio::task::spawn_blocking(move || {
+        let p = if path == "~" {
+            dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from(&path))
+        } else if let Some(stripped) = path.strip_prefix("~/") {
+            dirs::home_dir()
+                .map(|mut h| { h.push(stripped); h })
+                .unwrap_or_else(|| std::path::PathBuf::from(&path))
+        } else {
+            std::path::PathBuf::from(&path)
+        };
+        p.exists()
+    })
+    .await
+    .unwrap_or(false)
+}
+

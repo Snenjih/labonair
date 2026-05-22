@@ -15,6 +15,7 @@ import {
   setDefaultStartupTab,
   setHostPingInterval,
   setRestoreWindowState,
+  setSessionRestore,
   setVimMode,
 } from "@/modules/settings/store";
 import { useUpdater } from "@/modules/updater";
@@ -88,6 +89,7 @@ export function GeneralSection() {
 
   const autostart = usePreferencesStore((s) => s.autostart);
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
+  const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
@@ -280,6 +282,15 @@ export function GeneralSection() {
             <Switch
               checked={restoreWindowState}
               onCheckedChange={(v) => void setRestoreWindowState(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Session restore"
+            description="Reopen all tabs, SSH connections, SFTP paths, and editor files on the next launch. Periodically auto-saved."
+          >
+            <Switch
+              checked={sessionRestore}
+              onCheckedChange={(v) => void setSessionRestore(v)}
             />
           </SettingRow>
           <SettingRow

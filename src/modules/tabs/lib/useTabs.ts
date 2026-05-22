@@ -89,6 +89,8 @@ export type SftpTab = {
   kind: "sftp";
   title: string;
   hostId: string;
+  remotePath?: string;
+  localPath?: string;
 };
 
 export type QuickConnectParams = {
@@ -181,17 +183,15 @@ function titleFromUrl(url: string): string {
 export function useTabs() {
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
+  const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
 
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeId, setActiveId] = useState(-1);
   const nextIdRef = useRef(1);
   const initialTabOpened = useRef(false);
 
-  // Open the initial tab once preferences are hydrated, based on the user setting.
-  // The window stays hidden until hydration (see App.tsx), so the user never sees
-  // the brief empty state.
-  useEffect(() => {
-    if (!prefsHydrated || initialTabOpened.current) return;
+  const openDefaultTab = useCallback(() => {
+    if (initialTabOpened.current) return;
     initialTabOpened.current = true;
     const id = nextIdRef.current++;
     if (defaultStartupTab === "terminal") {
@@ -210,7 +210,19 @@ export function useTabs() {
       setTabs([{ id, kind: "home", title: "Home" }]);
       setActiveId(id);
     }
-  }, [prefsHydrated, defaultStartupTab]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultStartupTab]);
+
+  // Open the initial tab once preferences are hydrated, based on the user setting.
+  // When session restore is enabled, skip — App.tsx restore logic calls openDefaultTab
+  // as a fallback if no snapshot exists.
+  // The window stays hidden until hydration (see App.tsx), so the user never sees
+  // the brief empty state.
+  useEffect(() => {
+    if (!prefsHydrated || initialTabOpened.current) return;
+    if (sessionRestore) return;
+    openDefaultTab();
+  }, [prefsHydrated, sessionRestore, openDefaultTab]);
 
   // ── Workspace / terminal tabs ────────────────────────────────────────────────
 
@@ -568,6 +580,14 @@ export function useTabs() {
     return id;
   }, []);
 
+  const updateSftpPaths = useCallback((tabId: number, remotePath: string, localPath: string) => {
+    setTabs((curr) =>
+      curr.map((t) =>
+        t.kind === "sftp" && t.id === tabId ? { ...t, remotePath, localPath } : t,
+      ),
+    );
+  }, []);
+
   const openUntitledTab = useCallback(async () => {
     const id = nextIdRef.current++;
     const tempPath = await invoke<string>("fs_create_temp_file", { prefix: `untitled-${id}` });
@@ -666,6 +686,7 @@ export function useTabs() {
     activeId,
     setActiveId,
     newTab,
+    openDefaultTab,
     openHomeTab,
     openFileTab,
     newPreviewTab,
@@ -677,6 +698,7 @@ export function useTabs() {
     newSshTab,
     newQuickSshTab,
     newSftpTab,
+    updateSftpPaths,
     openRemoteEditorTab,
     openUntitledTab,
     // Workspace/pane actions

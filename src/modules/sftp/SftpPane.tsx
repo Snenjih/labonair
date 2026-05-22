@@ -32,9 +32,10 @@ interface SftpPaneProps {
   tab: SftpTab;
   onOpenSshTerminal?: (hostId: string, title: string, cwd: string) => void;
   onOpenRemoteEditor: (tabId: string, remotePath: string) => Promise<void>;
+  onPathsChange?: (tabId: number, remotePath: string, localPath: string) => void;
 }
 
-export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor }: SftpPaneProps) {
+export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsChange }: SftpPaneProps) {
   const tabId = String(tab.id);
   const {
     initTab,
@@ -87,6 +88,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor }: SftpPan
     return () => destroyTab(tabId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, isConnected]);
+
+  useEffect(() => {
+    if (!tabState || !onPathsChange) return;
+    onPathsChange(tab.id, tabState.remotePath, tabState.localPath);
+  }, [tab.id, tabState?.remotePath, tabState?.localPath, onPathsChange]);
 
   function handleLocalSelect(path: string, multi: boolean) {
     const current = tabState?.selectedLocalPaths ?? new Set<string>();
