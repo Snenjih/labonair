@@ -183,17 +183,15 @@ export function EditorStack({
             )}
             aria-hidden={!visible}
           >
-            <div className="h-full overflow-hidden rounded-md border border-border/60 bg-background">
-              <EditorPane
-                ref={getRefCallback(t.id)}
-                path={t.path}
-                isUntitled={t.isUntitled}
-                onDirtyChange={getDirtyCallback(t.id)}
-                onClose={getCloseCallback(t.id)}
-                onSaved={getSavedCallback(t)}
-                onSaveAs={getSaveAsCallback(t)}
-              />
-            </div>
+            <EditorPane
+              ref={getRefCallback(t.id)}
+              path={t.path}
+              isUntitled={t.isUntitled}
+              onDirtyChange={getDirtyCallback(t.id)}
+              onClose={getCloseCallback(t.id)}
+              onSaved={getSavedCallback(t)}
+              onSaveAs={getSaveAsCallback(t)}
+            />
           </div>
         );
       })}
