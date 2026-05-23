@@ -89,6 +89,21 @@ pub async fn run_worker(
                     emit_progress(&app, &job);
                 }
                 Err(e) => {
+                    // Detect network-level failures and notify the frontend so
+                    // it can show the reconnect overlay (same event as pty.rs).
+                    if !cancelled.contains(&job.id) && is_network_error(&e) {
+                        if let Ok(mut map) = sftp_state.0.lock() {
+                            map.remove(&job.session_id);
+                        }
+                        use tauri::Emitter;
+                        let _ = app.emit(
+                            "ssh_connection_lost",
+                            serde_json::json!({
+                                "session_id": job.session_id,
+                                "reason": e,
+                            }),
+                        );
+                    }
                     job.status = if cancelled.contains(&job.id) {
                         TransferStatus::Cancelled
                     } else {
@@ -122,6 +137,17 @@ pub async fn run_worker(
 fn emit_progress(app: &tauri::AppHandle, job: &TransferJob) {
     use tauri::Emitter;
     let _ = app.emit("transfer_progress", job);
+}
+
+fn is_network_error(e: &str) -> bool {
+    let lower = e.to_lowercase();
+    lower.contains("broken pipe")
+        || lower.contains("connection reset")
+        || lower.contains("connection refused")
+        || lower.contains("no route to host")
+        || lower.contains("network")
+        || lower.contains("no sftp session")
+        || lower.contains("sftp_state lock")
 }
 
 async fn process_job(
