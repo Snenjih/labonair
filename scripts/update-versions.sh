@@ -9,13 +9,13 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "==> Updating pnpm-lock.yaml..."
 cd "$REPO_ROOT"
-pnpm install
+pnpm update
 echo "    pnpm-lock.yaml updated."
 
 echo ""
 echo "==> Updating Cargo.lock..."
 cd "$REPO_ROOT/src-tauri"
-cargo install --path .
+cargo update
 echo "    Cargo.lock updated."
 
 echo ""
