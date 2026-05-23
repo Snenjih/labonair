@@ -17,6 +17,10 @@ import {
   setRestoreWindowState,
   setSessionRestore,
   setVimMode,
+  setReduceMotion,
+  setNewTabInheritsCwd,
+  setConfirmCloseTerminalTab,
+  setConfirmQuitWithSsh,
 } from "@/modules/settings/store";
 import { useUpdater } from "@/modules/updater";
 import {
@@ -95,6 +99,10 @@ export function GeneralSection() {
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
   const hostPingInterval = usePreferencesStore((s) => s.hostPingInterval);
   const credentialEncryption = usePreferencesStore((s) => s.credentialEncryption);
+  const reduceMotion = usePreferencesStore((s) => s.reduceMotion);
+  const newTabInheritsCwd = usePreferencesStore((s) => s.newTabInheritsCwd);
+  const confirmCloseTerminalTab = usePreferencesStore((s) => s.confirmCloseTerminalTab);
+  const confirmQuitWithSsh = usePreferencesStore((s) => s.confirmQuitWithSsh);
 
   const { status, check, install } = useUpdater({ autoCheck: false });
   const checking = status.kind === "checking";
@@ -358,6 +366,50 @@ export function GeneralSection() {
             checked={credentialEncryption}
             onCheckedChange={handleEncryptionToggle}
             disabled={pendingEncryption}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Confirm quit with active SSH connections"
+          description="Show a confirmation dialog before closing the app when SSH sessions are open."
+        >
+          <Switch
+            checked={confirmQuitWithSsh}
+            onCheckedChange={(v) => void setConfirmQuitWithSsh(v)}
+          />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Tabs</Label>
+        <SettingRow
+          title="New tab inherits current directory"
+          description="Open new terminal tabs in the working directory of the active tab instead of the home directory."
+        >
+          <Switch
+            checked={newTabInheritsCwd}
+            onCheckedChange={(v) => void setNewTabInheritsCwd(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Confirm before closing terminal tab"
+          description="Show a confirmation dialog when closing a terminal tab with a running shell."
+        >
+          <Switch
+            checked={confirmCloseTerminalTab}
+            onCheckedChange={(v) => void setConfirmCloseTerminalTab(v)}
+          />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Accessibility</Label>
+        <SettingRow
+          title="Reduce motion"
+          description="Disable all UI animations. Useful for motion sensitivity or older hardware."
+        >
+          <Switch
+            checked={reduceMotion}
+            onCheckedChange={(v) => void setReduceMotion(v)}
           />
         </SettingRow>
       </div>

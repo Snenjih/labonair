@@ -223,6 +223,21 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             | "normal" | "bold" | "100" | "200" | "300" | "400"
             | "500" | "600" | "700" | "800" | "900" | undefined;
         }
+        if (state.terminalRightClickPastes !== prev.terminalRightClickPastes) {
+          term.options.rightClickSelectsWord = !state.terminalRightClickPastes;
+        }
+        if (state.terminalWordSeparator !== prev.terminalWordSeparator) {
+          term.options.wordSeparator = state.terminalWordSeparator;
+        }
+        if (state.terminalScrollSensitivity !== prev.terminalScrollSensitivity) {
+          term.options.scrollSensitivity = state.terminalScrollSensitivity;
+        }
+        if (state.terminalFastScrollModifier !== prev.terminalFastScrollModifier) {
+          (term.options as Record<string, unknown>).fastScrollModifier =
+            state.terminalFastScrollModifier === "none"
+              ? undefined
+              : state.terminalFastScrollModifier;
+        }
       });
       return unsub;
     }, []);
@@ -306,6 +321,22 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             | "normal" | "bold" | "100" | "200" | "300" | "400"
             | "500" | "600" | "700" | "800" | "900" | undefined,
           allowProposedApi: true,
+          rightClickSelectsWord: !prefs.terminalRightClickPastes,
+          wordSeparator: prefs.terminalWordSeparator,
+          scrollSensitivity: prefs.terminalScrollSensitivity,
+          // fastScrollModifier is a runtime option in xterm v6 but not in public types
+          ...({
+            fastScrollModifier:
+              prefs.terminalFastScrollModifier === "none"
+                ? undefined
+                : prefs.terminalFastScrollModifier,
+          } as Record<string, unknown>),
+        });
+        // copyOnSelect: not a built-in option in xterm v6 — implement via selection event
+        t.onSelectionChange(() => {
+          if (!usePreferencesStore.getState().terminalCopyOnSelect) return;
+          const text = t.getSelection();
+          if (text) void navigator.clipboard.writeText(text).catch(() => undefined);
         });
         term = t;
         termRef.current = t;

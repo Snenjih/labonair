@@ -21,6 +21,11 @@ import {
   setTerminalShowPaneFooter,
   setTerminalUseWebGL,
   setTerminalBell,
+  setTerminalCopyOnSelect,
+  setTerminalRightClickPastes,
+  setTerminalWordSeparator,
+  setTerminalScrollSensitivity,
+  setTerminalFastScrollModifier,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -38,6 +43,11 @@ export function TerminalSection() {
   const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
   const terminalUseWebGL = usePreferencesStore((s) => s.terminalUseWebGL);
   const terminalBell = usePreferencesStore((s) => s.terminalBell);
+  const terminalCopyOnSelect = usePreferencesStore((s) => s.terminalCopyOnSelect);
+  const terminalRightClickPastes = usePreferencesStore((s) => s.terminalRightClickPastes);
+  const terminalWordSeparator = usePreferencesStore((s) => s.terminalWordSeparator);
+  const terminalScrollSensitivity = usePreferencesStore((s) => s.terminalScrollSensitivity);
+  const terminalFastScrollModifier = usePreferencesStore((s) => s.terminalFastScrollModifier);
 
   return (
     <div className="flex flex-col gap-6">
@@ -214,6 +224,75 @@ export function TerminalSection() {
             step={500}
             onChange={(v) => void setTerminalScrollback(v)}
           />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Input</Label>
+        <SettingRow
+          title="Copy on select"
+          description="Automatically copy selected text to the clipboard."
+        >
+          <Switch
+            checked={terminalCopyOnSelect}
+            onCheckedChange={(v) => void setTerminalCopyOnSelect(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Right-click pastes"
+          description="Paste clipboard content on right-click instead of showing a context menu."
+        >
+          <Switch
+            checked={terminalRightClickPastes}
+            onCheckedChange={(v) => void setTerminalRightClickPastes(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Word separators"
+          description="Characters treated as word boundaries when double-clicking to select."
+        >
+          <Input
+            value={terminalWordSeparator}
+            onChange={(e) => void setTerminalWordSeparator(e.target.value)}
+            className="h-7 w-52 font-mono text-[11.5px]"
+          />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Scrolling</Label>
+        <SettingRow
+          title="Scroll sensitivity"
+          description="Number of lines scrolled per mouse wheel tick."
+        >
+          <NumInput
+            value={terminalScrollSensitivity}
+            min={1}
+            max={10}
+            step={1}
+            onChange={(v) => void setTerminalScrollSensitivity(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Fast scroll modifier"
+          description="Hold this key to scroll faster. Applies to new terminal sessions."
+        >
+          <Select
+            value={terminalFastScrollModifier}
+            onValueChange={(v) =>
+              void setTerminalFastScrollModifier(v as "none" | "alt" | "ctrl" | "shift")
+            }
+          >
+            <SelectTrigger className="h-7 w-28 text-[11.5px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none" className="text-[11.5px]">None</SelectItem>
+              <SelectItem value="alt" className="text-[11.5px]">Alt</SelectItem>
+              <SelectItem value="ctrl" className="text-[11.5px]">Ctrl</SelectItem>
+              <SelectItem value="shift" className="text-[11.5px]">Shift</SelectItem>
+            </SelectContent>
+          </Select>
         </SettingRow>
       </div>
     </div>

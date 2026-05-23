@@ -56,6 +56,9 @@ type Deps = {
   getOpenaiCompatibleModelId?: () => string | undefined;
   onStep?: (step: string | null) => void;
   getPlanMode?: () => boolean;
+  getMaxAgentSteps?: () => number;
+  getTemperature?: () => number;
+  getTerminalContextLines?: () => number;
 };
 
 export function createContextAwareTransport(deps: Deps) {
@@ -66,6 +69,7 @@ export function createContextAwareTransport(deps: Deps) {
     }) {
       const live = deps.getLive();
       const projectMemory = await readNexumMd(live.workspaceRoot);
+      const bufferLines = deps.getTerminalContextLines?.() ?? TERMINAL_BUFFER_LINES;
       const agent = await createNexumAgent({
         keys: deps.getKeys(),
         modelId: deps.getModelId(),
@@ -79,9 +83,11 @@ export function createContextAwareTransport(deps: Deps) {
         openaiCompatibleModelId: deps.getOpenaiCompatibleModelId?.(),
         planMode: deps.getPlanMode?.(),
         projectMemory,
+        maxAgentSteps: deps.getMaxAgentSteps?.(),
+        temperature: deps.getTemperature?.(),
       });
       const base = new DirectChatTransport({ agent });
-      const augmented = injectContext(options.messages, deps.getLive());
+      const augmented = injectContext(options.messages, live, bufferLines);
       return base.sendMessages({
         ...options,
         messages: augmented,
@@ -103,6 +109,8 @@ export function createContextAwareTransport(deps: Deps) {
         openaiCompatibleModelId: deps.getOpenaiCompatibleModelId?.(),
         planMode: deps.getPlanMode?.(),
         projectMemory,
+        maxAgentSteps: deps.getMaxAgentSteps?.(),
+        temperature: deps.getTemperature?.(),
       });
       const base = new DirectChatTransport({ agent });
       type ReconnectArg = Parameters<typeof base.reconnectToStream>[0];
@@ -111,12 +119,12 @@ export function createContextAwareTransport(deps: Deps) {
   };
 }
 
-function injectContext(messages: UIMessage[], live: LiveSnapshot): UIMessage[] {
+function injectContext(messages: UIMessage[], live: LiveSnapshot, bufferLines: number): UIMessage[] {
   if (!live.cwd && !live.terminal && !live.workspaceRoot) return messages;
   const lastUserIdx = lastIndex(messages, (m) => m.role === "user");
   if (lastUserIdx === -1) return messages;
 
-  const block = formatContextBlock(live);
+  const block = formatContextBlock(live, bufferLines);
   return messages.map((m, i) => {
     if (i !== lastUserIdx) return m;
     const contextPart = { type: "text" as const, text: block };
@@ -127,7 +135,7 @@ function injectContext(messages: UIMessage[], live: LiveSnapshot): UIMessage[] {
   });
 }
 
-function formatContextBlock(live: LiveSnapshot): string {
+function formatContextBlock(live: LiveSnapshot, bufferLines: number): string {
   const lines = [
     '<terminal-context note="auto-injected, read-only">',
     `workspace_root: ${live.workspaceRoot ?? "(unknown)"}`,
@@ -136,7 +144,7 @@ function formatContextBlock(live: LiveSnapshot): string {
   if (live.activeFile) lines.push(`active_file: ${live.activeFile}`);
   if (live.terminal) {
     const trimmed = capChars(
-      lastNLines(live.terminal, TERMINAL_BUFFER_LINES),
+      lastNLines(live.terminal, bufferLines),
       MAX_TERMINAL_CHARS,
     );
     lines.push("recent_terminal_output:");

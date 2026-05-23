@@ -3,6 +3,16 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
@@ -71,7 +81,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 
@@ -194,9 +204,14 @@ export default function App() {
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
+  const reduceMotion = usePreferencesStore((s) => s.reduceMotion);
+  const newTabInheritsCwd = usePreferencesStore((s) => s.newTabInheritsCwd);
+  const confirmCloseTerminalTab = usePreferencesStore((s) => s.confirmCloseTerminalTab);
+  const confirmQuitWithSsh = usePreferencesStore((s) => s.confirmQuitWithSsh);
   useUpdater({ autoCheck: checkForUpdates });
 
   const [sessionRestored, setSessionRestored] = useState(false);
+  const [pendingCloseTabId, setPendingCloseTabId] = useState<number | null>(null);
   useEffect(() => {
     void initPrefs();
   }, [initPrefs]);
@@ -308,15 +323,36 @@ export default function App() {
     sessionSaveRef.current = { tabs, activeId };
   }, [tabs, activeId]);
 
+  // Keep a ref to latest confirmQuitWithSsh so the close handler always sees current value
+  const confirmQuitRef = useRef(confirmQuitWithSsh);
+  useEffect(() => { confirmQuitRef.current = confirmQuitWithSsh; }, [confirmQuitWithSsh]);
+
   // Save on clean app close (registered once, reads latest state via ref)
   useEffect(() => {
-    if (!sessionRestore) return;
+    if (!sessionRestore && !confirmQuitWithSsh) return;
     let cleanup: (() => void) | undefined;
     void getCurrentWindow().onCloseRequested(async (event) => {
       event.preventDefault();
+      // Check for active SSH sessions before quitting
+      if (confirmQuitRef.current) {
+        const { tabs: currentTabs } = sessionSaveRef.current;
+        const sshCount = currentTabs.filter(
+          (t) =>
+            t.kind === "workspace" &&
+            Object.values(t.sessions).some((s) => s.kind === "ssh"),
+        ).length;
+        if (sshCount > 0) {
+          const ok = window.confirm(
+            `You have ${sshCount} active SSH connection${sshCount > 1 ? "s" : ""}. Quit anyway?`,
+          );
+          if (!ok) return;
+        }
+      }
       try {
-        const { tabs: t, activeId: aid } = sessionSaveRef.current;
-        await captureAndSave(t, aid);
+        if (sessionRestore) {
+          const { tabs: t, activeId: aid } = sessionSaveRef.current;
+          await captureAndSave(t, aid);
+        }
       } finally {
         await invoke("quit_app");
       }
@@ -324,7 +360,8 @@ export default function App() {
       cleanup = unlisten;
     });
     return () => cleanup?.();
-  }, [sessionRestore]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionRestore, confirmQuitWithSsh]);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const isWorkspaceTab = activeTab?.kind === "workspace";
@@ -407,6 +444,10 @@ export default function App() {
       // For workspace tabs: always close the entire tab from the tab bar.
       // Individual pane X buttons call closePane directly via onClosePane.
       if (t?.kind === "workspace") {
+        if (confirmCloseTerminalTab) {
+          setPendingCloseTabId(id);
+          return;
+        }
         disposeTab(id);
         return;
       }
@@ -433,7 +474,7 @@ export default function App() {
       }
       disposeTab(id);
     },
-    [tabs, disposeTab, closePane],
+    [tabs, disposeTab, closePane, confirmCloseTerminalTab],
   );
 
   const handleCloseOthers = useCallback(
@@ -566,8 +607,8 @@ export default function App() {
   }, [askFromSelection]);
 
   const openNewTab = useCallback(() => {
-    newTab(inheritedCwdForNewTab());
-  }, [newTab, inheritedCwdForNewTab]);
+    newTab(newTabInheritsCwd ? inheritedCwdForNewTab() : undefined);
+  }, [newTab, inheritedCwdForNewTab, newTabInheritsCwd]);
 
   const onOpenHostManager = useCallback(() => {
     openHomeTab();
@@ -1083,6 +1124,7 @@ export default function App() {
   );
 
   const shell = (
+    <MotionConfig reducedMotion={reduceMotion ? "always" : "never"}>
     <ThemeProvider>
       <TooltipProvider>
         <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
@@ -1372,9 +1414,36 @@ export default function App() {
 
           <UpdaterDialog />
 
+          {/* Confirm close terminal tab */}
+          <AlertDialog
+            open={pendingCloseTabId !== null}
+            onOpenChange={(open) => { if (!open) setPendingCloseTabId(null); }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Close terminal tab?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The running shell process will be terminated.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (pendingCloseTabId !== null) disposeTab(pendingCloseTabId);
+                    setPendingCloseTabId(null);
+                  }}
+                >
+                  Close
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
         </div>
       </TooltipProvider>
     </ThemeProvider>
+    </MotionConfig>
   );
 
   if (aiEnabled && hasComposer) {

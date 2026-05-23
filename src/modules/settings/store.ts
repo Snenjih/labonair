@@ -118,6 +118,27 @@ export type Preferences = {
   // --- AI ---
   aiEnabled: boolean;
   showEditPrediction: boolean;
+  aiMaxAgentSteps: number;
+  aiTerminalContextLines: number;
+  aiTemperature: number;
+  aiWarnDestructiveCommands: boolean;
+
+  // --- Terminal (input / scrolling) ---
+  terminalCopyOnSelect: boolean;
+  terminalRightClickPastes: boolean;
+  terminalWordSeparator: string;
+  terminalScrollSensitivity: number;
+  terminalFastScrollModifier: "none" | "alt" | "ctrl" | "shift";
+
+  // --- Accessibility ---
+  reduceMotion: boolean;
+
+  // --- Tabs ---
+  newTabInheritsCwd: boolean;
+  confirmCloseTerminalTab: boolean;
+
+  // --- Quit ---
+  confirmQuitWithSsh: boolean;
 };
 
 const KEY_THEME = "theme";
@@ -186,6 +207,19 @@ const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 const KEY_HOST_PING_INTERVAL = "hostPingInterval";
 const KEY_AI_ENABLED = "aiEnabled";
 const KEY_SHOW_EDIT_PREDICTION = "showEditPrediction";
+const KEY_AI_MAX_AGENT_STEPS = "aiMaxAgentSteps";
+const KEY_AI_TERMINAL_CONTEXT_LINES = "aiTerminalContextLines";
+const KEY_AI_TEMPERATURE = "aiTemperature";
+const KEY_AI_WARN_DESTRUCTIVE = "aiWarnDestructiveCommands";
+const KEY_TERMINAL_COPY_ON_SELECT = "terminalCopyOnSelect";
+const KEY_TERMINAL_RIGHT_CLICK_PASTES = "terminalRightClickPastes";
+const KEY_TERMINAL_WORD_SEPARATOR = "terminalWordSeparator";
+const KEY_TERMINAL_SCROLL_SENSITIVITY = "terminalScrollSensitivity";
+const KEY_TERMINAL_FAST_SCROLL_MODIFIER = "terminalFastScrollModifier";
+const KEY_REDUCE_MOTION = "reduceMotion";
+const KEY_NEW_TAB_INHERITS_CWD = "newTabInheritsCwd";
+const KEY_CONFIRM_CLOSE_TERMINAL_TAB = "confirmCloseTerminalTab";
+const KEY_CONFIRM_QUIT_WITH_SSH = "confirmQuitWithSsh";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -256,6 +290,21 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
   aiEnabled: true,
   showEditPrediction: true,
+  aiMaxAgentSteps: 24,
+  aiTerminalContextLines: 300,
+  aiTemperature: 0.7,
+  aiWarnDestructiveCommands: true,
+
+  terminalCopyOnSelect: false,
+  terminalRightClickPastes: false,
+  terminalWordSeparator: " ()[]{}',\"`",
+  terminalScrollSensitivity: 1,
+  terminalFastScrollModifier: "alt",
+
+  reduceMotion: false,
+  newTabInheritsCwd: true,
+  confirmCloseTerminalTab: false,
+  confirmQuitWithSsh: true,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -429,6 +478,32 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_AI_ENABLED) ?? DEFAULT_PREFERENCES.aiEnabled,
     showEditPrediction:
       get<boolean>(KEY_SHOW_EDIT_PREDICTION) ?? DEFAULT_PREFERENCES.showEditPrediction,
+    aiMaxAgentSteps:
+      get<number>(KEY_AI_MAX_AGENT_STEPS) ?? DEFAULT_PREFERENCES.aiMaxAgentSteps,
+    aiTerminalContextLines:
+      get<number>(KEY_AI_TERMINAL_CONTEXT_LINES) ?? DEFAULT_PREFERENCES.aiTerminalContextLines,
+    aiTemperature:
+      get<number>(KEY_AI_TEMPERATURE) ?? DEFAULT_PREFERENCES.aiTemperature,
+    aiWarnDestructiveCommands:
+      get<boolean>(KEY_AI_WARN_DESTRUCTIVE) ?? DEFAULT_PREFERENCES.aiWarnDestructiveCommands,
+    terminalCopyOnSelect:
+      get<boolean>(KEY_TERMINAL_COPY_ON_SELECT) ?? DEFAULT_PREFERENCES.terminalCopyOnSelect,
+    terminalRightClickPastes:
+      get<boolean>(KEY_TERMINAL_RIGHT_CLICK_PASTES) ?? DEFAULT_PREFERENCES.terminalRightClickPastes,
+    terminalWordSeparator:
+      get<string>(KEY_TERMINAL_WORD_SEPARATOR) ?? DEFAULT_PREFERENCES.terminalWordSeparator,
+    terminalScrollSensitivity:
+      get<number>(KEY_TERMINAL_SCROLL_SENSITIVITY) ?? DEFAULT_PREFERENCES.terminalScrollSensitivity,
+    terminalFastScrollModifier:
+      get<"none" | "alt" | "ctrl" | "shift">(KEY_TERMINAL_FAST_SCROLL_MODIFIER) ?? DEFAULT_PREFERENCES.terminalFastScrollModifier,
+    reduceMotion:
+      get<boolean>(KEY_REDUCE_MOTION) ?? DEFAULT_PREFERENCES.reduceMotion,
+    newTabInheritsCwd:
+      get<boolean>(KEY_NEW_TAB_INHERITS_CWD) ?? DEFAULT_PREFERENCES.newTabInheritsCwd,
+    confirmCloseTerminalTab:
+      get<boolean>(KEY_CONFIRM_CLOSE_TERMINAL_TAB) ?? DEFAULT_PREFERENCES.confirmCloseTerminalTab,
+    confirmQuitWithSsh:
+      get<boolean>(KEY_CONFIRM_QUIT_WITH_SSH) ?? DEFAULT_PREFERENCES.confirmQuitWithSsh,
   };
 }
 
@@ -750,6 +825,73 @@ export async function setShowEditPrediction(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setAiMaxAgentSteps(value: number): Promise<void> {
+  await (await getStore()).set(KEY_AI_MAX_AGENT_STEPS, value);
+  await (await getStore()).save();
+}
+
+export async function setAiTerminalContextLines(value: number): Promise<void> {
+  await (await getStore()).set(KEY_AI_TERMINAL_CONTEXT_LINES, value);
+  await (await getStore()).save();
+}
+
+export async function setAiTemperature(value: number): Promise<void> {
+  await (await getStore()).set(KEY_AI_TEMPERATURE, value);
+  await (await getStore()).save();
+}
+
+export async function setAiWarnDestructiveCommands(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_AI_WARN_DESTRUCTIVE, value);
+  await (await getStore()).save();
+}
+
+export async function setTerminalCopyOnSelect(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_COPY_ON_SELECT, value);
+  await (await getStore()).save();
+}
+
+export async function setTerminalRightClickPastes(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_RIGHT_CLICK_PASTES, value);
+  await (await getStore()).save();
+}
+
+export async function setTerminalWordSeparator(value: string): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_WORD_SEPARATOR, value);
+  await (await getStore()).save();
+}
+
+export async function setTerminalScrollSensitivity(value: number): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_SCROLL_SENSITIVITY, value);
+  await (await getStore()).save();
+}
+
+export async function setTerminalFastScrollModifier(
+  value: "none" | "alt" | "ctrl" | "shift",
+): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_FAST_SCROLL_MODIFIER, value);
+  await (await getStore()).save();
+}
+
+export async function setReduceMotion(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_REDUCE_MOTION, value);
+  await (await getStore()).save();
+}
+
+export async function setNewTabInheritsCwd(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_NEW_TAB_INHERITS_CWD, value);
+  await (await getStore()).save();
+}
+
+export async function setConfirmCloseTerminalTab(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_CONFIRM_CLOSE_TERMINAL_TAB, value);
+  await (await getStore()).save();
+}
+
+export async function setConfirmQuitWithSsh(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_CONFIRM_QUIT_WITH_SSH, value);
+  await (await getStore()).save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -821,6 +963,19 @@ export async function onPreferencesChange(
     [KEY_HOST_PING_INTERVAL]: "hostPingInterval",
     [KEY_AI_ENABLED]: "aiEnabled",
     [KEY_SHOW_EDIT_PREDICTION]: "showEditPrediction",
+    [KEY_AI_MAX_AGENT_STEPS]: "aiMaxAgentSteps",
+    [KEY_AI_TERMINAL_CONTEXT_LINES]: "aiTerminalContextLines",
+    [KEY_AI_TEMPERATURE]: "aiTemperature",
+    [KEY_AI_WARN_DESTRUCTIVE]: "aiWarnDestructiveCommands",
+    [KEY_TERMINAL_COPY_ON_SELECT]: "terminalCopyOnSelect",
+    [KEY_TERMINAL_RIGHT_CLICK_PASTES]: "terminalRightClickPastes",
+    [KEY_TERMINAL_WORD_SEPARATOR]: "terminalWordSeparator",
+    [KEY_TERMINAL_SCROLL_SENSITIVITY]: "terminalScrollSensitivity",
+    [KEY_TERMINAL_FAST_SCROLL_MODIFIER]: "terminalFastScrollModifier",
+    [KEY_REDUCE_MOTION]: "reduceMotion",
+    [KEY_NEW_TAB_INHERITS_CWD]: "newTabInheritsCwd",
+    [KEY_CONFIRM_CLOSE_TERMINAL_TAB]: "confirmCloseTerminalTab",
+    [KEY_CONFIRM_QUIT_WITH_SSH]: "confirmQuitWithSsh",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];

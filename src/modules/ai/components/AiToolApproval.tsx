@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { checkDestructiveCommand } from "@/modules/ai/lib/security";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   Cancel01Icon,
   Edit02Icon,
@@ -9,6 +11,7 @@ import {
   TerminalIcon,
   Tick02Icon,
   ToolsIcon,
+  Alert02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { ToolUIPart } from "ai";
@@ -35,9 +38,18 @@ function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
   const label = meta?.label ?? toolName;
   const Icon = meta?.icon ?? ToolsIcon;
   const input = part.input as Record<string, unknown>;
+  const warnDestructive = usePreferencesStore((s) => s.aiWarnDestructiveCommands);
+
+  const isShellTool = toolName === "bash_run" || toolName === "bash_background";
+  const cmd = isShellTool ? String(input.command ?? "") : null;
+  const destructiveWarning =
+    warnDestructive && cmd ? checkDestructiveCommand(cmd) : null;
 
   return (
-    <div className="rounded-lg border border-border bg-card shadow-sm">
+    <div className={cn(
+      "rounded-lg border bg-card shadow-sm",
+      destructiveWarning ? "border-amber-500/60" : "border-border",
+    )}>
       <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
         <span className="size-1.5 shrink-0 rounded-full bg-amber-500 animate-pulse" />
         <HugeiconsIcon
@@ -49,6 +61,12 @@ function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
         <span className="text-[12px] font-medium text-foreground">
           {label}
         </span>
+        {destructiveWarning && (
+          <span className="ml-1 flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+            <HugeiconsIcon icon={Alert02Icon} size={10} strokeWidth={2} />
+            {destructiveWarning}
+          </span>
+        )}
         <span className="ml-auto text-[10px] text-muted-foreground">
           needs approval
         </span>

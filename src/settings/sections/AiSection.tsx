@@ -68,6 +68,10 @@ import {
   setOpenaiCompatibleBaseURL,
   setOpenaiCompatibleModelId,
   setShowEditPrediction,
+  setAiWarnDestructiveCommands,
+  setAiMaxAgentSteps,
+  setAiTerminalContextLines,
+  setAiTemperature,
 } from "@/modules/settings/store";
 import {
   Add01Icon,
@@ -144,6 +148,14 @@ export function AiSection() {
 
       <SectionDivider />
 
+      {/* Behaviour */}
+      <div className="flex flex-col gap-4">
+        <SubSectionTitle>Behaviour</SubSectionTitle>
+        <BehaviourContent />
+      </div>
+
+      <SectionDivider />
+
       {/* Models */}
       <div className="flex flex-col gap-4">
         <SubSectionTitle>Models</SubSectionTitle>
@@ -185,6 +197,7 @@ export function AiSection() {
 
 function GeneralContent() {
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
+  const aiWarnDestructiveCommands = usePreferencesStore((s) => s.aiWarnDestructiveCommands);
   return (
     <div className="flex flex-col gap-4">
       <SettingRow
@@ -194,6 +207,64 @@ function GeneralContent() {
         <Switch
           checked={!aiEnabled}
           onCheckedChange={(v) => void setAiEnabled(!v)}
+        />
+      </SettingRow>
+      <SettingRow
+        title="Warn on destructive commands"
+        description="Show an amber warning badge on the approval card when the AI tries to run rm -rf, DROP TABLE, git reset --hard, or similar."
+      >
+        <Switch
+          checked={aiWarnDestructiveCommands}
+          onCheckedChange={(v) => void setAiWarnDestructiveCommands(v)}
+        />
+      </SettingRow>
+    </div>
+  );
+}
+
+/* ── Behaviour ───────────────────────────────────────────────────── */
+
+function BehaviourContent() {
+  const aiMaxAgentSteps = usePreferencesStore((s) => s.aiMaxAgentSteps);
+  const aiTerminalContextLines = usePreferencesStore((s) => s.aiTerminalContextLines);
+  const aiTemperature = usePreferencesStore((s) => s.aiTemperature);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <SettingRow
+        title="Max agent steps"
+        description="Maximum number of tool-use steps the agent may take before stopping. Lower = faster, more predictable. Higher = can handle complex multi-step tasks."
+      >
+        <NumInput
+          value={aiMaxAgentSteps}
+          min={5}
+          max={50}
+          step={1}
+          onChange={(v) => void setAiMaxAgentSteps(v)}
+        />
+      </SettingRow>
+      <SettingRow
+        title="Temperature"
+        description="Controls response creativity. 0.0 = deterministic, 1.0 = more varied. Default 0.7."
+      >
+        <NumInput
+          value={aiTemperature}
+          min={0}
+          max={1}
+          step={0.1}
+          onChange={(v) => void setAiTemperature(Math.round(v * 10) / 10)}
+        />
+      </SettingRow>
+      <SettingRow
+        title="Terminal context lines"
+        description="How many lines of terminal output are sent to the AI with each message."
+      >
+        <NumInput
+          value={aiTerminalContextLines}
+          min={50}
+          max={1000}
+          step={50}
+          onChange={(v) => void setAiTerminalContextLines(v)}
         />
       </SettingRow>
     </div>
@@ -1214,6 +1285,32 @@ function CustomInstructionsBlock({ value }: { value: string }) {
         className="min-h-[100px] resize-y bg-card/60 font-sans text-[12px] leading-relaxed border border-border"
       />
     </div>
+  );
+}
+
+function NumInput({
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="h-7 w-20 rounded-md border border-border/60 bg-transparent px-2 text-center text-[11.5px] focus:outline-none focus:ring-1 focus:ring-ring"
+    />
   );
 }
 

@@ -108,6 +108,27 @@ export function checkWritable(path: string): SafetyResult {
   return { ok: true };
 }
 
+const DESTRUCTIVE_PATTERNS: Array<{ re: RegExp; label: string }> = [
+  { re: /\brm\s+(-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*)\s/i, label: "Recursive force delete (rm -rf)" },
+  { re: /\bdrop\s+(table|database|schema)\b/i, label: "SQL DROP statement" },
+  { re: /\btruncate\s+(table\b|\w)/i, label: "SQL TRUNCATE" },
+  { re: /\bgit\s+reset\s+--hard\b/, label: "git reset --hard" },
+  { re: /\bgit\s+push\b.*--force\b/, label: "git force push" },
+  { re: /\bchmod\s+(-R\s+)?777\b/, label: "chmod 777" },
+];
+
+/**
+ * Returns a human-readable warning label when a command matches a destructive
+ * pattern, or null if the command appears safe. Unlike checkShellCommand, this
+ * does NOT block — it surfaces a warning in the approval UI.
+ */
+export function checkDestructiveCommand(cmd: string): string | null {
+  for (const { re, label } of DESTRUCTIVE_PATTERNS) {
+    if (re.test(cmd)) return label;
+  }
+  return null;
+}
+
 /**
  * Lightweight heuristic for blocking obviously destructive shell commands
  * even after the user has approved them. The approval UI shows the command

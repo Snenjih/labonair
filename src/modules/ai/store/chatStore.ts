@@ -226,6 +226,9 @@ function makeChat(sessionId: string): Chat<UIMessage> {
     getOpenaiCompatibleModelId: () =>
       usePreferencesStore.getState().openaiCompatibleModelId || undefined,
     getPlanMode: () => usePlanStore.getState().active,
+    getMaxAgentSteps: () => usePreferencesStore.getState().aiMaxAgentSteps,
+    getTemperature: () => usePreferencesStore.getState().aiTemperature,
+    getTerminalContextLines: () => usePreferencesStore.getState().aiTerminalContextLines,
     onStep: (step) => {
       useChatStore.getState().patchAgentMeta({ step });
     },
