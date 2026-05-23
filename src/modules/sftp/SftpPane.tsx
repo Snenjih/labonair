@@ -3,6 +3,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/modules/hosts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -139,7 +140,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       loadRemoteDir(tabId, target);
       return;
     }
-    onOpenRemoteEditor(tabId, file.path).catch((e) => alert(String(e)));
+    onOpenRemoteEditor(tabId, file.path).catch((e) => handleApiError(e, "Failed to open remote file", "SFTP"));
   }
 
   function startRename(path: string) {

@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
 import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
@@ -221,7 +222,7 @@ export function SftpContextMenu({
                   try {
                     await onOpenRemoteEditor(tabId, singlePath);
                   } catch (e) {
-                    alert(String(e));
+                    handleApiError(e, "Failed to open remote file", "SFTP");
                   }
                 }}
               >

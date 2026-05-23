@@ -63,6 +63,7 @@ import { WorkspacePane, type TerminalPaneHandle, type WorkspacePaneHandle } from
 import { ThemeProvider } from "@/modules/theme";
 import { CommandPalette, useCommandStore, type RegistryCallbacks } from "@/modules/command-palette";
 import { useThemeEngine } from "@/lib/useThemeEngine";
+import { handleApiError } from "@/lib/errors";
 import { captureAndSave, clearSnapshot, restoreIfEnabled } from "@/modules/session";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
@@ -224,6 +225,23 @@ export default function App() {
 
   useEffect(() => {
     void bootstrapTransferListeners();
+  }, []);
+
+  // ── Global unhandled error → Notification Center ───────────────────────────
+  useEffect(() => {
+    function onUnhandledRejection(e: PromiseRejectionEvent) {
+      e.preventDefault();
+      handleApiError(e.reason, "Unhandled Error", "System");
+    }
+    function onError(e: ErrorEvent) {
+      handleApiError(e.error ?? e.message, "Runtime Error", "System");
+    }
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    window.addEventListener("error", onError);
+    return () => {
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+      window.removeEventListener("error", onError);
+    };
   }, []);
 
   // ── Session restore ────────────────────────────────────────────────────────

@@ -19,6 +19,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useRef } from "react";
+import { NotificationDropdown } from "@/modules/notifications/components/NotificationDropdown";
 import { TransferDropdown } from "./components/TransferDropdown";
 import { UpdaterButton } from "./components/UpdaterButton";
 
@@ -144,6 +145,7 @@ export function Header({
       </div>
 
       <UpdaterButton />
+      <NotificationDropdown />
       <TransferDropdown />
 
       {IS_MAC && sideButtons}

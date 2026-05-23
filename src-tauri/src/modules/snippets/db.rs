@@ -1,4 +1,5 @@
 use super::{CommandSnippet, SnippetGroup, SnippetReorderItem};
+use crate::modules::errors::NexumError;
 use crate::modules::hosts::HostsDb;
 
 fn now_millis() -> i64 {
@@ -44,16 +45,13 @@ const SELECT_SNIPPETS: &str =
 // ── Snippets ─────────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn snippets_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<CommandSnippet>, String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+pub async fn snippets_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<CommandSnippet>, NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     let mut stmt = conn
-        .prepare(&format!("{} ORDER BY sort_order ASC, name ASC", SELECT_SNIPPETS))
-        .map_err(|e| e.to_string())?;
+        .prepare(&format!("{} ORDER BY sort_order ASC, name ASC", SELECT_SNIPPETS))?;
     let snippets = stmt
-        .query_map([], row_to_snippet)
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        .query_map([], row_to_snippet)?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(snippets)
 }
 
@@ -71,13 +69,13 @@ pub async fn snippets_create(
     group_id: Option<String>,
     tags: Option<String>,
     sort_order: Option<i64>,
-) -> Result<CommandSnippet, String> {
+) -> Result<CommandSnippet, NexumError> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = now_millis();
     let exec_mode = default_exec_mode.unwrap_or_else(|| "terminal".to_string());
     let order = sort_order.unwrap_or(0);
 
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     conn.execute(
         "INSERT INTO snippets (id, name, description, command, target, host_id, \
          default_exec_mode, working_dir, group_id, tags, sort_order, created_at, updated_at) \
@@ -86,15 +84,13 @@ pub async fn snippets_create(
             id, name, description, command, target, host_id,
             exec_mode, working_dir, group_id, tags, order, now, now
         ],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
-    conn.query_row(
+    Ok(conn.query_row(
         &format!("{} WHERE id=?1", SELECT_SNIPPETS),
         rusqlite::params![id],
         row_to_snippet,
-    )
-    .map_err(|e| e.to_string())
+    )?)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -112,9 +108,9 @@ pub async fn snippets_update(
     group_id: Option<String>,
     tags: Option<String>,
     sort_order: Option<i64>,
-) -> Result<CommandSnippet, String> {
+) -> Result<CommandSnippet, NexumError> {
     let now = now_millis();
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
 
     macro_rules! maybe_update {
         ($field:expr, $col:literal, $val:expr) => {
@@ -122,8 +118,7 @@ pub async fn snippets_update(
                 conn.execute(
                     concat!("UPDATE snippets SET ", $col, "=?1 WHERE id=?2"),
                     rusqlite::params![v, id],
-                )
-                .map_err(|e| e.to_string())?;
+                )?;
             }
         };
     }
@@ -134,49 +129,40 @@ pub async fn snippets_update(
     maybe_update!(default_exec_mode, "default_exec_mode", default_exec_mode);
 
     if description.is_some() {
-        conn.execute("UPDATE snippets SET description=?1 WHERE id=?2", rusqlite::params![description, id])
-            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE snippets SET description=?1 WHERE id=?2", rusqlite::params![description, id])?;
     }
     if host_id.is_some() {
-        conn.execute("UPDATE snippets SET host_id=?1 WHERE id=?2", rusqlite::params![host_id, id])
-            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE snippets SET host_id=?1 WHERE id=?2", rusqlite::params![host_id, id])?;
     }
     if working_dir.is_some() {
-        conn.execute("UPDATE snippets SET working_dir=?1 WHERE id=?2", rusqlite::params![working_dir, id])
-            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE snippets SET working_dir=?1 WHERE id=?2", rusqlite::params![working_dir, id])?;
     }
     if group_id.is_some() {
-        conn.execute("UPDATE snippets SET group_id=?1 WHERE id=?2", rusqlite::params![group_id, id])
-            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE snippets SET group_id=?1 WHERE id=?2", rusqlite::params![group_id, id])?;
     }
     if tags.is_some() {
-        conn.execute("UPDATE snippets SET tags=?1 WHERE id=?2", rusqlite::params![tags, id])
-            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE snippets SET tags=?1 WHERE id=?2", rusqlite::params![tags, id])?;
     }
     if let Some(v) = sort_order {
-        conn.execute("UPDATE snippets SET sort_order=?1 WHERE id=?2", rusqlite::params![v, id])
-            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE snippets SET sort_order=?1 WHERE id=?2", rusqlite::params![v, id])?;
     }
 
-    conn.execute("UPDATE snippets SET updated_at=?1 WHERE id=?2", rusqlite::params![now, id])
-        .map_err(|e| e.to_string())?;
+    conn.execute("UPDATE snippets SET updated_at=?1 WHERE id=?2", rusqlite::params![now, id])?;
 
-    conn.query_row(
+    Ok(conn.query_row(
         &format!("{} WHERE id=?1", SELECT_SNIPPETS),
         rusqlite::params![id],
         row_to_snippet,
-    )
-    .map_err(|e| e.to_string())
+    )?)
 }
 
 #[tauri::command]
 pub async fn snippets_delete(
     db: tauri::State<'_, HostsDb>,
     id: String,
-) -> Result<(), String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM snippets WHERE id=?1", rusqlite::params![id])
-        .map_err(|e| e.to_string())?;
+) -> Result<(), NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+    conn.execute("DELETE FROM snippets WHERE id=?1", rusqlite::params![id])?;
     Ok(())
 }
 
@@ -184,14 +170,13 @@ pub async fn snippets_delete(
 pub async fn snippets_reorder(
     db: tauri::State<'_, HostsDb>,
     items: Vec<SnippetReorderItem>,
-) -> Result<(), String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+) -> Result<(), NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     for item in &items {
         conn.execute(
             "UPDATE snippets SET sort_order=?1 WHERE id=?2",
             rusqlite::params![item.sort_order, item.id],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
     Ok(())
 }
@@ -199,16 +184,13 @@ pub async fn snippets_reorder(
 // ── Snippet Groups ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn snippet_groups_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<SnippetGroup>, String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+pub async fn snippet_groups_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<SnippetGroup>, NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     let mut stmt = conn
-        .prepare("SELECT id, name, icon, color, sort_order, created_at FROM snippet_groups ORDER BY sort_order ASC, name ASC")
-        .map_err(|e| e.to_string())?;
+        .prepare("SELECT id, name, icon, color, sort_order, created_at FROM snippet_groups ORDER BY sort_order ASC, name ASC")?;
     let groups = stmt
-        .query_map([], row_to_group)
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        .query_map([], row_to_group)?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(groups)
 }
 
@@ -218,15 +200,14 @@ pub async fn snippet_groups_create(
     name: String,
     icon: Option<String>,
     color: Option<String>,
-) -> Result<SnippetGroup, String> {
+) -> Result<SnippetGroup, NexumError> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = now_millis();
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     conn.execute(
         "INSERT INTO snippet_groups (id, name, icon, color, sort_order, created_at) VALUES (?1,?2,?3,?4,0,?5)",
         rusqlite::params![id, name, icon, color, now],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
     Ok(SnippetGroup { id, name, icon, color, sort_order: 0, created_at: now })
 }
 
@@ -237,38 +218,31 @@ pub async fn snippet_groups_update(
     name: Option<String>,
     icon: Option<String>,
     color: Option<String>,
-) -> Result<SnippetGroup, String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+) -> Result<SnippetGroup, NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     if let Some(v) = name {
-        conn.execute("UPDATE snippet_groups SET name=?1 WHERE id=?2", rusqlite::params![v, id])
-            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE snippet_groups SET name=?1 WHERE id=?2", rusqlite::params![v, id])?;
     }
     if icon.is_some() {
-        conn.execute("UPDATE snippet_groups SET icon=?1 WHERE id=?2", rusqlite::params![icon, id])
-            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE snippet_groups SET icon=?1 WHERE id=?2", rusqlite::params![icon, id])?;
     }
     if color.is_some() {
-        conn.execute("UPDATE snippet_groups SET color=?1 WHERE id=?2", rusqlite::params![color, id])
-            .map_err(|e| e.to_string())?;
+        conn.execute("UPDATE snippet_groups SET color=?1 WHERE id=?2", rusqlite::params![color, id])?;
     }
-    conn.query_row(
+    Ok(conn.query_row(
         "SELECT id, name, icon, color, sort_order, created_at FROM snippet_groups WHERE id=?1",
         rusqlite::params![id],
         row_to_group,
-    )
-    .map_err(|e| e.to_string())
+    )?)
 }
 
 #[tauri::command]
 pub async fn snippet_groups_delete(
     db: tauri::State<'_, HostsDb>,
     id: String,
-) -> Result<(), String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
-    // Ungroup snippets in this group before deleting
-    conn.execute("UPDATE snippets SET group_id=NULL WHERE group_id=?1", rusqlite::params![id])
-        .map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM snippet_groups WHERE id=?1", rusqlite::params![id])
-        .map_err(|e| e.to_string())?;
+) -> Result<(), NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+    conn.execute("UPDATE snippets SET group_id=NULL WHERE group_id=?1", rusqlite::params![id])?;
+    conn.execute("DELETE FROM snippet_groups WHERE id=?1", rusqlite::params![id])?;
     Ok(())
 }
