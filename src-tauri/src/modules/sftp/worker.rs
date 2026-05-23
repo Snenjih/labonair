@@ -44,7 +44,7 @@ fn expand_home(path: &str) -> String {
 
 pub async fn run_worker(
     mut rx: mpsc::Receiver<WorkerMessage>,
-    ssh_state: Arc<crate::modules::ssh::SshState>,
+    sftp_state: Arc<crate::modules::sftp::SftpState>,
     app: tauri::AppHandle,
     conflicts: ConflictMap,
 ) {
@@ -81,7 +81,7 @@ pub async fn run_worker(
             job.status = TransferStatus::Running;
             emit_progress(&app, &job);
 
-            let result = process_job(&mut job, &ssh_state, &app, &conflicts, &cancelled).await;
+            let result = process_job(&mut job, &sftp_state, &app, &conflicts, &cancelled).await;
 
             match result {
                 Ok(()) => {
@@ -126,7 +126,7 @@ fn emit_progress(app: &tauri::AppHandle, job: &TransferJob) {
 
 async fn process_job(
     job: &mut TransferJob,
-    ssh_state: &Arc<crate::modules::ssh::SshState>,
+    sftp_state: &Arc<crate::modules::sftp::SftpState>,
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
     cancelled: &std::collections::HashSet<String>,
@@ -136,8 +136,8 @@ async fn process_job(
         job.direction, job.id, job.session_id, job.src_path, job.dest_path
     );
     let result = match job.direction {
-        TransferDirection::Download => download_file(job, ssh_state, app, conflicts, cancelled).await,
-        TransferDirection::Upload => upload_file(job, ssh_state, app, conflicts, cancelled).await,
+        TransferDirection::Download => download_file(job, sftp_state, app, conflicts, cancelled).await,
+        TransferDirection::Upload => upload_file(job, sftp_state, app, conflicts, cancelled).await,
     };
     match &result {
         Ok(()) => log::info!("[sftp] completed id={}", job.id),
@@ -148,7 +148,7 @@ async fn process_job(
 
 async fn download_file(
     job: &mut TransferJob,
-    ssh_state: &Arc<crate::modules::ssh::SshState>,
+    sftp_state: &Arc<crate::modules::sftp::SftpState>,
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
     cancelled: &std::collections::HashSet<String>,
@@ -175,12 +175,10 @@ async fn download_file(
     log::debug!("[sftp/download] looking up SFTP session for session_id={}", job.session_id);
     let (file_size, data) = {
         let sftp_arc = {
-            let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
+            let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
             let entry = map.get(&job.session_id)
-                .ok_or_else(|| format!("no SSH session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
-            entry.sftp.as_ref()
-                .ok_or_else(|| format!("SSH session found for session_id={} but SFTP handle is None — was SFTP opened?", job.session_id))?
-                .clone()
+                .ok_or_else(|| format!("no SFTP session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
+            entry.sftp.clone()
         };
         log::debug!("[sftp/download] opening remote file: {}", job.src_path);
         let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
@@ -236,13 +234,10 @@ async fn download_file(
     }
 
     let session_arc = {
-        let sftp_arc2 = {
-            let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
-            let entry = map.get(&job.session_id)
-                .ok_or_else(|| format!("no SSH session for session_id={}", job.session_id))?;
-            (entry.session.clone(), entry.sftp.as_ref().map(|s| s.clone()))
-        };
-        sftp_arc2.0
+        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
+        map.get(&job.session_id)
+            .ok_or_else(|| format!("no SFTP session for session_id={}", job.session_id))?
+            .session.clone()
     };
     let local_hash = compute_local_md5(std::path::Path::new(&job.dest_path))?;
     {
@@ -267,7 +262,7 @@ async fn download_file(
 
 async fn upload_file(
     job: &mut TransferJob,
-    ssh_state: &Arc<crate::modules::ssh::SshState>,
+    sftp_state: &Arc<crate::modules::sftp::SftpState>,
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
     cancelled: &std::collections::HashSet<String>,
@@ -283,12 +278,10 @@ async fn upload_file(
     log::debug!("[sftp/upload] looking up SFTP session for session_id={}", job.session_id);
     let conflict_exists = {
         let sftp_arc = {
-            let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
+            let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
             let entry = map.get(&job.session_id)
-                .ok_or_else(|| format!("no SSH session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
-            entry.sftp.as_ref()
-                .ok_or_else(|| format!("SSH session found for session_id={} but SFTP handle is None — was SFTP opened?", job.session_id))?
-                .clone()
+                .ok_or_else(|| format!("no SFTP session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
+            entry.sftp.clone()
         };
         let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
         sftp.0.stat(std::path::Path::new(&job.dest_path)).is_ok()
@@ -315,12 +308,10 @@ async fn upload_file(
 
     log::debug!("[sftp/upload] creating remote file: {}", job.dest_path);
     let sftp_arc = {
-        let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
+        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
         let entry = map.get(&job.session_id)
-            .ok_or_else(|| format!("no SSH session for session_id={}", job.session_id))?;
-        entry.sftp.as_ref()
-            .ok_or_else(|| format!("no SFTP handle for session_id={}", job.session_id))?
-            .clone()
+            .ok_or_else(|| format!("no SFTP session for session_id={}", job.session_id))?;
+        entry.sftp.clone()
     };
     let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
     let mut remote_file = sftp.0.create(std::path::Path::new(&job.dest_path))
@@ -360,9 +351,9 @@ async fn upload_file(
     drop(sftp);
 
     let session_arc = {
-        let map = ssh_state.0.lock().map_err(|e| format!("ssh_state lock: {e}"))?;
+        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
         map.get(&job.session_id)
-            .ok_or_else(|| format!("no SSH session for session_id={}", job.session_id))?
+            .ok_or_else(|| format!("no SFTP session for session_id={}", job.session_id))?
             .session.clone()
     };
     let local_hash = compute_local_md5(std::path::Path::new(&job.src_path))?;

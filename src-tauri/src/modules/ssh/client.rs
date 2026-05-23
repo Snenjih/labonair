@@ -1,4 +1,5 @@
 use tauri::Emitter;
+use crate::modules::errors::NexumError;
 
 macro_rules! log_step {
     ($app:expr, $session_id:expr, $msg:expr) => {
@@ -33,7 +34,6 @@ pub async fn ssh_connect(
     host_id: String,
     passphrase: Option<String>,
     password_override: Option<String>,
-    init_sftp: bool,
     initial_cols: Option<u32>,
     initial_rows: Option<u32>,
     state: tauri::State<'_, super::SshState>,
@@ -41,18 +41,17 @@ pub async fn ssh_connect(
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
     secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
     app: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<(), NexumError> {
     // Step 1: Fetch host from SQLite (fast, sync — do before spawn_blocking)
     log_step!(app, session_id, "Reading host configuration…");
     let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh, credential_id) = {
-        let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
+        let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare(
                 "SELECT host_address, port, username, auth_method, private_key_path, \
                  keep_alive_interval, keep_alive_tries, default_path_ssh, credential_id \
                  FROM hosts WHERE id = ?1",
-            )
-            .map_err(|e| e.to_string())?;
+            )?;
         stmt.query_row(rusqlite::params![host_id], |row| {
             Ok((
                 row.get::<_, String>(0)?,
@@ -65,21 +64,20 @@ pub async fn ssh_connect(
                 row.get::<_, Option<String>>(7)?,
                 row.get::<_, Option<String>>(8)?,
             ))
-        })
-        .map_err(|e| e.to_string())?
+        })?
     };
 
     // Step 1b: Resolve credential — if the host references a credential, override auth fields.
     let (auth_method, private_key_path) = if let Some(cid) = &credential_id {
         log_step!(app, session_id, "Resolving credential…");
         let (cred_type, cred_key_path, cred_has_secret): (String, Option<String>, bool) = {
-            let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
+            let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
             conn.query_row(
                 "SELECT cred_type, key_path, has_secret FROM credentials WHERE id=?1",
                 rusqlite::params![cid],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2).map(|v| v != 0).unwrap_or(false))),
             )
-            .map_err(|_| format!("Credential '{}' not found — it may have been deleted. Please update the host's auth settings.", cid))?
+            .map_err(|_| NexumError::Internal(format!("Credential '{}' not found — it may have been deleted. Please update the host's auth settings.", cid)))?
         };
         let _ = cred_has_secret; // used below for password fetch
         (cred_type, cred_key_path)
@@ -129,16 +127,16 @@ pub async fn ssh_connect(
             session_id_clone, host_id_clone.clone(), passphrase,
             host_address, port, username, auth_method,
             private_key_path, keep_alive_interval, keep_alive_tries,
-            default_path_ssh, password, init_sftp, cols, rows,
+            default_path_ssh, password, cols, rows,
             state_inner, trust_inner, app_clone,
         )
     })
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| NexumError::Internal(e.to_string()))?;
 
     if result.is_ok() {
         // Update last_connected_at on the DB thread after successful connect.
-        let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
+        let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -149,7 +147,29 @@ pub async fn ssh_connect(
         );
     }
 
-    result
+    result.map_err(|s| classify_ssh_error(s))
+}
+
+/// Maps a string error from ssh_connect_blocking to a structured NexumError variant.
+fn classify_ssh_error(s: String) -> NexumError {
+    let lower = s.to_lowercase();
+    if lower.contains("authentication failed")
+        || lower.contains("not authenticated")
+        || s == "passphrase_required"
+    {
+        NexumError::AuthFailed(s)
+    } else if lower.contains("tcp connect")
+        || lower.contains("network")
+        || lower.contains("connection reset")
+        || lower.contains("broken pipe")
+        || lower.contains("no route to host")
+    {
+        NexumError::NetworkError(s)
+    } else if lower.contains("mismatch") || lower.contains("host key") || lower.contains("user rejected host") {
+        NexumError::HostKeyMismatch(s)
+    } else {
+        NexumError::Internal(s)
+    }
 }
 
 /// Quick-connect: initiate an SSH connection without a saved host record.
@@ -189,7 +209,6 @@ pub async fn ssh_connect_quick(
             None,
             None,
             Some(password),
-            false, // quick connect is always a terminal session
             cols,
             rows,
             state_inner,
@@ -291,6 +310,174 @@ fn wait_for_trust(session_id: &str, trust_state: &super::TrustState) -> Result<b
     Ok(trusted)
 }
 
+/// Performs TCP connect → SSH handshake → host-key check → authentication.
+/// Returns the fully authenticated, blocking-mode `ssh2::Session`.
+/// Emits `ssh_connect_log`, `known_hosts_warning`, `auth_required`, and
+/// `passphrase_required` events exactly as the original connection flow.
+/// Used by both `ssh_connect_blocking` (PTY) and `sftp_connect_blocking` (SFTP).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn establish_authenticated_session(
+    session_id: &str,
+    host_address: &str,
+    port: i64,
+    username: &str,
+    auth_method: &str,
+    private_key_path: Option<&str>,
+    keep_alive_interval: Option<i64>,
+    keep_alive_tries: Option<i64>,
+    password: Option<&str>,
+    passphrase: Option<&str>,
+    trust_state: &super::TrustState,
+    app: &tauri::AppHandle,
+) -> Result<ssh2::Session, String> {
+    let _ = keep_alive_tries;
+
+    // TCP connect
+    log_step!(app, session_id, format!("TCP connecting to {}:{}…", host_address, port));
+    let tcp = tcp_connect(host_address, port)
+        .map_err(|e| format!("TCP connect to {}:{} failed: {}", host_address, port, e))?;
+    log_step!(app, session_id, "TCP connection established.");
+
+    // SSH handshake
+    log_step!(app, session_id, "Starting SSH handshake…");
+    let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
+    session.set_blocking(true);
+    session.set_timeout(15_000);
+    session.set_tcp_stream(tcp);
+    session.handshake().map_err(|e| e.to_string())?;
+    log_step!(app, session_id, "SSH handshake complete.");
+
+    if let Some(interval) = keep_alive_interval {
+        session.set_keepalive(true, interval as u32);
+    }
+
+    // Host-key verification
+    log_step!(app, session_id, "Verifying host fingerprint…");
+    let (host_key, key_type) = session.host_key().ok_or("no host key")?;
+    let fingerprint = session
+        .host_key_hash(ssh2::HashType::Md5)
+        .map(|h| h.iter().map(|b| format!("{:02x}", b)).collect::<Vec<_>>().join(":"))
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let known_hosts_path = dirs::home_dir().map(|h| h.join(".ssh").join("known_hosts"));
+    let known_host_check_name = if port == 22 {
+        host_address.to_string()
+    } else {
+        format!("[{}]:{}", host_address, port)
+    };
+    let known_host_status = if let Some(ref path) = known_hosts_path {
+        let mut kh = session.known_hosts().map_err(|e| e.to_string())?;
+        if path.exists() { let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH); }
+        let result = kh.check(&known_host_check_name, host_key);
+        if matches!(result, ssh2::CheckResult::NotFound) && port != 22 {
+            kh.check(host_address, host_key)
+        } else { result }
+    } else {
+        ssh2::CheckResult::NotFound
+    };
+
+    match known_host_status {
+        ssh2::CheckResult::Match => {
+            log_step!(app, session_id, "Host fingerprint verified ✓");
+        }
+        ssh2::CheckResult::Mismatch => {
+            log_step!(app, session_id, format!("Host key mismatch! Fingerprint: {}", fingerprint));
+            app.emit("known_hosts_warning", serde_json::json!({
+                "session_id": session_id, "fingerprint": fingerprint,
+                "host": host_address, "is_mismatch": true
+            })).map_err(|e| e.to_string())?;
+            if !wait_for_trust(session_id, trust_state)? {
+                return Err("User rejected host".to_string());
+            }
+            if let Some(ref path) = known_hosts_path {
+                drop_known_host_entry(path, &known_host_check_name);
+                drop_known_host_entry(path, host_address);
+                let mut kh = session.known_hosts().map_err(|e| e.to_string())?;
+                if path.exists() { let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH); }
+                let _ = kh.add(&known_host_check_name, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
+                let _ = kh.write_file(path, ssh2::KnownHostFileKind::OpenSSH);
+            }
+            log_step!(app, session_id, "Host key accepted and updated in known_hosts ✓");
+        }
+        ssh2::CheckResult::NotFound | ssh2::CheckResult::Failure => {
+            log_step!(app, session_id, format!("Unknown host — fingerprint: {}", fingerprint));
+            app.emit("known_hosts_warning", serde_json::json!({
+                "session_id": session_id, "fingerprint": fingerprint,
+                "host": host_address, "is_mismatch": false
+            })).map_err(|e| e.to_string())?;
+            if !wait_for_trust(session_id, trust_state)? {
+                return Err("User rejected host".to_string());
+            }
+            if let Some(ref path) = known_hosts_path {
+                let mut kh = session.known_hosts().map_err(|e| e.to_string())?;
+                if path.exists() { let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH); }
+                let _ = kh.add(&known_host_check_name, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
+                let _ = kh.write_file(path, ssh2::KnownHostFileKind::OpenSSH);
+            }
+            log_step!(app, session_id, "Host trusted and added to known_hosts ✓");
+        }
+    }
+
+    // Authentication
+    log_step!(app, session_id, "Authenticating…");
+    let authenticated = if auth_method == "key" {
+        let key_path = private_key_path
+            .map(std::path::Path::new)
+            .ok_or("private_key_path not set for key auth")?;
+        if !key_path.exists() {
+            return Err(format!("Private key file not found: {}", key_path.display()));
+        }
+        let agent_ok = try_agent_auth(&session, username, session_id, app);
+        if agent_ok {
+            true
+        } else {
+            let passphrase_str = passphrase.unwrap_or("");
+            log_step!(app, session_id, "Authenticating with public key file…");
+            match session.userauth_pubkey_file(username, None, key_path, Some(passphrase_str)) {
+                Ok(_) => true,
+                Err(e) => {
+                    let msg = e.to_string();
+                    if passphrase.is_none() && is_passphrase_error(&msg) {
+                        log_step!(app, session_id, "Key is passphrase-protected, prompting…");
+                        app.emit("passphrase_required", serde_json::json!({ "session_id": session_id }))
+                            .map_err(|e| e.to_string())?;
+                        return Err("passphrase_required".to_string());
+                    }
+                    log_step!(app, session_id, format!("Key auth failed: {}", msg));
+                    app.emit("auth_required", serde_json::json!({
+                        "session_id": session_id, "prompt_message": msg, "is_2fa": false
+                    })).map_err(|e| e.to_string())?;
+                    return Err(format!("authentication failed: {}", msg));
+                }
+            }
+        }
+    } else {
+        let pw = password.unwrap_or("");
+        match session.userauth_password(username, pw) {
+            Ok(_) => true,
+            Err(e) => {
+                let msg = e.to_string();
+                log_step!(app, session_id, format!("Password auth failed: {}", msg));
+                app.emit("auth_required", serde_json::json!({
+                    "session_id": session_id, "prompt_message": msg, "is_2fa": false
+                })).map_err(|e| e.to_string())?;
+                return Err(format!("authentication failed: {}", msg));
+            }
+        }
+    };
+
+    if !authenticated || !session.authenticated() {
+        log_step!(app, session_id, "Authentication failed.");
+        app.emit("auth_required", serde_json::json!({
+            "session_id": session_id, "prompt_message": "Authentication failed", "is_2fa": false
+        })).map_err(|e| e.to_string())?;
+        return Err("not authenticated".to_string());
+    }
+
+    log_step!(app, session_id, "Authenticated ✓");
+    Ok(session)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn ssh_connect_blocking(
     session_id: String,
@@ -305,329 +492,57 @@ fn ssh_connect_blocking(
     keep_alive_tries: Option<i64>,
     default_path_ssh: Option<String>,
     password: Option<String>,
-    init_sftp: bool,
     initial_cols: u32,
     initial_rows: u32,
     state: super::SshState,
     trust_state: super::TrustState,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    // (password already fetched by the async wrapper above)
-    let _ = keep_alive_tries; // suppress unused warning
+    let session = establish_authenticated_session(
+        &session_id,
+        &host_address,
+        port,
+        &username,
+        &auth_method,
+        private_key_path.as_deref(),
+        keep_alive_interval,
+        keep_alive_tries,
+        password.as_deref(),
+        passphrase.as_deref(),
+        &trust_state,
+        &app,
+    )?;
 
-    // Step 3: TCP connect (DNS resolution + connect, with a 15-second total timeout)
-    log_step!(
-        app,
-        session_id,
-        format!("TCP connecting to {}:{}…", host_address, port)
-    );
-    let tcp = tcp_connect(&host_address, port)
-        .map_err(|e| format!("TCP connect to {}:{} failed: {}", host_address, port, e))?;
-    log_step!(app, session_id, "TCP connection established.");
+    // Open PTY shell channel (switches session to non-blocking).
+    let session_arc = std::sync::Arc::new(std::sync::Mutex::new(super::SessionHandle(session)));
+    log_step!(app, session_id, "Opening PTY shell channel…");
+    let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
+    let (channel, shutdown) = super::pty::open_shell_channel(
+        session_arc.clone(),
+        &session_id,
+        &app,
+        state.clone(),
+        ready_rx,
+        initial_cols,
+        initial_rows,
+    )?;
+    log_step!(app, session_id, "Shell channel open ✓");
 
-    // Step 4: SSH handshake
-    log_step!(app, session_id, "Starting SSH handshake…");
-    let mut session = ssh2::Session::new().map_err(|e| e.to_string())?;
-    session.set_blocking(true);
-    session.set_timeout(15_000);
-    session.set_tcp_stream(tcp);
-    session.handshake().map_err(|e| e.to_string())?;
-    log_step!(app, session_id, "SSH handshake complete.");
-
-    // Configure keepalive if set
-    if let Some(interval) = keep_alive_interval {
-        let tries = keep_alive_tries.unwrap_or(3) as u32;
-        session.set_keepalive(true, interval as u32);
-        let _ = tries;
-    }
-
-    // Step 5: known_hosts check
-    log_step!(app, session_id, "Verifying host fingerprint…");
-    let (host_key, key_type) = session.host_key().ok_or("no host key")?;
-    let fingerprint = session
-        .host_key_hash(ssh2::HashType::Md5)
-        .map(|h| {
-            h.iter()
-                .map(|b| format!("{:02x}", b))
-                .collect::<Vec<_>>()
-                .join(":")
-        })
-        .unwrap_or_else(|| "unknown".to_string());
-
-    let known_hosts_path = dirs::home_dir().map(|h| h.join(".ssh").join("known_hosts"));
-
-    // For non-standard ports, OpenSSH known_hosts uses the "[host]:port" format.
-    // We must check both the bracketed form and the plain hostname so that keys
-    // stored by either `ssh-keyscan -p <port>` or a previous plain-host accept
-    // are correctly recognised.
-    let known_host_check_name = if port == 22 {
-        host_address.clone()
-    } else {
-        format!("[{}]:{}", host_address, port)
-    };
-    let known_host_status = if let Some(ref path) = known_hosts_path {
-        let mut kh = session.known_hosts().map_err(|e| e.to_string())?;
-        if path.exists() {
-            let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH);
-        }
-        let result = kh.check(&known_host_check_name, host_key);
-        // Fall back to plain hostname check (covers keys stored without port).
-        if matches!(result, ssh2::CheckResult::NotFound) && port != 22 {
-            kh.check(&host_address, host_key)
-        } else {
-            result
-        }
-    } else {
-        ssh2::CheckResult::NotFound
-    };
-
-    match known_host_status {
-        ssh2::CheckResult::Match => {
-            log_step!(app, session_id, "Host fingerprint verified ✓");
-        }
-        ssh2::CheckResult::Mismatch => {
-            log_step!(
-                app,
-                session_id,
-                format!("Host key mismatch! Fingerprint: {}", fingerprint)
-            );
-            app.emit(
-                "known_hosts_warning",
-                serde_json::json!({
-                    "session_id": session_id,
-                    "fingerprint": fingerprint,
-                    "host": host_address,
-                    "is_mismatch": true
-                }),
-            )
-            .map_err(|e| e.to_string())?;
-
-            if !wait_for_trust(&session_id, &trust_state)? {
-                return Err("User rejected host".to_string());
-            }
-
-            // Remove old entry and add updated host key to known_hosts.
-            if let Some(ref path) = known_hosts_path {
-                drop_known_host_entry(path, &known_host_check_name);
-                drop_known_host_entry(path, &host_address);
-                let mut kh = session.known_hosts().map_err(|e| e.to_string())?;
-                if path.exists() {
-                    let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH);
-                }
-                let _ = kh.add(&known_host_check_name, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
-                let _ = kh.write_file(path, ssh2::KnownHostFileKind::OpenSSH);
-            }
-            log_step!(app, session_id, "Host key accepted and updated in known_hosts ✓");
-        }
-        ssh2::CheckResult::NotFound | ssh2::CheckResult::Failure => {
-            log_step!(
-                app,
-                session_id,
-                format!("Unknown host — fingerprint: {}", fingerprint)
-            );
-            app.emit(
-                "known_hosts_warning",
-                serde_json::json!({
-                    "session_id": session_id,
-                    "fingerprint": fingerprint,
-                    "host": host_address,
-                    "is_mismatch": false
-                }),
-            )
-            .map_err(|e| e.to_string())?;
-
-            if !wait_for_trust(&session_id, &trust_state)? {
-                return Err("User rejected host".to_string());
-            }
-
-            // Write the host key to known_hosts so future connections match.
-            if let Some(ref path) = known_hosts_path {
-                let mut kh = session.known_hosts().map_err(|e| e.to_string())?;
-                if path.exists() {
-                    let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH);
-                }
-                let _ = kh.add(&known_host_check_name, host_key, "", ssh2::KnownHostKeyFormat::from(key_type));
-                let _ = kh.write_file(path, ssh2::KnownHostFileKind::OpenSSH);
-            }
-            log_step!(app, session_id, "Host trusted and added to known_hosts ✓");
-        }
-    }
-
-    // Step 6: Authentication
-    log_step!(app, session_id, "Authenticating…");
-
-    let authenticated = if auth_method == "key" {
-        let key_path = private_key_path
-            .as_deref()
-            .map(std::path::Path::new)
-            .ok_or("private_key_path not set for key auth")?;
-
-        // Guard: verify the key file is accessible before trying auth.
-        if !key_path.exists() {
-            return Err(format!(
-                "Private key file not found: {}",
-                key_path.display()
-            ));
-        }
-
-        // 6a. Try ssh-agent first (works for keys loaded via `ssh-add`).
-        let agent_ok = try_agent_auth(&session, &username, &session_id, &app);
-        if agent_ok {
-            true
-        } else {
-            // 6b. Direct key file auth — use provided passphrase if any.
-            // Pass "" instead of NULL for no-passphrase OpenSSH-format keys:
-            // libssh2 requires an empty string (not NULL) to successfully
-            // load unencrypted OpenSSH-format keys (BEGIN OPENSSH PRIVATE KEY).
-            let passphrase_str = passphrase.as_deref().unwrap_or("");
-            log_step!(app, session_id, "Authenticating with public key file…");
-            match session.userauth_pubkey_file(
-                &username,
-                None,
-                key_path,
-                Some(passphrase_str),
-            ) {
-                Ok(_) => true,
-                Err(e) => {
-                    let msg = e.to_string();
-                    if passphrase.is_none() && is_passphrase_error(&msg) {
-                        // Key is encrypted — ask frontend for passphrase.
-                        log_step!(app, session_id, "Key is passphrase-protected, prompting…");
-                        app.emit(
-                            "passphrase_required",
-                            serde_json::json!({ "session_id": session_id }),
-                        )
-                        .map_err(|e| e.to_string())?;
-                        return Err("passphrase_required".to_string());
-                    }
-                    log_step!(app, session_id, format!("Key auth failed: {}", msg));
-                    app.emit(
-                        "auth_required",
-                        serde_json::json!({
-                            "session_id": session_id,
-                            "prompt_message": msg,
-                            "is_2fa": false
-                        }),
-                    )
-                    .map_err(|e| e.to_string())?;
-                    return Err(format!("authentication failed: {}", msg));
-                }
-            }
-        }
-    } else {
-        let pw = password.as_deref().unwrap_or("");
-        match session.userauth_password(&username, pw) {
-            Ok(_) => true,
-            Err(e) => {
-                let msg = e.to_string();
-                log_step!(app, session_id, format!("Password auth failed: {}", msg));
-                app.emit(
-                    "auth_required",
-                    serde_json::json!({
-                        "session_id": session_id,
-                        "prompt_message": msg,
-                        "is_2fa": false
-                    }),
-                )
-                .map_err(|e| e.to_string())?;
-                return Err(format!("authentication failed: {}", msg));
-            }
-        }
-    };
-
-    if !authenticated || !session.authenticated() {
-        log_step!(app, session_id, "Authentication failed.");
-        app.emit(
-            "auth_required",
-            serde_json::json!({
-                "session_id": session_id,
-                "prompt_message": "Authentication failed",
-                "is_2fa": false
-            }),
-        )
-        .map_err(|e| e.to_string())?;
-        return Err("not authenticated".to_string());
-    }
-
-    log_step!(app, session_id, "Authenticated ✓");
-
-    // Step 7 (SFTP only): Open SFTP subsystem while still in blocking mode.
-    // Must happen BEFORE open_shell_channel, which switches to non-blocking.
-    // Skipped for SSH terminal connections — they never need the SFTP handle.
-    let sftp = if init_sftp {
-        log_step!(app, session_id, "Initialising SFTP subsystem…");
-        // The 15s handshake timeout is too short for SFTP subsystem negotiation
-        // on slower hosts (RPi, etc.). Use a 60s timeout for this phase only.
-        session.set_timeout(60_000);
-        log::debug!("[SFTP-CONNECT] calling session.sftp() in blocking mode…");
-        match session.sftp() {
-            Ok(s) => {
-                log::debug!("[SFTP-CONNECT] SFTP subsystem open ✓");
-                log_step!(app, session_id, "SFTP ready ✓");
-                Some(s)
-            }
-            Err(e) => {
-                log::warn!("[SFTP-CONNECT] SFTP subsystem failed: {}", e);
-                return Err(format!("SFTP subsystem unavailable: {}", e));
-            }
-        }
-    } else {
-        None
-    };
-
-    // Step 8 (SSH terminal only): Open PTY shell channel.
-    // Switches session to non-blocking mode for the output reader thread.
-    // Skipped for SFTP connections — SFTP operations require blocking mode.
-    // Wrap the session now so open_shell_channel can receive it via Arc.
-    let session_for_pty = std::sync::Arc::new(std::sync::Mutex::new(super::SessionHandle(session)));
-
-    let (channel, ready_tx, shutdown) = if !init_sftp {
-        log_step!(app, session_id, "Opening PTY shell channel…");
-        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
-        let (ch, shutdown) = super::pty::open_shell_channel(
-            session_for_pty.clone(),
-            &session_id,
-            &app,
-            state.clone(),
-            ready_rx,
-            initial_cols,
-            initial_rows,
-        )?;
-        log_step!(app, session_id, "Shell channel open ✓");
-        (Some(ch), Some(ready_tx), shutdown)
-    } else {
-        (None, None, std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)))
-    };
-
-    // Wrap the SFTP handle in its own lock so SFTP commands can release the
-    // outer SshState mutex before performing blocking network I/O.
-    let sftp_wrapped = sftp.map(|s| {
-        std::sync::Arc::new(std::sync::Mutex::new(super::SftpHandle(s)))
-    });
-
-    // For SFTP-only connections (init_sftp=true), session_for_pty was never
-    // used by open_shell_channel, so re-use it as the stored session_arc.
-    // For PTY connections it was already cloned into open_shell_channel.
-    let session_arc = session_for_pty;
-
-    // Step 9: Store session and emit session_established.
+    // Store session in SshState.
     {
         let mut map = state.0.lock().map_err(|e| e.to_string())?;
         map.insert(
             session_id.clone(),
             super::SshSession {
                 session: session_arc,
-                channel,
-                sftp: sftp_wrapped,
+                channel: Some(channel),
                 shutdown,
             },
         );
     }
 
     // Unblock the reader thread now that the session is in the map.
-    if let Some(tx) = ready_tx {
-        let _ = tx.send(());
-    }
+    let _ = ready_tx.send(());
 
     log_step!(app, session_id, "Session established ✓");
     app.emit(

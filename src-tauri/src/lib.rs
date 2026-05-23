@@ -6,7 +6,7 @@ use modules::{
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete}},
     credentials::{credentials_get_all, credentials_create, credentials_update, credentials_delete, credentials_get_hosts_using, credential_generate_keypair},
     ssh::{SshState, TrustState, client::{ssh_connect, ssh_connect_quick, ssh_trust_host, ssh_remove_known_host, ssh_disconnect}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_rename, sftp_delete, sftp_mkdir, sftp_chmod, sftp_calculate_size, sftp_chown, sftp_deep_search, prepare_remote_edit, save_remote_edit}, tunnels::{TunnelState, ssh_start_tunnels, ssh_stop_tunnels}},
-    sftp::{TransferWorkerState, commands::{enqueue_transfer, cancel_transfer, resolve_conflict}, worker::run_worker},
+    sftp::{SftpState, TransferWorkerState, commands::{enqueue_transfer, cancel_transfer, resolve_conflict}, connection::{sftp_connect, sftp_disconnect}, worker::run_worker},
     snippets::db::{snippets_get_all, snippets_create, snippets_update, snippets_delete, snippets_reorder, snippet_groups_get_all, snippet_groups_create, snippet_groups_update, snippet_groups_delete},
     snippets::exec::{snippet_run_local, snippet_run_ssh},
     themes::{themes_get_all, theme_import, theme_export, theme_delete, theme_fetch_index, theme_download},
@@ -358,17 +358,22 @@ pub fn run() {
             app.manage(HostsDb(std::sync::Mutex::new(conn)));
 
             let ssh_state = SshState::default();
-            let ssh_state_for_worker = ssh_state.clone();
             app.manage(ssh_state);
             app.manage(TrustState::default());
             app.manage(TunnelState::default());
+
+            // Dedicated SFTP state — decoupled from SshState so SFTP I/O never
+            // blocks the PTY terminal mutex.
+            let sftp_state = SftpState::default();
+            let sftp_state_for_worker = sftp_state.clone();
+            app.manage(sftp_state);
 
             let (tx, rx) = tokio::sync::mpsc::channel(100);
             let conflicts = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
             let conflicts_for_worker = conflicts.clone();
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                run_worker(rx, std::sync::Arc::new(ssh_state_for_worker), app_handle, conflicts_for_worker).await;
+                run_worker(rx, std::sync::Arc::new(sftp_state_for_worker), app_handle, conflicts_for_worker).await;
             });
             app.manage(TransferWorkerState { sender: tx, conflicts });
 
@@ -497,6 +502,8 @@ pub fn run() {
             ssh_exec_command,
             ssh_pty_write,
             ssh_pty_resize,
+            sftp_connect,
+            sftp_disconnect,
             sftp_read_dir,
             sftp_rename,
             sftp_delete,

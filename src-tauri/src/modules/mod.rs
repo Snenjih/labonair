@@ -1,4 +1,5 @@
 pub mod credentials;
+pub mod errors;
 #[cfg(target_os = "macos")]
 pub mod dock_menu;
 pub mod fs;

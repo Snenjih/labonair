@@ -20,6 +20,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { Button } from "@/components/ui/button";
 import { SshLoadingScreen } from "./SshLoadingScreen";
 import { SudoFillPopup } from "./SudoFillPopup";
 import type { TerminalPaneHandle } from "./TerminalPane";
@@ -63,6 +64,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
   function SshTerminalPane({ sessionId, session, isActive, tabVisible = true, onSearchReady}, ref) {
     const [isConnected, setIsConnected] = useState(false);
     const [hasError, setHasError] = useState(false);
+    const [isDisconnected, setIsDisconnected] = useState(false);
+    const [disconnectReason, setDisconnectReason] = useState("");
     const [sudoPopup, setSudoPopup] = useState<{ x: number; y: number } | null>(null);
     const { resolvedTheme } = useTheme();
 
@@ -87,6 +90,19 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       sudoPasswordRef.current = null;
       setSudoPopup(null);
     }, []);
+
+    const handleReconnect = useCallback(() => {
+      termRef.current?.dispose();
+      termRef.current = null;
+      fitRef.current = null;
+      invoke("ssh_disconnect", { sessionId }).catch(console.error);
+      if (session.hostId) {
+        invoke("ssh_stop_tunnels", { hostId: session.hostId }).catch(console.error);
+      }
+      setIsDisconnected(false);
+      setIsConnected(false);
+      setHasError(false);
+    }, [sessionId, session.hostId]);
 
     const handleSudoFill = useCallback(() => {
       const pw = sudoPasswordRef.current;
@@ -206,6 +222,12 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             }, 300);
           }
         }
+      }).then((unlisten) => cleanups.push(unlisten));
+
+      listen<{ session_id: string; reason: string }>("ssh_connection_lost", ({ payload }) => {
+        if (payload.session_id !== sessionId) return;
+        setIsDisconnected(true);
+        setDisconnectReason(payload.reason);
       }).then((unlisten) => cleanups.push(unlisten));
 
       (async () => {
@@ -406,6 +428,15 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     return (
       <div className="relative h-full w-full">
         <div ref={containerRef} className="h-full w-full" />
+        {isDisconnected && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-xl flex flex-col items-center gap-3 max-w-xs text-center">
+              <span className="text-base font-semibold text-foreground">Connection Lost</span>
+              <span className="text-sm text-muted-foreground">{disconnectReason}</span>
+              <Button onClick={handleReconnect}>Reconnect</Button>
+            </div>
+          </div>
+        )}
         <AnimatePresence>
           {sudoPopup && (
             <SudoFillPopup

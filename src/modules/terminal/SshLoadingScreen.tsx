@@ -43,7 +43,6 @@ function detectStage(logs: string[]): number {
 
 export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, connectionType = "ssh", initialCols, initialRows, onConnected, onError }: Props) {
   const isQuickConnect = !hostId && !!quickConnect;
-  const initSftp = connectionType === "sftp";
 
   const [status, setStatus] = useState<Status>(
     isQuickConnect ? "quick_connect_password" : "connecting"
@@ -64,7 +63,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
 
   const pushLog = (msg: string) => setLogs((prev) => [...prev, msg]);
 
-  const STAGES = initSftp ? SFTP_STAGES : SSH_STAGES;
+  const STAGES = connectionType === "sftp" ? SFTP_STAGES : SSH_STAGES;
   const currentStage = useMemo(() => detectStage(logs), [logs]);
 
   const doConnect = (passphraseArg?: string, passwordOverride?: string) => {
@@ -84,12 +83,18 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
           initialCols: initialCols ?? null,
           initialRows: initialRows ?? null,
         })
+      : connectionType === "sftp"
+      ? invoke("sftp_connect", {
+          sessionId: sessionId,
+          hostId,
+          passphrase: passphraseArg ?? null,
+          passwordOverride: passwordOverride ?? null,
+        })
       : invoke("ssh_connect", {
           sessionId: sessionId,
           hostId,
           passphrase: passphraseArg ?? null,
           passwordOverride: passwordOverride ?? null,
-          initSftp,
           initialCols: initialCols ?? null,
           initialRows: initialRows ?? null,
         });
@@ -98,6 +103,18 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
       // session_established event triggers onConnected
     })
       .catch((err: unknown) => {
+        // Structured NexumError from the Rust backend
+        if (typeof err === "object" && err !== null && "code" in err && "message" in err) {
+          const nexumErr = err as { code: string; message: string };
+          if (nexumErr.code === "AuthFailed" || nexumErr.code === "HostKeyMismatch") {
+            // Already handled by auth_required / known_hosts_warning events
+            return;
+          }
+          setErrorMessage(nexumErr.message);
+          setStatus("error");
+          return;
+        }
+        // Legacy string errors (e.g. from ssh_connect_quick which still returns String)
         const msg = String(err);
         if (
           msg.includes("mismatch") ||

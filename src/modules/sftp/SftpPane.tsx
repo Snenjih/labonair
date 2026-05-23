@@ -85,7 +85,10 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     initTab(tabId, host?.default_path_sftp ?? "/");
     loadLocalDir(tabId, "~");
     loadRemoteDir(tabId, host?.default_path_sftp ?? "/");
-    return () => destroyTab(tabId);
+    return () => {
+      destroyTab(tabId);
+      invoke("sftp_disconnect", { sessionId: tabId }).catch(console.error);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, isConnected]);
 

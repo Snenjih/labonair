@@ -26,9 +26,6 @@ pub struct SshSession {
     /// release the outer SshState lock, and then lock only the session.
     pub session: Arc<Mutex<SessionHandle>>,
     pub channel: Option<ssh2::Channel>,
-    /// Pre-initialized SFTP handle in its own lock so SFTP commands can
-    /// release the outer SshState mutex before blocking on network I/O.
-    pub sftp: Option<Arc<Mutex<SftpHandle>>>,
     /// Set to true by ssh_disconnect so the reader thread exits cleanly.
     pub shutdown: Arc<AtomicBool>,
 }

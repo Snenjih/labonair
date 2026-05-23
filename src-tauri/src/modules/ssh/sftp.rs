@@ -1,4 +1,5 @@
-use crate::modules::ssh::SshState;
+use crate::modules::sftp::SftpState;
+use crate::modules::errors::NexumError;
 use std::io::{Read as _, Write as _};
 use std::sync::Arc;
 
@@ -6,17 +7,22 @@ fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }
 
-/// Extract the SFTP Arc under a brief outer-lock, then release it so the
-/// PTY reader thread can acquire the same lock without waiting for I/O.
+/// Extract the SFTP Arc under a brief outer-lock, then release it so no
+/// long-held lock blocks other operations.
 macro_rules! get_sftp_arc {
     ($state_inner:expr, $session_id:expr) => {{
         let map = $state_inner.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get($session_id).ok_or("no session for tab")?;
-        entry
-            .sftp
-            .as_ref()
-            .ok_or("No SFTP handle — connection may not support SFTP")?
-            .clone()
+        let entry = map.get($session_id).ok_or("no SFTP session for tab")?;
+        entry.sftp.clone()
+    }};
+}
+
+/// Extract the SSH session Arc from SftpState for exec-based operations.
+macro_rules! get_sftp_session_arc {
+    ($state_inner:expr, $session_id:expr) => {{
+        let map = $state_inner.0.lock().map_err(|e| e.to_string())?;
+        let entry = map.get($session_id).ok_or("no SFTP session for tab")?;
+        entry.session.clone()
     }};
 }
 
@@ -48,8 +54,8 @@ fn mode_to_string(mode: u32) -> String {
 pub async fn sftp_read_dir(
     session_id: String,
     path: String,
-    state: tauri::State<'_, SshState>,
-) -> Result<Vec<FileNode>, String> {
+    state: tauri::State<'_, SftpState>,
+) -> Result<Vec<FileNode>, NexumError> {
     let state_inner = state.inner().clone();
 
     tokio::task::spawn_blocking(move || {
@@ -122,7 +128,8 @@ pub async fn sftp_read_dir(
         Ok(files)
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }
 
 #[tauri::command]
@@ -130,8 +137,8 @@ pub async fn sftp_rename(
     session_id: String,
     old_path: String,
     new_path: String,
-    state: tauri::State<'_, SshState>,
-) -> Result<(), String> {
+    state: tauri::State<'_, SftpState>,
+) -> Result<(), NexumError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
@@ -144,15 +151,16 @@ pub async fn sftp_rename(
         .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }
 
 #[tauri::command]
 pub async fn sftp_delete(
     session_id: String,
     paths: Vec<String>,
-    state: tauri::State<'_, SshState>,
-) -> Result<(), String> {
+    state: tauri::State<'_, SftpState>,
+) -> Result<(), NexumError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
@@ -170,15 +178,16 @@ pub async fn sftp_delete(
         Ok(())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }
 
 #[tauri::command]
 pub async fn sftp_mkdir(
     session_id: String,
     path: String,
-    state: tauri::State<'_, SshState>,
-) -> Result<(), String> {
+    state: tauri::State<'_, SftpState>,
+) -> Result<(), NexumError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
@@ -187,7 +196,8 @@ pub async fn sftp_mkdir(
             .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }
 
 #[tauri::command]
@@ -195,8 +205,8 @@ pub async fn sftp_chmod(
     session_id: String,
     path: String,
     permissions: u32,
-    state: tauri::State<'_, SshState>,
-) -> Result<(), String> {
+    state: tauri::State<'_, SftpState>,
+) -> Result<(), NexumError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
@@ -209,15 +219,16 @@ pub async fn sftp_chmod(
             .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }
 
 #[tauri::command]
 pub async fn prepare_remote_edit(
     session_id: String,
     remote_path: String,
-    state: tauri::State<'_, SshState>,
-) -> Result<String, String> {
+    state: tauri::State<'_, SftpState>,
+) -> Result<String, NexumError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let file_data = {
@@ -252,7 +263,8 @@ pub async fn prepare_remote_edit(
         Ok(temp_path.to_string_lossy().to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }
 
 #[tauri::command]
@@ -260,8 +272,8 @@ pub async fn save_remote_edit(
     session_id: String,
     remote_path: String,
     local_temp_path: String,
-    state: tauri::State<'_, SshState>,
-) -> Result<(), String> {
+    state: tauri::State<'_, SftpState>,
+) -> Result<(), NexumError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         // Validate that the path is inside the expected temp directory to prevent
@@ -282,7 +294,8 @@ pub async fn save_remote_edit(
         remote_file.write_all(&data).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }
 
 /// Run `du -sh '<path>'` on the remote server and return the human-readable size.
@@ -290,14 +303,13 @@ pub async fn save_remote_edit(
 pub async fn sftp_calculate_size(
     session_id: String,
     path: String,
-    state: tauri::State<'_, SshState>,
-) -> Result<String, String> {
-    // Clone the session Arc first so we can release the outer SshState lock
-    // before blocking on network I/O (avoids blocking sftp_read_dir).
+    state: tauri::State<'_, SftpState>,
+) -> Result<String, NexumError> {
     let state_inner = state.inner().clone();
-    let session_arc = crate::get_session_arc!(state_inner, &session_id);
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
+        // Acquire Arc under brief lock, then release before I/O.
+        let session_arc = get_sftp_session_arc!(state_inner, &session_id);
         let sess = session_arc.lock().map_err(|e| e.to_string())?;
         let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
         ch.exec(&format!("du -sh {}", shell_quote(&path))).map_err(|e| e.to_string())?;
@@ -307,7 +319,8 @@ pub async fn sftp_calculate_size(
         Ok(stdout.split_whitespace().next().unwrap_or("?").to_string())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }
 
 /// Execute `chown owner:group '<path>'` on the remote server.
@@ -317,8 +330,8 @@ pub async fn sftp_chown(
     path: String,
     owner: String,
     group: String,
-    state: tauri::State<'_, SshState>,
-) -> Result<(), String> {
+    state: tauri::State<'_, SftpState>,
+) -> Result<(), NexumError> {
     let spec = match (owner.is_empty(), group.is_empty()) {
         (true, true)   => return Ok(()),
         (false, false) => format!("{}:{}", shell_quote(&owner), shell_quote(&group)),
@@ -326,9 +339,10 @@ pub async fn sftp_chown(
         (true, false)  => format!(":{}", shell_quote(&group)),
     };
     let state_inner = state.inner().clone();
-    let session_arc = crate::get_session_arc!(state_inner, &session_id);
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
+        // Acquire Arc under brief lock, then release before I/O.
+        let session_arc = get_sftp_session_arc!(state_inner, &session_id);
         let sess = session_arc.lock().map_err(|e| e.to_string())?;
         let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
         let cmd = format!("chown {} {}", spec, shell_quote(&path));
@@ -343,7 +357,8 @@ pub async fn sftp_chown(
         Ok(())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }
 
 /// Run `find <start_path> -iname '*<query>*' -maxdepth 5` on the remote server.
@@ -353,12 +368,13 @@ pub async fn sftp_deep_search(
     session_id: String,
     start_path: String,
     query: String,
-    state: tauri::State<'_, SshState>,
-) -> Result<Vec<String>, String> {
+    state: tauri::State<'_, SftpState>,
+) -> Result<Vec<String>, NexumError> {
     let state_inner = state.inner().clone();
-    let session_arc = crate::get_session_arc!(state_inner, &session_id);
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
+        // Acquire Arc under brief lock, then release before I/O.
+        let session_arc = get_sftp_session_arc!(state_inner, &session_id);
         let sess = session_arc.lock().map_err(|e| e.to_string())?;
         let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
         // Build the glob as a Rust string first, then shell_quote the whole thing.
@@ -376,5 +392,6 @@ pub async fn sftp_deep_search(
         Ok(stdout.lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect())
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| NexumError::Internal(e.to_string()))?
+    .map_err(NexumError::Internal)
 }

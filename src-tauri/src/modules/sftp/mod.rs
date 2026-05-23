@@ -1,5 +1,9 @@
 pub mod commands;
+pub mod connection;
+pub mod state;
 pub mod worker;
+
+pub use state::SftpState;
 
 use std::collections::HashMap;
 use std::sync::Arc;

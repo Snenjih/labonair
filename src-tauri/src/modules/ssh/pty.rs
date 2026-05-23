@@ -71,20 +71,31 @@ pub fn open_shell_channel(
         // miss a single byte of output (replaces the old 200×10ms retry loop).
         let _ = ready_rx.recv();
 
+        // Tracks the reason for an unexpected exit so we can notify the frontend.
+        // None means the loop ended normally (ssh_disconnect set the shutdown flag).
+        let mut disconnect_reason: Option<String> = None;
+
         loop {
             if shutdown_clone.load(Ordering::Relaxed) {
-                break;
+                break; // clean shutdown via ssh_disconnect
             }
 
             let data = {
                 let mut map = match state.0.lock() {
                     Ok(m) => m,
-                    Err(_) => break,
+                    Err(_) => {
+                        disconnect_reason = Some("Internal lock error".to_string());
+                        break;
+                    }
                 };
-                let Some(sess) = map.get_mut(&session_id_clone) else { break };
+                let Some(sess) = map.get_mut(&session_id_clone) else {
+                    // Session was removed by ssh_disconnect — normal exit, no event.
+                    break;
+                };
                 let Some(ch) = sess.channel.as_mut() else { break };
 
                 if ch.eof() {
+                    disconnect_reason = Some("Connection closed by remote host".to_string());
                     break;
                 }
 
@@ -93,7 +104,10 @@ pub fn open_shell_channel(
                     Ok(0) => None,
                     Ok(n) => Some(String::from_utf8_lossy(&buf[..n]).to_string()),
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => None,
-                    Err(_) => break,
+                    Err(e) => {
+                        disconnect_reason = Some(e.to_string());
+                        break;
+                    }
                 }
             };
 
@@ -108,6 +122,21 @@ pub fn open_shell_channel(
             } else {
                 std::thread::sleep(std::time::Duration::from_millis(5));
             }
+        }
+
+        // Emit disconnect event only for unexpected exits.
+        if let Some(reason) = disconnect_reason {
+            // Clean up the dead session so reconnect can create a fresh one.
+            if let Ok(mut map) = state.0.lock() {
+                map.remove(&session_id_clone);
+            }
+            let _ = app_clone.emit(
+                "ssh_connection_lost",
+                serde_json::json!({
+                    "session_id": session_id_clone,
+                    "reason": reason
+                }),
+            );
         }
     });
 
