@@ -147,7 +147,7 @@ pub async fn ssh_connect(
         );
     }
 
-    result.map_err(|s| classify_ssh_error(s))
+    result.map_err(classify_ssh_error)
 }
 
 /// Maps a string error from ssh_connect_blocking to a structured NexumError variant.
