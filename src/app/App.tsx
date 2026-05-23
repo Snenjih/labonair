@@ -709,8 +709,10 @@ export default function App() {
   const restoreFocus = useCallback(() => {
     if (activeTab?.kind === "workspace" && activePaneId) {
       terminalRefs.current.get(activePaneId)?.focus();
+    } else if (activeTab?.kind === "editor") {
+      editorRefs.current.get(activeId)?.focus();
     }
-  }, [activeTab, activePaneId]);
+  }, [activeTab, activePaneId, activeId]);
 
   const [snippetLogDrawerOpen, setSnippetLogDrawerOpen] = useState(false);
   const workspaceTabs = tabs.filter((t): t is WorkspaceTab => t.kind === "workspace");

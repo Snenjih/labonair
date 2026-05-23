@@ -88,7 +88,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     loadRemoteDir(tabId, host?.default_path_sftp ?? "/");
     return () => {
       destroyTab(tabId);
-      invoke("sftp_disconnect", { sessionId: tabId }).catch(console.error);
+      invoke("sftp_disconnect", { sessionId: tabId }).catch((e) => handleApiError(e, "Failed to disconnect SFTP", "SFTP"));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, isConnected]);
@@ -162,7 +162,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
         loadLocalDir(tabId, tabState?.localPath ?? "~");
       }
     } catch (e) {
-      console.error("Rename failed:", e);
+      handleApiError(e, "Failed to rename", "SFTP");
     }
     setRenamingPath(null);
   }
@@ -225,7 +225,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
           direction: "download",
         });
       } catch (e) {
-        console.error("Download enqueue failed:", e);
+        handleApiError(e, "Failed to enqueue download", "SFTP");
       }
     }
   }
@@ -244,7 +244,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
           direction: "upload",
         });
       } catch (e) {
-        console.error("Upload enqueue failed:", e);
+        handleApiError(e, "Failed to enqueue upload", "SFTP");
       }
     }
   }
@@ -265,7 +265,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
         loadLocalDir(tabId, basePath);
       }
     } catch (e) {
-      console.error("New folder failed:", e);
+      handleApiError(e, "Failed to create folder", "SFTP");
     }
     setCreatingFolderSide(null);
     setNewFolderName("");
@@ -285,7 +285,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       });
       setDeepSearchResults(results);
     } catch (e) {
-      console.error("Deep search failed:", e);
+      handleApiError(e, "Deep search failed", "SFTP");
       setDeepSearchResults([]);
     } finally {
       setIsDeepSearching(false);

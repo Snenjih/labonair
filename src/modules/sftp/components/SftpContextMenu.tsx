@@ -79,7 +79,7 @@ export function SftpContextMenu({
       }
       onRefresh();
     } catch (e) {
-      console.error("Delete failed:", e);
+      handleApiError(e, "Failed to delete files", "SFTP");
     }
   }
 
@@ -91,13 +91,13 @@ export function SftpContextMenu({
       await invoke("sftp_chmod", { sessionId: tabId, path: singlePath, permissions: octal });
       onRefresh();
     } catch (e) {
-      console.error("Chmod failed:", e);
+      handleApiError(e, "Failed to set permissions", "SFTP");
     }
   }
 
   function handleCopyPath() {
     const text = [...selectedPaths].join("\n");
-    navigator.clipboard.writeText(text).catch(console.error);
+    navigator.clipboard.writeText(text).catch((e) => handleApiError(e, "Failed to copy path", "SFTP"));
   }
 
   async function handleDownloadTo() {
@@ -115,7 +115,7 @@ export function SftpContextMenu({
           direction: "download",
         });
       } catch (e) {
-        console.error("Download to enqueue failed:", e);
+        handleApiError(e, "Failed to enqueue download", "SFTP");
       }
     }
   }
@@ -137,7 +137,7 @@ export function SftpContextMenu({
           direction: "upload",
         });
       } catch (e) {
-        console.error("Upload here enqueue failed:", e);
+        handleApiError(e, "Failed to enqueue upload", "SFTP");
       }
     }
   }

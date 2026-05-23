@@ -1,6 +1,29 @@
 # Handshake — Session State
 
-## Last Session: 2026-05-24 (Editor Feature Expansion)
+## Last Session: 2026-05-24 (V1.1 Final Architecture Polish)
+
+### What Was Done
+Completed all 3 phases of `tasks/v1.1_final_architecture_polish.md`. `cargo check` ✅ · `tsc --noEmit` ✅
+
+**Phase 1 — Editor Focus Restoration**
+- Added `focus: () => void` to `EditorPaneHandle` type in `EditorPane.tsx`
+- Added `focus` implementation in `useImperativeHandle`: calls `cmRef.current?.view.focus()`
+- Updated `restoreFocus` callback in `App.tsx`: now handles `kind === "editor"` tabs by calling `editorRefs.current.get(activeId)?.focus()`
+
+**Phase 2 — SFTP Error-Handling Purge**
+- `SftpContextMenu.tsx`: replaced all `console.error` in `handleDelete`, `handleChmod`, `handleCopyPath`, `handleDownloadTo`, `handleUploadHere` with `handleApiError`
+- `SftpPane.tsx`: replaced all `console.error` in `sftp_disconnect` cleanup, `commitRename`, `enqueueDownloads`, `enqueueUploads`, `commitNewFolder`, `handleDeepSearch` with `handleApiError`
+
+**Phase 3 — Rust `NexumError` Migration**
+- `src-tauri/src/modules/hosts/db.rs`: all Tauri commands (`hosts_get_all`, `hosts_create`, `hosts_update`, `hosts_delete`, `hosts_reorder`, `get_sudo_password`, `groups_get_all`, `groups_create`, `groups_delete`) now return `Result<T, NexumError>` instead of `Result<T, String>`
+- rusqlite `?` operator works directly via `From<rusqlite::Error>` impl in `errors.rs`
+- Mutex lock errors use `.map_err(|e| NexumError::Internal(e.to_string()))?`
+- Secrets function errors use `.map_err(NexumError::Internal)?`
+- `initialize_db` left as `Result<_, String>` (not a Tauri command)
+
+---
+
+## Previous Session: 2026-05-24 (Editor Feature Expansion)
 
 ### What Was Done
 Added **5 editor improvements** (committed `632e736`). `tsc --noEmit` ✅

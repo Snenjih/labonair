@@ -1,4 +1,5 @@
 use super::{Group, Host, HostsDb, ReorderItem};
+use crate::modules::errors::NexumError;
 use crate::modules::secrets::{delete_password, get_password, store_password, SecretsState};
 
 pub fn initialize_db(
@@ -136,16 +137,13 @@ const SELECT_HOSTS: &str = "SELECT id, name, host_address, port, username, auth_
     startup_snippet_id, startup_snippet_mode, credential_id FROM hosts";
 
 #[tauri::command]
-pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     let mut stmt = conn
-        .prepare(&format!("{} ORDER BY pin_to_top DESC, sort_order ASC, name ASC", SELECT_HOSTS))
-        .map_err(|e| e.to_string())?;
+        .prepare(&format!("{} ORDER BY pin_to_top DESC, sort_order ASC, name ASC", SELECT_HOSTS))?;
     let hosts = stmt
-        .query_map([], row_to_host)
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        .query_map([], row_to_host)?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(hosts)
 }
 
@@ -175,7 +173,7 @@ pub async fn hosts_create(
     startup_snippet_id: Option<String>,
     startup_snippet_mode: Option<String>,
     credential_id: Option<String>,
-) -> Result<Host, String> {
+) -> Result<Host, NexumError> {
     let id = uuid::Uuid::new_v4().to_string();
     let created_at = now_millis();
     let pin = pin_to_top.unwrap_or(false) as i64;
@@ -183,7 +181,7 @@ pub async fn hosts_create(
     let sudo_set = sudo_password.is_some() as i64;
 
     {
-        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
         let snippet_id: Option<&str> = startup_snippet_id.as_deref().filter(|s| !s.is_empty());
         conn.execute(
             "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
@@ -198,26 +196,24 @@ pub async fn hosts_create(
                 keep_alive_interval, keep_alive_tries, order, tunnels,
                 snippet_id, startup_snippet_mode, credential_id
             ],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
     if let Some(pw) = password {
         if !pw.is_empty() {
-            store_password(&app, &secrets, "nexum-app", &id, &pw)?;
+            store_password(&app, &secrets, "nexum-app", &id, &pw).map_err(NexumError::Internal)?;
         }
     }
     if let Some(sp) = sudo_password {
         if !sp.is_empty() {
-            store_password(&app, &secrets, "nexum-sudo", &id, &sp)?;
+            store_password(&app, &secrets, "nexum-sudo", &id, &sp).map_err(NexumError::Internal)?;
         }
     }
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     conn.query_row(
         &format!("{} WHERE id=?1", SELECT_HOSTS),
         rusqlite::params![id],
         row_to_host,
-    )
-    .map_err(|e| e.to_string())
+    ).map_err(NexumError::from)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -247,92 +243,91 @@ pub async fn hosts_update(
     startup_snippet_id: Option<String>,
     startup_snippet_mode: Option<String>,
     credential_id: Option<String>,
-) -> Result<Host, String> {
+) -> Result<Host, NexumError> {
     {
-        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
         if let Some(v) = &name {
-            conn.execute("UPDATE hosts SET name=?1 WHERE id=?2", rusqlite::params![v, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET name=?1 WHERE id=?2", rusqlite::params![v, id])?;
         }
         if let Some(v) = &host_address {
-            conn.execute("UPDATE hosts SET host_address=?1 WHERE id=?2", rusqlite::params![v, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET host_address=?1 WHERE id=?2", rusqlite::params![v, id])?;
         }
         if let Some(v) = port {
-            conn.execute("UPDATE hosts SET port=?1 WHERE id=?2", rusqlite::params![v, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET port=?1 WHERE id=?2", rusqlite::params![v, id])?;
         }
         if let Some(v) = &username {
-            conn.execute("UPDATE hosts SET username=?1 WHERE id=?2", rusqlite::params![v, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET username=?1 WHERE id=?2", rusqlite::params![v, id])?;
         }
         if let Some(v) = &auth_method {
-            conn.execute("UPDATE hosts SET auth_method=?1 WHERE id=?2", rusqlite::params![v, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET auth_method=?1 WHERE id=?2", rusqlite::params![v, id])?;
         }
         if private_key_path.is_some() {
-            conn.execute("UPDATE hosts SET private_key_path=?1 WHERE id=?2", rusqlite::params![private_key_path, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET private_key_path=?1 WHERE id=?2", rusqlite::params![private_key_path, id])?;
         }
         if group_id.is_some() {
-            conn.execute("UPDATE hosts SET group_id=?1 WHERE id=?2", rusqlite::params![group_id, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET group_id=?1 WHERE id=?2", rusqlite::params![group_id, id])?;
         }
         if tags.is_some() {
-            conn.execute("UPDATE hosts SET tags=?1 WHERE id=?2", rusqlite::params![tags, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET tags=?1 WHERE id=?2", rusqlite::params![tags, id])?;
         }
         if default_path_ssh.is_some() {
-            conn.execute("UPDATE hosts SET default_path_ssh=?1 WHERE id=?2", rusqlite::params![default_path_ssh, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET default_path_ssh=?1 WHERE id=?2", rusqlite::params![default_path_ssh, id])?;
         }
         if default_path_sftp.is_some() {
-            conn.execute("UPDATE hosts SET default_path_sftp=?1 WHERE id=?2", rusqlite::params![default_path_sftp, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET default_path_sftp=?1 WHERE id=?2", rusqlite::params![default_path_sftp, id])?;
         }
         if let Some(v) = pin_to_top {
             let pin = v as i64;
-            conn.execute("UPDATE hosts SET pin_to_top=?1 WHERE id=?2", rusqlite::params![pin, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET pin_to_top=?1 WHERE id=?2", rusqlite::params![pin, id])?;
         }
         if let Some(v) = keep_alive_interval {
-            conn.execute("UPDATE hosts SET keep_alive_interval=?1 WHERE id=?2", rusqlite::params![v, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET keep_alive_interval=?1 WHERE id=?2", rusqlite::params![v, id])?;
         }
         if let Some(v) = keep_alive_tries {
-            conn.execute("UPDATE hosts SET keep_alive_tries=?1 WHERE id=?2", rusqlite::params![v, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET keep_alive_tries=?1 WHERE id=?2", rusqlite::params![v, id])?;
         }
         if let Some(v) = sort_order {
-            conn.execute("UPDATE hosts SET sort_order=?1 WHERE id=?2", rusqlite::params![v, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET sort_order=?1 WHERE id=?2", rusqlite::params![v, id])?;
         }
         if tunnels.is_some() {
-            conn.execute("UPDATE hosts SET tunnels=?1 WHERE id=?2", rusqlite::params![tunnels, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET tunnels=?1 WHERE id=?2", rusqlite::params![tunnels, id])?;
         }
         if let Some(ref v) = startup_snippet_id {
             let db_val: Option<&str> = if v.is_empty() { None } else { Some(v.as_str()) };
-            conn.execute("UPDATE hosts SET startup_snippet_id=?1 WHERE id=?2", rusqlite::params![db_val, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET startup_snippet_id=?1 WHERE id=?2", rusqlite::params![db_val, id])?;
         }
         if startup_snippet_mode.is_some() {
-            conn.execute("UPDATE hosts SET startup_snippet_mode=?1 WHERE id=?2", rusqlite::params![startup_snippet_mode, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET startup_snippet_mode=?1 WHERE id=?2", rusqlite::params![startup_snippet_mode, id])?;
         }
         if credential_id.is_some() {
             let val: Option<String> = credential_id.filter(|s| !s.is_empty());
-            conn.execute("UPDATE hosts SET credential_id=?1 WHERE id=?2", rusqlite::params![val, id]).map_err(|e| e.to_string())?;
+            conn.execute("UPDATE hosts SET credential_id=?1 WHERE id=?2", rusqlite::params![val, id])?;
         }
     }
     if let Some(pw) = password {
         if pw.is_empty() {
             let _ = delete_password(&app, &secrets, "nexum-app", &id);
         } else {
-            store_password(&app, &secrets, "nexum-app", &id, &pw)?;
+            store_password(&app, &secrets, "nexum-app", &id, &pw).map_err(NexumError::Internal)?;
         }
     }
     if let Some(sp) = sudo_password {
         if sp.is_empty() {
             let _ = delete_password(&app, &secrets, "nexum-sudo", &id);
-            let conn = db.0.lock().map_err(|e| e.to_string())?;
+            let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
             let _ = conn.execute("UPDATE hosts SET sudo_password_set=0 WHERE id=?1", rusqlite::params![id]);
         } else {
-            store_password(&app, &secrets, "nexum-sudo", &id, &sp)?;
-            let conn = db.0.lock().map_err(|e| e.to_string())?;
+            store_password(&app, &secrets, "nexum-sudo", &id, &sp).map_err(NexumError::Internal)?;
+            let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
             let _ = conn.execute("UPDATE hosts SET sudo_password_set=1 WHERE id=?1", rusqlite::params![id]);
         }
     }
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     conn.query_row(
         &format!("{} WHERE id=?1", SELECT_HOSTS),
         rusqlite::params![id],
         row_to_host,
-    )
-    .map_err(|e| e.to_string())
+    ).map_err(NexumError::from)
 }
 
 #[tauri::command]
@@ -341,11 +336,10 @@ pub async fn hosts_delete(
     db: tauri::State<'_, HostsDb>,
     secrets: tauri::State<'_, SecretsState>,
     id: String,
-) -> Result<(), String> {
+) -> Result<(), NexumError> {
     {
-        let conn = db.0.lock().map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM hosts WHERE id=?1", rusqlite::params![id])
-            .map_err(|e| e.to_string())?;
+        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        conn.execute("DELETE FROM hosts WHERE id=?1", rusqlite::params![id])?;
     }
     let _ = delete_password(&app, &secrets, "nexum-app", &id);
     let _ = delete_password(&app, &secrets, "nexum-sudo", &id);
@@ -356,14 +350,13 @@ pub async fn hosts_delete(
 pub async fn hosts_reorder(
     db: tauri::State<'_, HostsDb>,
     items: Vec<ReorderItem>,
-) -> Result<(), String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+) -> Result<(), NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     for item in &items {
         conn.execute(
             "UPDATE hosts SET sort_order=?1 WHERE id=?2",
             rusqlite::params![item.sort_order, item.id],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
     Ok(())
 }
@@ -374,9 +367,9 @@ pub async fn get_sudo_password(
     db: tauri::State<'_, HostsDb>,
     secrets: tauri::State<'_, SecretsState>,
     host_id: String,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, NexumError> {
     let sudo_set: bool = {
-        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
         conn.query_row(
             "SELECT sudo_password_set FROM hosts WHERE id=?1",
             rusqlite::params![host_id],
@@ -388,15 +381,14 @@ pub async fn get_sudo_password(
     if !sudo_set {
         return Ok(None);
     }
-    get_password(&app, &secrets, "nexum-sudo", &host_id)
+    get_password(&app, &secrets, "nexum-sudo", &host_id).map_err(NexumError::Internal)
 }
 
 #[tauri::command]
-pub async fn groups_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Group>, String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+pub async fn groups_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Group>, NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
     let mut stmt = conn
-        .prepare("SELECT id, name, icon, color, created_at FROM groups ORDER BY name")
-        .map_err(|e| e.to_string())?;
+        .prepare("SELECT id, name, icon, color, created_at FROM groups ORDER BY name")?;
     let groups = stmt
         .query_map([], |row| {
             Ok(Group {
@@ -406,10 +398,8 @@ pub async fn groups_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Group>,
                 color: row.get(3)?,
                 created_at: row.get(4)?,
             })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(groups)
 }
 
@@ -419,24 +409,22 @@ pub async fn groups_create(
     name: String,
     icon: Option<String>,
     color: Option<String>,
-) -> Result<Group, String> {
+) -> Result<Group, NexumError> {
     let id = uuid::Uuid::new_v4().to_string();
     let created_at = now_millis();
     {
-        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
         conn.execute(
             "INSERT INTO groups (id, name, icon, color, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
             rusqlite::params![id, name, icon, color, created_at],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
     Ok(Group { id, name, icon, color, created_at })
 }
 
 #[tauri::command]
-pub async fn groups_delete(db: tauri::State<'_, HostsDb>, id: String) -> Result<(), String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM groups WHERE id=?1", rusqlite::params![id])
-        .map_err(|e| e.to_string())?;
+pub async fn groups_delete(db: tauri::State<'_, HostsDb>, id: String) -> Result<(), NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+    conn.execute("DELETE FROM groups WHERE id=?1", rusqlite::params![id])?;
     Ok(())
 }

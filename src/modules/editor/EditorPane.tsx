@@ -81,6 +81,7 @@ export type EditorPaneHandle = {
   reload: () => boolean;
   /** Save the current buffer (triggers save-as dialog for untitled files). */
   save: () => Promise<void>;
+  focus: () => void;
   openFind: () => void;
   closeFind: () => void;
 };
@@ -503,6 +504,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           if (editorFormatOnSaveRef.current) await runFormat();
           await saveRef.current();
           onSavedRef.current?.();
+        },
+        focus: () => {
+          const view = cmRef.current?.view;
+          if (view) view.focus();
         },
         openFind: () => setFindOpen(true),
         closeFind: () => setFindOpen(false),
