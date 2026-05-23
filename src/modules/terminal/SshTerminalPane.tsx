@@ -257,6 +257,13 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         t.loadAddon(new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)));
         t.open(containerRef.current);
         fit.fit();
+        // estCols/estRows are rough pixel estimates; send the real dimensions
+        // immediately so TUI apps (claude, vim, htop, …) get the correct size.
+        invoke("ssh_pty_resize", {
+          sessionId,
+          cols: t.cols,
+          rows: t.rows,
+        }).catch(console.error);
         onSearchReadyRef.current?.(search);
 
         if (prefs.terminalUseWebGL) {
