@@ -12,7 +12,10 @@ import { EditorState } from "@codemirror/state";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorBracketMatching,
+  setEditorFormatOnSave,
   setEditorLineNumbers,
+  setEditorShowOutline,
+  setEditorShowSelectionStats,
   setEditorWordWrap,
 } from "@/modules/settings/store";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
@@ -59,6 +62,10 @@ import { useDocument } from "./lib/useDocument";
 import { inlineCompletion } from "./lib/autocomplete/inlineExtension";
 import { getKey } from "@/modules/ai/lib/keyring";
 import { onKeysChanged } from "@/modules/settings/store";
+import { useEditorCursorStore } from "./lib/cursorStore";
+import { extractOutline, type OutlineItem } from "./lib/outline";
+import { OutlinePanel } from "./OutlinePanel";
+import { formatDocument } from "./lib/formatter";
 
 export type EditorPaneHandle = {
   setQuery: (q: string) => void;
@@ -78,6 +85,7 @@ export type EditorPaneHandle = {
 type Props = {
   path: string;
   isUntitled?: boolean;
+  isActive?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onSaveAs?: (newPath: string) => void;
@@ -91,7 +99,7 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, isUntitled, onDirtyChange, onSaved, onSaveAs, onClose }, ref) {
+  function EditorPane({ path, isUntitled, isActive = false, onDirtyChange, onSaved, onSaveAs, onClose }, ref) {
     const { doc, dirty, onChange: _onChange, save, reload } = useDocument({ path, isUntitled, onDirtyChange, onSaveAs });
     const isMarkdownRef = useRef(false);
     const reloadRef = useRef(reload);
@@ -104,6 +112,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
     const editorTabSize = usePreferencesStore((s) => s.editorTabSize);
     const editorBracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
+    const editorShowSelectionStats = usePreferencesStore((s) => s.editorShowSelectionStats);
+    const editorShowOutline = usePreferencesStore((s) => s.editorShowOutline);
+    const editorFormatOnSave = usePreferencesStore((s) => s.editorFormatOnSave);
     const languageRef = useRef<string | null>(null);
 
     const fileName = path.split("/").pop() ?? (isUntitled ? "Untitled" : path);
@@ -113,7 +124,30 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const [markdownPreviewOpen, setMarkdownPreviewOpen] = useState(false);
     const [previewContent, setPreviewContent] = useState("");
     const [findOpen, setFindOpen] = useState(false);
+    const [outline, setOutline] = useState<OutlineItem[]>([]);
     const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const outlineDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Keep isActive in a ref so listener closures never capture stale value
+    const isActiveRef = useRef(isActive);
+    useEffect(() => {
+      isActiveRef.current = isActive;
+      // When becoming active, do an immediate cursor read
+      if (isActive) {
+        const view = cmRef.current?.view;
+        if (view) {
+          const sel = view.state.selection.main;
+          const pos = sel.head;
+          const line = view.state.doc.lineAt(pos);
+          const col = pos - line.from + 1;
+          const chars = sel.empty ? 0 : Math.abs(sel.to - sel.from);
+          const lines = sel.empty
+            ? 0
+            : view.state.doc.lineAt(sel.to).number - view.state.doc.lineAt(sel.from).number + 1;
+          useEditorCursorStore.getState().set(line.number, col, chars, lines);
+        }
+      }
+    }, [isActive]);
 
     const onChange = useCallback((value: string) => {
       _onChange(value);
@@ -225,26 +259,55 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [doc.status]);
 
+    // Seed outline when doc first loads
+    useEffect(() => {
+      if (doc.status === "ready" && editorShowOutline) {
+        const view = cmRef.current?.view;
+        if (view) setOutline(extractOutline(view));
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [doc.status]);
+
+    const editorFormatOnSaveRef = useRef(editorFormatOnSave);
+    editorFormatOnSaveRef.current = editorFormatOnSave;
+
+    /** Format the current buffer via Prettier and apply to the editor. Returns whether formatting ran. */
+    const runFormat = useCallback(async (): Promise<boolean> => {
+      const view = cmRef.current?.view;
+      if (!view) return false;
+      const content = view.state.doc.toString();
+      const formatted = await formatDocument(content, pathRef.current);
+      if (formatted === null || formatted === content) return false;
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: formatted },
+      });
+      return true;
+    }, []);
+
     useEffect(() => {
       if (editorAutoSave !== "afterDelay") return;
       if (doc.status !== "ready") return;
       if (isUntitled) return;
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = setTimeout(async () => {
         autoSaveTimerRef.current = null;
-        void saveRef.current().then(() => onSavedRef.current?.());
+        if (editorFormatOnSaveRef.current) await runFormat();
+        await saveRef.current();
+        onSavedRef.current?.();
       }, 5000);
       return () => {
         if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       };
-    }, [editorAutoSave, doc]);
+    }, [editorAutoSave, doc, isUntitled, runFormat]);
 
     // Auto-save: onFocusChange — attach blur listener to CodeMirror's DOM.
-    const handleBlur = useCallback(() => {
+    const handleBlur = useCallback(async () => {
       if (editorAutoSave !== "onFocusChange") return;
       if (isUntitled) return;
-      void saveRef.current().then(() => onSavedRef.current?.());
-    }, [editorAutoSave, isUntitled]);
+      if (editorFormatOnSaveRef.current) await runFormat();
+      await saveRef.current();
+      onSavedRef.current?.();
+    }, [editorAutoSave, isUntitled, runFormat]);
 
     const extensions = useMemo(
       () => {
@@ -258,6 +321,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           vimHandlersExtension(() => ({
             save: () => {
               void (async () => {
+                if (editorFormatOnSaveRef.current) await runFormat();
                 await saveRef.current();
                 onSavedRef.current?.();
               })();
@@ -284,15 +348,45 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             getPath: () => pathRef.current,
             getLanguage: () => languageRef.current,
           }),
+          // Update cursor/selection store and outline on every editor change
+          EditorView.updateListener.of((update) => {
+            if (!isActiveRef.current) return;
+            const sel = update.state.selection.main;
+            const pos = sel.head;
+            const line = update.state.doc.lineAt(pos);
+            const col = pos - line.from + 1;
+            const chars = sel.empty ? 0 : Math.abs(sel.to - sel.from);
+            const lines = sel.empty
+              ? 0
+              : update.state.doc.lineAt(sel.to).number -
+                update.state.doc.lineAt(sel.from).number + 1;
+            useEditorCursorStore.getState().set(line.number, col, chars, lines);
+
+            if (update.docChanged) {
+              if (outlineDebounceRef.current) clearTimeout(outlineDebounceRef.current);
+              outlineDebounceRef.current = setTimeout(() => {
+                setOutline(extractOutline(update.view));
+              }, 250);
+            }
+          }),
           keymap.of([
             {
               key: "Mod-s",
               preventDefault: true,
               run: () => {
                 void (async () => {
+                  if (editorFormatOnSaveRef.current) await runFormat();
                   await saveRef.current();
                   onSavedRef.current?.();
                 })();
+                return true;
+              },
+            },
+            {
+              key: "Mod-Shift-f",
+              preventDefault: true,
+              run: () => {
+                void runFormat();
                 return true;
               },
             },
@@ -300,7 +394,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         ];
       },
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      [],
+      [runFormat],
     );
 
     useEffect(() => {
@@ -329,8 +423,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
 
     useEffect(() => {
       let cancelled = false;
-      const ext = path.split(".").pop()?.toLowerCase() ?? null;
-      languageRef.current = ext;
+      const extStr = path.split(".").pop()?.toLowerCase() ?? null;
+      languageRef.current = extStr;
       resolveLanguage(path).then((ext) => {
         if (cancelled) return;
         const view = cmRef.current?.view;
@@ -338,11 +432,19 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         view.dispatch({
           effects: languageCompartment.reconfigure(ext ?? []),
         });
+        // Re-extract outline after language is resolved
+        if (editorShowOutline) {
+          setOutline(extractOutline(view));
+        }
       });
       return () => {
         cancelled = true;
       };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [path, doc.status]);
+
+    const selectionChars = useEditorCursorStore((s) => s.selectionChars);
+    const selectionLines = useEditorCursorStore((s) => s.selectionLines);
 
     useImperativeHandle(
       ref,
@@ -382,13 +484,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         getPath: () => path,
         reload: () => reloadRef.current(),
         save: async () => {
+          if (editorFormatOnSaveRef.current) await runFormat();
           await saveRef.current();
           onSavedRef.current?.();
         },
         openFind: () => setFindOpen(true),
         closeFind: () => setFindOpen(false),
       }),
-      [path],
+      [path, runFormat],
     );
 
     if (doc.status === "loading") {
@@ -435,49 +538,81 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             <span className="size-2 rounded-full bg-foreground/60 animate-pulse shrink-0" title="Unsaved changes" />
           )}
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={1.75} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-44">
-            <DropdownMenuCheckboxItem
-              checked={editorWordWrap}
-              onCheckedChange={(v) => void setEditorWordWrap(v)}
-            >
-              Word Wrap
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={editorLineNumbers}
-              onCheckedChange={(v) => void setEditorLineNumbers(v)}
-            >
-              Line Numbers
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={editorBracketMatching}
-              onCheckedChange={(v) => void setEditorBracketMatching(v)}
-            >
-              Bracket Matching
-            </DropdownMenuCheckboxItem>
-            {isMarkdownFile && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuCheckboxItem
-                  checked={markdownPreviewOpen}
-                  onCheckedChange={setMarkdownPreviewOpen}
-                >
-                  Markdown Preview
-                </DropdownMenuCheckboxItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2 shrink-0">
+          {editorShowSelectionStats && selectionChars > 0 && (
+            <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+              {selectionChars} chars · {selectionLines} lines
+            </span>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={1.75} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-44">
+              <DropdownMenuCheckboxItem
+                checked={editorWordWrap}
+                onCheckedChange={(v) => void setEditorWordWrap(v)}
+              >
+                Word Wrap
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={editorLineNumbers}
+                onCheckedChange={(v) => void setEditorLineNumbers(v)}
+              >
+                Line Numbers
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={editorBracketMatching}
+                onCheckedChange={(v) => void setEditorBracketMatching(v)}
+              >
+                Bracket Matching
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={editorShowSelectionStats}
+                onCheckedChange={(v) => void setEditorShowSelectionStats(v)}
+              >
+                Selection Stats
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={editorShowOutline}
+                onCheckedChange={(v) => {
+                  void setEditorShowOutline(v);
+                  if (v) {
+                    const view = cmRef.current?.view;
+                    if (view) setOutline(extractOutline(view));
+                  }
+                }}
+              >
+                Outline
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={editorFormatOnSave}
+                onCheckedChange={(v) => void setEditorFormatOnSave(v)}
+              >
+                Format on Save
+              </DropdownMenuCheckboxItem>
+              {isMarkdownFile && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={markdownPreviewOpen}
+                    onCheckedChange={setMarkdownPreviewOpen}
+                  >
+                    Markdown Preview
+                  </DropdownMenuCheckboxItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     );
 
@@ -504,6 +639,31 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       />
     );
 
+    const handleJump = useCallback((pos: number) => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+      view.focus();
+    }, []);
+
+    // Determine if outline panel should be shown alongside the editor
+    const showOutlinePanel = editorShowOutline && outline.length >= 0;
+
+    // Build the editor area (possibly wrapped with outline)
+    const editorWithOutline = showOutlinePanel ? (
+      <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
+        <ResizablePanel defaultSize={78} minSize={40}>
+          <div className="h-full flex flex-col">{codeMirrorEl}</div>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={22} minSize={15} maxSize={40}>
+          <OutlinePanel items={outline} onJump={handleJump} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    ) : (
+      <div className="flex-1 min-h-0 flex flex-col">{codeMirrorEl}</div>
+    );
+
     return (
       <div className="flex h-full min-h-0 flex-col" onBlur={handleBlur}>
         {toolbar}
@@ -526,7 +686,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             </ResizablePanel>
           </ResizablePanelGroup>
         ) : (
-          <div className="flex-1 min-h-0 flex flex-col">{codeMirrorEl}</div>
+          editorWithOutline
         )}
       </div>
     );

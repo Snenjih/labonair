@@ -187,6 +187,7 @@ export function EditorStack({
               ref={getRefCallback(t.id)}
               path={t.path}
               isUntitled={t.isUntitled}
+              isActive={visible}
               onDirtyChange={getDirtyCallback(t.id)}
               onClose={getCloseCallback(t.id)}
               onSaved={getSavedCallback(t)}

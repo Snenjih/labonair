@@ -84,6 +84,10 @@ export type Preferences = {
   editorWordWrap: boolean;
   editorTabSize: 2 | 4 | 8;
   editorBracketMatching: boolean;
+  editorShowCursorPosition: boolean;
+  editorShowSelectionStats: boolean;
+  editorShowOutline: boolean;
+  editorFormatOnSave: boolean;
 
   // --- File Manager ---
   sftpFontSize: number;
@@ -182,6 +186,10 @@ const KEY_EDITOR_LINE_NUMBERS = "editorLineNumbers";
 const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
 const KEY_EDITOR_TAB_SIZE = "editorTabSize";
 const KEY_EDITOR_BRACKET_MATCHING = "editorBracketMatching";
+const KEY_EDITOR_SHOW_CURSOR_POSITION = "editor.showCursorPosition";
+const KEY_EDITOR_SHOW_SELECTION_STATS = "editor.showSelectionStats";
+const KEY_EDITOR_SHOW_OUTLINE = "editor.showOutline";
+const KEY_EDITOR_FORMAT_ON_SAVE = "editor.formatOnSave";
 
 const KEY_SFTP_FONT_SIZE = "sftpFontSize";
 const KEY_SFTP_SHOW_HIDDEN = "sftpShowHiddenFiles";
@@ -263,6 +271,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorWordWrap: false,
   editorTabSize: 2,
   editorBracketMatching: true,
+  editorShowCursorPosition: true,
+  editorShowSelectionStats: true,
+  editorShowOutline: false,
+  editorFormatOnSave: false,
 
   sftpFontSize: 13,
   sftpShowHiddenFiles: false,
@@ -420,6 +432,18 @@ export async function loadPreferences(): Promise<Preferences> {
     editorBracketMatching:
       get<boolean>(KEY_EDITOR_BRACKET_MATCHING) ??
       DEFAULT_PREFERENCES.editorBracketMatching,
+    editorShowCursorPosition:
+      get<boolean>(KEY_EDITOR_SHOW_CURSOR_POSITION) ??
+      DEFAULT_PREFERENCES.editorShowCursorPosition,
+    editorShowSelectionStats:
+      get<boolean>(KEY_EDITOR_SHOW_SELECTION_STATS) ??
+      DEFAULT_PREFERENCES.editorShowSelectionStats,
+    editorShowOutline:
+      get<boolean>(KEY_EDITOR_SHOW_OUTLINE) ??
+      DEFAULT_PREFERENCES.editorShowOutline,
+    editorFormatOnSave:
+      get<boolean>(KEY_EDITOR_FORMAT_ON_SAVE) ??
+      DEFAULT_PREFERENCES.editorFormatOnSave,
 
     sftpFontSize:
       get<number>(KEY_SFTP_FONT_SIZE) ?? DEFAULT_PREFERENCES.sftpFontSize,
@@ -892,6 +916,26 @@ export async function setConfirmQuitWithSsh(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setEditorShowCursorPosition(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EDITOR_SHOW_CURSOR_POSITION, value);
+  await (await getStore()).save();
+}
+
+export async function setEditorShowSelectionStats(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EDITOR_SHOW_SELECTION_STATS, value);
+  await (await getStore()).save();
+}
+
+export async function setEditorShowOutline(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EDITOR_SHOW_OUTLINE, value);
+  await (await getStore()).save();
+}
+
+export async function setEditorFormatOnSave(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EDITOR_FORMAT_ON_SAVE, value);
+  await (await getStore()).save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -940,6 +984,10 @@ export async function onPreferencesChange(
     [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
     [KEY_EDITOR_TAB_SIZE]: "editorTabSize",
     [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
+    [KEY_EDITOR_SHOW_CURSOR_POSITION]: "editorShowCursorPosition",
+    [KEY_EDITOR_SHOW_SELECTION_STATS]: "editorShowSelectionStats",
+    [KEY_EDITOR_SHOW_OUTLINE]: "editorShowOutline",
+    [KEY_EDITOR_FORMAT_ON_SAVE]: "editorFormatOnSave",
 
     [KEY_SFTP_FONT_SIZE]: "sftpFontSize",
     [KEY_SFTP_SHOW_HIDDEN]: "sftpShowHiddenFiles",

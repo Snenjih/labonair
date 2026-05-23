@@ -10,7 +10,11 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
   setEditorBracketMatching,
+  setEditorFormatOnSave,
   setEditorLineNumbers,
+  setEditorShowCursorPosition,
+  setEditorShowOutline,
+  setEditorShowSelectionStats,
   setEditorTabSize,
   setEditorWordWrap,
   setEditorTheme,
@@ -28,6 +32,10 @@ export function EditorSection() {
   const editorLineNumbers = usePreferencesStore((s) => s.editorLineNumbers);
   const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
   const editorBracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
+  const editorShowCursorPosition = usePreferencesStore((s) => s.editorShowCursorPosition);
+  const editorShowSelectionStats = usePreferencesStore((s) => s.editorShowSelectionStats);
+  const editorShowOutline = usePreferencesStore((s) => s.editorShowOutline);
+  const editorFormatOnSave = usePreferencesStore((s) => s.editorFormatOnSave);
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,6 +71,15 @@ export function EditorSection() {
       <div className="flex flex-col gap-2">
         <Label>Behaviour</Label>
         <div className="flex flex-col gap-2">
+          <SettingRow
+            title="Format on Save"
+            description="Automatically format the document with Prettier when saving (Cmd+S). Also triggered by Cmd+Shift+F."
+          >
+            <Switch
+              checked={editorFormatOnSave}
+              onCheckedChange={(v) => void setEditorFormatOnSave(v)}
+            />
+          </SettingRow>
           <SettingRow
             title="Auto save"
             description="Automatically save files when idle or on focus change."
@@ -132,6 +149,33 @@ export function EditorSection() {
             <Switch
               checked={editorBracketMatching}
               onCheckedChange={(v) => void setEditorBracketMatching(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Cursor position"
+            description="Display the current line and column in the status bar while editing."
+          >
+            <Switch
+              checked={editorShowCursorPosition}
+              onCheckedChange={(v) => void setEditorShowCursorPosition(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Selection stats"
+            description="Show selected character and line count in the editor toolbar."
+          >
+            <Switch
+              checked={editorShowSelectionStats}
+              onCheckedChange={(v) => void setEditorShowSelectionStats(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Outline panel"
+            description="Show a document outline panel with headings and symbol names."
+          >
+            <Switch
+              checked={editorShowOutline}
+              onCheckedChange={(v) => void setEditorShowOutline(v)}
             />
           </SettingRow>
         </div>

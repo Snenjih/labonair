@@ -31,6 +31,13 @@ const loaders: Record<string, LanguageLoader> = {
   py: () => import("@codemirror/lang-python").then((m) => m.python()),
   json: () => import("@codemirror/lang-json").then((m) => m.json()),
 
+  go: () => import("@codemirror/lang-go").then((m) => m.go()),
+  java: () => import("@codemirror/lang-java").then((m) => m.java()),
+  sql: () => import("@codemirror/lang-sql").then((m) => m.sql()),
+  php: () => import("@codemirror/lang-php").then((m) => m.php({ plain: true })),
+  xml: () => import("@codemirror/lang-xml").then((m) => m.xml()),
+  svg: () => import("@codemirror/lang-xml").then((m) => m.xml()),
+
   md: () => import("@codemirror/lang-markdown").then((m) => m.markdown()),
   markdown: () => import("@codemirror/lang-markdown").then((m) => m.markdown()),
 
@@ -47,6 +54,10 @@ const loaders: Record<string, LanguageLoader> = {
   yml: () => import("@codemirror/legacy-modes/mode/yaml").then((m) => m.yaml),
   dockerfile: () =>
     import("@codemirror/legacy-modes/mode/dockerfile").then((m) => m.dockerFile),
+  rb: () => import("@codemirror/legacy-modes/mode/ruby").then((m) => m.ruby),
+  swift: () => import("@codemirror/legacy-modes/mode/swift").then((m) => m.swift),
+  kt: () => import("@codemirror/legacy-modes/mode/clike").then((m) => m.kotlin),
+  kts: () => import("@codemirror/legacy-modes/mode/clike").then((m) => m.kotlin),
 };
 
 const filenameOverrides: Record<string, LanguageLoader> = {

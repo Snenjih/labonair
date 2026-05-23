@@ -13,6 +13,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { CwdBreadcrumb } from "./CwdBreadcrumb";
+import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
 
 export type SidebarPanel = "explorer" | "snippets" | "hosts" | null;
 
@@ -52,6 +53,9 @@ export function StatusBar({
   const panelOpen = useChatStore((s) => s.panelOpen);
   const openPanel = useChatStore((s) => s.openPanel);
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
+  const showCursorPosition = usePreferencesStore((s) => s.editorShowCursorPosition);
+  const cursorLine = useEditorCursorStore((s) => s.line);
+  const cursorCol = useEditorCursorStore((s) => s.col);
 
   return (
     <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-card/60 px-3 text-[11px]">
@@ -83,6 +87,11 @@ export function StatusBar({
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
+        {filePath && showCursorPosition && (
+          <span className="tabular-nums text-muted-foreground/60">
+            Ln {cursorLine}, Col {cursorCol}
+          </span>
+        )}
         {detectedPreviewUrl && onOpenPreview ? (
           <button
             type="button"
