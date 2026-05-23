@@ -1,6 +1,46 @@
 # Handshake — Session State
 
-## Last Session: 2026-05-23 (Settings Expansion)
+## Last Session: 2026-05-24 (Editor Feature Expansion)
+
+### What Was Done
+Added **5 editor improvements** (committed `632e736`). `tsc --noEmit` ✅
+
+**Feature 1 — Cursor Position in StatusBar**
+- New `editorShowCursorPosition: boolean` preference (default: true)
+- New `src/modules/editor/lib/cursorStore.ts` — Zustand micro-store `{line, col, selectionChars, selectionLines}`
+- `EditorPane` now accepts `isActive` prop; `EditorView.updateListener` writes to cursorStore only when active
+- `EditorStack` passes `isActive={visible}` to each EditorPane
+- `StatusBar` reads cursorStore → shows `Ln X, Col Y` when editor tab is active
+
+**Feature 3 — More Languages**
+- Installed: `@codemirror/lang-go`, `@codemirror/lang-java`, `@codemirror/lang-sql`, `@codemirror/lang-php`, `@codemirror/lang-xml`
+- Added to `languageResolver.ts`: go, java, sql, php, xml, svg, rb (ruby), swift, kt/kts (kotlin via legacy-modes/clike)
+
+**Feature 5 — Prettier Formatting**
+- Installed: `prettier@3.8.3`
+- New `src/modules/editor/lib/formatter.ts` — dynamic Prettier standalone with per-extension plugin loading
+- New `editorFormatOnSave: boolean` preference (default: false)
+- `Cmd+Shift+F` → format now; `Cmd+S` runs format first if pref enabled
+- Gear dropdown: "Format on Save" toggle
+- Settings → Editor: "Format on Save" row in Behaviour group
+
+**Feature 6 — Selection Stats**
+- New `editorShowSelectionStats: boolean` preference (default: true)
+- Toolbar shows `N chars · M lines` when text is selected and pref enabled
+- Gear dropdown: "Selection Stats" toggle
+- Settings → Editor: "Selection Stats" row in Display group
+
+**Feature 7 — Document Outline**
+- New `editorShowOutline: boolean` preference (default: false)
+- New `src/modules/editor/lib/outline.ts` — walks CodeMirror syntaxTree, extracts Markdown headings + code declarations
+- New `src/modules/editor/OutlinePanel.tsx` — clickable outline sidebar (resizable, right side)
+- Outline updates on every doc change (debounced 250ms)
+- Gear dropdown: "Outline" toggle
+- Settings → Editor: "Outline panel" row in Display group
+
+---
+
+## Previous Session: 2026-05-23 (Settings Expansion)
 
 ### What Was Done
 Added **13 new user-configurable settings** across Terminal, General, Security, and AI (committed `ca3dd9e`). All settings persist via `tauri-plugin-store`. `tsc --noEmit` ✅
