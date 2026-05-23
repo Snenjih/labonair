@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { useUpdater } from "./useUpdater";
+import { useUpdaterStore } from "./updaterStore";
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -17,7 +17,9 @@ function formatBytes(n: number): string {
 }
 
 export function UpdaterDialog() {
-  const { status, install, dismiss } = useUpdater();
+  const status = useUpdaterStore((s) => s.status);
+  const install = useUpdaterStore((s) => s.install);
+  const dismiss = useUpdaterStore((s) => s.dismiss);
 
   const open =
     status.kind === "available" ||

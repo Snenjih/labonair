@@ -1,10 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useUpdater } from "@/modules/updater/useUpdater";
+import { useUpdaterStore } from "@/modules/updater/updaterStore";
 
 export function UpdaterButton() {
-  const autoCheck = usePreferencesStore((s) => s.checkForUpdates);
-  const { status, install } = useUpdater({ autoCheck });
+  const status = useUpdaterStore((s) => s.status);
+  const install = useUpdaterStore((s) => s.install);
 
   if (
     status.kind === "idle" ||

@@ -62,6 +62,7 @@ import {
 import { WorkspacePane, type TerminalPaneHandle, type WorkspacePaneHandle } from "@/modules/terminal";
 import { ThemeProvider } from "@/modules/theme";
 import { CommandPalette, useCommandStore, type RegistryCallbacks } from "@/modules/command-palette";
+import { UpdaterDialog, useUpdater } from "@/modules/updater";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { handleApiError } from "@/lib/errors";
 import { captureAndSave, clearSnapshot, restoreIfEnabled } from "@/modules/session";
@@ -191,6 +192,8 @@ export default function App() {
   const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
+  const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
+  useUpdater({ autoCheck: checkForUpdates });
 
   const [sessionRestored, setSessionRestored] = useState(false);
   useEffect(() => {
@@ -1323,6 +1326,8 @@ export default function App() {
             activeContext={activeContext}
             restoreFocus={restoreFocus}
           />
+
+          <UpdaterDialog />
 
         </div>
       </TooltipProvider>
