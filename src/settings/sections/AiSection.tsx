@@ -395,7 +395,12 @@ function ModelsContent({
 /* ── Edit Prediction ─────────────────────────────────────────────── */
 
 function EditPredictionContent({ keys }: { keys: KeysMap | null }) {
-  const showEditPrediction = usePreferencesStore((s) => s.showEditPrediction);
+  const autocompleteEnabled = usePreferencesStore((s) => s.autocompleteEnabled);
+
+  const handleToggle = (v: boolean) => {
+    void setAutocompleteEnabled(v);
+    void setShowEditPrediction(v);
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -404,12 +409,12 @@ function EditPredictionContent({ keys }: { keys: KeysMap | null }) {
         description="Enable or disable inline ghost-text edit predictions in the code editor."
       >
         <Switch
-          checked={showEditPrediction}
-          onCheckedChange={(v) => void setShowEditPrediction(v)}
+          checked={autocompleteEnabled}
+          onCheckedChange={handleToggle}
         />
       </SettingRow>
 
-      {keys && <AutocompleteBlock keys={keys} />}
+      {keys && autocompleteEnabled && <AutocompleteBlock keys={keys} />}
     </div>
   );
 }
@@ -850,7 +855,6 @@ function OpenAICompatibleBlock({
 }
 
 function AutocompleteBlock({ keys }: { keys: KeysMap }) {
-  const enabled = usePreferencesStore((s) => s.autocompleteEnabled);
   const provider = usePreferencesStore((s) => s.autocompleteProvider);
   const modelId = usePreferencesStore((s) => s.autocompleteModelId);
   const lmstudioBaseURL = usePreferencesStore((s) => s.lmstudioBaseURL);
@@ -885,18 +889,7 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-0.5">
-          <Label>Editor autocomplete provider</Label>
-          <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-            Inline ghost-text suggestions in the code editor. Powered by ultra-fast inference (Cerebras / Groq) or a local LM Studio server.
-          </span>
-        </div>
-        <Switch
-          checked={enabled}
-          onCheckedChange={(v) => void setAutocompleteEnabled(v)}
-        />
-      </div>
+      <Label>Editor autocomplete provider</Label>
 
       <div className="flex flex-col gap-0 divide-y divide-border/50 rounded-lg border border-border/50 bg-card/50 px-3 py-0 overflow-hidden">
         <div className="py-2.5">
