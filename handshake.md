@@ -1,6 +1,36 @@
 # Handshake — Session State
 
-## Last Session: 2026-05-23
+## Last Session: 2026-05-23 (Settings Expansion)
+
+### What Was Done
+Added **13 new user-configurable settings** across Terminal, General, Security, and AI (committed `ca3dd9e`). All settings persist via `tauri-plugin-store`. `tsc --noEmit` ✅
+
+**Terminal (5 settings) — `TerminalSection.tsx`, `useTerminalSession.ts`, `SshTerminalPane.tsx`**
+- Copy on select — implemented via `onSelectionChange` + `navigator.clipboard` (xterm v6 removed the native option)
+- Right-click pastes — `rightClickSelectsWord: !pref`
+- Word separators — `wordSeparator` option
+- Scroll sensitivity — `scrollSensitivity` option
+- Fast scroll modifier — `fastScrollModifier` via type-cast (runtime option in xterm v6, not in public types)
+
+**General (4 settings) — `App.tsx`, `GeneralSection.tsx`**
+- Reduce motion — wraps entire app in `<MotionConfig reducedMotion="always">` (no per-file changes needed)
+- New tab inherits cwd — toggle in `openNewTab` callback
+- Confirm before closing terminal tab — `AlertDialog` via `pendingCloseTabId` state
+- Confirm quit with active SSH — `window.confirm()` inside the existing `onCloseRequested` handler (merged with sessionRestore logic)
+
+**Security (1 setting) — `security.ts`, `AiToolApproval.tsx`, `AiSection.tsx`**
+- Warn on destructive commands — new `checkDestructiveCommand()` function with DESTRUCTIVE_PATTERNS; amber warning badge appears in the approval card header when matched
+
+**AI (3 settings) — `agent.ts`, `transport.ts`, `chatStore.ts`, `AiSection.tsx`**
+- Max agent steps — `maxAgentSteps` param in `createNexumAgent`, default falls back to `MAX_AGENT_STEPS` constant
+- Temperature — `model.withSettings({ temperature })` via runtime cast (type `withSettings` absent from `LanguageModel` union)
+- Terminal context lines — `getTerminalContextLines` dep in `createContextAwareTransport`, replaces hard-coded `TERMINAL_BUFFER_LINES`
+
+**Store boilerplate** — `store.ts` updated in all 6 places (type, KEY constant, default, loadPreferences, setter, onPreferencesChange map)
+
+---
+
+## Previous Session: 2026-05-23 (V1.1 Architecture Hardening)
 
 ### What Was Done
 Completed **V1.1 Architecture Hardening** (all 3 phases, committed `752da0f`):
@@ -39,11 +69,13 @@ See `handshake.md` git history for full details of the Terminal Split Panes feat
 ---
 
 ### Current State
-- All V1.1 hardening work complete and committed
-- `cargo check` ✅ · `tsc --noEmit` ✅
+- 13 new settings implemented and committed (`ca3dd9e`)
+- `tsc --noEmit` ✅
+- No Rust changes in this session — `cargo check` not needed
 
 ### What's Next
 - The GitHub repo `Snenjih/nexum-themes` still needs to be created for community themes
+- (Optional) SSH Agent Forwarding — excluded this session, requires Rust change to `ssh_connect` + `channel.request_agent_forwarding()`
 - (Optional) Add pane navigation shortcuts (⌘← / ⌘→ to cycle active pane)
 - (Optional) Persist split layout across app restarts
 - (Optional) Auto-reconnect with exponential backoff on the reconnect overlay
