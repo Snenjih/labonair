@@ -304,8 +304,18 @@ export function useTerminalSession({
 
   useLayoutEffect(() => {
     if (!visible) return;
-    fitRef.current?.fit();
-    termRef.current?.focus();
+    const term = termRef.current;
+    const fit = fitRef.current;
+    const pty = ptyRef.current;
+    if (term && fit) {
+      const prevCols = term.cols;
+      const prevRows = term.rows;
+      fit.fit();
+      if (pty && (term.cols !== prevCols || term.rows !== prevRows)) {
+        pty.resize(term.cols, term.rows);
+      }
+    }
+    term?.focus();
   }, [visible]);
 
   const write = useCallback((data: string) => {

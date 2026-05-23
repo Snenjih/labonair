@@ -67,6 +67,11 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const [isDisconnected, setIsDisconnected] = useState(false);
     const [disconnectReason, setDisconnectReason] = useState("");
     const [sudoPopup, setSudoPopup] = useState<{ x: number; y: number } | null>(null);
+    // Real terminal dimensions measured from the actual container element before
+    // the SSH connection starts. Avoids the off-by-1-3-column mismatch that the
+    // old pixel-heuristic (window.innerWidth / 7.8) produced, which caused
+    // history-scroll corruption because the shell initialised with a wrong COLUMNS.
+    const [initialDims, setInitialDims] = useState<{ cols: number; rows: number } | null>(null);
     const { resolvedTheme } = useTheme();
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -79,6 +84,34 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const sudoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const outputTailRef = useRef<string>("");
     const sudoPopupRef = useRef<{ x: number; y: number } | null>(null);
+
+    // Measure the real container dimensions after mount so the SSH PTY is opened
+    // with the exact column/row count that xterm will use — not a pixel heuristic.
+    useLayoutEffect(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const prefs = usePreferencesStore.getState();
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      try {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("no 2d context");
+        ctx.font = `${prefs.terminalFontSize}px ${prefs.terminalFontFamily}`;
+        const charWidth = Math.ceil(ctx.measureText("W").width) + (prefs.terminalLetterSpacing ?? 0);
+        const charHeight = Math.ceil(prefs.terminalFontSize * (prefs.terminalLineHeight ?? 1.0));
+        setInitialDims({
+          cols: Math.max(2, Math.floor(rect.width / charWidth)),
+          rows: Math.max(1, Math.floor(rect.height / charHeight)),
+        });
+      } catch {
+        setInitialDims({
+          cols: Math.max(80, Math.floor(rect.width / 7.8)),
+          rows: Math.max(24, Math.floor(rect.height / 17)),
+        });
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const showSudoPopup = useCallback((pos: { x: number; y: number }) => {
       sudoPopupRef.current = pos;
@@ -393,41 +426,54 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     useLayoutEffect(() => {
       if (!isConnected) return;
-      // fit() runs on all panes (not just isActive) so that when tabVisible
-      // transitions true, every pane in the workspace is already correctly sized.
-      fitRef.current?.fit();
-      if (isActive && tabVisible) termRef.current?.focus();
-    }, [isActive, isConnected, tabVisible]);
-
-    if (!isConnected && !hasError) {
-      const estCols = Math.max(80, Math.floor((window.innerWidth - 220) / 7.8));
-      const estRows = Math.max(24, Math.floor((window.innerHeight - 60) / 18));
-      return (
-        <SshLoadingScreen
-          sessionId={sessionId}
-          hostId={session.hostId}
-          quickConnect={session.quickConnect}
-          hostName={session.title}
-          connectionType="ssh"
-          initialCols={estCols}
-          initialRows={estRows}
-          onConnected={() => setIsConnected(true)}
-          onError={() => setHasError(true)}
-        />
-      );
-    }
-
-    if (hasError) {
-      return (
-        <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
-          Connection closed.
-        </div>
-      );
-    }
+      const term = termRef.current;
+      const fit = fitRef.current;
+      if (term && fit) {
+        const prevCols = term.cols;
+        const prevRows = term.rows;
+        // fit() runs on all panes (not just isActive) so that when tabVisible
+        // transitions true, every pane in the workspace is already correctly sized.
+        fit.fit();
+        if (term.cols !== prevCols || term.rows !== prevRows) {
+          invoke("ssh_pty_resize", {
+            sessionId,
+            cols: term.cols,
+            rows: term.rows,
+          }).catch(console.error);
+        }
+      }
+      if (isActive && tabVisible) term?.focus();
+    }, [isActive, isConnected, tabVisible, sessionId]);
 
     return (
       <div className="relative h-full w-full">
+        {/* Container is always mounted so useLayoutEffect can measure real
+            dimensions before the SSH connection starts. Hidden behind the
+            overlay during the loading phase. */}
         <div ref={containerRef} className="h-full w-full" />
+        {(!isConnected && !hasError) && (initialDims ? (
+          <div className="absolute inset-0 z-10">
+            <SshLoadingScreen
+              sessionId={sessionId}
+              hostId={session.hostId}
+              quickConnect={session.quickConnect}
+              hostName={session.title}
+              connectionType="ssh"
+              initialCols={initialDims.cols}
+              initialRows={initialDims.rows}
+              onConnected={() => setIsConnected(true)}
+              onError={() => setHasError(true)}
+            />
+          </div>
+        ) : (
+          // Container just mounted, measurement pending — blank for one frame.
+          <div className="absolute inset-0 z-10 bg-background" />
+        ))}
+        {hasError && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center text-muted-foreground text-sm bg-background">
+            Connection closed.
+          </div>
+        )}
         {isDisconnected && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-sm">
             <div className="rounded-xl border border-border bg-card p-6 shadow-xl flex flex-col items-center gap-3 max-w-xs text-center">

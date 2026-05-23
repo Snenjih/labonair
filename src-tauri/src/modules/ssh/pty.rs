@@ -75,6 +75,13 @@ pub fn open_shell_channel(
         // None means the loop ended normally (ssh_disconnect set the shutdown flag).
         let mut disconnect_reason: Option<String> = None;
 
+        // Carry buffer for incomplete multi-byte UTF-8 sequences. When a read ends
+        // in the middle of a multi-byte character (e.g. a 3-byte box-drawing glyph
+        // split across a 4096-byte boundary), we keep the trailing bytes here and
+        // prepend them to the next read so the full character is emitted intact
+        // rather than replaced with U+FFFD by from_utf8_lossy.
+        let mut carry: Vec<u8> = Vec::new();
+
         loop {
             if shutdown_clone.load(Ordering::Relaxed) {
                 break; // clean shutdown via ssh_disconnect
@@ -102,7 +109,27 @@ pub fn open_shell_channel(
                 let mut buf = [0u8; 4096];
                 match ch.read(&mut buf) {
                     Ok(0) => None,
-                    Ok(n) => Some(String::from_utf8_lossy(&buf[..n]).to_string()),
+                    Ok(n) => {
+                        carry.extend_from_slice(&buf[..n]);
+                        // Find the longest valid UTF-8 prefix. Utf8Error::valid_up_to()
+                        // points to the byte just past the last complete character.
+                        let valid_end = match std::str::from_utf8(&carry) {
+                            Ok(_) => carry.len(),
+                            Err(e) => e.valid_up_to(),
+                        };
+                        if valid_end == 0 {
+                            // All accumulated bytes are the start of an incomplete
+                            // sequence — wait for the next read chunk.
+                            None
+                        } else {
+                            // SAFETY: verified as valid UTF-8 above.
+                            let s = unsafe {
+                                String::from_utf8_unchecked(carry[..valid_end].to_vec())
+                            };
+                            carry.drain(..valid_end);
+                            Some(s)
+                        }
+                    }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => None,
                     Err(e) => {
                         disconnect_reason = Some(e.to_string());
