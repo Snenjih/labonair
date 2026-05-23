@@ -10,8 +10,10 @@ import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
+import { AnimatePresence } from "motion/react";
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
@@ -19,6 +21,7 @@ import {
   useState,
 } from "react";
 import { SshLoadingScreen } from "./SshLoadingScreen";
+import { SudoFillPopup } from "./SudoFillPopup";
 import type { TerminalPaneHandle } from "./TerminalPane";
 
 const FONT_WEIGHT_MAP: Record<string, string | number> = {
@@ -26,6 +29,27 @@ const FONT_WEIGHT_MAP: Record<string, string | number> = {
   medium: 500,
   bold: "bold",
 };
+
+const ANSI_RE = /\x1B\[[0-9;]*[mGKHFJA-Za-z]|\x1B\][^\x07]*\x07|\x1B[@-_][0-?]*[ -/]*[@-~]/g;
+const SUDO_PROMPT_RE = /\[sudo\] password for [^:]+:|sudo password:/i;
+const TAIL_MAX = 300;
+
+function stripAnsi(s: string): string {
+  return s.replace(ANSI_RE, "");
+}
+
+function getCursorPixelPos(
+  term: Terminal,
+  container: HTMLDivElement,
+): { x: number; y: number } {
+  const rect = container.getBoundingClientRect();
+  const cellW = rect.width / term.cols;
+  const cellH = rect.height / term.rows;
+  return {
+    x: rect.left + (term.buffer.active.cursorX + 0.5) * cellW,
+    y: rect.top + (term.buffer.active.cursorY + 1) * cellH,
+  };
+}
 
 interface Props {
   sessionId: string;
@@ -39,6 +63,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
   function SshTerminalPane({ sessionId, session, isActive, tabVisible = true, onSearchReady}, ref) {
     const [isConnected, setIsConnected] = useState(false);
     const [hasError, setHasError] = useState(false);
+    const [sudoPopup, setSudoPopup] = useState<{ x: number; y: number } | null>(null);
     const { resolvedTheme } = useTheme();
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +72,30 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const searchRef = useRef<SearchAddon | null>(null);
     const onSearchReadyRef = useRef(onSearchReady);
     onSearchReadyRef.current = onSearchReady;
+    const sudoPasswordRef = useRef<string | null>(null);
+    const sudoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const outputTailRef = useRef<string>("");
+    const sudoPopupRef = useRef<{ x: number; y: number } | null>(null);
+
+    const showSudoPopup = useCallback((pos: { x: number; y: number }) => {
+      sudoPopupRef.current = pos;
+      setSudoPopup(pos);
+    }, []);
+
+    const hideSudoPopup = useCallback(() => {
+      sudoPopupRef.current = null;
+      sudoPasswordRef.current = null;
+      setSudoPopup(null);
+    }, []);
+
+    const handleSudoFill = useCallback(() => {
+      const pw = sudoPasswordRef.current;
+      if (!pw) return;
+      sudoPopupRef.current = null;
+      sudoPasswordRef.current = null;
+      setSudoPopup(null);
+      invoke("ssh_pty_write", { sessionId, data: pw + "\n" }).catch(console.error);
+    }, [sessionId]);
 
     useImperativeHandle(ref, () => ({
       write: (data: string) => {
@@ -127,10 +176,35 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
       listen<{ session_id: string; data: string }>("ssh_pty_output", (event) => {
         if (event.payload.session_id !== sessionId) return;
+        const { data } = event.payload;
         if (term) {
-          term.write(event.payload.data);
+          term.write(data);
         } else {
-          earlyBuffer.push(event.payload.data);
+          earlyBuffer.push(data);
+        }
+
+        if (session.hostId) {
+          const stripped = stripAnsi(data);
+          outputTailRef.current = (outputTailRef.current + stripped).slice(-TAIL_MAX);
+
+          if (SUDO_PROMPT_RE.test(outputTailRef.current)) {
+            if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
+            sudoDebounceRef.current = setTimeout(async () => {
+              sudoDebounceRef.current = null;
+              if (sudoPopupRef.current) return;
+              try {
+                const pw = await invoke<string | null>("get_sudo_password", { hostId: session.hostId });
+                if (!pw) return;
+                sudoPasswordRef.current = pw;
+                const pos = term && containerRef.current
+                  ? getCursorPixelPos(term, containerRef.current)
+                  : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+                showSudoPopup(pos);
+              } catch {
+                // keychain unavailable — silent no-op
+              }
+            }, 300);
+          }
         }
       }).then((unlisten) => cleanups.push(unlisten));
 
@@ -218,6 +292,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         }
 
         t.onData((data) => {
+          if (sudoPopupRef.current) hideSudoPopup();
           invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
         });
 
@@ -273,6 +348,9 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       return () => {
         disposed = true;
         cleanups.forEach((fn) => fn());
+        if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
+        sudoPopupRef.current = null;
+        sudoPasswordRef.current = null;
         invoke("ssh_disconnect", { sessionId }).catch(console.error);
         if (session.hostId) {
           invoke("ssh_stop_tunnels", { hostId: session.hostId }).catch(console.error);
@@ -318,6 +396,21 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       );
     }
 
-    return <div ref={containerRef} className="h-full w-full" />;
+    return (
+      <div className="relative h-full w-full">
+        <div ref={containerRef} className="h-full w-full" />
+        <AnimatePresence>
+          {sudoPopup && (
+            <SudoFillPopup
+              key="sudo-fill"
+              x={sudoPopup.x}
+              y={sudoPopup.y}
+              onFill={handleSudoFill}
+              onDismiss={hideSudoPopup}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    );
   },
 );
