@@ -180,6 +180,16 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       getSelection: () => termRef.current?.getSelection() ?? null,
     }), []);
 
+    // Listen for palette-triggered reconnect
+    useEffect(() => {
+      function onReconnect(e: Event) {
+        const paneId = (e as CustomEvent<{ paneId: string }>).detail?.paneId;
+        if (paneId === sessionId) handleReconnect();
+      }
+      window.addEventListener("nexum:ssh-reconnect", onReconnect);
+      return () => window.removeEventListener("nexum:ssh-reconnect", onReconnect);
+    }, [sessionId, handleReconnect]);
+
     // Apply live preference changes
     useEffect(() => {
       const unsub = usePreferencesStore.subscribe((state, prev) => {

@@ -22,6 +22,7 @@ type Props = {
   callbacks: RegistryCallbacks;
   activeTabKind: string | undefined;
   activeContext: CommandContext | null;
+  activeTabId: number;
   restoreFocus: () => void;
 };
 
@@ -39,6 +40,7 @@ export function CommandPalette({
   callbacks,
   activeTabKind,
   activeContext,
+  activeTabId,
   restoreFocus,
 }: Props) {
   const isOpen = useCommandStore((s) => s.isOpen);
@@ -62,7 +64,7 @@ export function CommandPalette({
 
   const activePage = pages[pages.length - 1];
 
-  const registry = useCommandRegistry(callbacks, activeTabKind, activeContext);
+  const registry = useCommandRegistry(callbacks, activeTabKind, activeContext, activeTabId);
   const currentPage = registry[activePage];
 
   const navigateTo = useCallback((pageId: string) => {

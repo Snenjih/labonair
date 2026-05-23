@@ -53,6 +53,7 @@ import {
 import { StatusBar, type SidebarPanel } from "@/modules/statusbar";
 import { SftpPane } from "@/modules/sftp";
 import { bootstrapTransferListeners } from "@/modules/sftp/store/transferStore";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import {
   useTabs,
   useWorkspaceCwd,
@@ -335,6 +336,8 @@ export default function App() {
   // Active pane session id (only for workspace tabs)
   const activePaneId =
     activeTab?.kind === "workspace" ? activeTab.activePaneId : null;
+
+  const setSelectedHost = useHostsStore((s) => s.setSelectedHost);
 
   const appliedDiffsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -730,17 +733,51 @@ export default function App() {
         useChatStore.getState().switchSession(id);
         togglePanelAndFocus();
       },
+      // Tab management
+      duplicateCurrentTab: () => {
+        if (!activeTab) return;
+        if (activeTab.kind === "workspace") {
+          const session = activePaneId ? (activeTab as WorkspaceTab).sessions[activePaneId] : null;
+          if (session?.kind === "ssh" && session.hostId) {
+            newSshTab(session.hostId, activeTab.title);
+          } else {
+            newTab(session?.cwd);
+          }
+        } else if (activeTab.kind === "editor" && (activeTab as { path?: string }).path) {
+          openFileTab((activeTab as { path: string }).path);
+        }
+      },
+      closeOtherTabs: () => {
+        tabs.forEach((t) => { if (t.id !== activeId) handleClose(t.id); });
+      },
+      // SSH
+      disconnectCurrentSsh: () => {
+        const session = activePaneId ? (activeTab as WorkspaceTab | undefined)?.sessions[activePaneId] : null;
+        if (session?.id) void invoke("ssh_disconnect", { sessionId: session.id });
+      },
+      reconnectCurrentSsh: () => {
+        if (activePaneId) {
+          window.dispatchEvent(new CustomEvent("nexum:ssh-reconnect", { detail: { paneId: activePaneId } }));
+        }
+      },
+      // Hosts
+      openNewHostForm: () => {
+        openHomeTab();
+        setTimeout(() => setSelectedHost("__new__"), 150);
+      },
     }),
     [
       activeId,
       activeTab,
       activePaneId,
       tabs,
+      newTab,
       newSshTab,
       newSftpTab,
       openNewTab,
       openUntitledTab,
       openHomeTab,
+      openFileTab,
       splitPane,
       closePane,
       handleClose,
@@ -749,17 +786,22 @@ export default function App() {
       askFromSelection,
       execSnippet,
       setActivePanel,
+      setSelectedHost,
     ],
   );
 
   const activeContext = useMemo(() => {
     if (!activeTab) return null;
-    if (activeTab.kind === "workspace") return "terminal" as const;
+    if (activeTab.kind === "workspace") {
+      const session = activePaneId ? (activeTab as WorkspaceTab).sessions[activePaneId] : null;
+      if (session?.kind === "ssh") return "ssh-terminal" as const;
+      return "terminal" as const;
+    }
     if (activeTab.kind === "editor") return "editor" as const;
     if (activeTab.kind === "sftp") return "sftp" as const;
     if (activeTab.kind === "home") return "home" as const;
     return null;
-  }, [activeTab]);
+  }, [activeTab, activePaneId]);
 
   const shortcutHandlers = useMemo<ShortcutHandlers>(
     () => ({
@@ -1324,6 +1366,7 @@ export default function App() {
             callbacks={paletteCallbacks}
             activeTabKind={activeTab?.kind}
             activeContext={activeContext}
+            activeTabId={activeId}
             restoreFocus={restoreFocus}
           />
 

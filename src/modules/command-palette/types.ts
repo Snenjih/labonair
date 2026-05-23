@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets/types";
 
-export type CommandContext = "terminal" | "editor" | "sftp" | "home";
+export type CommandContext = "terminal" | "editor" | "sftp" | "home" | "ssh-terminal";
 
 export type CommandAction = {
   id: string;
@@ -54,4 +54,12 @@ export type RegistryCallbacks = {
   newAiSession: () => void;
   clearAiChat: () => void;
   switchAiSession: (id: string) => void;
+  // Tab management
+  duplicateCurrentTab: () => void;
+  closeOtherTabs: () => void;
+  // SSH
+  disconnectCurrentSsh: () => void;
+  reconnectCurrentSsh: () => void;
+  // Hosts
+  openNewHostForm: () => void;
 };

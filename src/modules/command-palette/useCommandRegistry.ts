@@ -9,6 +9,8 @@ import { useZoomCommands } from "./hooks/useZoomCommands";
 import { useTabCommands } from "./hooks/useTabCommands";
 import { useSnippetCommands } from "./hooks/useSnippetCommands";
 import { useAiSessionCommands } from "./hooks/useAiSessionCommands";
+import { useTerminalCommands } from "./hooks/useTerminalCommands";
+import { useSftpCommands } from "./hooks/useSftpCommands";
 
 type Registry = Record<string, CommandPage>;
 
@@ -16,16 +18,19 @@ export function useCommandRegistry(
   cb: RegistryCallbacks,
   activeTabKind: string | undefined,
   activeContext: CommandContext | null,
+  activeTabId: number,
 ): Registry {
   const systemPage = useSystemCommands(cb);
   const layoutPage = useLayoutCommands(cb, activeTabKind);
-  const { rootAction: hostRootAction, hostsPage } = useHostCommands(cb);
+  const { rootActions: hostRootActions, sshPage, sftpPage } = useHostCommands(cb);
   const { rootActions: settingsRootActions, themesPage, appModePage, editorThemePage } =
     useSettingsCommands();
   const { rootAction: zoomRootAction, zoomPage } = useZoomCommands(activeTabKind);
   const { rootAction: tabRootAction, tabsPage } = useTabCommands(cb);
   const { rootActions: snippetRootActions, snippetsPage } = useSnippetCommands(cb);
   const { rootActions: aiRootActions, aiSessionsPage } = useAiSessionCommands(cb);
+  const terminalPage = useTerminalCommands(cb);
+  const { rootActions: sftpActionRoots } = useSftpCommands(activeTabId);
 
   return useMemo(() => {
     const filterByContext = (actions: CommandAction[]): CommandAction[] => {
@@ -40,7 +45,9 @@ export function useCommandRegistry(
       ...filterByContext(layoutPage.actions),
       ...(zoomRootAction ? [zoomRootAction] : []),
       tabRootAction,
-      hostRootAction,
+      ...hostRootActions,
+      ...filterByContext(terminalPage.actions),
+      ...filterByContext(sftpActionRoots),
       ...filterByContext(snippetRootActions),
       ...filterByContext(aiRootActions),
       ...filterByContext(settingsRootActions),
@@ -54,7 +61,8 @@ export function useCommandRegistry(
 
     return {
       root: rootPage,
-      hosts: hostsPage,
+      "hosts-ssh": sshPage,
+      "hosts-sftp": sftpPage,
       themes: themesPage,
       mode: appModePage,
       "editor-theme": editorThemePage,
@@ -66,9 +74,10 @@ export function useCommandRegistry(
   }, [
     systemPage,
     layoutPage,
-    hostRootAction,
+    hostRootActions,
+    sshPage,
+    sftpPage,
     settingsRootActions,
-    hostsPage,
     themesPage,
     appModePage,
     editorThemePage,
@@ -80,6 +89,8 @@ export function useCommandRegistry(
     snippetsPage,
     aiRootActions,
     aiSessionsPage,
+    terminalPage,
+    sftpActionRoots,
     activeContext,
   ]);
 }

@@ -5,6 +5,8 @@ import {
   Cancel01Icon,
   File02Icon,
   TerminalIcon,
+  Folder01Icon,
+  Copy01Icon,
 } from "@hugeicons/core-free-icons";
 import { createElement } from "react";
 import type { CommandAction, CommandPage } from "../types";
@@ -51,6 +53,39 @@ export function useLayoutCommands(
         className: "size-4",
       }),
       perform: () => cb.openHomeTab(),
+    },
+    {
+      id: "layout.open-sftp",
+      title: "Open SFTP...",
+      section: "Layout",
+      icon: createElement(HugeiconsIcon, {
+        icon: Folder01Icon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      subPageId: "hosts-sftp",
+    },
+    {
+      id: "layout.duplicate-tab",
+      title: "Duplicate Tab",
+      section: "Layout",
+      icon: createElement(HugeiconsIcon, {
+        icon: Copy01Icon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      perform: () => cb.duplicateCurrentTab(),
+    },
+    {
+      id: "layout.close-other-tabs",
+      title: "Close Other Tabs",
+      section: "Layout",
+      icon: createElement(HugeiconsIcon, {
+        icon: Cancel01Icon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      perform: () => cb.closeOtherTabs(),
     },
   ];
 

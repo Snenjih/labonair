@@ -3,7 +3,7 @@ import {
   Settings01Icon,
   CheckListIcon,
   SparklesIcon,
-  Refresh01Icon,
+  Key01Icon,
 } from "@hugeicons/core-free-icons";
 import { createElement } from "react";
 import type { CommandPage } from "../types";
@@ -66,7 +66,7 @@ export function useSystemCommands(cb: RegistryCallbacks): CommandPage {
         title: "Manage AI Keys & Models",
         section: "Application",
         icon: createElement(HugeiconsIcon, {
-          icon: Refresh01Icon,
+          icon: Key01Icon,
           strokeWidth: 2,
           className: "size-4",
         }),

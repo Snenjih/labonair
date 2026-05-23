@@ -1,13 +1,17 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import { TerminalIcon, Globe02Icon, Folder01Icon } from "@hugeicons/core-free-icons";
+import {
+  TerminalIcon,
+  Folder01Icon,
+  Add01Icon,
+} from "@hugeicons/core-free-icons";
 import { createElement } from "react";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import type { CommandAction, CommandPage } from "../types";
 import type { RegistryCallbacks } from "../types";
 
 export function useHostCommands(cb: RegistryCallbacks): {
-  rootAction: CommandAction;
-  hostsPage: CommandPage;
+  rootActions: CommandAction[];
+  sshPage: CommandPage;
   sftpPage: CommandPage;
 } {
   const hosts = useHostsStore((s) => s.hosts);
@@ -44,27 +48,53 @@ export function useHostCommands(cb: RegistryCallbacks): {
     perform: () => cb.newSftpTab(h.id, h.name),
   }));
 
-  const rootAction: CommandAction = {
-    id: "hosts.connect",
-    title: "Connect to Host...",
-    section: "Hosts",
-    icon: createElement(HugeiconsIcon, {
-      icon: Globe02Icon,
-      strokeWidth: 2,
-      className: "size-4",
-    }),
-    subPageId: "hosts",
-  };
+  const rootActions: CommandAction[] = [
+    {
+      id: "hosts.connect-ssh",
+      title: "Connect SSH...",
+      subtitle: hosts.length > 0 ? `${hosts.length} hosts` : undefined,
+      section: "Hosts",
+      icon: createElement(HugeiconsIcon, {
+        icon: TerminalIcon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      subPageId: "hosts-ssh",
+    },
+    {
+      id: "hosts.open-sftp",
+      title: "Open SFTP...",
+      subtitle: hosts.length > 0 ? `${hosts.length} hosts` : undefined,
+      section: "Hosts",
+      icon: createElement(HugeiconsIcon, {
+        icon: Folder01Icon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      subPageId: "hosts-sftp",
+    },
+    {
+      id: "hosts.add-new",
+      title: "Add New Host...",
+      section: "Hosts",
+      icon: createElement(HugeiconsIcon, {
+        icon: Add01Icon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      perform: () => cb.openNewHostForm(),
+    },
+  ];
 
   return {
-    rootAction,
-    hostsPage: {
-      id: "hosts",
-      searchPlaceholder: "Search hosts...",
-      actions: [...sshActions, ...sftpActions],
+    rootActions,
+    sshPage: {
+      id: "hosts-ssh",
+      searchPlaceholder: "Search SSH hosts...",
+      actions: sshActions,
     },
     sftpPage: {
-      id: "sftp",
+      id: "hosts-sftp",
       searchPlaceholder: "Search SFTP hosts...",
       actions: sftpActions,
     },
