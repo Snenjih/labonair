@@ -11,6 +11,7 @@ import {
   setEditorAutoSave,
   setEditorBracketMatching,
   setEditorFormatOnSave,
+  setEditorIndentationGuides,
   setEditorLineNumbers,
   setEditorShowCursorPosition,
   setEditorShowOutline,
@@ -36,6 +37,7 @@ export function EditorSection() {
   const editorShowSelectionStats = usePreferencesStore((s) => s.editorShowSelectionStats);
   const editorShowOutline = usePreferencesStore((s) => s.editorShowOutline);
   const editorFormatOnSave = usePreferencesStore((s) => s.editorFormatOnSave);
+  const editorIndentationGuides = usePreferencesStore((s) => s.editorIndentationGuides);
 
   return (
     <div className="flex flex-col gap-6">
@@ -176,6 +178,15 @@ export function EditorSection() {
             <Switch
               checked={editorShowOutline}
               onCheckedChange={(v) => void setEditorShowOutline(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Indentation guides"
+            description="Show vertical guide lines at each indentation level."
+          >
+            <Switch
+              checked={editorIndentationGuides}
+              onCheckedChange={(v) => void setEditorIndentationGuides(v)}
             />
           </SettingRow>
         </div>

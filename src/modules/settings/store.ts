@@ -88,6 +88,7 @@ export type Preferences = {
   editorShowSelectionStats: boolean;
   editorShowOutline: boolean;
   editorFormatOnSave: boolean;
+  editorIndentationGuides: boolean;
 
   // --- File Manager ---
   sftpFontSize: number;
@@ -190,6 +191,7 @@ const KEY_EDITOR_SHOW_CURSOR_POSITION = "editor.showCursorPosition";
 const KEY_EDITOR_SHOW_SELECTION_STATS = "editor.showSelectionStats";
 const KEY_EDITOR_SHOW_OUTLINE = "editor.showOutline";
 const KEY_EDITOR_FORMAT_ON_SAVE = "editor.formatOnSave";
+const KEY_EDITOR_INDENTATION_GUIDES = "editor.indentationGuides";
 
 const KEY_SFTP_FONT_SIZE = "sftpFontSize";
 const KEY_SFTP_SHOW_HIDDEN = "sftpShowHiddenFiles";
@@ -275,6 +277,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorShowSelectionStats: true,
   editorShowOutline: false,
   editorFormatOnSave: false,
+  editorIndentationGuides: true,
 
   sftpFontSize: 13,
   sftpShowHiddenFiles: false,
@@ -444,6 +447,9 @@ export async function loadPreferences(): Promise<Preferences> {
     editorFormatOnSave:
       get<boolean>(KEY_EDITOR_FORMAT_ON_SAVE) ??
       DEFAULT_PREFERENCES.editorFormatOnSave,
+    editorIndentationGuides:
+      get<boolean>(KEY_EDITOR_INDENTATION_GUIDES) ??
+      DEFAULT_PREFERENCES.editorIndentationGuides,
 
     sftpFontSize:
       get<number>(KEY_SFTP_FONT_SIZE) ?? DEFAULT_PREFERENCES.sftpFontSize,
@@ -936,6 +942,11 @@ export async function setEditorFormatOnSave(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setEditorIndentationGuides(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EDITOR_INDENTATION_GUIDES, value);
+  await (await getStore()).save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -988,6 +999,7 @@ export async function onPreferencesChange(
     [KEY_EDITOR_SHOW_SELECTION_STATS]: "editorShowSelectionStats",
     [KEY_EDITOR_SHOW_OUTLINE]: "editorShowOutline",
     [KEY_EDITOR_FORMAT_ON_SAVE]: "editorFormatOnSave",
+    [KEY_EDITOR_INDENTATION_GUIDES]: "editorIndentationGuides",
 
     [KEY_SFTP_FONT_SIZE]: "sftpFontSize",
     [KEY_SFTP_SHOW_HIDDEN]: "sftpShowHiddenFiles",

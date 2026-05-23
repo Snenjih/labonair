@@ -13,6 +13,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorBracketMatching,
   setEditorFormatOnSave,
+  setEditorIndentationGuides,
   setEditorLineNumbers,
   setEditorShowOutline,
   setEditorShowSelectionStats,
@@ -48,12 +49,14 @@ import {
   bracketMatchingCompartment,
   buildSharedExtensions,
   fontSizeCompartment,
+  indentGuidesCompartment,
   languageCompartment,
   lineNumbersCompartment,
   tabSizeCompartment,
   vimCompartment,
   wrapCompartment,
 } from "./lib/extensions";
+import { indentationGuides } from "./lib/indentationGuides";
 import { initVimGlobals, vimHandlersExtension } from "./lib/vim";
 
 initVimGlobals();
@@ -115,6 +118,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const editorShowSelectionStats = usePreferencesStore((s) => s.editorShowSelectionStats);
     const editorShowOutline = usePreferencesStore((s) => s.editorShowOutline);
     const editorFormatOnSave = usePreferencesStore((s) => s.editorFormatOnSave);
+    const editorIndentationGuides = usePreferencesStore((s) => s.editorIndentationGuides);
     const languageRef = useRef<string | null>(null);
 
     const fileName = path.split("/").pop() ?? (isUntitled ? "Untitled" : path);
@@ -246,6 +250,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       });
     }, [editorBracketMatching]);
 
+    // Reconfigure indentation guides compartment when pref changes.
+    useEffect(() => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: indentGuidesCompartment.reconfigure(
+          editorIndentationGuides ? indentationGuides : [],
+        ),
+      });
+    }, [editorIndentationGuides]);
+
     // Auto-save: afterDelay — debounced 5 s after doc changes.
     const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const docContentRef = useRef(doc.status === "ready" ? doc.content : "");
@@ -333,6 +348,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           bracketMatchingCompartment.of(prefs.editorBracketMatching ? bracketMatching() : []),
           tabSizeCompartment.of(EditorState.tabSize.of(prefs.editorTabSize)),
           wrapCompartment.of(prefs.editorWordWrap ? EditorView.lineWrapping : []),
+          indentGuidesCompartment.of(prefs.editorIndentationGuides ? indentationGuides : []),
           languageCompartment.of([]),
           inlineCompletion({
             getPrefs: () => {
@@ -579,6 +595,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
                 onCheckedChange={(v) => void setEditorShowSelectionStats(v)}
               >
                 Selection Stats
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={editorIndentationGuides}
+                onCheckedChange={(v) => void setEditorIndentationGuides(v)}
+              >
+                Indentation Guides
               </DropdownMenuCheckboxItem>
               <DropdownMenuSeparator />
               <DropdownMenuCheckboxItem
