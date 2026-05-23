@@ -1,0 +1,103 @@
+name: Performance report
+description: The app is slow, stuttering, or using too many resources
+labels: ["performance"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Nexum targets 60 fps rendering and smooth handling of 10 000+ file lists. If something feels sluggish, please describe it here.
+
+  - type: input
+    id: version
+    attributes:
+      label: Nexum version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+        - Windows
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - SSH terminal rendering
+        - SFTP file list scrolling
+        - SFTP transfer throughput
+        - Local terminal rendering
+        - File explorer
+        - App startup
+        - Memory usage
+        - CPU / fan
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What is slow or resource-hungry?
+      description: Describe the specific action that feels sluggish and how it should feel instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scale
+    attributes:
+      label: Scale / data size
+      description: |
+        Numbers help a lot here. How many files in the SFTP pane? Transfer size? How long is the terminal scrollback?
+      placeholder: |
+        - SFTP directory: ~8 000 files
+        - Transfer: 2 GB in 400 files
+        - Terminal scrollback: unlimited
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open SFTP tab connected to server X
+        2. Navigate to /var/log (≈12 000 files)
+        3. Scroll to the bottom
+        4. FPS drops to ~10
+    validations:
+      required: true
+
+  - type: textarea
+    id: profiling
+    attributes:
+      label: Profiling data / screenshots
+      description: |
+        Activity Monitor CPU/memory screenshot, DevTools Performance trace, or `cargo flamegraph` output — attach whatever you have.
+
+  - type: dropdown
+    id: build
+    attributes:
+      label: Reproducible in
+      options:
+        - Release build only
+        - Dev build (`pnpm tauri dev`) only
+        - Both
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true

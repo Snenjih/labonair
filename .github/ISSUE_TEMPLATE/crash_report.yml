@@ -1,0 +1,124 @@
+name: Crash report
+description: Nexum quit unexpectedly or the window became unresponsive
+labels: ["crash"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Sorry Nexum crashed on you. The information below — especially the crash log and the action that triggered it — is essential for diagnosing Rust panics and renderer errors.
+
+        **Where to find crash logs on macOS:**
+        - `~/Library/Logs/DiagnosticReports/` — look for a file starting with `Nexum-`
+        - Or open **Console.app** → Crash Reports
+
+  - type: input
+    id: version
+    attributes:
+      label: Nexum version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+        - Windows
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: "macOS 15.4"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: crash-type
+    attributes:
+      label: How did it crash?
+      options:
+        - App quit completely without warning
+        - Window froze / became unresponsive
+        - White / blank screen (renderer crash)
+        - Rust panic message visible before quit
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: What were you doing when it crashed?
+      options:
+        - Connecting via SSH
+        - Active SSH terminal session
+        - SFTP file transfer
+        - SFTP file browsing
+        - Host management (add / edit / delete)
+        - Local terminal
+        - File explorer
+        - AI assistant
+        - App startup / launch
+        - App quit
+        - Idle (no active action)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: If reproducible, list the exact steps. If it only happened once, describe what you were doing in the minutes before the crash.
+      placeholder: |
+        1. Start a large SFTP transfer (5 GB)
+        2. Navigate away to an SSH terminal tab
+        3. App quit after ~30 seconds
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproducible
+    attributes:
+      label: Is this reproducible?
+      options:
+        - Always (100%)
+        - Sometimes (intermittent)
+        - Happened once
+    validations:
+      required: true
+
+  - type: textarea
+    id: crash-log
+    attributes:
+      label: Crash log
+      description: |
+        Paste the relevant section of the crash log from `~/Library/Logs/DiagnosticReports/` (macOS).
+        At minimum include the **Exception Type**, **Exception Subtype**, and the first 40 lines of the **Thread that crashed**.
+      render: text
+
+  - type: textarea
+    id: stderr
+    attributes:
+      label: stderr / console output
+      description: |
+        If you launched Nexum from a terminal, paste any output printed before the crash.
+        DevTools console (⌘⌥I) output is also helpful if the renderer was involved.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true
+        - label: I am running the latest version
+          required: false

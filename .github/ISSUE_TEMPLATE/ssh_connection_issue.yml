@@ -1,0 +1,123 @@
+name: SSH / connection issue
+description: Can't connect, auth fails, known_hosts warning, or session drops unexpectedly
+labels: ["ssh", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        SSH connection problems have many causes. The fields below help us narrow it down quickly.
+
+        **Tip:** Launch Nexum from a terminal (`/Applications/Nexum.app/Contents/MacOS/Nexum`) to see raw stderr output from the Rust SSH layer.
+
+  - type: input
+    id: version
+    attributes:
+      label: Nexum version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+        - Windows
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Type of connection issue
+      options:
+        - Cannot connect at all (timeout / refused)
+        - Authentication fails (wrong password / key rejected)
+        - 2FA / keyboard-interactive not working
+        - known_hosts mismatch or warning
+        - Session disconnects unexpectedly
+        - PTY rendering broken after connect
+        - SFTP subsystem fails to start
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth-method
+    attributes:
+      label: Authentication method
+      options:
+        - Password
+        - SSH key (no passphrase)
+        - SSH key (with passphrase)
+        - SSH key + 2FA
+        - Password + 2FA
+        - SSH agent
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: network
+    attributes:
+      label: Network type
+      options:
+        - Local network (LAN / same subnet)
+        - VPN
+        - Public internet
+        - Localhost / loopback
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: server-type
+    attributes:
+      label: Server SSH daemon
+      description: OpenSSH version, Dropbear, embedded device, cloud provider — anything you know.
+      placeholder: "OpenSSH_9.6 on Ubuntu 24.04 / Dropbear on router / AWS EC2"
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happens?
+      description: Describe the exact failure — error message shown in Nexum, loading screen text, or any other visible feedback.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add host: 192.168.1.10, port 22, user admin, password auth
+        2. Click Connect
+        3. Loading screen appears then shows "Authentication failed"
+    validations:
+      required: true
+
+  - type: textarea
+    id: cli-test
+    attributes:
+      label: Does `ssh` from the terminal work?
+      description: Run the equivalent `ssh user@host` from your terminal and note whether it succeeds or fails with the same error.
+      placeholder: "ssh admin@192.168.1.10 → works fine / same auth error"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / stderr output
+      description: Paste any output from stderr or the Nexum DevTools console (⌘⌥I).
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and didn't find a duplicate
+          required: true
+        - label: I confirmed the same credentials work with the `ssh` CLI or another client
+          required: false
