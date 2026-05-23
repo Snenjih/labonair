@@ -69,7 +69,7 @@ const LINKS: {
     icon: AlertDiamondIcon,
     label: "Report a problem",
     description: "Generate a pre-filled GitHub issue",
-    href: `${REPO_URL}/issues/new`,
+    href: `${REPO_URL}/issues/new?template=bug_report.yml`,
   },
   {
     icon: GithubIcon,
