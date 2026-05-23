@@ -85,31 +85,44 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const outputTailRef = useRef<string>("");
     const sudoPopupRef = useRef<{ x: number; y: number } | null>(null);
 
-    // Measure the real container dimensions after mount so the SSH PTY is opened
-    // with the exact column/row count that xterm will use — not a pixel heuristic.
-    useLayoutEffect(() => {
+    // Measure the real container dimensions once the pane is actually visible.
+    // We use a ResizeObserver instead of a one-shot useLayoutEffect because
+    // SshTerminalPane mounts while its parent in WorkspacePane still has
+    // display:none (paneRects hasn't been computed yet). getBoundingClientRect()
+    // returns 0×0 at that point, so the one-shot approach never sets initialDims
+    // and the loading screen never appears. The observer fires as soon as the
+    // slot rect is resolved and the container gets real dimensions.
+    useEffect(() => {
       const el = containerRef.current;
       if (!el) return;
-      const prefs = usePreferencesStore.getState();
-      const rect = el.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      try {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("no 2d context");
-        ctx.font = `${prefs.terminalFontSize}px ${prefs.terminalFontFamily}`;
-        const charWidth = Math.ceil(ctx.measureText("W").width) + (prefs.terminalLetterSpacing ?? 0);
-        const charHeight = Math.ceil(prefs.terminalFontSize * (prefs.terminalLineHeight ?? 1.0));
-        setInitialDims({
-          cols: Math.max(2, Math.floor(rect.width / charWidth)),
-          rows: Math.max(1, Math.floor(rect.height / charHeight)),
-        });
-      } catch {
-        setInitialDims({
-          cols: Math.max(80, Math.floor(rect.width / 7.8)),
-          rows: Math.max(24, Math.floor(rect.height / 17)),
-        });
-      }
+
+      const obs = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        const { width, height } = entry.contentRect;
+        if (width === 0 || height === 0) return;
+        const prefs = usePreferencesStore.getState();
+        try {
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("no 2d context");
+          ctx.font = `${prefs.terminalFontSize}px ${prefs.terminalFontFamily}`;
+          const charWidth = Math.ceil(ctx.measureText("W").width) + (prefs.terminalLetterSpacing ?? 0);
+          const charHeight = Math.ceil(prefs.terminalFontSize * (prefs.terminalLineHeight ?? 1.0));
+          setInitialDims({
+            cols: Math.max(2, Math.floor(width / charWidth)),
+            rows: Math.max(1, Math.floor(height / charHeight)),
+          });
+        } catch {
+          setInitialDims({
+            cols: Math.max(80, Math.floor(width / 7.8)),
+            rows: Math.max(24, Math.floor(height / 17)),
+          });
+        }
+        obs.disconnect(); // measure once, then stop
+      });
+      obs.observe(el);
+      return () => obs.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -447,8 +460,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     return (
       <div className="relative h-full w-full">
-        {/* Container is always mounted so useLayoutEffect can measure real
-            dimensions before the SSH connection starts. Hidden behind the
+        {/* Container is always mounted so the ResizeObserver can measure real
+            dimensions once the pane slot becomes visible. Hidden behind the
             overlay during the loading phase. */}
         <div ref={containerRef} className="h-full w-full" />
         {(!isConnected && !hasError) && (initialDims ? (
