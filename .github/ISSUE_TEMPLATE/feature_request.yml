@@ -1,0 +1,73 @@
+name: Feature request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! A short conversation here saves everyone time before any code is written.
+
+        Nexum is intentionally focused on being the best remote workspace for sysadmins and backend developers — not every idea will make it in. A "no" is not a judgment of the idea.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature area
+      description: Which part of the app does this relate to?
+      options:
+        - SSH terminal
+        - SFTP file manager
+        - Host & credential management
+        - Local terminal
+        - File explorer
+        - Editor
+        - AI assistant
+        - Transfer queue
+        - Command palette
+        - Performance
+        - General UI / other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: |
+        The **why**, not the **what**. What were you trying to do when you wished this existed?
+      placeholder: "When I'm managing multiple servers, I want to run the same command on all of them at once without switching tabs."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you imagine using this? UX sketch, keyboard shortcut, behavior — anything that helps us picture it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds have you tried? What other tools (Termius, iTerm2, Tabby, etc.) handle this well?
+
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Are you willing to contribute the implementation?
+      options:
+        - "Yes, with guidance"
+        - "Yes, I can do it"
+        - "No, just suggesting"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and discussions and didn't find a duplicate
+          required: true
