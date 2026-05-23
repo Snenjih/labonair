@@ -22,8 +22,10 @@ function saveRecent(ids: string[]): void {
 
 type State = {
   isOpen: boolean;
+  initialPage: string;
   recentIds: string[];
   open: () => void;
+  openToPage: (pageId: string) => void;
   close: () => void;
   toggle: () => void;
   pushRecent: (id: string) => void;
@@ -31,10 +33,12 @@ type State = {
 
 export const useCommandStore = create<State>((set) => ({
   isOpen: false,
+  initialPage: "root",
   recentIds: loadRecent(),
-  open: () => set({ isOpen: true }),
-  close: () => set({ isOpen: false }),
-  toggle: () => set((s) => ({ isOpen: !s.isOpen })),
+  open: () => set({ isOpen: true, initialPage: "root" }),
+  openToPage: (pageId) => set({ isOpen: true, initialPage: pageId }),
+  close: () => set({ isOpen: false, initialPage: "root" }),
+  toggle: () => set((s) => ({ isOpen: !s.isOpen, initialPage: "root" })),
   pushRecent: (id) =>
     set((s) => {
       const max = usePreferencesStore.getState().commandPaletteHistorySize;

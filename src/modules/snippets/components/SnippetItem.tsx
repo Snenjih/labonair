@@ -31,7 +31,9 @@ interface Props {
 
 export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDuplicate, onDelete }: Props) {
   const isSSH = snippet.target === "ssh";
-  const accentColor = groupColor ?? (isSSH ? "#60a5fa" : "#6366f1");
+  // groupColor comes from user-defined group data (intentional arbitrary color).
+  // Defaults use chart tokens: chart-2 (blue) for SSH, chart-5 (purple) for local.
+  const accentColor = groupColor ?? (isSSH ? "var(--chart-2)" : "var(--chart-5)");
   const preview = snippet.description?.trim() || snippet.command.split("\n")[0];
 
   async function copyCommand() {
@@ -51,7 +53,7 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
             style={{
               background: accentColor,
               opacity: 0.9,
-              boxShadow: `2px 0 10px ${accentColor}55`,
+              boxShadow: `2px 0 10px color-mix(in srgb, ${accentColor} 33%, transparent)`,
             }}
           />
 

@@ -15,6 +15,7 @@ import {
   SidebarLeftIcon,
   Menu01Icon,
   Globe02Icon,
+  EyeIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useRef } from "react";
@@ -37,6 +38,7 @@ type Props = {
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
   onOpenHostManager: () => void;
+  onOpenThemes: () => void;
 };
 
 export function Header({
@@ -55,6 +57,7 @@ export function Header({
   onOpenShortcuts,
   onOpenSettings,
   onOpenHostManager,
+  onOpenThemes,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -79,9 +82,9 @@ export function Header({
           <HugeiconsIcon icon={KeyboardIcon} size={16} strokeWidth={1.75} />
           <span>Keyboard Shortcuts</span>
         </DropdownMenuItem>
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem onClick={onOpenThemes}>
+          <HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.75} />
           <span>Themes...</span>
-          {/* TODO: Implement theme switcher */}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenHostManager}>
           <HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.75} />

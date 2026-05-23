@@ -40,8 +40,8 @@ function resolveThemeColor(cssVar: string, fallback: string): string {
 }
 
 function getTermDecorations() {
-  const muted = resolveThemeColor("--muted-foreground", "#515c6a");
-  const primary = resolveThemeColor("--primary", "#d18616");
+  const muted = resolveThemeColor("--muted-foreground", "oklch(55% 0.02 264)");
+  const primary = resolveThemeColor("--primary", "oklch(72% 0.18 75)");
   return {
     matchBackground: muted,
     activeMatchBackground: primary,

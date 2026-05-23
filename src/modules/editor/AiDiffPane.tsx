@@ -60,7 +60,7 @@ const DIFF_THEME = EditorView.theme({
   //   backgroundColor: "#ef4444",
   // },
   ".cm-changedText": {
-    background: "#88ff881a !important",
+    background: "color-mix(in srgb, var(--chart-3, oklch(0.83 0.17 126)) 10%, transparent) !important",
   },
 });
 

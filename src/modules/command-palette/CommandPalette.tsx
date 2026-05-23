@@ -43,6 +43,7 @@ export function CommandPalette({
 }: Props) {
   const isOpen = useCommandStore((s) => s.isOpen);
   const close = useCommandStore((s) => s.close);
+  const initialPage = useCommandStore((s) => s.initialPage);
   const recentIds = useCommandStore((s) => s.recentIds);
   const pushRecent = useCommandStore((s) => s.pushRecent);
   const blurAmount = usePreferencesStore((s) => s.commandPaletteBlur);
@@ -85,7 +86,7 @@ export function CommandPalette({
 
   useEffect(() => {
     if (!prevOpenRef.current && isOpen) {
-      setPages(["root"]);
+      setPages([initialPage || "root"]);
       setSearch("");
       setTimeout(() => inputRef.current?.focus(), 0);
     }

@@ -1039,6 +1039,7 @@ export default function App() {
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onOpenSettings={() => void openSettingsWindow()}
             onOpenHostManager={onOpenHostManager}
+            onOpenThemes={() => useCommandStore.getState().openToPage("themes")}
           />
 
           <main className="flex min-h-0 flex-1 flex-col">
