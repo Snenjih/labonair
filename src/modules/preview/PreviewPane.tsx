@@ -1,7 +1,7 @@
 import { Alert02Icon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
   PreviewAddressBar,
   type PreviewAddressBarHandle,
@@ -18,6 +18,17 @@ type Props = {
   visible: boolean;
   onUrlChange: (url: string) => void;
 };
+
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif"]);
+
+function getUrlExtension(url: string): string {
+  try {
+    const pathname = url.includes("://") ? new URL(url).pathname : url;
+    return pathname.split(".").pop()?.toLowerCase() ?? "";
+  } catch {
+    return url.split(".").pop()?.toLowerCase() ?? "";
+  }
+}
 
 export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
   function PreviewPane({ url, visible, onUrlChange }, ref) {
@@ -46,6 +57,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
 
     const isLocalFilePath = url ? (/^\//.test(url) || /^[a-zA-Z]:[\\/]/.test(url)) : false;
     const showXfoHint = url ? (!isLocalUrl(url) && !isLocalFilePath) : false;
+    const isImage = url ? IMAGE_EXTENSIONS.has(getUrlExtension(url)) : false;
 
     return (
       <div
@@ -83,13 +95,17 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
           }
         >
           {url ? (
-            <iframe
-              key={`${url}#${nonce}`}
-              src={resolvedUrl}
-              title="Preview"
-              className="h-full w-full border-0"
-              allow="clipboard-read; clipboard-write; fullscreen"
-            />
+            isImage ? (
+              <ImageViewer key={`${url}#${nonce}`} src={resolvedUrl} />
+            ) : (
+              <iframe
+                key={`${url}#${nonce}`}
+                src={resolvedUrl}
+                title="Preview"
+                className="h-full w-full border-0"
+                allow="clipboard-read; clipboard-write; fullscreen"
+              />
+            )
           ) : (
             <EmptyState />
           )}
@@ -98,6 +114,122 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
     );
   },
 );
+
+type ZoomState = { zoom: number; tx: number; ty: number };
+
+function ImageViewer({ src }: { src: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const stateRef = useRef<ZoomState>({ zoom: 1, tx: 0, ty: 0 });
+  const [transform, setTransform] = useState<ZoomState>({ zoom: 1, tx: 0, ty: 0 });
+  const isDragging = useRef(false);
+  const dragOrigin = useRef({ mx: 0, my: 0, tx: 0, ty: 0 });
+
+  const applyState = useCallback((next: ZoomState) => {
+    stateRef.current = next;
+    setTransform(next);
+  }, []);
+
+  const fitToContainer = useCallback(() => {
+    const img = imgRef.current;
+    const container = containerRef.current;
+    if (!img || !container || !img.naturalWidth) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    const iw = img.naturalWidth;
+    const ih = img.naturalHeight;
+    const scale = Math.min(1, cw / iw, ch / ih);
+    applyState({
+      zoom: scale,
+      tx: (cw - iw * scale) / 2,
+      ty: (ch - ih * scale) / 2,
+    });
+  }, [applyState]);
+
+  // Wheel zoom centered at cursor
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const prev = stateRef.current;
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      const newZoom = Math.min(Math.max(prev.zoom * factor, 0.02), 32);
+      applyState({
+        zoom: newZoom,
+        tx: cx - (cx - prev.tx) * (newZoom / prev.zoom),
+        ty: cy - (cy - prev.ty) * (newZoom / prev.zoom),
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [applyState]);
+
+  // Drag to pan
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    isDragging.current = true;
+    dragOrigin.current = {
+      mx: e.clientX,
+      my: e.clientY,
+      tx: stateRef.current.tx,
+      ty: stateRef.current.ty,
+    };
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const { mx, my, tx, ty } = dragOrigin.current;
+      applyState({
+        ...stateRef.current,
+        tx: tx + (e.clientX - mx),
+        ty: ty + (e.clientY - my),
+      });
+    };
+    const onMouseUp = () => { isDragging.current = false; };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [applyState]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative h-full w-full overflow-hidden select-none"
+      style={{
+        background:
+          "repeating-conic-gradient(color-mix(in srgb, var(--color-foreground) 6%, transparent) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px",
+        cursor: isDragging.current ? "grabbing" : "grab",
+      }}
+      onMouseDown={onMouseDown}
+      onDoubleClick={fitToContainer}
+    >
+      <img
+        ref={imgRef}
+        src={src}
+        alt=""
+        draggable={false}
+        onLoad={fitToContainer}
+        className="absolute top-0 left-0 max-w-none"
+        style={{
+          transform: `translate(${transform.tx}px, ${transform.ty}px) scale(${transform.zoom})`,
+          transformOrigin: "0 0",
+        }}
+      />
+      <div className="pointer-events-none absolute bottom-2 right-2 rounded bg-black/40 px-1.5 py-0.5 font-mono text-[10px] text-white/80 tabular-nums">
+        {Math.round(transform.zoom * 100)}%
+      </div>
+    </div>
+  );
+}
 
 function EmptyState() {
   return (
