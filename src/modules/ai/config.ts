@@ -228,12 +228,17 @@ export function providerNeedsKey(id: ProviderId): boolean {
 }
 
 /** Providers eligible for the editor's inline autocomplete (latency-critical). */
-export type AutocompleteProviderId = "cerebras" | "groq" | "lmstudio";
+export type AutocompleteProviderId =
+  | "cerebras"
+  | "groq"
+  | "lmstudio"
+  | "openai-compatible";
 
 export const AUTOCOMPLETE_PROVIDERS: readonly AutocompleteProviderId[] = [
   "cerebras",
   "groq",
   "lmstudio",
+  "openai-compatible",
 ] as const;
 
 export const DEFAULT_AUTOCOMPLETE_MODEL: Record<
@@ -243,6 +248,7 @@ export const DEFAULT_AUTOCOMPLETE_MODEL: Record<
   cerebras: "gpt-oss-120b",
   groq: "openai/gpt-oss-20b",
   lmstudio: "qwen2.5-coder-7b-instruct",
+  "openai-compatible": "",
 };
 
 export const LMSTUDIO_DEFAULT_BASE_URL = "http://localhost:1234/v1";

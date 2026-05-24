@@ -858,13 +858,19 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
   const provider = usePreferencesStore((s) => s.autocompleteProvider);
   const modelId = usePreferencesStore((s) => s.autocompleteModelId);
   const lmstudioBaseURL = usePreferencesStore((s) => s.lmstudioBaseURL);
+  const openaiCompatibleBaseURL = usePreferencesStore((s) => s.openaiCompatibleBaseURL);
+  const currentCompatKey = keys["openai-compatible"];
 
   const [modelDraft, setModelDraft] = useState(modelId);
-  const [urlDraft, setUrlDraft] = useState(lmstudioBaseURL);
+  const [lmUrlDraft, setLmUrlDraft] = useState(lmstudioBaseURL);
+  const [compatUrlDraft, setCompatUrlDraft] = useState(openaiCompatibleBaseURL);
+  const [compatKeyDraft, setCompatKeyDraft] = useState("");
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "ok" | "fail">("idle");
 
   useEffect(() => setModelDraft(modelId), [modelId]);
-  useEffect(() => setUrlDraft(lmstudioBaseURL), [lmstudioBaseURL]);
+  useEffect(() => setLmUrlDraft(lmstudioBaseURL), [lmstudioBaseURL]);
+  useEffect(() => setCompatUrlDraft(openaiCompatibleBaseURL), [openaiCompatibleBaseURL]);
+  useEffect(() => setTestStatus("idle"), [provider]);
 
   const onProviderChange = (next: AutocompleteProviderId) => {
     void setAutocompleteProvider(next);
@@ -875,17 +881,26 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
   };
 
   const providerInfo = getProvider(provider);
-  const hasKey = providerNeedsKey(provider) ? !!keys[provider] : true;
+  const hasKey =
+    provider === "lmstudio" || provider === "openai-compatible"
+      ? true
+      : !!keys[provider];
 
-  const testLmStudio = async () => {
+  const testUrl = async (url: string, apiKey?: string | null) => {
     setTestStatus("testing");
     try {
-      const res = await fetch(urlDraft.replace(/\/$/, "") + "/models", { method: "GET" });
+      const headers: Record<string, string> = {};
+      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+      const res = await fetch(url.replace(/\/$/, "") + "/models", { method: "GET", headers });
       setTestStatus(res.ok ? "ok" : "fail");
     } catch {
       setTestStatus("fail");
     }
   };
+
+  const maskedCompatKey = currentCompatKey
+    ? `${currentCompatKey.slice(0, 4)}${"•".repeat(9)}${currentCompatKey.slice(-4)}`
+    : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -935,9 +950,9 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
               onChange={(e) => setModelDraft(e.target.value)}
               onBlur={() => {
                 const v = modelDraft.trim();
-                if (v && v !== modelId) void setAutocompleteModelId(v);
+                if (v !== modelId) void setAutocompleteModelId(v);
               }}
-              placeholder={DEFAULT_AUTOCOMPLETE_MODEL[provider]}
+              placeholder={DEFAULT_AUTOCOMPLETE_MODEL[provider] || "e.g. qwen2.5-coder-7b-instruct"}
               spellCheck={false}
               className="h-8 flex-1 font-mono text-[11.5px]"
             />
@@ -948,10 +963,10 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
           <div className="py-2.5">
             <FieldRow label="Base URL">
               <Input
-                value={urlDraft}
-                onChange={(e) => setUrlDraft(e.target.value)}
+                value={lmUrlDraft}
+                onChange={(e) => setLmUrlDraft(e.target.value)}
                 onBlur={() => {
-                  const v = urlDraft.trim();
+                  const v = lmUrlDraft.trim();
                   if (v && v !== lmstudioBaseURL) void setLmstudioBaseURL(v);
                 }}
                 placeholder="http://localhost:1234/v1"
@@ -961,10 +976,11 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => void testLmStudio()}
+                onClick={() => void testUrl(lmUrlDraft)}
+                disabled={!lmUrlDraft.trim() || testStatus === "testing"}
                 className="h-8 shrink-0 px-2.5 text-[11px]"
               >
-                Test
+                {testStatus === "testing" ? <Spinner className="size-3" /> : "Test"}
               </Button>
             </FieldRow>
             {testStatus === "ok" && (
@@ -976,6 +992,83 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
               </p>
             )}
           </div>
+        )}
+
+        {provider === "openai-compatible" && (
+          <>
+            <div className="py-2.5">
+              <FieldRow label="Base URL">
+                <Input
+                  value={compatUrlDraft}
+                  onChange={(e) => setCompatUrlDraft(e.target.value)}
+                  onBlur={() => {
+                    const v = compatUrlDraft.trim();
+                    if (v && v !== openaiCompatibleBaseURL) void setOpenaiCompatibleBaseURL(v);
+                  }}
+                  placeholder={OPENAI_COMPATIBLE_DEFAULT_BASE_URL}
+                  spellCheck={false}
+                  className="h-8 flex-1 font-mono text-[11.5px]"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void testUrl(compatUrlDraft, compatKeyDraft.trim() || currentCompatKey)}
+                  disabled={!compatUrlDraft.trim() || testStatus === "testing"}
+                  className="h-8 shrink-0 px-2.5 text-[11px]"
+                >
+                  {testStatus === "testing" ? <Spinner className="size-3" /> : "Test"}
+                </Button>
+              </FieldRow>
+              {testStatus === "ok" && (
+                <p className="mt-1.5 pl-[84px] text-[10.5px] text-emerald-500">Connected — endpoint responded.</p>
+              )}
+              {testStatus === "fail" && (
+                <p className="mt-1.5 pl-[84px] text-[10.5px] text-destructive">
+                  Could not reach the endpoint. Check the URL and key.
+                </p>
+              )}
+            </div>
+            <div className="py-2.5">
+              <FieldRow label="API key">
+                <div className="relative flex-1">
+                  <Input
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={compatKeyDraft}
+                    onChange={(e) => setCompatKeyDraft(e.target.value)}
+                    onBlur={async () => {
+                      const v = compatKeyDraft.trim();
+                      if (v) {
+                        await setKey("openai-compatible", v);
+                        await emitKeysChanged();
+                        setCompatKeyDraft("");
+                      }
+                    }}
+                    placeholder={maskedCompatKey ?? "Leave blank if not needed"}
+                    className="h-8 font-mono text-[11.5px]"
+                  />
+                </div>
+                {(compatKeyDraft || currentCompatKey) && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setCompatKeyDraft("");
+                      await clearKey("openai-compatible");
+                      await emitKeysChanged();
+                    }}
+                    className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                    title="Clear API key"
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.75} />
+                  </button>
+                )}
+              </FieldRow>
+              <p className="mt-1.5 pl-[84px] text-[10.5px] text-muted-foreground">
+                Shared with Models → OpenAI-compatible endpoint.
+              </p>
+            </div>
+          </>
         )}
       </div>
     </div>

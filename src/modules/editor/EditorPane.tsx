@@ -164,6 +164,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       }
     }, [_onChange]);
     const apiKeyRef = useRef<string | null>(null);
+    const openaiCompatibleKeyRef = useRef<string | null>(null);
 
     useEffect(() => {
       let cancelled = false;
@@ -174,11 +175,23 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           return;
         }
         const k = await getKey(provider);
-        if (!cancelled) apiKeyRef.current = k;
+        if (!cancelled) {
+          if (provider === "openai-compatible") {
+            openaiCompatibleKeyRef.current = k;
+          } else {
+            apiKeyRef.current = k;
+          }
+        }
+      };
+      // Always keep the openai-compatible key up-to-date regardless of active provider
+      const refreshCompat = async () => {
+        const k = await getKey("openai-compatible");
+        if (!cancelled) openaiCompatibleKeyRef.current = k;
       };
       void refresh();
+      void refreshCompat();
       let unlistenKeys: (() => void) | undefined;
-      void onKeysChanged(() => void refresh()).then((un) => {
+      void onKeysChanged(() => { void refresh(); void refreshCompat(); }).then((un) => {
         unlistenKeys = un;
       });
       const unsubPrefs = usePreferencesStore.subscribe((state, prev) => {
@@ -360,6 +373,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
                 modelId: s.autocompleteModelId,
                 apiKey: apiKeyRef.current,
                 lmstudioBaseURL: s.lmstudioBaseURL,
+                openaiCompatibleBaseURL: s.openaiCompatibleBaseURL,
+                openaiCompatibleApiKey: openaiCompatibleKeyRef.current,
               };
             },
             getPath: () => pathRef.current,

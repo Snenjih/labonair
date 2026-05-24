@@ -18,6 +18,8 @@ export type CompletionDeps = {
   /** API key for the configured provider, or null for keyless (LM Studio). */
   apiKey: string | null;
   lmstudioBaseURL: string;
+  openaiCompatibleBaseURL: string;
+  openaiCompatibleApiKey: string | null;
 };
 
 const MAX_OUTPUT_TOKENS_DEFAULT = 128;
@@ -33,9 +35,14 @@ export async function requestCompletion(
 ): Promise<string> {
   const modelId =
     deps.modelId.trim() || DEFAULT_AUTOCOMPLETE_MODEL[deps.provider];
-  const keys = { ...EMPTY_PROVIDER_KEYS, [deps.provider]: deps.apiKey };
+  const resolvedApiKey =
+    deps.provider === "openai-compatible"
+      ? deps.openaiCompatibleApiKey
+      : deps.apiKey;
+  const keys = { ...EMPTY_PROVIDER_KEYS, [deps.provider]: resolvedApiKey };
   const model = await buildLanguageModel(deps.provider, keys, modelId, {
     lmstudioBaseURL: deps.lmstudioBaseURL || LMSTUDIO_DEFAULT_BASE_URL,
+    openaiCompatibleBaseURL: deps.openaiCompatibleBaseURL || undefined,
   });
 
   const isReasoning = /\bgpt-oss\b/i.test(modelId);
