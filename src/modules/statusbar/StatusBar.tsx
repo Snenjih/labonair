@@ -9,13 +9,14 @@ import {
   CodeIcon,
   FlashIcon,
   Globe02Icon,
+  LayoutTopIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { CwdBreadcrumb } from "./CwdBreadcrumb";
 import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
 
-export type SidebarPanel = "explorer" | "snippets" | "hosts" | null;
+export type SidebarPanel = "explorer" | "snippets" | "hosts" | "tabs" | null;
 
 type Props = {
   cwd: string | null;
@@ -54,6 +55,7 @@ export function StatusBar({
   const openPanel = useChatStore((s) => s.openPanel);
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   const showCursorPosition = usePreferencesStore((s) => s.editorShowCursorPosition);
+  const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
   const cursorLine = useEditorCursorStore((s) => s.line);
   const cursorCol = useEditorCursorStore((s) => s.col);
 
@@ -78,6 +80,21 @@ export function StatusBar({
               <HugeiconsIcon icon={icon} size={12} strokeWidth={1.75} />
             </button>
           ))}
+          {tabsLocation === "sidebar" && (
+            <button
+              type="button"
+              title="Tabs"
+              onClick={() => onPanelToggle?.("tabs")}
+              className={cn(
+                "flex h-5 w-5 items-center justify-center rounded transition-colors",
+                activePanel === "tabs"
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground/60 hover:bg-primary/10 hover:text-primary/80"
+              )}
+            >
+              <HugeiconsIcon icon={LayoutTopIcon} size={12} strokeWidth={1.75} />
+            </button>
+          )}
         </div>
         {/* Divider */}
         <div className="mx-1 h-3.5 w-px shrink-0 bg-border/60" />

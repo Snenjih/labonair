@@ -4,6 +4,7 @@ import {
   setAppFontSize,
   setAppLineHeight,
   setSidebarPosition,
+  setTabsLocation,
   setTitlebarsIconsPosition,
 } from "@/modules/settings/store";
 import type { ThemePref } from "@/modules/settings/store";
@@ -49,6 +50,7 @@ export function AppearanceSection() {
   const appLineHeight = usePreferencesStore((s) => s.appLineHeight);
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
   const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
+  const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
 
   return (
     <div className="flex flex-col gap-6">
@@ -117,6 +119,23 @@ export function AppearanceSection() {
               <SelectItem value="auto" className="text-[11.5px]">Auto</SelectItem>
               <SelectItem value="left" className="text-[11.5px]">Left</SelectItem>
               <SelectItem value="right" className="text-[11.5px]">Right</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
+        <SettingRow
+          title="Tab bar location"
+          description="Display the tab bar in the titlebar or move it into the sidebar panel."
+        >
+          <Select
+            value={tabsLocation}
+            onValueChange={(v) => void setTabsLocation(v as "titlebar" | "sidebar")}
+          >
+            <SelectTrigger className="h-7 w-24 text-[11.5px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="titlebar" className="text-[11.5px]">Titlebar</SelectItem>
+              <SelectItem value="sidebar" className="text-[11.5px]">Sidebar</SelectItem>
             </SelectContent>
           </Select>
         </SettingRow>

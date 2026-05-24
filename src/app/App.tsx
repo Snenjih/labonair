@@ -67,6 +67,7 @@ import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import {
   useTabs,
   useWorkspaceCwd,
+  SidebarTabList,
   type SftpTab,
   type WorkspaceTab,
 } from "@/modules/tabs";
@@ -200,6 +201,7 @@ export default function App() {
   const prefDefaultModel = usePreferencesStore((s) => s.defaultModelId);
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
+  const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
   const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
@@ -209,6 +211,15 @@ export default function App() {
   const confirmCloseTerminalTab = usePreferencesStore((s) => s.confirmCloseTerminalTab);
   const confirmQuitWithSsh = usePreferencesStore((s) => s.confirmQuitWithSsh);
   useUpdater({ autoCheck: checkForUpdates });
+
+  // When the user switches tab location back to titlebar while the sidebar shows
+  // the tab list, reset to the explorer so the sidebar isn't stuck on "tabs".
+  useEffect(() => {
+    if (tabsLocation === "titlebar" && activePanel === "tabs") {
+      handlePanelToggle("explorer");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabsLocation]);
 
   const [sessionRestored, setSessionRestored] = useState(false);
   const [pendingCloseTabId, setPendingCloseTabId] = useState<number | null>(null);
@@ -1172,7 +1183,22 @@ export default function App() {
                     collapsedSize={0}
                   >
                     <div className="h-full border-r border-border/60 bg-card">
-                      {activePanel === "snippets" ? (
+                      {activePanel === "tabs" ? (
+                        <SidebarTabList
+                          tabs={tabs}
+                          activeId={activeId}
+                          onSelect={setActiveId}
+                          onNew={openNewTab}
+                          onNewPreview={() => openPreviewTab("")}
+                          onNewEditor={() => void openUntitledTab()}
+                          onNewSsh={newSshTab}
+                          onNewSftp={newSftpTab}
+                          onOpenHostManager={onOpenHostManager}
+                          onClose={handleClose}
+                          onCloseOthers={handleCloseOthers}
+                          onCloseAll={handleCloseAll}
+                        />
+                      ) : activePanel === "snippets" ? (
                         <SnippetsPanel onRun={handleSnippetRun} />
                       ) : (
                         <FileExplorer
@@ -1341,7 +1367,22 @@ export default function App() {
                     collapsedSize={0}
                   >
                     <div className="h-full border-l border-border/60 bg-card">
-                      {activePanel === "snippets" ? (
+                      {activePanel === "tabs" ? (
+                        <SidebarTabList
+                          tabs={tabs}
+                          activeId={activeId}
+                          onSelect={setActiveId}
+                          onNew={openNewTab}
+                          onNewPreview={() => openPreviewTab("")}
+                          onNewEditor={() => void openUntitledTab()}
+                          onNewSsh={newSshTab}
+                          onNewSftp={newSftpTab}
+                          onOpenHostManager={onOpenHostManager}
+                          onClose={handleClose}
+                          onCloseOthers={handleCloseOthers}
+                          onCloseAll={handleCloseAll}
+                        />
+                      ) : activePanel === "snippets" ? (
                         <SnippetsPanel onRun={handleSnippetRun} />
                       ) : (
                         <FileExplorer

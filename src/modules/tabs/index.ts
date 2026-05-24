@@ -1,4 +1,5 @@
 export { TabBar } from "./TabBar";
+export { SidebarTabList } from "./SidebarTabList";
 export {
   useTabs,
   type Tab,

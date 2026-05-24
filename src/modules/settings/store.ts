@@ -147,6 +147,9 @@ export type Preferences = {
 
   // --- Titlebar ---
   titlebarsIconsPosition: "auto" | "left" | "right";
+
+  // --- Tabs ---
+  tabsLocation: "titlebar" | "sidebar";
 };
 
 const KEY_THEME = "theme";
@@ -234,6 +237,7 @@ const KEY_NEW_TAB_INHERITS_CWD = "newTabInheritsCwd";
 const KEY_CONFIRM_CLOSE_TERMINAL_TAB = "confirmCloseTerminalTab";
 const KEY_CONFIRM_QUIT_WITH_SSH = "confirmQuitWithSsh";
 const KEY_TITLEBAR_ICONS_POSITION = "titlebarsIconsPosition";
+const KEY_TABS_LOCATION = "tabsLocation";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -326,6 +330,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   confirmQuitWithSsh: true,
 
   titlebarsIconsPosition: "auto",
+
+  tabsLocation: "titlebar",
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -543,6 +549,9 @@ export async function loadPreferences(): Promise<Preferences> {
 
     titlebarsIconsPosition:
       get<"auto" | "left" | "right">(KEY_TITLEBAR_ICONS_POSITION) ?? DEFAULT_PREFERENCES.titlebarsIconsPosition,
+
+    tabsLocation:
+      get<"titlebar" | "sidebar">(KEY_TABS_LOCATION) ?? DEFAULT_PREFERENCES.tabsLocation,
   };
 }
 
@@ -963,6 +972,11 @@ export async function setEditorIndentationGuides(value: boolean): Promise<void> 
   await (await getStore()).save();
 }
 
+export async function setTabsLocation(value: "titlebar" | "sidebar"): Promise<void> {
+  await (await getStore()).set(KEY_TABS_LOCATION, value);
+  await (await getStore()).save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -1053,6 +1067,7 @@ export async function onPreferencesChange(
     [KEY_CONFIRM_CLOSE_TERMINAL_TAB]: "confirmCloseTerminalTab",
     [KEY_CONFIRM_QUIT_WITH_SSH]: "confirmQuitWithSsh",
     [KEY_TITLEBAR_ICONS_POSITION]: "titlebarsIconsPosition",
+    [KEY_TABS_LOCATION]: "tabsLocation",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];

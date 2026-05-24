@@ -63,6 +63,7 @@ export function Header({
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
+  const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
   const iconsOnLeft = titlebarsIconsPosition === "left";
 
   const actionIcons = (
@@ -144,21 +145,23 @@ export function Header({
         className="flex min-w-0 flex-1 items-center gap-2"
         data-tauri-drag-region
       >
-        <TabBar
-          tabs={tabs}
-          activeId={activeId}
-          onSelect={onSelect}
-          onNew={onNew}
-          onNewPreview={onNewPreview}
-          onNewEditor={onNewEditor}
-          onNewSsh={onNewSsh}
-          onNewSftp={onNewSftp}
-          onOpenHostManager={onOpenHostManager}
-          onClose={onClose}
-          onCloseOthers={onCloseOthers}
-          onCloseAll={onCloseAll}
-          compact={false}
-        />
+        {tabsLocation === "titlebar" && (
+          <TabBar
+            tabs={tabs}
+            activeId={activeId}
+            onSelect={onSelect}
+            onNew={onNew}
+            onNewPreview={onNewPreview}
+            onNewEditor={onNewEditor}
+            onNewSsh={onNewSsh}
+            onNewSftp={onNewSftp}
+            onOpenHostManager={onOpenHostManager}
+            onClose={onClose}
+            onCloseOthers={onCloseOthers}
+            onCloseAll={onCloseAll}
+            compact={false}
+          />
+        )}
         <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
       </div>
 
