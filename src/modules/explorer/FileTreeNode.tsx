@@ -21,7 +21,7 @@ import type { DirEntry, useFileTree } from "./lib/useFileTree";
 
 type Tree = ReturnType<typeof useFileTree>;
 
-const PREVIEW_EXTENSIONS = new Set([
+export const PREVIEW_EXTENSIONS = new Set([
   "html", "htm", "png", "jpg", "jpeg", "gif", "webp", "svg", "pdf",
 ]);
 

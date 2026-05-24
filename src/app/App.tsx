@@ -33,7 +33,7 @@ import {
   EditorStack,
   type EditorPaneHandle,
 } from "@/modules/editor";
-import { FileExplorer } from "@/modules/explorer";
+import { FileExplorer, PREVIEW_EXTENSIONS } from "@/modules/explorer";
 import { HomeDashboard } from "@/modules/hosts";
 import {
   SnippetLogDrawer,
@@ -648,12 +648,6 @@ export default function App() {
     [newTab, tabs],
   );
 
-  const handleOpenFile = useCallback(
-    (path: string) => {
-      openFileTab(path);
-    },
-    [openFileTab],
-  );
 
   const handlePathRenamed = useCallback(
     (from: string, to: string) => {
@@ -704,6 +698,18 @@ export default function App() {
       return id;
     },
     [newPreviewTab],
+  );
+
+  const handleOpenFile = useCallback(
+    (path: string) => {
+      const ext = path.split(".").pop()?.toLowerCase() ?? "";
+      if (PREVIEW_EXTENSIONS.has(ext)) {
+        openPreviewTab(path);
+      } else {
+        openFileTab(path);
+      }
+    },
+    [openFileTab, openPreviewTab],
   );
 
   const restoreFocus = useCallback(() => {
