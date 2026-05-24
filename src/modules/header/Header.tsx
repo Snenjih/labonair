@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
 import {
@@ -61,6 +62,16 @@ export function Header({
   onOpenThemes,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
+  const iconsOnLeft = titlebarsIconsPosition === "left";
+
+  const actionIcons = (
+    <>
+      <UpdaterButton />
+      <NotificationDropdown />
+      <TransferDropdown />
+    </>
+  );
 
   const sideButtons = (
     <DropdownMenu>
@@ -122,6 +133,13 @@ export function Header({
 
       {IS_MAC && <span className="mr-1 h-full w-px shrink-0 bg-border" />}
 
+      {iconsOnLeft && (
+        <>
+          {actionIcons}
+          <span className="mx-1 h-5 w-px shrink-0 bg-border" />
+        </>
+      )}
+
       <div
         className="flex min-w-0 flex-1 items-center gap-2"
         data-tauri-drag-region
@@ -144,9 +162,7 @@ export function Header({
         <div data-tauri-drag-region className="h-full min-w-2 flex-1" />
       </div>
 
-      <UpdaterButton />
-      <NotificationDropdown />
-      <TransferDropdown />
+      {!iconsOnLeft && actionIcons}
 
       {IS_MAC && sideButtons}
 

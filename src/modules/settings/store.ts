@@ -144,6 +144,9 @@ export type Preferences = {
 
   // --- Quit ---
   confirmQuitWithSsh: boolean;
+
+  // --- Titlebar ---
+  titlebarsIconsPosition: "auto" | "left" | "right";
 };
 
 const KEY_THEME = "theme";
@@ -230,6 +233,7 @@ const KEY_REDUCE_MOTION = "reduceMotion";
 const KEY_NEW_TAB_INHERITS_CWD = "newTabInheritsCwd";
 const KEY_CONFIRM_CLOSE_TERMINAL_TAB = "confirmCloseTerminalTab";
 const KEY_CONFIRM_QUIT_WITH_SSH = "confirmQuitWithSsh";
+const KEY_TITLEBAR_ICONS_POSITION = "titlebarsIconsPosition";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -320,6 +324,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   newTabInheritsCwd: true,
   confirmCloseTerminalTab: false,
   confirmQuitWithSsh: true,
+
+  titlebarsIconsPosition: "auto",
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -534,6 +540,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_CONFIRM_CLOSE_TERMINAL_TAB) ?? DEFAULT_PREFERENCES.confirmCloseTerminalTab,
     confirmQuitWithSsh:
       get<boolean>(KEY_CONFIRM_QUIT_WITH_SSH) ?? DEFAULT_PREFERENCES.confirmQuitWithSsh,
+
+    titlebarsIconsPosition:
+      get<"auto" | "left" | "right">(KEY_TITLEBAR_ICONS_POSITION) ?? DEFAULT_PREFERENCES.titlebarsIconsPosition,
   };
 }
 
@@ -922,6 +931,13 @@ export async function setConfirmQuitWithSsh(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setTitlebarsIconsPosition(
+  value: "auto" | "left" | "right",
+): Promise<void> {
+  await (await getStore()).set(KEY_TITLEBAR_ICONS_POSITION, value);
+  await (await getStore()).save();
+}
+
 export async function setEditorShowCursorPosition(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_EDITOR_SHOW_CURSOR_POSITION, value);
   await (await getStore()).save();
@@ -1036,6 +1052,7 @@ export async function onPreferencesChange(
     [KEY_NEW_TAB_INHERITS_CWD]: "newTabInheritsCwd",
     [KEY_CONFIRM_CLOSE_TERMINAL_TAB]: "confirmCloseTerminalTab",
     [KEY_CONFIRM_QUIT_WITH_SSH]: "confirmQuitWithSsh",
+    [KEY_TITLEBAR_ICONS_POSITION]: "titlebarsIconsPosition",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];
