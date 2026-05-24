@@ -149,7 +149,7 @@ function BreadcrumbSegment({
           >
             <Badge
               variant="outline"
-              className="gap-1 text-muted-foreground hover:text-foreground"
+              className="gap-1 rounded-full text-muted-foreground hover:text-foreground"
             >
               {isHome ? (
                 <HugeiconsIcon
@@ -199,7 +199,7 @@ function CurrentSegmentDropdown({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <BreadcrumbPage className="flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 text-foreground hover:bg-accent">
+        <BreadcrumbPage className="flex cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-foreground hover:bg-accent">
           {label === "~" ? (
             <>
               <HugeiconsIcon
@@ -265,7 +265,7 @@ function CollapsedSegments({
             <button
               type="button"
               title="Show hidden folders"
-              className="flex items-center rounded-sm px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="flex items-center rounded-md px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <HugeiconsIcon
                 icon={MoreHorizontalIcon}
