@@ -21,6 +21,7 @@ import {
   Add01Icon,
   AlertCircleIcon,
   ArrowDown01Icon,
+  ArrowExpand01Icon,
   Cancel01Icon,
   Delete02Icon,
   FilterIcon,
@@ -90,9 +91,9 @@ export function AiMiniWindow() {
       transition={{ type: "spring", stiffness: 320, damping: 32 }}
       data-ai-mini-window
       className={cn(
-        "no-scrollbar-deep fixed right-4 bottom-12 z-40 flex h-[42rem] w-[34rem] flex-col overflow-hidden",
+        "no-scrollbar-deep fixed right-4 bottom-12 z-40 flex h-[42rem] w-[36rem] flex-col overflow-hidden",
         "rounded-2xl border border-border/40 bg-card/90 shadow-2xl ring-1 ring-black/5 backdrop-blur-2xl dark:ring-white/5",
-        "text-[12px]",
+        "text-[13px]",
       )}
     >
       <div
@@ -146,7 +147,7 @@ function Body({
         {helpers.messages.length === 0 ? (
           <EmptyState onPick={focusInput} />
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col [&_.text-sm]:text-[12px] [&_p]:leading-relaxed">
+          <div className="flex min-h-0 flex-1 flex-col [&_p]:leading-relaxed">
             <AiChatView
               messages={helpers.messages}
               status={helpers.status}
@@ -154,6 +155,7 @@ function Body({
               clearError={helpers.clearError}
               addToolApprovalResponse={helpers.addToolApprovalResponse}
               stop={helpers.stop}
+              reload={helpers.regenerate}
             />
           </div>
         )}
@@ -172,15 +174,15 @@ function PlanModeStrip() {
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border/40 bg-muted/40 px-3 py-1.5">
       <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />
-      <span className="text-[11px] font-medium text-foreground">Plan mode</span>
-      <span className="text-[11px] text-muted-foreground">
+      <span className="text-[12px] font-medium text-foreground">Plan mode</span>
+      <span className="text-[12px] text-muted-foreground">
         {queueLen > 0 ? `· ${queueLen} queued` : "· no edits queued"}
       </span>
       <span className="flex-1" />
       <button
         type="button"
         onClick={() => disable()}
-        className="rounded px-1.5 py-0.5 text-[10.5px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         Exit
       </button>
@@ -214,6 +216,7 @@ function Header({
   step,
   isBusy,
   onClose,
+  onExpand,
   messages,
 }: {
   step: string | null;
@@ -235,12 +238,23 @@ function Header({
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {isBusy ? (
-          <span className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
+          <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
             <Spinner className="size-2.5" />
             <span className="max-w-32 truncate">{step ?? "Thinking…"}</span>
           </span>
         ) : null}
         <SessionPicker />
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          onClick={onExpand}
+          className="size-5"
+          aria-label="Open in panel"
+          title="Open in panel"
+        >
+          <HugeiconsIcon icon={ArrowExpand01Icon} size={11} strokeWidth={1.75} />
+        </Button>
         <Button
           type="button"
           size="icon"
@@ -345,7 +359,7 @@ function SessionPicker() {
           type="button"
           className={cn(
             "flex min-w-0 max-w-48 items-center gap-1 rounded-md px-1.5 py-1",
-            "text-[11px] text-muted-foreground transition-colors",
+            "text-[12px] text-muted-foreground transition-colors",
             "hover:bg-accent hover:text-foreground",
           )}
           title="Switch session"
@@ -436,7 +450,7 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
         <p className="text-[14px] font-semibold tracking-tight">
           Ask Nexum anything
         </p>
-        <p className="max-w-[18rem] text-[11.5px] leading-relaxed text-muted-foreground">
+        <p className="max-w-[18rem] text-[12px] leading-relaxed text-muted-foreground">
           Nexum sees the active terminal — cwd, recent commands, and output.
         </p>
       </div>
@@ -455,10 +469,10 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
               <HugeiconsIcon icon={s.icon} size={13} strokeWidth={1.75} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[12px] font-medium text-foreground">
+              <div className="text-[13px] font-medium text-foreground">
                 {s.label}
               </div>
-              <div className="text-[10.5px] text-muted-foreground">
+              <div className="text-[11px] text-muted-foreground">
                 {s.hint}
               </div>
             </div>
