@@ -3,17 +3,26 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setSidebarPosition } from "@/modules/settings/store";
 import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
 import {
   KeyboardIcon,
   Settings01Icon,
   SidebarLeftIcon,
+  SidebarRightIcon,
   Menu01Icon,
   Globe02Icon,
   EyeIcon,
@@ -64,6 +73,7 @@ export function Header({
   const rootRef = useRef<HTMLDivElement>(null);
   const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
+  const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
   const iconsOnLeft = titlebarsIconsPosition === "left";
 
   const actionIcons = (
@@ -86,23 +96,50 @@ export function Header({
           <HugeiconsIcon icon={Menu01Icon} size={16} strokeWidth={1.75} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuItem onClick={onOpenSettings}>
           <HugeiconsIcon icon={Settings01Icon} size={16} strokeWidth={1.75} />
-          <span>Settings</span>
+          <span className="flex-1">Settings</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenShortcuts}>
           <HugeiconsIcon icon={KeyboardIcon} size={16} strokeWidth={1.75} />
-          <span>Keyboard Shortcuts</span>
+          <span className="flex-1">Keyboard Shortcuts</span>
+          <DropdownMenuShortcut>⌘?</DropdownMenuShortcut>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenThemes}>
           <HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.75} />
-          <span>Themes...</span>
+          <span className="flex-1">Themes...</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenHostManager}>
           <HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.75} />
-          <span>Host Manager</span>
+          <span className="flex-1">Host Manager</span>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <HugeiconsIcon
+              icon={sidebarPosition === "right" ? SidebarRightIcon : SidebarLeftIcon}
+              size={16}
+              strokeWidth={1.75}
+            />
+            <span className="flex-1">Panel Layout</span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup
+              value={sidebarPosition}
+              onValueChange={(v) => void setSidebarPosition(v as "left" | "right")}
+            >
+              <DropdownMenuRadioItem value="left">
+                <HugeiconsIcon icon={SidebarLeftIcon} size={14} strokeWidth={1.75} />
+                <span>Left</span>
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="right">
+                <HugeiconsIcon icon={SidebarRightIcon} size={14} strokeWidth={1.75} />
+                <span>Right</span>
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   );
