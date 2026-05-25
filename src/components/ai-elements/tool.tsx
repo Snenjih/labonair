@@ -7,9 +7,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import {
-  Tick02Icon,
   CheckListIcon,
-  Copy01Icon,
   Edit02Icon,
   EyeIcon,
   File01Icon,
@@ -27,7 +25,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { DynamicToolUIPart, ToolUIPart } from "ai";
 import type { ComponentProps, ReactNode } from "react";
-import { isValidElement, memo, useEffect, useRef, useState } from "react";
+import { isValidElement, memo, useState } from "react";
 
 import type { BundledLanguage } from "shiki";
 import { CodeBlockContent } from "./code-block";
@@ -153,24 +151,12 @@ const ToolImpl = ({
   const isError = state === "output-error";
   const open = defaultOpen ?? isError;
   const isHeavy = HEAVY_CONTENT_TOOLS.has(toolName);
+  // For heavy tools, only show details on error — never the streamed input
+  // body, which is huge and re-renders per token.
   const showInputBody = !isHeavy && Boolean(input);
   const showOutputBody = !isHeavy && output !== undefined;
   const hasDetails =
     showInputBody || showOutputBody || Boolean(errorText);
-
-  const startTimeRef = useRef<number | null>(null);
-  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
-  const isRunning = state === "input-streaming" || state === "input-available";
-  const isDone = state === "output-available" || state === "output-denied" || state === "output-error";
-
-  useEffect(() => {
-    if (isRunning && startTimeRef.current === null) {
-      startTimeRef.current = Date.now();
-    } else if (isDone && startTimeRef.current !== null) {
-      setElapsedMs(Date.now() - startTimeRef.current);
-      startTimeRef.current = null;
-    }
-  }, [isRunning, isDone]);
 
   return (
     <Collapsible
@@ -204,11 +190,6 @@ const ToolImpl = ({
           </span>
         ) : (
           <span className="flex-1" />
-        )}
-        {elapsedMs !== null && (
-          <span className="shrink-0 font-mono text-[10px] text-muted-foreground/70">
-            {elapsedMs < 1000 ? `${elapsedMs}ms` : `${(elapsedMs / 1000).toFixed(1)}s`}
-          </span>
         )}
         {isError && (
           <span className="shrink-0 text-[10px] font-medium text-destructive">
@@ -607,13 +588,6 @@ function BashRunOutput({ data }: { data: Record<string, unknown> }) {
   const hasStderr = stderr.length > 0;
   const initial = hasStdout ? "stdout" : hasStderr ? "stderr" : "stdout";
   const [tab, setTab] = useState<"stdout" | "stderr">(initial);
-  const [copied, setCopied] = useState(false);
-
-  const copyOutput = () => {
-    navigator.clipboard.writeText(tab === "stdout" ? stdout : stderr).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
 
   const tabs: Array<{
     key: "stdout" | "stderr";
@@ -670,15 +644,6 @@ function BashRunOutput({ data }: { data: Record<string, unknown> }) {
             truncated
           </span>
         ) : null}
-        <button
-          type="button"
-          onClick={copyOutput}
-          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          aria-label="Copy output"
-          title="Copy"
-        >
-          <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} size={11} strokeWidth={1.75} />
-        </button>
       </div>
       <pre className="max-h-72 overflow-auto rounded bg-muted/40 p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
         {tab === "stdout" ? stdout || " " : stderr || " "}

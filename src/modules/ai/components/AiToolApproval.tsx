@@ -14,9 +14,8 @@ import {
   Alert02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { motion } from "motion/react";
 import type { ToolUIPart } from "ai";
-import { memo, useEffect, useState } from "react";
+import { memo } from "react";
 
 type Props = {
   part: Extract<ToolUIPart, { state: "approval-requested" }>;
@@ -46,41 +45,11 @@ function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
   const destructiveWarning =
     warnDestructive && cmd ? checkDestructiveCommand(cmd) : null;
 
-  const [responded, setResponded] = useState<"approve" | "deny" | null>(null);
-
-  const handleRespond = (approved: boolean) => {
-    setResponded(approved ? "approve" : "deny");
-  };
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "Enter") handleRespond(true);
-      if (e.key === "Escape") handleRespond(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
   return (
-    <motion.div
-      animate={
-        responded === "approve"
-          ? { backgroundColor: "oklch(0.7 0.15 145 / 0.1)" }
-          : responded === "deny"
-            ? { backgroundColor: "oklch(0.55 0.2 27 / 0.1)" }
-            : {}
-      }
-      onAnimationComplete={() => {
-        if (responded !== null) onRespond(responded === "approve");
-      }}
-      transition={{ duration: 0.15 }}
-      className={cn(
-        "rounded-lg border bg-card shadow-sm",
-        destructiveWarning ? "border-amber-500/60" : "border-border",
-      )}
-    >
+    <div className={cn(
+      "rounded-lg border bg-card shadow-sm",
+      destructiveWarning ? "border-amber-500/60" : "border-border",
+    )}>
       <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
         <span className="size-1.5 shrink-0 rounded-full bg-amber-500 animate-pulse" />
         <HugeiconsIcon
@@ -107,35 +76,29 @@ function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
         <PreviewBlock toolName={toolName} input={input} />
       </div>
 
-      <div className="flex items-center justify-between border-t border-border/60 px-3 py-2">
-        <span className="text-[10px] text-muted-foreground/50 select-none">
-          ↵ Approve · Esc Deny
-        </span>
-        <div className="flex items-center gap-1.5">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => handleRespond(false)}
-            className="h-7 gap-1.5 text-[11px]"
-          >
-            <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
-            Deny
-          </Button>
-          <Button
-            size="sm"
-            variant="default"
-            onClick={() => handleRespond(true)}
-            className="h-7 gap-1.5 text-[11px]"
-          >
-            <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} />
-            Approve
-          </Button>
-        </div>
+      <div className="flex items-center justify-end gap-1.5 border-t border-border/60 px-3 py-2">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => onRespond(false)}
+          className="h-7 gap-1.5 text-[11px]"
+        >
+          <HugeiconsIcon icon={Cancel01Icon} size={12} strokeWidth={2} />
+          Deny
+        </Button>
+        <Button
+          size="sm"
+          variant="default"
+          onClick={() => onRespond(true)}
+          className="h-7 gap-1.5 text-[11px]"
+        >
+          <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} />
+          Approve
+        </Button>
       </div>
-    </motion.div>
+    </div>
   );
 }
-
 
 export const AiToolApproval = memo(AiToolApprovalImpl, (a, b) => {
   // The approval card never changes content for a given approvalId — once
