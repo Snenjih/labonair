@@ -12,6 +12,7 @@ import {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -59,7 +60,11 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(
     }), []);
 
     // Sync slot element rects → terminal absolute positions
-    useEffect(() => {
+    // useLayoutEffect instead of useEffect so the initial updateRect() calls
+    // happen synchronously before the first paint. Without this, paneRects is
+    // empty on the first render and terminal divs get display:none for one
+    // frame — visible as a blank flash when switching to a terminal tab.
+    useLayoutEffect(() => {
       const observers: ResizeObserver[] = [];
       const updateRect = (paneId: string) => {
         const slotEl = slotRefs.current.get(paneId);

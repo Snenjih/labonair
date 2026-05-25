@@ -1226,10 +1226,17 @@ export default function App() {
                       return (
                         <div
                           key={t.id}
+                          // inert prevents focus/interaction on descendants when hidden.
+                          // opacity-0 (not visibility:hidden) keeps the WebGL canvas in
+                          // WebKit's compositor tree so it renders in the background —
+                          // eliminating the one-frame blank/tear on tab activation.
+                          // z-0 keeps workspace tabs below other overlay tabs (z-10)
+                          // so GPU compositor layer ordering is always deterministic.
+                          inert={!isActive}
                           className={cn(
-                            "absolute inset-0 px-3 pt-2",
+                            "absolute inset-0 z-0 px-3 pt-2",
                             terminalShowPaneFooter && "pb-2",
-                            !isActive && "invisible pointer-events-none",
+                            !isActive && "opacity-0",
                           )}
                           aria-hidden={!isActive}
                         >
@@ -1262,7 +1269,7 @@ export default function App() {
                     <div
                       className={cn(
                         "absolute inset-0 px-3 pt-2 pb-2",
-                        !isEditorTab && "invisible pointer-events-none",
+                        isEditorTab ? "z-10" : "z-0 invisible pointer-events-none",
                       )}
                       aria-hidden={!isEditorTab}
                     >
@@ -1278,7 +1285,7 @@ export default function App() {
                     <div
                       className={cn(
                         "absolute inset-0 px-3 pt-2 pb-2",
-                        !isPreviewTab && "invisible pointer-events-none",
+                        isPreviewTab ? "z-10" : "z-0 invisible pointer-events-none",
                       )}
                       aria-hidden={!isPreviewTab}
                     >
@@ -1292,7 +1299,7 @@ export default function App() {
                     <div
                       className={cn(
                         "absolute inset-0 px-3 pt-2 pb-2",
-                        !isAiDiffTab && "invisible pointer-events-none",
+                        isAiDiffTab ? "z-10" : "z-0 invisible pointer-events-none",
                       )}
                       aria-hidden={!isAiDiffTab}
                     >
@@ -1306,7 +1313,7 @@ export default function App() {
                     <div
                       className={cn(
                         "absolute inset-0",
-                        !isHomeTab && "invisible pointer-events-none",
+                        isHomeTab ? "z-10" : "z-0 invisible pointer-events-none",
                       )}
                       aria-hidden={!isHomeTab}
                     >
@@ -1322,7 +1329,7 @@ export default function App() {
                         key={t.id}
                         className={cn(
                           "absolute inset-0",
-                          activeId !== t.id && "invisible pointer-events-none",
+                          activeId === t.id ? "z-10" : "z-0 invisible pointer-events-none",
                         )}
                         aria-hidden={activeId !== t.id}
                       >

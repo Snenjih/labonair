@@ -530,6 +530,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       [path, runFormat],
     );
 
+    const handleJump = useCallback((pos: number) => {
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+      view.focus();
+    }, []);
+
     if (doc.status === "loading") {
       return (
         <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
@@ -680,13 +687,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         }}
       />
     );
-
-    const handleJump = useCallback((pos: number) => {
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-      view.focus();
-    }, []);
 
     // Determine if outline panel should be shown alongside the editor
     const showOutlinePanel = editorShowOutline && outline.length >= 0;
