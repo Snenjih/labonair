@@ -8,6 +8,8 @@ import {
 import { cn } from "@/lib/utils";
 import {
   CheckListIcon,
+  CheckmarkCircle01Icon,
+  Copy01Icon,
   Edit02Icon,
   EyeIcon,
   File01Icon,
@@ -154,7 +156,7 @@ const ToolImpl = ({
   // For heavy tools, only show details on error — never the streamed input
   // body, which is huge and re-renders per token.
   const showInputBody = !isHeavy && Boolean(input);
-  const showOutputBody = !isHeavy && output !== undefined;
+  const showOutputBody = output !== undefined;
   const hasDetails =
     showInputBody || showOutputBody || Boolean(errorText);
 
@@ -285,9 +287,14 @@ function renderInputPreview(
             {cwd}
           </div>
         ) : null}
-        <pre className="overflow-auto rounded bg-muted/40 p-2 font-mono text-[11px] leading-relaxed">
-          {cmd}
-        </pre>
+        <div className="relative">
+          <pre className="overflow-auto rounded bg-muted/40 p-2 pr-7 font-mono text-[11px] leading-relaxed">
+            {cmd}
+          </pre>
+          <div className="absolute right-1 top-1">
+            <CopyButton text={cmd} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -372,15 +379,32 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
     const content = typeof o.content === "string" ? o.content : "";
     const lines = content ? content.split("\n").length : null;
     return (
-      <div className="flex items-center gap-1.5 font-mono text-[11px]">
-        <span className="text-emerald-600 dark:text-emerald-400">✓</span>
-        <span className="text-foreground">read</span>
-        {path ? <span className="text-muted-foreground">· {path}</span> : null}
-        {lines != null ? (
-          <span className="text-muted-foreground">
-            ({lines} line{lines === 1 ? "" : "s"}
-            {size != null ? `, ${formatBytes(size)}` : ""})
-          </span>
+      <div className="space-y-1">
+        <div className="flex items-center gap-1.5 font-mono text-[11px]">
+          <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+          <span className="text-foreground">read</span>
+          {path ? <span className="text-muted-foreground">· {path}</span> : null}
+          {lines != null ? (
+            <span className="text-muted-foreground">
+              ({lines} line{lines === 1 ? "" : "s"}
+              {size != null ? `, ${formatBytes(size)}` : ""})
+            </span>
+          ) : null}
+        </div>
+        {content ? (
+          <details>
+            <summary className="cursor-pointer text-[10px] text-muted-foreground hover:text-foreground select-none">
+              view content
+            </summary>
+            <div className="relative mt-1">
+              <pre className="max-h-60 overflow-auto rounded bg-muted/40 p-2 pr-7 font-mono text-[11px] leading-relaxed whitespace-pre-wrap">
+                {content}
+              </pre>
+              <div className="absolute right-1 top-1">
+                <CopyButton text={content} />
+              </div>
+            </div>
+          </details>
         ) : null}
       </div>
     );
@@ -621,6 +645,7 @@ function BashRunOutput({ data }: { data: Record<string, unknown> }) {
             ) : null}
           </button>
         ))}
+        <CopyButton text={tab === "stdout" ? stdout : stderr} />
         <span className="flex-1" />
         {exit != null ? (
           <span
@@ -691,6 +716,28 @@ function CodeBlockMini({ code, language }: { code: string; language: string }) {
     <div className="overflow-hidden rounded bg-muted/40 [&_pre]:!bg-transparent [&_pre]:!p-2 [&_pre]:text-[11px] [&>div]:max-h-60">
       <CodeBlockContent code={code} language={language as BundledLanguage} />
     </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+      title="Copy"
+    >
+      <HugeiconsIcon
+        icon={copied ? CheckmarkCircle01Icon : Copy01Icon}
+        size={11}
+        strokeWidth={1.75}
+      />
+    </button>
   );
 }
 

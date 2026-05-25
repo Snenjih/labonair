@@ -3,10 +3,12 @@ import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import {
+  ArrowUpIcon,
   Cancel01Icon,
   CodeIcon,
   HashtagIcon,
   Key01Icon,
+  StopCircleIcon,
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -203,6 +205,29 @@ export function AiInputBar() {
                 )}
               />
               <AgentSwitcher />
+              {c.isBusy ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={c.stop}
+                  className="size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
+                  title="Stop"
+                >
+                  <HugeiconsIcon icon={StopCircleIcon} size={13} strokeWidth={1.75} />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="icon"
+                  onClick={c.submit}
+                  disabled={!c.canSend}
+                  className="size-7 shrink-0 rounded-md"
+                  title="Send (Enter)"
+                >
+                  <HugeiconsIcon icon={ArrowUpIcon} size={13} strokeWidth={1.75} />
+                </Button>
+              )}
             </div>
           </PopoverAnchor>
           <DirectivePickerContent
