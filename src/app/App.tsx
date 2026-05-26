@@ -1153,7 +1153,7 @@ export default function App() {
     <MotionConfig reducedMotion={reduceMotion ? "always" : "never"}>
     <ThemeProvider>
       <TooltipProvider>
-        <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
+        <div className="relative z-[1] flex h-screen flex-col overflow-hidden bg-background text-foreground">
           <BackgroundImageLayer />
           <Header
             tabs={tabs}

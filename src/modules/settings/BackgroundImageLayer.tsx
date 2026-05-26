@@ -1,67 +1,64 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { getStoragePaths } from "@/lib/paths";
 import { usePreferencesStore } from "./preferences";
-
-type BackgroundInfo = {
-  filename: string;
-  path: string;
-  size_bytes: number;
-};
 
 export function BackgroundImageLayer() {
   const backgroundImage = usePreferencesStore((s) => s.backgroundImage);
   const backgroundOpacity = usePreferencesStore((s) => s.backgroundOpacity);
   const backgroundBlur = usePreferencesStore((s) => s.backgroundBlur);
-  const [bgUrl, setBgUrl] = useState<string | null>(null);
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
 
+  // Load image as base64 data URL via IPC — no asset protocol scope issues.
   useEffect(() => {
     if (!backgroundImage) {
-      setBgUrl(null);
+      setDataUrl(null);
       document.documentElement.removeAttribute("data-wallpaper");
+      document.documentElement.style.removeProperty("--ui-alpha");
       return;
     }
 
-    // Resolve the full absolute path from the backgrounds list so
-    // convertFileSrc gets a verified, OS-correct path.
-    void invoke<BackgroundInfo[]>("backgrounds_list").then((list) => {
-      const found = list.find((b) => b.filename === backgroundImage);
-      if (found) {
-        setBgUrl(convertFileSrc(found.path));
+    void invoke<string>("background_read_data_url", { filename: backgroundImage })
+      .then((url) => {
+        setDataUrl(url);
         document.documentElement.setAttribute("data-wallpaper", "");
-      } else {
-        // File no longer exists on disk — clear gracefully
-        setBgUrl(null);
+      })
+      .catch(() => {
+        // File no longer accessible — clear the preference gracefully
+        setDataUrl(null);
         document.documentElement.removeAttribute("data-wallpaper");
-      }
-    }).catch(() => {
-      // Fall back to path construction if invoke fails
-      getStoragePaths().then((paths) => {
-        const sep = paths.config.includes("\\") ? "\\" : "/";
-        setBgUrl(convertFileSrc(`${paths.config}${sep}backgrounds${sep}${backgroundImage}`));
-        document.documentElement.setAttribute("data-wallpaper", "");
+        document.documentElement.style.removeProperty("--ui-alpha");
       });
-    });
   }, [backgroundImage]);
 
-  // Remove attribute on unmount
+  // Keep --ui-alpha in sync with the opacity slider.
+  // opacity=0   → --ui-alpha=1.0  (fully opaque surfaces, wallpaper hidden)
+  // opacity=90  → --ui-alpha=0.10 (very transparent surfaces, wallpaper fully visible)
+  useEffect(() => {
+    if (!backgroundImage) return;
+    const alpha = Math.max(0.10, 1 - backgroundOpacity / 100);
+    document.documentElement.style.setProperty("--ui-alpha", alpha.toFixed(3));
+  }, [backgroundImage, backgroundOpacity]);
+
   useEffect(() => {
     return () => {
       document.documentElement.removeAttribute("data-wallpaper");
+      document.documentElement.style.removeProperty("--ui-alpha");
     };
   }, []);
 
-  if (!bgUrl) return null;
+  if (!dataUrl) return null;
 
+  // Portal to document.body at z-index:0.
+  // App root div sits at z-index:1 above this layer.
+  // UI surfaces use --background/--card with var(--ui-alpha) for transparency.
   return createPortal(
     <div
       aria-hidden
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: -1,
+        zIndex: 0,
         pointerEvents: "none",
         overflow: "hidden",
       }}
@@ -69,11 +66,10 @@ export function BackgroundImageLayer() {
       <div
         style={{
           position: "absolute",
-          inset: "-12px",
-          backgroundImage: `url(${bgUrl})`,
+          inset: backgroundBlur > 0 ? "-12px" : 0,
+          backgroundImage: `url(${dataUrl})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          opacity: backgroundOpacity / 100,
           filter: backgroundBlur > 0 ? `blur(${backgroundBlur}px)` : undefined,
         }}
       />

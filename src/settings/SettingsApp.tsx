@@ -121,7 +121,7 @@ export function SettingsApp() {
     : [];
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground select-none">
+    <div className="relative z-[1] flex h-screen flex-col overflow-hidden bg-background text-foreground select-none">
       <BackgroundImageLayer />
       {/* Titlebar */}
       <header

@@ -270,7 +270,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   appFontSize: 13,
   appLineHeight: 1.5,
   backgroundImage: "",
-  backgroundOpacity: 100,
+  backgroundOpacity: 30,
   backgroundBlur: 0,
 
   terminalShell: "",

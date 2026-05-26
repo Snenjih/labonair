@@ -1,3 +1,4 @@
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -108,6 +109,38 @@ pub async fn background_import(source_path: String) -> Result<BackgroundInfo, St
         path: dest.to_string_lossy().to_string(),
         size_bytes,
     })
+}
+
+/// Read an image from the backgrounds directory and return it as a base64 data URL.
+/// This bypasses the asset protocol entirely — no scope config needed.
+#[tauri::command]
+pub async fn background_read_data_url(filename: String) -> Result<String, String> {
+    if filename.contains('/') || filename.contains('\\') {
+        return Err("Invalid filename".to_string());
+    }
+
+    let dir = backgrounds_dir()?;
+    let path = dir.join(&filename);
+
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("jpeg")
+        .to_lowercase();
+
+    let mime = match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "avif" => "image/avif",
+        "bmp" => "image/bmp",
+        _ => "image/jpeg",
+    };
+
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:{};base64,{}", mime, b64))
 }
 
 #[tauri::command]

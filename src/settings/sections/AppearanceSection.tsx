@@ -11,7 +11,6 @@ import {
   setTitlebarsIconsPosition,
 } from "@/modules/settings/store";
 import type { ThemePref } from "@/modules/settings/store";
-import { getStoragePaths } from "@/lib/paths";
 import { useTheme } from "@/modules/theme";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -32,7 +31,7 @@ import {
   Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
 
@@ -71,22 +70,24 @@ export function AppearanceSection() {
   const backgroundBlur = usePreferencesStore((s) => s.backgroundBlur);
 
   const [backgrounds, setBackgrounds] = useState<BackgroundInfo[]>([]);
-  const [configPath, setConfigPath] = useState<string>("");
+  // filename → base64 data URL for thumbnails (loaded lazily)
+  const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
+  // Track which thumbnail is hovered for the delete button
+  const [hoveredFilename, setHoveredFilename] = useState<string | null>(null);
 
   useEffect(() => {
     invoke<BackgroundInfo[]>("backgrounds_list")
-      .then(setBackgrounds)
-      .catch(() => {});
-    getStoragePaths()
-      .then((p) => setConfigPath(p.config))
+      .then((list) => {
+        setBackgrounds(list);
+        // Load data URLs for all thumbnails
+        for (const bg of list) {
+          invoke<string>("background_read_data_url", { filename: bg.filename })
+            .then((url) => setThumbUrls((prev) => ({ ...prev, [bg.filename]: url })))
+            .catch(() => {});
+        }
+      })
       .catch(() => {});
   }, []);
-
-  function thumbUrl(filename: string): string {
-    if (!configPath || !filename) return "";
-    const sep = configPath.includes("\\") ? "\\" : "/";
-    return convertFileSrc(`${configPath}${sep}backgrounds${sep}${filename}`);
-  }
 
   async function handleImport() {
     const selected = await open({
@@ -100,7 +101,13 @@ export function AppearanceSection() {
       const info = await invoke<BackgroundInfo>("background_import", {
         sourcePath: selected,
       });
-      setBackgrounds((prev) => [...prev, info].sort((a, b) => a.filename.localeCompare(b.filename)));
+      setBackgrounds((prev) =>
+        [...prev, info].sort((a, b) => a.filename.localeCompare(b.filename))
+      );
+      // Load data URL for the new thumbnail
+      void invoke<string>("background_read_data_url", { filename: info.filename })
+        .then((url) => setThumbUrls((prev) => ({ ...prev, [info.filename]: url })))
+        .catch(() => {});
       void setBackgroundImage(info.filename);
     } catch (e) {
       console.error("Failed to import background:", e);
@@ -111,9 +118,11 @@ export function AppearanceSection() {
     try {
       await invoke("background_delete", { filename });
       setBackgrounds((prev) => prev.filter((b) => b.filename !== filename));
+      setThumbUrls((prev) => { const next = { ...prev }; delete next[filename]; return next; });
       if (backgroundImage === filename) {
         void setBackgroundImage("");
       }
+      setHoveredFilename(null);
     } catch (e) {
       console.error("Failed to delete background:", e);
     }
@@ -161,33 +170,39 @@ export function AppearanceSection() {
             type="button"
             onClick={() => handleSelect("")}
             className={cn(
-              "relative h-12 w-16 shrink-0 overflow-hidden rounded-md border transition-all",
+              "relative h-[86px] w-[112px] shrink-0 overflow-hidden rounded-md border transition-all",
               backgroundImage === ""
                 ? "border-foreground/60 ring-1 ring-foreground/20"
                 : "border-border/60 hover:border-border",
             )}
             title="No background"
           >
-            <div className="absolute inset-0"
+            <div
+              className="absolute inset-0"
               style={{
                 backgroundImage:
                   "repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%)",
-                backgroundSize: "8px 8px",
+                backgroundSize: "10px 10px",
               }}
             />
-            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-medium text-muted-foreground">
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-muted-foreground">
               None
             </span>
           </button>
 
           {/* Saved background thumbnails */}
           {backgrounds.map((bg) => (
-            <div key={bg.filename} className="relative shrink-0">
+            <div
+              key={bg.filename}
+              className="relative shrink-0"
+              onMouseEnter={() => setHoveredFilename(bg.filename)}
+              onMouseLeave={() => setHoveredFilename(null)}
+            >
               <button
                 type="button"
                 onClick={() => handleSelect(bg.filename)}
                 className={cn(
-                  "h-12 w-16 overflow-hidden rounded-md border transition-all",
+                  "h-[86px] w-[112px] overflow-hidden rounded-md border transition-all",
                   backgroundImage === bg.filename
                     ? "border-foreground/60 ring-1 ring-foreground/20"
                     : "border-border/60 hover:border-border",
@@ -195,22 +210,26 @@ export function AppearanceSection() {
                 title={bg.filename}
               >
                 <img
-                  src={thumbUrl(bg.filename)}
+                  src={thumbUrls[bg.filename]}
                   alt={bg.filename}
                   className="h-full w-full object-cover"
                   draggable={false}
                 />
               </button>
+              {/* Delete button — visible on hover */}
               <button
                 type="button"
-                onClick={() => void handleDelete(bg.filename)}
-                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-background/90 border border-border/60 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 [.group:hover_&]:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleDelete(bg.filename);
+                }}
+                className={cn(
+                  "absolute -right-1 -top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground transition-all hover:bg-destructive/90 hover:text-white",
+                  hoveredFilename === bg.filename ? "opacity-100" : "opacity-0",
+                )}
                 title={`Delete ${bg.filename}`}
-                style={{ opacity: undefined }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = "")}
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2} />
+                <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2.5} />
               </button>
             </div>
           ))}
@@ -219,11 +238,11 @@ export function AppearanceSection() {
           <button
             type="button"
             onClick={() => void handleImport()}
-            className="flex h-12 w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-border/60 text-muted-foreground transition-all hover:border-border hover:text-foreground"
+            className="flex h-[86px] w-[112px] shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border/60 text-muted-foreground transition-all hover:border-border hover:text-foreground"
             title="Add background image"
           >
-            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.5} />
-            <span className="text-[9px]">Add</span>
+            <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.5} />
+            <span className="text-[10px]">Add image</span>
           </button>
         </div>
 
@@ -231,15 +250,15 @@ export function AppearanceSection() {
         {backgroundImage !== "" && (
           <div className="flex flex-col gap-2 mt-1">
             <SettingRow
-              title="Opacity"
-              description="Intensity of the background image relative to the UI."
+              title="UI opacity"
+              description="How transparent UI surfaces are — higher value lets more of the background image show through."
             >
               <div className="flex items-center gap-2">
                 <input
                   type="range"
-                  min={10}
-                  max={100}
-                  step={1}
+                  min={0}
+                  max={90}
+                  step={5}
                   value={backgroundOpacity}
                   onChange={(e) => void setBackgroundOpacity(Number(e.target.value))}
                   className="w-24 accent-foreground"
@@ -250,7 +269,7 @@ export function AppearanceSection() {
               </div>
             </SettingRow>
             <SettingRow
-              title="Blur"
+              title="Image blur"
               description="Gaussian blur applied to the background image."
             >
               <div className="flex items-center gap-2">

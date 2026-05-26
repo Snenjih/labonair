@@ -10,7 +10,7 @@ use modules::{
     snippets::db::{snippets_get_all, snippets_create, snippets_update, snippets_delete, snippets_reorder, snippet_groups_get_all, snippet_groups_create, snippet_groups_update, snippet_groups_delete},
     snippets::exec::{snippet_run_local, snippet_run_ssh},
     themes::{themes_get_all, theme_import, theme_export, theme_delete, theme_fetch_index, theme_download},
-    backgrounds::{backgrounds_list, background_import, background_delete},
+    backgrounds::{backgrounds_list, background_import, background_delete, background_read_data_url},
 };
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_window_state::StateFlags;
@@ -540,6 +540,7 @@ pub fn run() {
             backgrounds_list,
             background_import,
             background_delete,
+            background_read_data_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
