@@ -149,8 +149,12 @@ export default function App() {
     if (!p) return;
     if (activePanel === panel) {
       // Same panel clicked → toggle sidebar open/close
-      if (p.getSize().asPercentage <= 0) p.expand();
-      else p.collapse();
+      if (p.getSize().asPercentage <= 0) {
+        p.expand();
+      } else {
+        p.collapse();
+        setActivePanel(null);
+      }
     } else {
       // Different panel → switch panel and make sure sidebar is open
       setActivePanel(panel);
@@ -1159,7 +1163,7 @@ export default function App() {
             onClose={handleClose}
             onCloseOthers={handleCloseOthers}
             onCloseAll={handleCloseAll}
-            onToggleSidebar={toggleSidebar}
+
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onOpenSettings={() => void openSettingsWindow()}
             onOpenHostManager={onOpenHostManager}
@@ -1181,6 +1185,9 @@ export default function App() {
                     maxSize="450px"
                     collapsible
                     collapsedSize={0}
+                    onResize={(size) => {
+                      if (size.asPercentage <= 0) setActivePanel(null);
+                    }}
                   >
                     <div className="h-full border-r border-border/60 bg-card">
                       {activePanel === "tabs" ? (
@@ -1372,6 +1379,9 @@ export default function App() {
                     maxSize="450px"
                     collapsible
                     collapsedSize={0}
+                    onResize={(size) => {
+                      if (size.asPercentage <= 0) setActivePanel(null);
+                    }}
                   >
                     <div className="h-full border-l border-border/60 bg-card">
                       {activePanel === "tabs" ? (

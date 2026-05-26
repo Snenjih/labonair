@@ -45,7 +45,6 @@ type Props = {
   onClose: (id: number) => void;
   onCloseOthers: (id: number) => void;
   onCloseAll: () => void;
-  onToggleSidebar: () => void;
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
   onOpenHostManager: () => void;
@@ -64,7 +63,6 @@ export function Header({
   onClose,
   onCloseOthers,
   onCloseAll,
-  onToggleSidebar,
   onOpenShortcuts,
   onOpenSettings,
   onOpenHostManager,
@@ -152,16 +150,6 @@ export function Header({
         IS_MAC ? "pr-2 pl-20" : "pr-0 pl-2"
       }`}
     >
-      <Button
-        onClick={onToggleSidebar}
-        title="Toggle sidebar"
-        variant="ghost"
-        size="icon"
-        className="shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-      >
-        <HugeiconsIcon icon={SidebarLeftIcon} size={18} strokeWidth={1.75} />
-      </Button>
-
       {!IS_MAC && (
         <>
           {sideButtons}

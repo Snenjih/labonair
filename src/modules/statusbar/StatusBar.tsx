@@ -6,7 +6,7 @@ import {
 import { useChatStore } from "@/modules/ai";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  CodeIcon,
+  SidebarLeft01Icon,
   FlashIcon,
   Globe02Icon,
   LayoutTopIcon,
@@ -34,8 +34,8 @@ type Props = {
   onPanelToggle?: (panel: SidebarPanel) => void;
 };
 
-const PANEL_BUTTONS: Array<{ panel: SidebarPanel; icon: typeof CodeIcon; title: string }> = [
-  { panel: "explorer", icon: CodeIcon, title: "Explorer (Cmd+B)" },
+const PANEL_BUTTONS: Array<{ panel: SidebarPanel; icon: typeof SidebarLeft01Icon; title: string }> = [
+  { panel: "explorer", icon: SidebarLeft01Icon, title: "Explorer (Cmd+B)" },
   { panel: "snippets", icon: FlashIcon, title: "Snippets" },
 ];
 
