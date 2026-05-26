@@ -174,6 +174,7 @@ export function Header({
       {iconsOnLeft && (
         <>
           {actionIcons}
+          {IS_MAC && sideButtons}
           <span className="mx-1 h-5 w-px shrink-0 bg-border" />
         </>
       )}
@@ -204,7 +205,7 @@ export function Header({
 
       {!iconsOnLeft && actionIcons}
 
-      {IS_MAC && sideButtons}
+      {IS_MAC && !iconsOnLeft && sideButtons}
 
       {USE_CUSTOM_WINDOW_CONTROLS && (
         <>
