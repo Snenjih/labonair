@@ -33,6 +33,7 @@ import { HostListItem } from "./HostListItem";
 import { HostFormPanel } from "./HostFormPanel";
 import { CredentialFormPanel } from "./CredentialFormPanel";
 import { CredentialListItem } from "./CredentialListItem";
+import { CredentialCard } from "./CredentialCard";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -458,10 +459,8 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
                 "flex items-center justify-center px-2 h-8 transition-colors",
                 layoutMode === "list"
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent",
-                viewMode === "credentials" && "opacity-40 cursor-not-allowed pointer-events-none"
+                  : "text-muted-foreground hover:bg-accent"
               )}
-              disabled={viewMode === "credentials"}
             >
               {/* List icon */}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -683,7 +682,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
               ) : null}
             </>
           ) : (
-            /* Credentials list */
+            /* Credentials — grid or list */
             <div className="flex flex-col">
               {credentials.length === 0 ? (
                 <motion.div
@@ -711,6 +710,23 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
               ) : filteredCredentials.length === 0 ? (
                 <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
                   No credentials match your search
+                </div>
+              ) : layoutMode === "grid" ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {sortedCredentials.map((cred) => (
+                    <CredentialCard
+                      key={cred.id}
+                      credential={cred}
+                      hostsCount={hosts.filter((h) => h.credential_id === cred.id).length}
+                      isSelected={selectedCredentialId === cred.id}
+                      onClick={() => setSelectedCredential(selectedCredentialId === cred.id ? null : cred.id)}
+                      onEdit={() => setSelectedCredential(cred.id)}
+                      onDuplicate={async () => {
+                        const dup = await duplicateCredential(cred.id);
+                        setSelectedCredential(dup.id);
+                      }}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
