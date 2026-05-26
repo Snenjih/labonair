@@ -1,20 +1,27 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { setBackgroundImage } from "./store";
 import { usePreferencesStore } from "./preferences";
+
+function clearWallpaperDom() {
+  document.documentElement.removeAttribute("data-wallpaper");
+  document.documentElement.style.removeProperty("--ui-alpha");
+}
 
 export function BackgroundImageLayer() {
   const backgroundImage = usePreferencesStore((s) => s.backgroundImage);
   const backgroundOpacity = usePreferencesStore((s) => s.backgroundOpacity);
   const backgroundBlur = usePreferencesStore((s) => s.backgroundBlur);
+  const addNotification = useNotificationStore((s) => s.addNotification);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
   // Load image as base64 data URL via IPC — no asset protocol scope issues.
   useEffect(() => {
     if (!backgroundImage) {
       setDataUrl(null);
-      document.documentElement.removeAttribute("data-wallpaper");
-      document.documentElement.style.removeProperty("--ui-alpha");
+      clearWallpaperDom();
       return;
     }
 
@@ -23,13 +30,20 @@ export function BackgroundImageLayer() {
         setDataUrl(url);
         document.documentElement.setAttribute("data-wallpaper", "");
       })
-      .catch(() => {
-        // File no longer accessible — clear the preference gracefully
+      .catch((err: unknown) => {
+        const detail = err instanceof Error ? err.message : String(err);
+        addNotification({
+          type: "error",
+          title: "Background image failed to load",
+          message: `"${backgroundImage}" could not be read — falling back to no background. ${detail}`,
+          source: "Background",
+        });
+        // Clear preference so the app doesn't retry a broken image on every launch
+        void setBackgroundImage("");
         setDataUrl(null);
-        document.documentElement.removeAttribute("data-wallpaper");
-        document.documentElement.style.removeProperty("--ui-alpha");
+        clearWallpaperDom();
       });
-  }, [backgroundImage]);
+  }, [backgroundImage, addNotification]);
 
   // Keep --ui-alpha in sync with the opacity slider.
   // opacity=0   → --ui-alpha=1.0  (fully opaque surfaces, wallpaper hidden)

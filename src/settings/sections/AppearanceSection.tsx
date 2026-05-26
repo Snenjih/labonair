@@ -34,6 +34,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 
 const TITLEBAR_ICONS_DESCRIPTIONS: Record<"auto" | "left" | "right", string> = {
   auto: "Follows platform conventions — right side on macOS (traffic lights occupy the left) and on Windows (before the window controls).",
@@ -69,6 +70,8 @@ export function AppearanceSection() {
   const backgroundOpacity = usePreferencesStore((s) => s.backgroundOpacity);
   const backgroundBlur = usePreferencesStore((s) => s.backgroundBlur);
 
+  const addNotification = useNotificationStore((s) => s.addNotification);
+
   const [backgrounds, setBackgrounds] = useState<BackgroundInfo[]>([]);
   // filename → base64 data URL for thumbnails (loaded lazily)
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
@@ -86,8 +89,16 @@ export function AppearanceSection() {
             .catch(() => {});
         }
       })
-      .catch(() => {});
-  }, []);
+      .catch((err: unknown) => {
+        const detail = err instanceof Error ? err.message : String(err);
+        addNotification({
+          type: "error",
+          title: "Failed to load backgrounds",
+          message: `Could not read the backgrounds directory. ${detail}`,
+          source: "Background",
+        });
+      });
+  }, [addNotification]);
 
   async function handleImport() {
     const selected = await open({
@@ -109,8 +120,14 @@ export function AppearanceSection() {
         .then((url) => setThumbUrls((prev) => ({ ...prev, [info.filename]: url })))
         .catch(() => {});
       void setBackgroundImage(info.filename);
-    } catch (e) {
-      console.error("Failed to import background:", e);
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      addNotification({
+        type: "error",
+        title: "Failed to import background",
+        message: `The image could not be imported. ${detail}`,
+        source: "Background",
+      });
     }
   }
 
@@ -123,8 +140,14 @@ export function AppearanceSection() {
         void setBackgroundImage("");
       }
       setHoveredFilename(null);
-    } catch (e) {
-      console.error("Failed to delete background:", e);
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      addNotification({
+        type: "error",
+        title: "Failed to delete background",
+        message: `"${filename}" could not be deleted. ${detail}`,
+        source: "Background",
+      });
     }
   }
 
