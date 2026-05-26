@@ -3,17 +3,15 @@ import {
   setAppFontFamily,
   setAppFontSize,
   setAppLineHeight,
+  setBackgroundBlur,
+  setBackgroundImage,
+  setBackgroundOpacity,
   setSidebarPosition,
   setTabsLocation,
   setTitlebarsIconsPosition,
 } from "@/modules/settings/store";
 import type { ThemePref } from "@/modules/settings/store";
-
-const TITLEBAR_ICONS_DESCRIPTIONS: Record<"auto" | "left" | "right", string> = {
-  auto: "Follows platform conventions — right side on macOS (traffic lights occupy the left) and on Windows (before the window controls).",
-  left: "Icons appear to the left of the tab bar, right next to the sidebar toggle.",
-  right: "Icons always appear at the far right end of the titlebar.",
-};
+import { getStoragePaths } from "@/lib/paths";
 import { useTheme } from "@/modules/theme";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -27,11 +25,22 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
+  Add01Icon,
+  Cancel01Icon,
   ComputerIcon,
   Moon02Icon,
   Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useEffect, useState } from "react";
+
+const TITLEBAR_ICONS_DESCRIPTIONS: Record<"auto" | "left" | "right", string> = {
+  auto: "Follows platform conventions — right side on macOS (traffic lights occupy the left) and on Windows (before the window controls).",
+  left: "Icons appear to the left of the tab bar, right next to the sidebar toggle.",
+  right: "Icons always appear at the far right end of the titlebar.",
+};
 
 const APPEARANCE: {
   id: ThemePref;
@@ -43,6 +52,12 @@ const APPEARANCE: {
   { id: "dark", label: "Dark", icon: Moon02Icon },
 ];
 
+type BackgroundInfo = {
+  filename: string;
+  path: string;
+  size_bytes: number;
+};
+
 export function AppearanceSection() {
   const { theme, setTheme } = useTheme();
   const appFontFamily = usePreferencesStore((s) => s.appFontFamily);
@@ -51,12 +66,68 @@ export function AppearanceSection() {
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
   const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
+  const backgroundImage = usePreferencesStore((s) => s.backgroundImage);
+  const backgroundOpacity = usePreferencesStore((s) => s.backgroundOpacity);
+  const backgroundBlur = usePreferencesStore((s) => s.backgroundBlur);
+
+  const [backgrounds, setBackgrounds] = useState<BackgroundInfo[]>([]);
+  const [configPath, setConfigPath] = useState<string>("");
+
+  useEffect(() => {
+    invoke<BackgroundInfo[]>("backgrounds_list")
+      .then(setBackgrounds)
+      .catch(() => {});
+    getStoragePaths()
+      .then((p) => setConfigPath(p.config))
+      .catch(() => {});
+  }, []);
+
+  function thumbUrl(filename: string): string {
+    if (!configPath || !filename) return "";
+    const sep = configPath.includes("\\") ? "\\" : "/";
+    return convertFileSrc(`${configPath}${sep}backgrounds${sep}${filename}`);
+  }
+
+  async function handleImport() {
+    const selected = await open({
+      multiple: false,
+      filters: [
+        { name: "Image", extensions: ["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp"] },
+      ],
+    });
+    if (!selected) return;
+    try {
+      const info = await invoke<BackgroundInfo>("background_import", {
+        sourcePath: selected,
+      });
+      setBackgrounds((prev) => [...prev, info].sort((a, b) => a.filename.localeCompare(b.filename)));
+      void setBackgroundImage(info.filename);
+    } catch (e) {
+      console.error("Failed to import background:", e);
+    }
+  }
+
+  async function handleDelete(filename: string) {
+    try {
+      await invoke("background_delete", { filename });
+      setBackgrounds((prev) => prev.filter((b) => b.filename !== filename));
+      if (backgroundImage === filename) {
+        void setBackgroundImage("");
+      }
+    } catch (e) {
+      console.error("Failed to delete background:", e);
+    }
+  }
+
+  function handleSelect(filename: string) {
+    void setBackgroundImage(filename);
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
         title="Appearance"
-        description="Color theme, typography, and layout."
+        description="Color theme, background, typography, and layout."
       />
 
       <div className="flex flex-col gap-2">
@@ -79,6 +150,126 @@ export function AppearanceSection() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Background image */}
+      <div className="flex flex-col gap-3">
+        <Label>Background image</Label>
+        <div className="flex flex-wrap gap-2">
+          {/* None tile */}
+          <button
+            type="button"
+            onClick={() => handleSelect("")}
+            className={cn(
+              "relative h-12 w-16 shrink-0 overflow-hidden rounded-md border transition-all",
+              backgroundImage === ""
+                ? "border-foreground/60 ring-1 ring-foreground/20"
+                : "border-border/60 hover:border-border",
+            )}
+            title="No background"
+          >
+            <div className="absolute inset-0"
+              style={{
+                backgroundImage:
+                  "repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%)",
+                backgroundSize: "8px 8px",
+              }}
+            />
+            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-medium text-muted-foreground">
+              None
+            </span>
+          </button>
+
+          {/* Saved background thumbnails */}
+          {backgrounds.map((bg) => (
+            <div key={bg.filename} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => handleSelect(bg.filename)}
+                className={cn(
+                  "h-12 w-16 overflow-hidden rounded-md border transition-all",
+                  backgroundImage === bg.filename
+                    ? "border-foreground/60 ring-1 ring-foreground/20"
+                    : "border-border/60 hover:border-border",
+                )}
+                title={bg.filename}
+              >
+                <img
+                  src={thumbUrl(bg.filename)}
+                  alt={bg.filename}
+                  className="h-full w-full object-cover"
+                  draggable={false}
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDelete(bg.filename)}
+                className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-background/90 border border-border/60 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 [.group:hover_&]:opacity-100"
+                title={`Delete ${bg.filename}`}
+                style={{ opacity: undefined }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = "")}
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2} />
+              </button>
+            </div>
+          ))}
+
+          {/* Add button */}
+          <button
+            type="button"
+            onClick={() => void handleImport()}
+            className="flex h-12 w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-border/60 text-muted-foreground transition-all hover:border-border hover:text-foreground"
+            title="Add background image"
+          >
+            <HugeiconsIcon icon={Add01Icon} size={14} strokeWidth={1.5} />
+            <span className="text-[9px]">Add</span>
+          </button>
+        </div>
+
+        {/* Opacity & blur — only shown when a background is set */}
+        {backgroundImage !== "" && (
+          <div className="flex flex-col gap-2 mt-1">
+            <SettingRow
+              title="Opacity"
+              description="Intensity of the background image relative to the UI."
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min={10}
+                  max={100}
+                  step={1}
+                  value={backgroundOpacity}
+                  onChange={(e) => void setBackgroundOpacity(Number(e.target.value))}
+                  className="w-24 accent-foreground"
+                />
+                <span className="w-8 text-right text-[11px] tabular-nums text-muted-foreground">
+                  {backgroundOpacity}%
+                </span>
+              </div>
+            </SettingRow>
+            <SettingRow
+              title="Blur"
+              description="Gaussian blur applied to the background image."
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="range"
+                  min={0}
+                  max={20}
+                  step={1}
+                  value={backgroundBlur}
+                  onChange={(e) => void setBackgroundBlur(Number(e.target.value))}
+                  className="w-24 accent-foreground"
+                />
+                <span className="w-8 text-right text-[11px] tabular-nums text-muted-foreground">
+                  {backgroundBlur}px
+                </span>
+              </div>
+            </SettingRow>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">

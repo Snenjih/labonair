@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
 import {
   SETTING_DEFINITIONS,
   type SettingCategory,
@@ -120,7 +121,8 @@ export function SettingsApp() {
     : [];
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground select-none">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground select-none">
+      <BackgroundImageLayer />
       {/* Titlebar */}
       <header
         data-tauri-drag-region

@@ -46,6 +46,7 @@ import {
 import { Header } from "@/modules/header";
 import { PreviewStack, type PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow, type SettingsTab } from "@/modules/settings/openSettingsWindow";
+import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   onKeysChanged,
@@ -1153,6 +1154,7 @@ export default function App() {
     <ThemeProvider>
       <TooltipProvider>
         <div className="relative flex h-screen flex-col overflow-hidden bg-background text-foreground">
+          <BackgroundImageLayer />
           <Header
             tabs={tabs}
             activeId={activeId}

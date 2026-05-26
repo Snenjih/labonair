@@ -62,6 +62,9 @@ export type Preferences = {
   appFontFamily: string;
   appFontSize: number;
   appLineHeight: number;
+  backgroundImage: string;
+  backgroundOpacity: number;
+  backgroundBlur: number;
 
   // --- Terminal ---
   terminalShell: string;
@@ -174,6 +177,9 @@ const KEY_APP_THEME = "appTheme";
 const KEY_APP_FONT_FAMILY = "appFontFamily";
 const KEY_APP_FONT_SIZE = "appFontSize";
 const KEY_APP_LINE_HEIGHT = "appLineHeight";
+const KEY_BG_IMAGE = "backgroundImage";
+const KEY_BG_OPACITY = "backgroundOpacity";
+const KEY_BG_BLUR = "backgroundBlur";
 
 const KEY_TERMINAL_SHELL = "terminalShell";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
@@ -263,6 +269,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   appFontFamily: "system-ui",
   appFontSize: 13,
   appLineHeight: 1.5,
+  backgroundImage: "",
+  backgroundOpacity: 100,
+  backgroundBlur: 0,
 
   terminalShell: "",
   terminalCursorBlink: true,
@@ -399,6 +408,12 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_APP_FONT_SIZE) ?? DEFAULT_PREFERENCES.appFontSize,
     appLineHeight:
       get<number>(KEY_APP_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.appLineHeight,
+    backgroundImage:
+      get<string>(KEY_BG_IMAGE) ?? DEFAULT_PREFERENCES.backgroundImage,
+    backgroundOpacity:
+      get<number>(KEY_BG_OPACITY) ?? DEFAULT_PREFERENCES.backgroundOpacity,
+    backgroundBlur:
+      get<number>(KEY_BG_BLUR) ?? DEFAULT_PREFERENCES.backgroundBlur,
 
     terminalShell:
       get<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
@@ -661,6 +676,21 @@ export async function setAppFontSize(value: number): Promise<void> {
 
 export async function setAppLineHeight(value: number): Promise<void> {
   await (await getStore()).set(KEY_APP_LINE_HEIGHT, value);
+  await (await getStore()).save();
+}
+
+export async function setBackgroundImage(value: string): Promise<void> {
+  await (await getStore()).set(KEY_BG_IMAGE, value);
+  await (await getStore()).save();
+}
+
+export async function setBackgroundOpacity(value: number): Promise<void> {
+  await (await getStore()).set(KEY_BG_OPACITY, value);
+  await (await getStore()).save();
+}
+
+export async function setBackgroundBlur(value: number): Promise<void> {
+  await (await getStore()).set(KEY_BG_BLUR, value);
   await (await getStore()).save();
 }
 
@@ -1015,6 +1045,9 @@ export async function onPreferencesChange(
     [KEY_APP_FONT_FAMILY]: "appFontFamily",
     [KEY_APP_FONT_SIZE]: "appFontSize",
     [KEY_APP_LINE_HEIGHT]: "appLineHeight",
+    [KEY_BG_IMAGE]: "backgroundImage",
+    [KEY_BG_OPACITY]: "backgroundOpacity",
+    [KEY_BG_BLUR]: "backgroundBlur",
 
     [KEY_TERMINAL_SHELL]: "terminalShell",
     [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
