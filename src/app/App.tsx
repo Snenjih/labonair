@@ -136,6 +136,7 @@ export default function App() {
     useState<EditorPaneHandle | null>(null);
   const sidebarRef = useRef<PanelImperativeHandle | null>(null);
   const [activePanel, setActivePanel] = useState<SidebarPanel>("explorer");
+  const lastActivePanelRef = useRef<SidebarPanel>("explorer");
 
   const toggleSidebar = useCallback(() => {
     const p = sidebarRef.current;
@@ -157,6 +158,7 @@ export default function App() {
       }
     } else {
       // Different panel → switch panel and make sure sidebar is open
+      if (panel) lastActivePanelRef.current = panel;
       setActivePanel(panel);
       if (p.getSize().asPercentage <= 0) p.expand();
     }
@@ -1186,7 +1188,15 @@ export default function App() {
                     collapsible
                     collapsedSize={0}
                     onResize={(size) => {
-                      if (size.asPercentage <= 0) setActivePanel(null);
+                      if (size.asPercentage <= 0) {
+                        setActivePanel(null);
+                      } else if (size.asPercentage > 0) {
+                        setActivePanel((prev) => {
+                          const next = prev ?? lastActivePanelRef.current ?? "explorer";
+                          lastActivePanelRef.current = next;
+                          return next;
+                        });
+                      }
                     }}
                   >
                     <div className="h-full border-r border-border/60 bg-card">
@@ -1380,7 +1390,15 @@ export default function App() {
                     collapsible
                     collapsedSize={0}
                     onResize={(size) => {
-                      if (size.asPercentage <= 0) setActivePanel(null);
+                      if (size.asPercentage <= 0) {
+                        setActivePanel(null);
+                      } else if (size.asPercentage > 0) {
+                        setActivePanel((prev) => {
+                          const next = prev ?? lastActivePanelRef.current ?? "explorer";
+                          lastActivePanelRef.current = next;
+                          return next;
+                        });
+                      }
                     }}
                   >
                     <div className="h-full border-l border-border/60 bg-card">
