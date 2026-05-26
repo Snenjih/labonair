@@ -4,6 +4,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -21,12 +22,14 @@ import {
   arrayMove,
   rectSortingStrategy,
   useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GroupCard } from "./GroupCard";
 import { HostCard } from "./HostCard";
+import { HostListItem } from "./HostListItem";
 import { HostFormPanel } from "./HostFormPanel";
 import { CredentialFormPanel } from "./CredentialFormPanel";
 import { CredentialListItem } from "./CredentialListItem";
@@ -34,6 +37,30 @@ import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Host } from "../types";
+
+type LayoutMode = "grid" | "list";
+type SortMode = "last_connected" | "a_z" | "z_a";
+
+function applySorting<T extends { name: string; last_connected_at?: number; created_at: number }>(
+  items: T[],
+  mode: SortMode,
+): T[] {
+  if (mode === "a_z") return [...items].sort((a, b) => a.name.localeCompare(b.name));
+  if (mode === "z_a") return [...items].sort((a, b) => b.name.localeCompare(a.name));
+  return [...items].sort((a, b) => {
+    const ta = a.last_connected_at ?? 0;
+    const tb = b.last_connected_at ?? 0;
+    if (ta !== tb) return tb - ta;
+    return b.created_at - a.created_at;
+  });
+}
+
+function applyHostSorting(hosts: Host[], mode: SortMode): Host[] {
+  // Pin-to-top always wins — sort within each group separately, then concat
+  const pinned = hosts.filter((h) => h.pin_to_top);
+  const rest = hosts.filter((h) => !h.pin_to_top);
+  return [...applySorting(pinned, mode), ...applySorting(rest, mode)];
+}
 
 function SkeletonCard() {
   return (
@@ -49,6 +76,19 @@ function SkeletonCard() {
         <div className="h-5 w-10 rounded bg-muted" />
         <div className="h-5 w-16 rounded bg-muted" />
       </div>
+    </div>
+  );
+}
+
+function SkeletonListRow() {
+  return (
+    <div className="animate-pulse flex items-center gap-3 px-4 py-3 border-b border-border/40 last:border-0">
+      <div className="h-8 w-8 rounded-lg bg-muted shrink-0" />
+      <div className="flex-1 space-y-1.5">
+        <div className="h-3 w-1/3 rounded bg-muted" />
+        <div className="h-2.5 w-1/2 rounded bg-muted" />
+      </div>
+      <div className="h-3 w-16 rounded bg-muted shrink-0" />
     </div>
   );
 }
@@ -89,9 +129,10 @@ interface SortableHostCardProps {
   newSftpTab: ConnectFn;
   tabs: Tab[];
   pingStatus?: "online" | "offline" | "checking";
+  layoutMode: LayoutMode;
 }
 
-function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, tabs, pingStatus }: SortableHostCardProps) {
+function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, tabs, pingStatus, layoutMode }: SortableHostCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: host.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -100,24 +141,46 @@ function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit,
   };
   return (
     <div ref={setNodeRef} style={style}>
-      <HostCard
-        host={host}
-        isSelected={isSelected}
-        isMultiSelected={isMultiSelected}
-        onSelect={onSelect}
-        onEdit={onEdit}
-        group={group}
-        dragHandleProps={{ ...attributes, ...listeners }}
-        newSshTab={newSshTab}
-        newSftpTab={newSftpTab}
-        tabs={tabs}
-        pingStatus={pingStatus}
-      />
+      {layoutMode === "list" ? (
+        <HostListItem
+          host={host}
+          isSelected={isSelected}
+          isMultiSelected={isMultiSelected}
+          onSelect={onSelect}
+          onEdit={onEdit}
+          group={group}
+          dragHandleProps={{ ...attributes, ...listeners }}
+          newSshTab={newSshTab}
+          newSftpTab={newSftpTab}
+          tabs={tabs}
+          pingStatus={pingStatus}
+        />
+      ) : (
+        <HostCard
+          host={host}
+          isSelected={isSelected}
+          isMultiSelected={isMultiSelected}
+          onSelect={onSelect}
+          onEdit={onEdit}
+          group={group}
+          dragHandleProps={{ ...attributes, ...listeners }}
+          newSshTab={newSshTab}
+          newSftpTab={newSftpTab}
+          tabs={tabs}
+          pingStatus={pingStatus}
+        />
+      )}
     </div>
   );
 }
 
 const AUTO_REFRESH_MS = 30_000;
+
+const SORT_LABELS: Record<SortMode, string> = {
+  last_connected: "Last Connected",
+  a_z: "A–Z",
+  z_a: "Z–A",
+};
 
 export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: { newSshTab: ConnectFn; newQuickSshTab: QuickConnectFn; newSftpTab: ConnectFn; tabs: Tab[] }) {
   const hosts = useHostsStore((s) => s.hosts);
@@ -151,6 +214,23 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
   const [addingGroup, setAddingGroup] = useState(false);
   const [groupName, setGroupName] = useState("");
   const groupInputRef = useRef<HTMLInputElement>(null);
+
+  // Layout and sort preferences — persisted in localStorage
+  const [layoutMode, setLayoutModeState] = useState<LayoutMode>(
+    () => (localStorage.getItem("hm_layout") as LayoutMode) ?? "grid"
+  );
+  const [sortMode, setSortModeState] = useState<SortMode>(
+    () => (localStorage.getItem("hm_sort") as SortMode) ?? "last_connected"
+  );
+
+  const setLayoutMode = (m: LayoutMode) => {
+    setLayoutModeState(m);
+    localStorage.setItem("hm_layout", m);
+  };
+  const setSortMode = (m: SortMode) => {
+    setSortModeState(m);
+    localStorage.setItem("hm_sort", m);
+  };
 
   // Local ordered list for dnd (mirrors store but allows optimistic reorder)
   const [localHosts, setLocalHosts] = useState<Host[]>([]);
@@ -198,6 +278,11 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
     return list;
   }, [localHosts, activeGroupId, search]);
 
+  const sortedHosts = useMemo(
+    () => applyHostSorting(filteredHosts, sortMode),
+    [filteredHosts, sortMode],
+  );
+
   const filteredCredentials = useMemo(() => {
     if (!search.trim()) return credentials;
     const q = search.toLowerCase();
@@ -205,6 +290,11 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
       (c) => c.name.toLowerCase().includes(q) || c.cred_type.includes(q)
     );
   }, [credentials, search]);
+
+  const sortedCredentials = useMemo(
+    () => applySorting(filteredCredentials, sortMode),
+    [filteredCredentials, sortMode],
+  );
 
   const quickConnectMatch = useMemo(() => {
     const q = search.trim();
@@ -230,6 +320,8 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
   );
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    // DnD only works in last_connected (natural) order — ignore drags when sorted
+    if (sortMode !== "last_connected") return;
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const oldIndex = localHosts.findIndex((h) => h.id === active.id);
@@ -255,13 +347,19 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
     }
   };
 
+  const dndDisabled = sortMode !== "last_connected";
+
+  // Prevents Radix from stealing focus back to the trigger after "New Group" is clicked,
+  // which would immediately fire onBlur on the group input and hide it.
+  const suppressDropdownFocusReturn = useRef(false);
+
   return (
     <div className="flex h-full w-full overflow-hidden">
       {/* LEFT MASTER PANE */}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-        {/* Toolbar */}
-        <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-          {/* Universal search */}
+
+        {/* ── Row 1: Search ── */}
+        <div className="flex items-center gap-2 px-4 pt-2.5 pb-2">
           <div className="relative flex-1">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -277,8 +375,142 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+        </div>
 
-          {/* View toggle */}
+        {/* ── Row 2: Actions toolbar ── */}
+        <div className="flex items-center gap-2 border-b border-border px-4 pb-2.5">
+          {/* Split NEW button — dropdown includes New Group */}
+          <div className="flex shrink-0">
+            <Button
+              size="sm"
+              className="h-8 rounded-l-2xl rounded-r-none border-r border-primary-foreground/20 text-xs px-3"
+              onClick={() => {
+                if (viewMode === "hosts") setSelectedHost("__new__");
+                else setSelectedCredential("__new__");
+              }}
+            >
+              {viewMode === "hosts" ? "NEW HOST" : "NEW CREDENTIAL"}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="h-8 rounded-l-none rounded-r-2xl px-2 text-xs">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                onCloseAutoFocus={(e) => {
+                  if (suppressDropdownFocusReturn.current) {
+                    suppressDropdownFocusReturn.current = false;
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <DropdownMenuItem onClick={() => { setViewMode("hosts"); setSelectedHost("__new__"); }}>
+                  New Host
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setViewMode("credentials"); setSelectedCredential("__new__"); }}>
+                  New Credential
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={viewMode === "credentials"}
+                  onClick={() => {
+                    suppressDropdownFocusReturn.current = true;
+                    setAddingGroup(true);
+                  }}
+                >
+                  New Group
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Spacer — pushes layout, sort, and view toggle to the right */}
+          <div className="flex-1" />
+
+          {/* Layout toggle: Grid / List */}
+          <div className="flex rounded-lg border border-input overflow-hidden shrink-0">
+            <button
+              onClick={() => setLayoutMode("grid")}
+              title="Grid view"
+              className={cn(
+                "flex items-center justify-center px-2 h-8 transition-colors",
+                layoutMode === "grid"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent"
+              )}
+            >
+              {/* Grid icon */}
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+                <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setLayoutMode("list")}
+              title="List view"
+              className={cn(
+                "flex items-center justify-center px-2 h-8 transition-colors",
+                layoutMode === "list"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent",
+                viewMode === "credentials" && "opacity-40 cursor-not-allowed pointer-events-none"
+              )}
+              disabled={viewMode === "credentials"}
+            >
+              {/* List icon */}
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M1 3h12M1 7h12M1 11h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Sort dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 px-2.5 text-xs rounded-2xl gap-1.5 shrink-0"
+              >
+                {/* Sort icon */}
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M1 3h10M3 6h6M5 9h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+                {SORT_LABELS[sortMode]}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setSortMode("last_connected")}>
+                <span className="flex items-center gap-2">
+                  {sortMode === "last_connected" && <span className="text-primary">✓</span>}
+                  {sortMode !== "last_connected" && <span className="w-3" />}
+                  Last Connected
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortMode("a_z")}>
+                <span className="flex items-center gap-2">
+                  {sortMode === "a_z" && <span className="text-primary">✓</span>}
+                  {sortMode !== "a_z" && <span className="w-3" />}
+                  A–Z
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setSortMode("z_a")}>
+                <span className="flex items-center gap-2">
+                  {sortMode === "z_a" && <span className="text-primary">✓</span>}
+                  {sortMode !== "z_a" && <span className="w-3" />}
+                  Z–A
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* View toggle: Hosts / Credentials — right side */}
           <div className="flex rounded-2xl border border-input overflow-hidden shrink-0">
             {(["hosts", "credentials"] as const).map((v) => (
               <button
@@ -300,48 +532,6 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
               </button>
             ))}
           </div>
-
-          {/* Split New button */}
-          <div className="flex shrink-0">
-            <Button
-              size="sm"
-              className="h-8 rounded-l-2xl rounded-r-none border-r border-primary-foreground/20 text-xs px-3"
-              onClick={() => {
-                if (viewMode === "hosts") setSelectedHost("__new__");
-                else setSelectedCredential("__new__");
-              }}
-            >
-              {viewMode === "hosts" ? "NEW HOST" : "NEW CREDENTIAL"}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" className="h-8 rounded-l-none rounded-r-2xl px-2 text-xs">
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => { setViewMode("hosts"); setSelectedHost("__new__"); }}>
-                  New Host
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setViewMode("credentials"); setSelectedCredential("__new__"); }}>
-                  New Credential
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Group button — always visible, disabled in credentials view */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 px-3 text-xs shrink-0 rounded-2xl"
-            disabled={viewMode === "credentials"}
-            onClick={() => setAddingGroup(true)}
-          >
-            + Group
-          </Button>
         </div>
 
         {/* Error banner */}
@@ -390,7 +580,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
           </div>
         )}
 
-        {/* Main content — switches between hosts grid and credentials list */}
+        {/* Main content */}
         <div className="flex-1 overflow-y-auto p-4">
           {viewMode === "hosts" ? (
             <>
@@ -420,35 +610,74 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
               )}
 
               {!hasFetched || isLoading ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
-                </div>
-              ) : filteredHosts.length === 0 && !search && !activeGroupId ? (
+                layoutMode === "list" ? (
+                  <div className="flex flex-col rounded-xl border border-border overflow-hidden">
+                    {[...Array(4)].map((_, i) => <SkeletonListRow key={i} />)}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
+                  </div>
+                )
+              ) : sortedHosts.length === 0 && !search && !activeGroupId ? (
                 <EmptyState onNew={() => setSelectedHost("__new__")} />
-              ) : filteredHosts.length === 0 && !quickConnectMatch ? (
+              ) : sortedHosts.length === 0 && !quickConnectMatch ? (
                 <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
                   No hosts match your search
                 </div>
-              ) : filteredHosts.length > 0 ? (
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={filteredHosts.map((h) => h.id)} strategy={rectSortingStrategy}>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {filteredHosts.map((host) => (
-                        <SortableHostCard
-                          key={host.id}
-                          host={host}
-                          isSelected={selectedHostId === host.id}
-                          isMultiSelected={selectedHostIds.has(host.id)}
-                          onSelect={handleCardSelect(host)}
-                          onEdit={() => setSelectedHost(host.id)}
-                          group={groups.find((g) => g.id === host.group_id)}
-                          newSshTab={newSshTab}
-                          newSftpTab={newSftpTab}
-                          tabs={tabs}
-                          pingStatus={hostStatuses[host.id]}
-                        />
-                      ))}
-                    </div>
+              ) : sortedHosts.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={sortedHosts.map((h) => h.id)}
+                    strategy={layoutMode === "list" ? verticalListSortingStrategy : rectSortingStrategy}
+                  >
+                    {layoutMode === "list" ? (
+                      <div className={cn(
+                        "flex flex-col rounded-xl border border-border overflow-hidden",
+                        dndDisabled && "opacity-[0.99]" // no-op class to keep structure
+                      )}>
+                        {sortedHosts.map((host) => (
+                          <div key={host.id} className="border-b border-border/40 last:border-0">
+                            <SortableHostCard
+                              host={host}
+                              isSelected={selectedHostId === host.id}
+                              isMultiSelected={selectedHostIds.has(host.id)}
+                              onSelect={handleCardSelect(host)}
+                              onEdit={() => setSelectedHost(host.id)}
+                              group={groups.find((g) => g.id === host.group_id)}
+                              newSshTab={newSshTab}
+                              newSftpTab={newSftpTab}
+                              tabs={tabs}
+                              pingStatus={hostStatuses[host.id]}
+                              layoutMode={layoutMode}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {sortedHosts.map((host) => (
+                          <SortableHostCard
+                            key={host.id}
+                            host={host}
+                            isSelected={selectedHostId === host.id}
+                            isMultiSelected={selectedHostIds.has(host.id)}
+                            onSelect={handleCardSelect(host)}
+                            onEdit={() => setSelectedHost(host.id)}
+                            group={groups.find((g) => g.id === host.group_id)}
+                            newSshTab={newSshTab}
+                            newSftpTab={newSftpTab}
+                            tabs={tabs}
+                            pingStatus={hostStatuses[host.id]}
+                            layoutMode={layoutMode}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </SortableContext>
                 </DndContext>
               ) : null}
@@ -485,7 +714,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
                 </div>
               ) : (
                 <div className="divide-y divide-border rounded-lg border border-border overflow-hidden">
-                  {filteredCredentials.map((cred) => (
+                  {sortedCredentials.map((cred) => (
                     <CredentialListItem
                       key={cred.id}
                       credential={cred}
