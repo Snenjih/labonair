@@ -228,6 +228,7 @@ export function useTerminalSession({
       // a multi-byte UTF-8 codepoint between unrelated streams.
       const urlDecoder = new TextDecoder("utf-8", { fatal: false });
 
+      const shellPref = usePreferencesStore.getState().terminalShell;
       const pty = await openPty(
         term.cols,
         term.rows,
@@ -256,6 +257,7 @@ export function useTerminalSession({
           },
         },
         initialCwd,
+        shellPref || undefined,
       );
       if (disposed) {
         pty.close();

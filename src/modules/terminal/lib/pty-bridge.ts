@@ -28,6 +28,7 @@ export async function openPty(
   rows: number,
   handlers: PtyHandlers,
   cwd?: string,
+  shell?: string,
 ): Promise<PtySession> {
   const channel = new Channel<PtyEvent>();
   channel.onmessage = (event) => {
@@ -45,6 +46,7 @@ export async function openPty(
     cols,
     rows,
     cwd: cwd ?? null,
+    shell: shell && shell.trim() !== "" ? shell.trim() : null,
     onEvent: channel,
   });
 

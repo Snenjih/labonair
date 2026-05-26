@@ -49,10 +49,31 @@ impl Shell {
         };
         (shell, path)
     }
+
+    fn from_path(path: &str) -> Shell {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        match name {
+            "zsh" => Shell::Zsh,
+            "bash" => Shell::Bash,
+            _ => Shell::Other,
+        }
+    }
 }
 
-pub fn build_command(cwd: Option<String>) -> Result<CommandBuilder, String> {
-    let (shell, shell_path) = Shell::detect();
+pub fn build_command(cwd: Option<String>, shell_override: Option<String>) -> Result<CommandBuilder, String> {
+    let (shell, shell_path) = match shell_override {
+        Some(ref p) if !p.trim().is_empty() => {
+            let trimmed = p.trim().to_string();
+            if std::path::Path::new(&trimmed).exists() {
+                let kind = Shell::from_path(&trimmed);
+                (kind, trimmed)
+            } else {
+                log::warn!("configured shell '{trimmed}' not found on disk, falling back to auto-detection");
+                Shell::detect()
+            }
+        }
+        _ => Shell::detect(),
+    };
     let mut cmd = CommandBuilder::new(&shell_path);
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");

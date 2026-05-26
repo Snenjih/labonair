@@ -26,6 +26,7 @@ import {
   setTerminalWordSeparator,
   setTerminalScrollSensitivity,
   setTerminalFastScrollModifier,
+  setTerminalShell,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -48,6 +49,7 @@ export function TerminalSection() {
   const terminalWordSeparator = usePreferencesStore((s) => s.terminalWordSeparator);
   const terminalScrollSensitivity = usePreferencesStore((s) => s.terminalScrollSensitivity);
   const terminalFastScrollModifier = usePreferencesStore((s) => s.terminalFastScrollModifier);
+  const terminalShell = usePreferencesStore((s) => s.terminalShell);
 
   return (
     <div className="flex flex-col gap-6">
@@ -55,6 +57,21 @@ export function TerminalSection() {
         title="Terminal"
         description="Font, cursor, and display settings for the terminal emulator."
       />
+
+      <div className="flex flex-col gap-2">
+        <Label>Shell</Label>
+        <SettingRow
+          title="Shell path"
+          description="Full path to the shell binary. Leave empty to use the system default ($SHELL). Applies to new terminal sessions."
+        >
+          <Input
+            value={terminalShell}
+            onChange={(e) => void setTerminalShell(e.target.value)}
+            placeholder="Auto-detect (e.g. /bin/zsh)"
+            className="h-7 w-52 font-mono text-[11.5px]"
+          />
+        </SettingRow>
+      </div>
 
       <div className="flex flex-col gap-2">
         <Label>Font</Label>

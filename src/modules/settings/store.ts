@@ -64,6 +64,7 @@ export type Preferences = {
   appLineHeight: number;
 
   // --- Terminal ---
+  terminalShell: string;
   terminalCursorBlink: boolean;
   terminalCursorStyle: "block" | "underline" | "bar";
   terminalFontFamily: string;
@@ -174,6 +175,7 @@ const KEY_APP_FONT_FAMILY = "appFontFamily";
 const KEY_APP_FONT_SIZE = "appFontSize";
 const KEY_APP_LINE_HEIGHT = "appLineHeight";
 
+const KEY_TERMINAL_SHELL = "terminalShell";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
 const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
@@ -262,6 +264,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   appFontSize: 13,
   appLineHeight: 1.5,
 
+  terminalShell: "",
   terminalCursorBlink: true,
   terminalCursorStyle: "bar",
   terminalFontFamily: '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
@@ -397,6 +400,8 @@ export async function loadPreferences(): Promise<Preferences> {
     appLineHeight:
       get<number>(KEY_APP_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.appLineHeight,
 
+    terminalShell:
+      get<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
     terminalCursorBlink:
       get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
       DEFAULT_PREFERENCES.terminalCursorBlink,
@@ -723,6 +728,11 @@ export async function setTerminalBell(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setTerminalShell(value: string): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_SHELL, value);
+  await (await getStore()).save();
+}
+
 export async function setEditorFontSize(value: number): Promise<void> {
   await (await getStore()).set(KEY_EDITOR_FONT_SIZE, value);
   await (await getStore()).save();
@@ -1006,6 +1016,7 @@ export async function onPreferencesChange(
     [KEY_APP_FONT_SIZE]: "appFontSize",
     [KEY_APP_LINE_HEIGHT]: "appLineHeight",
 
+    [KEY_TERMINAL_SHELL]: "terminalShell",
     [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
     [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
     [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
