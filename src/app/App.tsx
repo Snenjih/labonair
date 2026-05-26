@@ -1269,7 +1269,7 @@ export default function App() {
                     <div
                       className={cn(
                         "absolute inset-0 px-3 pt-2 pb-2",
-                        isEditorTab ? "z-10" : "z-0 invisible pointer-events-none",
+                        isEditorTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
                       )}
                       aria-hidden={!isEditorTab}
                     >
@@ -1285,7 +1285,7 @@ export default function App() {
                     <div
                       className={cn(
                         "absolute inset-0 px-3 pt-2 pb-2",
-                        isPreviewTab ? "z-10" : "z-0 invisible pointer-events-none",
+                        isPreviewTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
                       )}
                       aria-hidden={!isPreviewTab}
                     >
@@ -1299,7 +1299,7 @@ export default function App() {
                     <div
                       className={cn(
                         "absolute inset-0 px-3 pt-2 pb-2",
-                        isAiDiffTab ? "z-10" : "z-0 invisible pointer-events-none",
+                        isAiDiffTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
                       )}
                       aria-hidden={!isAiDiffTab}
                     >
@@ -1313,7 +1313,7 @@ export default function App() {
                     <div
                       className={cn(
                         "absolute inset-0",
-                        isHomeTab ? "z-10" : "z-0 invisible pointer-events-none",
+                        isHomeTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
                       )}
                       aria-hidden={!isHomeTab}
                     >
@@ -1329,7 +1329,7 @@ export default function App() {
                         key={t.id}
                         className={cn(
                           "absolute inset-0",
-                          activeId === t.id ? "z-10" : "z-0 invisible pointer-events-none",
+                          activeId === t.id ? "z-10" : "z-0 opacity-0 pointer-events-none",
                         )}
                         aria-hidden={activeId !== t.id}
                       >
