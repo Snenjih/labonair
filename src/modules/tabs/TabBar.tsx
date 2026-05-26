@@ -112,9 +112,19 @@ export function TabBar({
                   <TabsTrigger
                     value={String(t.id)}
                     data-tab-id={t.id}
+                    onAuxClick={(e) => {
+                      if (e.button === 1 && tabs.length > 1) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onClose(t.id);
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      if (e.button === 1) e.preventDefault();
+                    }}
                     className={cn(
                       "group h-7 shrink-0 gap-1.5 rounded-xl text-xs text-muted-foreground transition-colors data-[state=active]:bg-accent data-[state=active]:text-foreground hover:bg-accent/60 hover:text-foreground justify-between",
-                      compact ? "px-1.5!" : "ps-2! pe-1!"
+                      compact ? "px-1.5!" : "ps-2! pe-1!",
                     )}
                   >
                     <span
@@ -204,7 +214,11 @@ export function TabBar({
             <DropdownMenuSeparator />
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <HugeiconsIcon icon={ComputerTerminal02Icon} size={14} strokeWidth={1.75} />
+                <HugeiconsIcon
+                  icon={ComputerTerminal02Icon}
+                  size={14}
+                  strokeWidth={1.75}
+                />
                 <span className="flex-1">SSH</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="min-w-48">
@@ -233,7 +247,11 @@ export function TabBar({
             </DropdownMenuSub>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
-                <HugeiconsIcon icon={CloudServerIcon} size={14} strokeWidth={1.75} />
+                <HugeiconsIcon
+                  icon={CloudServerIcon}
+                  size={14}
+                  strokeWidth={1.75}
+                />
                 <span className="flex-1">SFTP</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="min-w-48">
@@ -315,7 +333,10 @@ function TabIcon({ tab, active }: { tab: Tab; active: boolean }) {
   if (tab.kind === "workspace") {
     const wt = tab as WorkspaceTab;
     const activeSession = wt.sessions[wt.activePaneId];
-    const icon = activeSession?.kind === "ssh" ? ComputerTerminal02Icon : ComputerTerminal02Icon;
+    const icon =
+      activeSession?.kind === "ssh"
+        ? ComputerTerminal02Icon
+        : ComputerTerminal02Icon;
     return (
       <HugeiconsIcon
         icon={icon}
