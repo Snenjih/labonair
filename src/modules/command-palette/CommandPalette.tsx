@@ -59,6 +59,7 @@ export function CommandPalette({
   const [pages, setPages] = useState<string[]>(["root"]);
   const [search, setSearch] = useState("");
   const [slideDir, setSlideDir] = useState<"forward" | "back">("forward");
+  const [highlightedValue, setHighlightedValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const prevOpenRef = useRef(false);
 
@@ -71,20 +72,25 @@ export function CommandPalette({
     setSlideDir("forward");
     setPages((prev) => [...prev, pageId]);
     setSearch("");
+    setHighlightedValue("");
   }, []);
 
   const goBack = useCallback(() => {
     if (pages.length <= 1) return;
+    currentPage?.onLeave?.();
     setSlideDir("back");
     setPages((prev) => prev.slice(0, -1));
     setSearch("");
-  }, [pages.length]);
+    setHighlightedValue("");
+  }, [pages.length, currentPage]);
 
   const handleClose = useCallback(() => {
+    currentPage?.onLeave?.();
     close();
     setPages(["root"]);
     setSearch("");
-  }, [close]);
+    setHighlightedValue("");
+  }, [close, currentPage]);
 
   useEffect(() => {
     if (!prevOpenRef.current && isOpen) {
@@ -147,6 +153,20 @@ export function CommandPalette({
     [currentPage],
   );
 
+  const actionByValue = useMemo(() => {
+    const map = new Map<string, CommandAction>();
+    for (const action of currentPage?.actions ?? []) {
+      map.set(`${action.title} ${action.subtitle ?? ""} ${action.section}`.trim(), action);
+    }
+    return map;
+  }, [currentPage]);
+
+  const handleValueChange = useCallback((value: string) => {
+    setHighlightedValue(value);
+    const action = actionByValue.get(value);
+    action?.onPreview?.();
+  }, [actionByValue]);
+
   const recentActions = useMemo(() => {
     if (search || activePage !== "root") return [];
     const allRootActions = registry["root"]?.actions ?? [];
@@ -201,6 +221,8 @@ export function CommandPalette({
 
           <CommandPrimitive
             shouldFilter={true}
+            value={highlightedValue}
+            onValueChange={handleValueChange}
             filter={(value: string, search: string) => {
               if (!search) return 1;
               const v = value.toLowerCase();

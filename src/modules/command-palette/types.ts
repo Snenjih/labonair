@@ -14,12 +14,14 @@ export type CommandAction = {
   perform?: () => void;
   subPageId?: string;
   rightLabel?: string;
+  onPreview?: () => void;
 };
 
 export type CommandPage = {
   id: string;
   searchPlaceholder: string;
   actions: CommandAction[];
+  onLeave?: () => void;
 };
 
 export type TabEntry = {

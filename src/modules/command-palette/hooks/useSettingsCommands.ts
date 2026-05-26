@@ -27,6 +27,7 @@ import {
   type ThemePref,
 } from "@/modules/settings/store";
 import type { CommandAction, CommandPage } from "../types";
+import { applyThemeColors, revertThemeColors } from "@/lib/useThemeEngine";
 import type { ThemeMeta } from "@/lib/useThemeEngine";
 
 function toggle(label: boolean | undefined): string {
@@ -63,6 +64,15 @@ export function useSettingsCommands(): {
 
   // ─── Theme pages ──────────────────────────────────────────────────────────
 
+  function revertToSavedTheme() {
+    if (appTheme === "default") {
+      revertThemeColors();
+    } else {
+      const saved = themes.find((t) => t.id === appTheme);
+      if (saved) applyThemeColors(saved);
+    }
+  }
+
   const themeActions: CommandAction[] = [
     {
       id: "theme.default",
@@ -70,6 +80,7 @@ export function useSettingsCommands(): {
       section: "App Themes",
       rightLabel: appTheme === "default" ? "active" : undefined,
       icon: createElement(HugeiconsIcon, { icon: Settings01Icon, strokeWidth: 2, className: "size-4" }),
+      onPreview: () => revertThemeColors(),
       perform: () => void setAppTheme("default"),
     },
     ...themes.map((t) => ({
@@ -79,6 +90,7 @@ export function useSettingsCommands(): {
       section: t.type === "dark" ? "Dark Themes" : "Light Themes",
       rightLabel: appTheme === t.id ? "active" : undefined,
       icon: createElement(HugeiconsIcon, { icon: Settings01Icon, strokeWidth: 2, className: "size-4" }),
+      onPreview: () => applyThemeColors(t),
       perform: () => void setAppTheme(t.id),
     })),
   ];
@@ -237,7 +249,7 @@ export function useSettingsCommands(): {
 
   return {
     rootActions,
-    themesPage: { id: "themes", searchPlaceholder: "Search themes...", actions: themeActions },
+    themesPage: { id: "themes", searchPlaceholder: "Search themes...", actions: themeActions, onLeave: revertToSavedTheme },
     appModePage: { id: "mode", searchPlaceholder: "Search color modes...", actions: appModeActions },
     editorThemePage,
   };
