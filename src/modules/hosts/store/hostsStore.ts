@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import type { CreateHostPayload, Group, Host, ReorderItem, UpdateHostPayload } from "../types";
@@ -107,6 +108,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       ]);
       set({ hosts, groups, isLoading: false, hasFetched: true, fetchError: null });
     } catch (e) {
+      handleApiError(e, "Failed to load hosts", "Hosts");
       const msg = e instanceof Error ? e.message : String(e);
       set({ isLoading: false, hasFetched: true, fetchError: msg });
     }

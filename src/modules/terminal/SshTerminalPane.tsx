@@ -1,4 +1,5 @@
 import { buildTerminalTheme } from "@/styles/terminalTheme";
+import { handleApiError } from "@/lib/errors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import type { TerminalSessionData } from "@/modules/tabs";
@@ -363,7 +364,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         const search = new SearchAddon();
         searchRef.current = search;
         t.loadAddon(search);
-        t.loadAddon(new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)));
+        t.loadAddon(new WebLinksAddon((_e, uri) => openUrl(uri).catch((e) => handleApiError(e, "Failed to open URL", "SSH"))));
         t.open(containerRef.current);
         fit.fit();
         // estCols/estRows are rough pixel estimates; send the real dimensions

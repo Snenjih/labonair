@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import type { FileNode } from "../types";
@@ -118,6 +119,7 @@ export const useSftpStore = create<SftpStore>((set) => ({
         },
       }));
     } catch (e) {
+      handleApiError(e, "Failed to load local directory", "SFTP");
       set((s) => ({
         tabs: {
           ...s.tabs,
@@ -152,6 +154,7 @@ export const useSftpStore = create<SftpStore>((set) => ({
         },
       }));
     } catch (e) {
+      handleApiError(e, "Failed to load remote directory", "SFTP");
       set((s) => ({
         tabs: {
           ...s.tabs,

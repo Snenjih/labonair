@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { handleApiError } from "@/lib/errors";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { useHostsStore } from "../store/hostsStore";
@@ -140,6 +141,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
       setSelectedCredential(newCred.id);
     } catch (e) {
       setError(String(e));
+      handleApiError(e, "Failed to create credential", "Hosts");
     } finally {
       setSubmitting(false);
     }
@@ -168,6 +170,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
       setForm((d) => ({ ...d, key_path: result.key_path, public_key: result.public_key }));
     } catch (e) {
       setError(String(e));
+      handleApiError(e, "Failed to generate keypair", "Hosts");
     } finally {
       setGenerating(false);
     }

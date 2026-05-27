@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import type { FileNode } from "../types";
@@ -117,6 +118,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
       setCalculatedSize(size);
     } catch (e) {
       setSizeError(String(e));
+      handleApiError(e, "Failed to calculate size", "SFTP");
     } finally {
       setIsCalculating(false);
     }
@@ -143,6 +145,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
       setApplySuccess(true);
     } catch (e) {
       setApplyError(String(e));
+      handleApiError(e, "Failed to apply permissions", "SFTP");
     } finally {
       setIsApplying(false);
     }

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { handleApiError } from "@/lib/errors";
 import type { QuickConnectParams } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -177,12 +178,12 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
             service: "nexum-app",
             account: hostId,
             password: pendingPasswordRef.current,
-          }).catch(console.error);
+          }).catch((e) => handleApiError(e, "Failed to save credentials", "SSH"));
           pendingPasswordRef.current = null;
         }
         // Start tunnels on a dedicated background SSH connection (non-blocking).
         if (hostId) {
-          invoke("ssh_start_tunnels", { hostId }).catch(console.error);
+          invoke("ssh_start_tunnels", { hostId }).catch((e) => handleApiError(e, "Failed to start SSH tunnels", "SSH"));
         }
         onConnected();
       }),
@@ -360,7 +361,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
               <button
                 onClick={() => {
                   setStatus("connecting");
-                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: true }).catch(console.error);
+                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: true }).catch((e) => handleApiError(e, "Failed to trust host key", "SSH"));
                 }}
                 className={cn(
                   "flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-opacity",
@@ -373,7 +374,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
               </button>
               <button
                 onClick={() => {
-                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: false }).catch(console.error);
+                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: false }).catch((e) => handleApiError(e, "Failed to abort host trust", "SSH"));
                   onError("User aborted");
                 }}
                 className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"

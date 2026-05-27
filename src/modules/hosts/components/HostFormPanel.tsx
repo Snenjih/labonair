@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHostsStore } from "../store/hostsStore";
@@ -207,6 +208,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
       setSelectedHost(newHost.id);
     } catch (e) {
       setError(String(e));
+      handleApiError(e, "Failed to save host", "Hosts");
     } finally {
       setSubmitting(false);
     }
