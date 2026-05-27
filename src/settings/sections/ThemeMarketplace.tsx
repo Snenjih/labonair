@@ -4,15 +4,17 @@ import { useThemeStore } from "@/modules/settings/useThemeStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { AlertCircleIcon, GithubIcon, Upload02Icon } from "@hugeicons/core-free-icons";
+import { emit } from "@tauri-apps/api/event";
+import { Add01Icon, AlertCircleIcon, Cancel01Icon, GithubIcon, Tick02Icon, Upload02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ThemeCard } from "../components/ThemeCard";
 import { Button } from "@/components/ui/button";
 
-type TabId = "all" | "installed" | "community";
+type TabId = "installed" | "community";
 
 const DEFAULT_META: ThemeMeta = {
   id: "default",
@@ -33,15 +35,21 @@ export function ThemeMarketplace() {
     fetchCommunity,
     cancelPreview,
     previewThemeId,
+    createTheme,
   } = useThemeStore();
 
   const savedTheme = usePreferencesStore((s) => s.appTheme);
-  const [tab, setTab] = useState<TabId>("all");
+  const [tab, setTab] = useState<TabId>("installed");
   const [search, setSearch] = useState("");
   const savedThemeRef = useRef(savedTheme);
   savedThemeRef.current = savedTheme;
   const previewRef = useRef(previewThemeId);
   previewRef.current = previewThemeId;
+
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  const [creatorName, setCreatorName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const creatorInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void fetchInstalled();
@@ -71,6 +79,33 @@ export function ThemeMarketplace() {
     }
   };
 
+  const handleOpenCreator = () => {
+    setCreatorOpen(true);
+    setTimeout(() => creatorInputRef.current?.focus(), 50);
+  };
+
+  const handleCancelCreate = () => {
+    setCreatorOpen(false);
+    setCreatorName("");
+  };
+
+  const handleCreate = async () => {
+    const trimmed = creatorName.trim();
+    if (!trimmed) return;
+    setIsCreating(true);
+    try {
+      const filePath = await createTheme(trimmed);
+      setCreatorOpen(false);
+      setCreatorName("");
+      setTab("installed");
+      await emit("nexum:open-file", { path: filePath });
+    } catch (e) {
+      console.error("Theme creation failed:", e);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const q = search.trim().toLowerCase();
 
   // Build the "installed" list: default + user themes
@@ -93,23 +128,6 @@ export function ThemeMarketplace() {
         r.name.toLowerCase().includes(q) ||
         r.author.toLowerCase().includes(q) ||
         r.description.toLowerCase().includes(q)),
-  );
-
-  // "All" tab merges installed + community-only-entries
-  const communityInstalled = communityThemes
-    .filter((r) => installedIds.has(r.id))
-    .map((r) => installedThemes.find((t) => t.id === r.id)!)
-    .filter(Boolean);
-
-  const allTabThemes: ThemeMeta[] = [
-    DEFAULT_META,
-    ...installedThemes.filter((t) => !communityInstalled.some((c) => c.id === t.id)),
-    ...communityInstalled,
-  ].filter(
-    (t) =>
-      !q ||
-      t.name.toLowerCase().includes(q) ||
-      t.author.toLowerCase().includes(q),
   );
 
   return (
@@ -141,8 +159,65 @@ export function ThemeMarketplace() {
             <HugeiconsIcon icon={Upload02Icon} size={12} strokeWidth={2} />
             Import JSON
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2.5 text-[11.5px]"
+            onClick={handleOpenCreator}
+          >
+            <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={2} />
+            New Theme
+          </Button>
         </div>
       </div>
+
+      {/* Inline theme creator */}
+      <AnimatePresence>
+        {creatorOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-accent/30 px-3 py-2">
+              <span className="shrink-0 text-[12px] text-muted-foreground">Theme name</span>
+              <input
+                ref={creatorInputRef}
+                value={creatorName}
+                onChange={(e) => setCreatorName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleCreate();
+                  if (e.key === "Escape") handleCancelCreate();
+                }}
+                placeholder="My Theme"
+                className="min-w-0 flex-1 bg-transparent text-[12.5px] text-foreground placeholder:text-muted-foreground/50 outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleCancelCreate}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+              </button>
+              <Button
+                size="sm"
+                className="h-6 shrink-0 gap-1 px-2.5 text-[11.5px]"
+                disabled={!creatorName.trim() || isCreating}
+                onClick={() => void handleCreate()}
+              >
+                {isCreating ? (
+                  <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+                ) : (
+                  <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} />
+                )}
+                Create
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Search */}
       <Input
@@ -155,7 +230,7 @@ export function ThemeMarketplace() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-border/40 pb-0">
-        {(["all", "installed", "community"] as TabId[]).map((t) => (
+        {(["installed", "community"] as TabId[]).map((t) => (
           <button
             key={t}
             type="button"
@@ -173,7 +248,7 @@ export function ThemeMarketplace() {
       </div>
 
       {/* Error banner */}
-      {communityError && (tab === "community" || tab === "all") && (
+      {communityError && tab === "community" && (
         <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-[11.5px] text-destructive">
           <HugeiconsIcon icon={AlertCircleIcon} size={13} strokeWidth={2} />
           {communityError}
@@ -182,26 +257,6 @@ export function ThemeMarketplace() {
 
       {/* Content */}
       <div className="flex flex-col gap-1">
-        {tab === "all" && (
-          <>
-            {allTabThemes.map((t) => (
-              <ThemeCard
-                key={t.id}
-                kind="installed"
-                meta={t}
-                isBuiltin={t.id === "default"}
-              />
-            ))}
-            {communityOnly.map((r) => (
-              <ThemeCard key={r.id} kind="community" remote={r} />
-            ))}
-            {isLoadingCommunity && <LoadingRow />}
-            {!isLoadingCommunity && allTabThemes.length === 0 && communityOnly.length === 0 && (
-              <EmptyState query={q} />
-            )}
-          </>
-        )}
-
         {tab === "installed" && (
           <>
             {filteredInstalled.map((t) => (

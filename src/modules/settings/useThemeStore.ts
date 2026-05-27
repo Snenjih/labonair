@@ -64,6 +64,7 @@ type ThemeStore = {
   applyTheme: (id: string) => Promise<void>;
   previewTheme: (meta: ThemeMeta | null) => void;
   cancelPreview: () => void;
+  createTheme: (name: string) => Promise<string>;
 };
 
 export const useThemeStore = create<ThemeStore>((set, get) => ({
@@ -156,6 +157,13 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
       }
       set({ previewThemeId: null });
     }
+  },
+
+  createTheme: async (name: string) => {
+    const [meta, filePath] = await invoke<[ThemeMeta, string]>("theme_create", { name });
+    get().fetchInstalled();
+    void meta;
+    return filePath;
   },
 
   cancelPreview: () => {

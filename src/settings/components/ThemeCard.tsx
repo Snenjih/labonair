@@ -12,6 +12,7 @@ import {
   User03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { ThemeThumbnail } from "./ThemeThumbnail";
 
 type InstalledCardProps = {
   meta: ThemeMeta;
@@ -73,8 +74,10 @@ function InstalledCard({
         <div className="absolute left-0 top-1/2 h-8 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
       )}
 
-      {/* Left: metadata */}
-      <div className="flex min-w-0 flex-col gap-0.5 pr-4">
+      {/* Left: thumbnail + metadata */}
+      <div className="flex min-w-0 items-center gap-3 pr-4">
+        <ThemeThumbnail colors={meta.colors} />
+        <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex items-center gap-2">
           <span className="text-[13px] font-semibold">{meta.name}</span>
           {isActive && (
@@ -94,6 +97,7 @@ function InstalledCard({
             <span>{meta.author}</span>
           </div>
         )}
+        </div>
       </div>
 
       {/* Right: actions */}

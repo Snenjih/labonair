@@ -1038,6 +1038,15 @@ export default function App() {
     activeEditorHandle,
   ]);
 
+  // Open a file in the editor when the settings window requests it
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<{ path: string }>("nexum:open-file", (event) => {
+      openFileTab(event.payload.path);
+    }).then((fn) => { unlisten = fn; });
+    return () => unlisten?.();
+  }, [openFileTab]);
+
   const registerEditorHandle = useCallback(
     (id: number, h: EditorPaneHandle | null) => {
       if (h) editorRefs.current.set(id, h);

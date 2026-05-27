@@ -138,6 +138,45 @@ pub async fn theme_delete(app: tauri::AppHandle, id: String) -> Result<(), Strin
     Ok(())
 }
 
+/// Create a new theme file from the default dark theme values and return the ThemeMeta
+/// plus the absolute path to the created file so the frontend can open it in the editor.
+#[tauri::command]
+pub async fn theme_create(app: tauri::AppHandle, name: String) -> Result<(ThemeMeta, String), String> {
+    // Derive a filesystem-safe slug from the name
+    let slug: String = name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    let slug = if slug.is_empty() { "my-theme".to_string() } else { slug };
+
+    let mut theme: Theme = serde_json::from_str(DEFAULT_DARK_JSON)
+        .map_err(|e| format!("Failed to parse default theme: {}", e))?;
+    theme.name = name.clone();
+    theme.author = String::new();
+
+    let json = serde_json::to_string_pretty(&theme)
+        .map_err(|e| format!("Failed to serialize theme: {}", e))?;
+
+    let dest = themes_dir(&app)?.join(format!("{}.json", slug));
+    std::fs::write(&dest, &json).map_err(|e| e.to_string())?;
+
+    let path_str = dest.to_string_lossy().to_string();
+    let meta = ThemeMeta {
+        id: slug,
+        name,
+        author: String::new(),
+        theme_type: theme.theme_type,
+        colors: theme.colors,
+        builtin: false,
+    };
+    Ok((meta, path_str))
+}
+
 /// Fetch the remote theme index JSON via reqwest (bypasses Tauri CSP / CORS).
 /// Returns the raw JSON string; React parses it with JSON.parse().
 #[tauri::command]
