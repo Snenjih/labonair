@@ -20,22 +20,59 @@ const COLOR_VAR_MAP: Record<string, string> = {
   background: "--background",
   foreground: "--foreground",
   card: "--card",
+  card_foreground: "--card-foreground",
   "card-foreground": "--card-foreground",
   popover: "--popover",
+  popover_foreground: "--popover-foreground",
   "popover-foreground": "--popover-foreground",
   primary: "--primary",
+  primary_foreground: "--primary-foreground",
   "primary-foreground": "--primary-foreground",
   secondary: "--secondary",
+  secondary_foreground: "--secondary-foreground",
   "secondary-foreground": "--secondary-foreground",
   muted: "--muted",
+  muted_foreground: "--muted-foreground",
   "muted-foreground": "--muted-foreground",
   accent: "--accent",
+  accent_foreground: "--accent-foreground",
   "accent-foreground": "--accent-foreground",
   destructive: "--destructive",
+  destructive_foreground: "--destructive-foreground",
   border: "--border",
   input: "--input",
   ring: "--ring",
-  // Terminal ANSI 16
+  // Semantic status colors (new)
+  modified: "--modified",
+  error: "--error",
+  warning: "--warning",
+  info: "--info",
+  hint: "--hint",
+  success: "--success",
+  // UI interaction (new)
+  cursor: "--cursor",
+  selection: "--selection",
+  // Surface colors (new)
+  "toolbar.background": "--toolbar-background",
+  "title_bar.background": "--title-bar-background",
+  "status_bar.background": "--status-bar-background",
+  // Border variants (new)
+  "border.variant": "--border-variant",
+  "border.focused": "--border-focused",
+  "border.selected": "--border-selected",
+  "border.transparent": "--border-transparent",
+  "border.disabled": "--border-disabled",
+  // Sidebar — old key kept for backward compat
+  sidebar: "--sidebar",
+  "sidebar.background": "--sidebar",
+  "sidebar-foreground": "--sidebar-foreground",
+  "sidebar-primary": "--sidebar-primary",
+  "sidebar-primary-foreground": "--sidebar-primary-foreground",
+  "sidebar-accent": "--sidebar-accent",
+  "sidebar-accent-foreground": "--sidebar-accent-foreground",
+  "sidebar-border": "--sidebar-border",
+  "sidebar-ring": "--sidebar-ring",
+  // Terminal ANSI 16 — legacy underscore keys (backward compat)
   terminal_background: "--terminal-background",
   terminal_foreground: "--terminal-foreground",
   terminal_black: "--terminal-black",
@@ -54,19 +91,40 @@ const COLOR_VAR_MAP: Record<string, string> = {
   terminal_bright_magenta: "--terminal-bright-magenta",
   terminal_bright_cyan: "--terminal-bright-cyan",
   terminal_bright_white: "--terminal-bright-white",
-  // Sidebar
-  sidebar: "--sidebar",
-  "sidebar-foreground": "--sidebar-foreground",
-  "sidebar-primary": "--sidebar-primary",
-  "sidebar-primary-foreground": "--sidebar-primary-foreground",
-  "sidebar-accent": "--sidebar-accent",
-  "sidebar-accent-foreground": "--sidebar-accent-foreground",
-  "sidebar-border": "--sidebar-border",
-  "sidebar-ring": "--sidebar-ring",
+  // Terminal — new dot-notation keys (schema.json canonical)
+  "terminal.background": "--terminal-background",
+  "terminal.foreground": "--terminal-foreground",
+  "terminal.bright_foreground": "--terminal-bright-foreground",
+  "terminal.dim_foreground": "--terminal-dim-foreground",
+  "terminal.ansi.background": "--terminal-background",
+  "terminal.ansi.black": "--terminal-black",
+  "terminal.ansi.red": "--terminal-red",
+  "terminal.ansi.green": "--terminal-green",
+  "terminal.ansi.yellow": "--terminal-yellow",
+  "terminal.ansi.blue": "--terminal-blue",
+  "terminal.ansi.magenta": "--terminal-magenta",
+  "terminal.ansi.cyan": "--terminal-cyan",
+  "terminal.ansi.white": "--terminal-white",
+  "terminal.ansi.bright_black": "--terminal-bright-black",
+  "terminal.ansi.bright_red": "--terminal-bright-red",
+  "terminal.ansi.bright_green": "--terminal-bright-green",
+  "terminal.ansi.bright_yellow": "--terminal-bright-yellow",
+  "terminal.ansi.bright_blue": "--terminal-bright-blue",
+  "terminal.ansi.bright_magenta": "--terminal-bright-magenta",
+  "terminal.ansi.bright_cyan": "--terminal-bright-cyan",
+  "terminal.ansi.bright_white": "--terminal-bright-white",
+  "terminal.ansi.dim_black": "--terminal-dim-black",
+  "terminal.ansi.dim_red": "--terminal-dim-red",
+  "terminal.ansi.dim_green": "--terminal-dim-green",
+  "terminal.ansi.dim_yellow": "--terminal-dim-yellow",
+  "terminal.ansi.dim_blue": "--terminal-dim-blue",
+  "terminal.ansi.dim_magenta": "--terminal-dim-magenta",
+  "terminal.ansi.dim_cyan": "--terminal-dim-cyan",
+  "terminal.ansi.dim_white": "--terminal-dim-white",
 };
 
-/** All CSS vars we inject — used to clean them up when reverting. */
-const ALL_VARS = Object.values(COLOR_VAR_MAP);
+/** All CSS vars we inject — deduplicated so cleanup doesn't double-remove. */
+const ALL_VARS = [...new Set(Object.values(COLOR_VAR_MAP))];
 
 /**
  * Convert a HEX color to a full `hsl(H S% L%)` CSS value.
@@ -86,6 +144,7 @@ export function hexToHslCss(hex: string): string {
   const r = parseInt(full.slice(0, 2), 16) / 255;
   const g = parseInt(full.slice(2, 4), 16) / 255;
   const b = parseInt(full.slice(4, 6), 16) / 255;
+  const a = full.length === 8 ? parseInt(full.slice(6, 8), 16) / 255 : 1;
 
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
@@ -106,6 +165,10 @@ export function hexToHslCss(hex: string): string {
   const hDeg = Math.round(h * 360);
   const sPct = Math.round(s * 100);
   const lPct = Math.round(l * 100);
+  if (a < 1) {
+    const aPct = Math.round(a * 100);
+    return `hsl(${hDeg}deg ${sPct}% ${lPct}% / ${aPct}%)`;
+  }
   return `hsl(${hDeg}deg ${sPct}% ${lPct}%)`;
 }
 

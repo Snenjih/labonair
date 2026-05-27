@@ -22,8 +22,25 @@ type TokenName =
   | "primary"
   | "destructive"
   | "ring"
+  // Surfaces
+  | "toolbar-background"
+  | "title-bar-background"
+  | "status-bar-background"
+  // Semantic status
+  | "modified"
+  | "error"
+  | "warning"
+  | "info"
+  | "hint"
+  | "success"
+  // UI interaction
+  | "cursor"
+  | "selection"
+  // Terminal
   | "terminal-background"
   | "terminal-foreground"
+  | "terminal-bright-foreground"
+  | "terminal-dim-foreground"
   | "terminal-black"
   | "terminal-red"
   | "terminal-green"
@@ -39,7 +56,15 @@ type TokenName =
   | "terminal-bright-blue"
   | "terminal-bright-magenta"
   | "terminal-bright-cyan"
-  | "terminal-bright-white";
+  | "terminal-bright-white"
+  | "terminal-dim-black"
+  | "terminal-dim-red"
+  | "terminal-dim-green"
+  | "terminal-dim-yellow"
+  | "terminal-dim-blue"
+  | "terminal-dim-magenta"
+  | "terminal-dim-cyan"
+  | "terminal-dim-white";
 
 export type AppTokens = Record<TokenName, string>;
 
@@ -55,8 +80,21 @@ const TOKENS: TokenName[] = [
   "primary",
   "destructive",
   "ring",
+  "toolbar-background",
+  "title-bar-background",
+  "status-bar-background",
+  "modified",
+  "error",
+  "warning",
+  "info",
+  "hint",
+  "success",
+  "cursor",
+  "selection",
   "terminal-background",
   "terminal-foreground",
+  "terminal-bright-foreground",
+  "terminal-dim-foreground",
   "terminal-black",
   "terminal-red",
   "terminal-green",
@@ -73,6 +111,14 @@ const TOKENS: TokenName[] = [
   "terminal-bright-magenta",
   "terminal-bright-cyan",
   "terminal-bright-white",
+  "terminal-dim-black",
+  "terminal-dim-red",
+  "terminal-dim-green",
+  "terminal-dim-yellow",
+  "terminal-dim-blue",
+  "terminal-dim-magenta",
+  "terminal-dim-cyan",
+  "terminal-dim-white",
 ];
 
 let probe: HTMLDivElement | null = null;

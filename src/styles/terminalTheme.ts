@@ -17,9 +17,9 @@ export function buildTerminalTheme(): ITheme {
   return {
     background: t["terminal-background"] || t.background,
     foreground: t["terminal-foreground"] || t.foreground,
-    cursor: t["terminal-foreground"] || t.foreground,
+    cursor: t.cursor || t["terminal-foreground"] || t.foreground,
     cursorAccent: t["terminal-background"] || t.background,
-    selectionBackground: t.accent,
+    selectionBackground: t.selection || t.accent,
     black: t["terminal-black"],
     red: t["terminal-red"],
     green: t["terminal-green"],

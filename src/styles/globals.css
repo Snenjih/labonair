@@ -27,6 +27,7 @@
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -41,6 +42,26 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
+    /* Surface tokens */
+    --color-toolbar: var(--toolbar-background);
+    --color-title-bar: var(--title-bar-background);
+    --color-status-bar: var(--status-bar-background);
+    /* Border variant tokens */
+    --color-border-variant: var(--border-variant);
+    --color-border-focused: var(--border-focused);
+    --color-border-selected: var(--border-selected);
+    --color-border-transparent: var(--border-transparent);
+    --color-border-disabled: var(--border-disabled);
+    /* Semantic status tokens */
+    --color-modified: var(--modified);
+    --color-error: var(--error);
+    --color-warning: var(--warning);
+    --color-info: var(--info);
+    --color-hint: var(--hint);
+    --color-success: var(--success);
+    /* UI interaction tokens */
+    --color-cursor: var(--cursor);
+    --color-selection: var(--selection);
     --radius-sm: calc(var(--radius) * 0.6);
     --radius-md: calc(var(--radius) * 0.8);
     --radius-lg: var(--radius);
@@ -83,9 +104,32 @@
     --sidebar-accent-foreground: oklch(25.20% 0.0000 0);
     --sidebar-border: oklch(88.00% 0.000 0);
     --sidebar-ring: oklch(79.68% 0.1298 82.18);
+    /* Surface colors */
+    --toolbar-background: var(--card);
+    --title-bar-background: var(--card);
+    --status-bar-background: var(--card);
+    /* Border variants */
+    --border-variant: var(--border);
+    --border-focused: var(--ring);
+    --border-selected: var(--ring);
+    --border-transparent: transparent;
+    --border-disabled: oklch(88.00% 0.000 0);
+    /* Semantic status colors */
+    --modified: oklch(73.86% 0.1252 225.69);
+    --error: oklch(69.82% 0.1637 17.27);
+    --warning: oklch(79.68% 0.1298 82.18);
+    --info: oklch(73.86% 0.1252 225.69);
+    --hint: oklch(55.41% 0.0220 262.94);
+    --success: oklch(82.51% 0.1745 125.86);
+    /* UI interaction */
+    --cursor: var(--foreground);
+    --selection: oklch(79.68% 0.1298 82.18 / 13%);
+    --destructive-foreground: oklch(100.00% 0.000 0);
     /* ANSI 16 terminal colors — fallback for the default light theme */
     --terminal-background: oklch(100.00% 0.000 0);
     --terminal-foreground: oklch(20.90% 0.0000 0);
+    --terminal-bright-foreground: oklch(100.00% 0.0001 259.98);
+    --terminal-dim-foreground: oklch(60.00% 0.0000 0);
     --terminal-black: oklch(20.90% 0.0000 259.98);
     --terminal-red: oklch(59.32% 0.1422 16.44);
     --terminal-green: oklch(69.52% 0.1447 125.28);
@@ -102,6 +146,15 @@
     --terminal-bright-magenta: oklch(84.18% 0.1159 315.20);
     --terminal-bright-cyan: oklch(90.08% 0.0588 232.06);
     --terminal-bright-white: oklch(100.00% 0.0001 259.98);
+    /* Dim ANSI colors */
+    --terminal-dim-black: oklch(20.90% 0.0000 259.98);
+    --terminal-dim-red: oklch(50.00% 0.1100 17.00);
+    --terminal-dim-green: oklch(64.00% 0.1300 125.00);
+    --terminal-dim-yellow: oklch(60.00% 0.0900 82.00);
+    --terminal-dim-blue: oklch(54.00% 0.0900 225.00);
+    --terminal-dim-magenta: oklch(60.00% 0.0900 306.00);
+    --terminal-dim-cyan: oklch(68.00% 0.0700 171.00);
+    --terminal-dim-white: oklch(60.00% 0.0050 93.00);
 }
 
 .dark {
@@ -144,9 +197,32 @@
     --sidebar-accent-foreground: oklch(94.52% 0.0001 259.98);
     --sidebar-border: oklch(28.91% 0.0000 259.98);
     --sidebar-ring: oklch(79.68% 0.1298 82.18);
+    /* Surface colors */
+    --toolbar-background: oklch(23.93% 0.0000 259.98);
+    --title-bar-background: oklch(23.93% 0.0000 259.98);
+    --status-bar-background: oklch(23.93% 0.0000 259.98);
+    /* Border variants */
+    --border-variant: oklch(28.91% 0.0000 259.98);
+    --border-focused: oklch(79.68% 0.1298 82.18);
+    --border-selected: oklch(79.68% 0.1298 82.18);
+    --border-transparent: transparent;
+    --border-disabled: oklch(28.00% 0.0000 259.98);
+    /* Semantic status colors */
+    --modified: oklch(73.86% 0.1252 225.69);
+    --error: oklch(69.82% 0.1637 17.27);
+    --warning: oklch(79.68% 0.1298 82.18);
+    --info: oklch(73.86% 0.1252 225.69);
+    --hint: oklch(50.00% 0.0120 262.94);
+    --success: oklch(82.51% 0.1745 125.86);
+    /* UI interaction */
+    --cursor: oklch(79.68% 0.1298 82.18);
+    --selection: oklch(79.68% 0.1298 82.18 / 13%);
+    --destructive-foreground: oklch(100.00% 0.0000 0);
     /* ANSI 16 terminal colors — from reference palette terminal.ansi.* */
     --terminal-background: oklch(20.90% 0.0000 259.98);
     --terminal-foreground: oklch(94.52% 0.0001 259.98);
+    --terminal-bright-foreground: oklch(100.00% 0.0001 259.98);
+    --terminal-dim-foreground: oklch(61.50% 0.0000 259.98);
     --terminal-black: oklch(20.90% 0.0000 259.98);
     --terminal-red: oklch(69.82% 0.1637 17.27);
     --terminal-green: oklch(82.51% 0.1745 125.86);
@@ -163,6 +239,15 @@
     --terminal-bright-magenta: oklch(84.18% 0.1159 315.20);
     --terminal-bright-cyan: oklch(90.08% 0.0588 232.06);
     --terminal-bright-white: oklch(100.00% 0.0001 259.98);
+    /* Dim ANSI colors */
+    --terminal-dim-black: oklch(20.90% 0.0000 259.98);
+    --terminal-dim-red: oklch(50.20% 0.1170 17.27);
+    --terminal-dim-green: oklch(63.80% 0.1350 125.86);
+    --terminal-dim-yellow: oklch(60.20% 0.0980 82.18);
+    --terminal-dim-blue: oklch(54.60% 0.0960 225.69);
+    --terminal-dim-magenta: oklch(59.50% 0.0980 306.30);
+    --terminal-dim-cyan: oklch(68.50% 0.0700 171.17);
+    --terminal-dim-white: oklch(60.20% 0.0050 93.74);
 }
 
 @layer base {
