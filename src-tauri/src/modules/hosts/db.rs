@@ -428,3 +428,28 @@ pub async fn groups_delete(db: tauri::State<'_, HostsDb>, id: String) -> Result<
     conn.execute("DELETE FROM groups WHERE id=?1", rusqlite::params![id])?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn groups_update(
+    db: tauri::State<'_, HostsDb>,
+    id: String,
+    name: String,
+) -> Result<Group, NexumError> {
+    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+    conn.execute(
+        "UPDATE groups SET name=?1 WHERE id=?2",
+        rusqlite::params![name, id],
+    )?;
+    let group = conn.query_row(
+        "SELECT id, name, icon, color, created_at FROM groups WHERE id=?1",
+        rusqlite::params![id],
+        |row| Ok(Group {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            icon: row.get(2)?,
+            color: row.get(3)?,
+            created_at: row.get(4)?,
+        }),
+    )?;
+    Ok(group)
+}

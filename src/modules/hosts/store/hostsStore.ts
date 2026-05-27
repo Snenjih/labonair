@@ -34,6 +34,7 @@ interface HostsState {
 
   createGroup: (name: string, icon?: string, color?: string) => Promise<Group>;
   deleteGroup: (id: string) => Promise<void>;
+  renameGroup: (id: string, name: string) => Promise<void>;
 }
 
 let _pingIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -265,5 +266,10 @@ export const useHostsStore = create<HostsState>((set, get) => ({
   deleteGroup: async (id) => {
     await invoke("groups_delete", { id });
     set((s) => ({ groups: s.groups.filter((g) => g.id !== id) }));
+  },
+
+  renameGroup: async (id, name) => {
+    const updated = await invoke<Group>("groups_update", { id, name });
+    set((s) => ({ groups: s.groups.map((g) => (g.id === id ? updated : g)) }));
   },
 }));

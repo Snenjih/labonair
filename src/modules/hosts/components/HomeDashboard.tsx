@@ -1,6 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -37,7 +47,7 @@ import { CredentialCard } from "./CredentialCard";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import type { Host } from "../types";
+import type { Group, Host } from "../types";
 
 type LayoutMode = "grid" | "list";
 type SortMode = "last_connected" | "a_z" | "z_a";
@@ -196,6 +206,8 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
   const stopPingWorker = useHostsStore((s) => s.stopPingWorker);
   const hostPingInterval = usePreferencesStore((s) => s.hostPingInterval);
   const createGroup = useHostsStore((s) => s.createGroup);
+  const deleteGroup = useHostsStore((s) => s.deleteGroup);
+  const renameGroup = useHostsStore((s) => s.renameGroup);
   const setSelectedHost = useHostsStore((s) => s.setSelectedHost);
   const selectHost = useHostsStore((s) => s.selectHost);
   const reorderHosts = useHostsStore((s) => s.reorderHosts);
@@ -214,6 +226,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
 
   const [addingGroup, setAddingGroup] = useState(false);
   const [groupName, setGroupName] = useState("");
+  const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
   const groupInputRef = useRef<HTMLInputElement>(null);
 
   // Layout and sort preferences — persisted in localStorage
@@ -563,6 +576,8 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
                 isSelected={activeGroupId === g.id}
                 onClick={() => setActiveGroupId(activeGroupId === g.id ? null : g.id)}
                 hostCount={hosts.filter((h) => h.group_id === g.id).length}
+                onDelete={() => setGroupToDelete(g)}
+                onRename={(name) => void renameGroup(g.id, name)}
               />
             ))}
             {addingGroup && (
@@ -782,6 +797,33 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Delete group confirmation */}
+      <AlertDialog open={!!groupToDelete} onOpenChange={(open) => { if (!open) setGroupToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{groupToDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The group will be deleted. Hosts in this group will not be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (groupToDelete) {
+                  void deleteGroup(groupToDelete.id);
+                  if (activeGroupId === groupToDelete.id) setActiveGroupId(null);
+                  setGroupToDelete(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
