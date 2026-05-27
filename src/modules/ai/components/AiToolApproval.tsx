@@ -48,10 +48,10 @@ function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
   return (
     <div className={cn(
       "rounded-lg border bg-card shadow-sm",
-      destructiveWarning ? "border-amber-500/60" : "border-border",
+      destructiveWarning ? "border-warning/60" : "border-border",
     )}>
       <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
-        <span className="size-1.5 shrink-0 rounded-full bg-amber-500 animate-pulse" />
+        <span className="size-1.5 shrink-0 rounded-full bg-warning animate-pulse" />
         <HugeiconsIcon
           icon={Icon}
           size={13}
@@ -62,7 +62,7 @@ function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
           {label}
         </span>
         {destructiveWarning && (
-          <span className="ml-1 flex items-center gap-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+          <span className="ml-1 flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
             <HugeiconsIcon icon={Alert02Icon} size={10} strokeWidth={2} />
             {destructiveWarning}
           </span>

@@ -306,7 +306,7 @@ function TabIcon({ tab, active }: { tab: Tab; active: boolean }) {
         icon={GitCompareIcon}
         size={14}
         strokeWidth={1.75}
-        className="shrink-0 text-yellow-600 dark:text-yellow-400"
+        className="shrink-0 text-warning"
       />
     );
   }

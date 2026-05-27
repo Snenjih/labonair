@@ -135,7 +135,7 @@ function StatusIcon({ status }: { status: SnippetRunLog["status"] }) {
         icon={CheckmarkCircle02Icon}
         size={12}
         strokeWidth={2}
-        className="shrink-0 text-green-500"
+        className="shrink-0 text-success"
       />
     );
   }
@@ -166,7 +166,7 @@ function LogOutput({ log }: { log: SnippetRunLog }) {
           <span
             key={i}
             className={cn(
-              line.stream === "stderr" ? "text-red-400" : "text-foreground/90"
+              line.stream === "stderr" ? "text-error" : "text-foreground/90"
             )}
           >
             {line.data}
@@ -176,7 +176,7 @@ function LogOutput({ log }: { log: SnippetRunLog }) {
           <span
             className={cn(
               "mt-1 block border-t border-border/40 pt-1 text-muted-foreground",
-              log.exitCode !== 0 && "text-red-400"
+              log.exitCode !== 0 && "text-error"
             )}
           >
             {`[exit ${log.exitCode}]`}

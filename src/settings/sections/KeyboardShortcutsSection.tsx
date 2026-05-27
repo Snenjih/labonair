@@ -372,9 +372,9 @@ function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
                   icon={AlertCircleIcon}
                   size={10}
                   strokeWidth={2}
-                  className="text-amber-500/80"
+                  className="text-warning/80"
                 />
-                <span className="text-[10.5px] text-amber-500/80">
+                <span className="text-[10.5px] text-warning/80">
                   Used by &ldquo;{rowState.conflictLabel}&rdquo;
                 </span>
               </div>
@@ -384,7 +384,7 @@ function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
                 <button
                   type="button"
                   onClick={() => void handleOverride()}
-                  className="rounded px-1.5 py-0.5 text-[10.5px] text-amber-500/80 transition-colors hover:bg-amber-500/10 hover:text-amber-500"
+                  className="rounded px-1.5 py-0.5 text-[10.5px] text-warning/80 transition-colors hover:bg-warning/10 hover:text-warning"
                 >
                   Override
                 </button>

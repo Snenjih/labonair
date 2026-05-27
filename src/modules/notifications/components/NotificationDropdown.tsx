@@ -46,7 +46,7 @@ function TypeIcon({ type }: { type: NotificationType }) {
         <HugeiconsIcon
           icon={Alert02Icon}
           size={14}
-          className="mt-0.5 shrink-0 text-yellow-500"
+          className="mt-0.5 shrink-0 text-warning"
         />
       );
     case "success":
@@ -54,7 +54,7 @@ function TypeIcon({ type }: { type: NotificationType }) {
         <HugeiconsIcon
           icon={CheckmarkCircle01Icon}
           size={14}
-          className="mt-0.5 shrink-0 text-green-500"
+          className="mt-0.5 shrink-0 text-success"
         />
       );
     case "info":
@@ -62,7 +62,7 @@ function TypeIcon({ type }: { type: NotificationType }) {
         <HugeiconsIcon
           icon={InformationCircleIcon}
           size={14}
-          className="mt-0.5 shrink-0 text-blue-500"
+          className="mt-0.5 shrink-0 text-info"
         />
       );
   }

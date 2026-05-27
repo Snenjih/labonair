@@ -349,9 +349,9 @@ function statusLabel(status: TransferStatus): string {
 function statusColorClass(status: TransferStatus): string {
   if (isFailed(status)) return "bg-destructive/20 text-destructive";
   switch (status) {
-    case "running": return "bg-blue-500/20 text-blue-500";
-    case "completed": return "bg-green-500/20 text-green-600";
-    case "paused": return "bg-yellow-500/20 text-yellow-600";
+    case "running": return "bg-info/20 text-info";
+    case "completed": return "bg-success/20 text-success";
+    case "paused": return "bg-warning/20 text-warning";
     case "queued": return "bg-muted text-muted-foreground";
     case "cancelled": return "bg-muted text-muted-foreground line-through";
     default: return "bg-muted text-muted-foreground";
@@ -362,8 +362,8 @@ function statusProgressClass(status: TransferStatus): string {
   if (isFailed(status)) return "bg-destructive";
   switch (status) {
     case "running": return "bg-primary";
-    case "completed": return "bg-green-500";
-    case "paused": return "bg-yellow-500";
+    case "completed": return "bg-success";
+    case "paused": return "bg-warning";
     default: return "bg-muted-foreground";
   }
 }

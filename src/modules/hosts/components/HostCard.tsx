@@ -172,7 +172,7 @@ export function HostCard({
                 <span
                   className={cn(
                     "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background",
-                    pingStatus === "online" && "bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]",
+                    pingStatus === "online" && "bg-success [box-shadow:0_0_6px_color-mix(in_oklch,var(--color-success)_70%,transparent)]",
                     pingStatus === "offline" && "bg-destructive",
                     (!pingStatus || pingStatus === "checking") && "bg-muted-foreground/40 animate-pulse",
                   )}
@@ -237,7 +237,7 @@ export function HostCard({
                 className="h-9 flex-1 gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-background/50"
               >
                 {hasActiveSshTab && (
-                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="size-1.5 rounded-full bg-success animate-pulse" />
                 )}
                 <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
                   <rect x="1" y="3" width="12" height="8" rx="1.5" />
@@ -252,7 +252,7 @@ export function HostCard({
                 className="h-9 flex-1 gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-background/50"
               >
                 {hasActiveSftpTab && (
-                  <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="size-1.5 rounded-full bg-success animate-pulse" />
                 )}
                 <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M1 4.5V11a1 1 0 001 1h10a1 1 0 001-1V5.5a1 1 0 00-1-1H7L5.5 3H2a1 1 0 00-1 1.5z" />

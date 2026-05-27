@@ -203,7 +203,7 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
         </Button>
       </div>
       {notice ? (
-        <div className="flex items-center gap-1.5 bg-amber-500/8 px-3 py-1 text-[11px] text-amber-600 dark:text-amber-400">
+        <div className="flex items-center gap-1.5 bg-warning/8 px-3 py-1 text-[11px] text-warning">
           <span className="truncate">{notice}</span>
           <button
             type="button"

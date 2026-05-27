@@ -103,7 +103,7 @@ export function CredentialListItem({ credential, hostsCount, isSelected, onClick
 
         {/* has_secret indicator */}
         {credential.has_secret && (
-          <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-green-500" title="Secret stored" />
+          <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-success" title="Secret stored" />
         )}
 
         {/* Actions */}

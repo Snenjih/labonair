@@ -103,7 +103,7 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
             placeholder="Host name"
           />
           {saving && <p className="text-[11px] text-muted-foreground">Saving…</p>}
-          {saved && !saving && <p className="text-[11px] text-green-500">Saved</p>}
+          {saved && !saving && <p className="text-[11px] text-success">Saved</p>}
         </div>
         <button
           onClick={onClose}

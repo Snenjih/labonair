@@ -191,7 +191,7 @@ function ModelDropdown() {
             "h-5.5 gap-1 rounded-md px-1.5 my-1 text-xs hover:bg-accent hover:text-foreground",
             currentProviderHasKey
               ? "text-muted-foreground"
-              : "text-amber-600 dark:text-amber-400",
+              : "text-warning",
           )}
           title={
             currentProviderHasKey
@@ -234,7 +234,7 @@ function ModelDropdown() {
                       e.stopPropagation();
                       void openSettingsWindow("models");
                     }}
-                    className="ml-auto rounded-sm px-1 text-[9px] normal-case tracking-normal text-amber-600 underline-offset-2 hover:underline dark:text-amber-400"
+                    className="ml-auto rounded-sm px-1 text-[9px] normal-case tracking-normal text-warning underline-offset-2 hover:underline"
                   >
                     Set key…
                   </button>

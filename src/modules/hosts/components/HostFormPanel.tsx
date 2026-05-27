@@ -255,7 +255,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
             className="w-full bg-transparent text-base font-semibold text-foreground outline-none placeholder:text-muted-foreground"
           />
           {saving && <p className="text-[11px] text-muted-foreground">Saving…</p>}
-          {saved && !saving && <p className="text-[11px] text-green-500">Saved</p>}
+          {saved && !saving && <p className="text-[11px] text-success">Saved</p>}
           {isNew && <p className="text-[11px] text-muted-foreground">New host</p>}
         </div>
         <button

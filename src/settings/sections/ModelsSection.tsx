@@ -326,7 +326,7 @@ function LmStudioChatBlock() {
         </div>
         <div className="py-2">
           {testStatus === "ok" && (
-            <span className="text-[10.5px] text-emerald-500">
+            <span className="text-[10.5px] text-success">
               Connected — server responded.
             </span>
           )}
@@ -336,7 +336,7 @@ function LmStudioChatBlock() {
             </span>
           )}
           {testStatus === "idle" && (
-            <span className="text-[10.5px] text-amber-500">
+            <span className="text-[10.5px] text-warning">
               Enter the model ID that's loaded in LM Studio — e.g. the one shown on
               the server's /v1/models page.
             </span>
@@ -497,7 +497,7 @@ function OpenAICompatibleBlock({
         {(testStatus === "ok" || testStatus === "fail") && (
           <div className="py-2">
             {testStatus === "ok" && (
-              <span className="text-[10.5px] text-emerald-500">
+              <span className="text-[10.5px] text-success">
                 Connected — endpoint responded.
               </span>
             )}
@@ -598,7 +598,7 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
             </Select>
           </FieldRow>
           {!hasKey && (
-            <p className="mt-1.5 pl-[84px] text-[10.5px] text-amber-500">
+            <p className="mt-1.5 pl-[84px] text-[10.5px] text-warning">
               No API key configured for {providerInfo.label}. Add one above.
             </p>
           )}
@@ -644,7 +644,7 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
               </Button>
             </FieldRow>
             {testStatus === "ok" && (
-              <p className="mt-1.5 pl-[84px] text-[10.5px] text-emerald-500">
+              <p className="mt-1.5 pl-[84px] text-[10.5px] text-success">
                 Connected — server responded.
               </p>
             )}

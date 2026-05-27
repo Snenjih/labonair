@@ -157,10 +157,10 @@ export function AiDiffPane({
             {path}
           </span>
           <span className="flex shrink-0 items-center gap-1.5 text-[10.5px] tabular-nums">
-            <span className="text-emerald-600 dark:text-emerald-400">
+            <span className="text-success">
               +{stats.added}
             </span>
-            <span className="text-rose-600 dark:text-rose-400">
+            <span className="text-error">
               −{stats.removed}
             </span>
           </span>

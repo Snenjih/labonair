@@ -74,7 +74,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
           onReload={() => setNonce((n) => n + 1)}
         />
         {showXfoHint ? (
-          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border/60 bg-amber-500/8 px-3 text-[11px] text-amber-600 dark:text-amber-400">
+          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border/60 bg-warning/8 px-3 text-[11px] text-warning">
             <HugeiconsIcon
               icon={Alert02Icon}
               size={12}

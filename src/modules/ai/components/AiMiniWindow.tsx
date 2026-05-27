@@ -171,7 +171,7 @@ function PlanModeStrip() {
   if (!active) return null;
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border/40 bg-muted/40 px-3 py-1.5">
-      <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />
+      <span className="size-1.5 shrink-0 rounded-full bg-warning" />
       <span className="text-[11px] font-medium text-foreground">Plan mode</span>
       <span className="text-[11px] text-muted-foreground">
         {queueLen > 0 ? `· ${queueLen} queued` : "· no edits queued"}

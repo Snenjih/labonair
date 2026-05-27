@@ -381,7 +381,7 @@ function PaletteItem({ action, onExecute }: PaletteItemProps) {
             className={cn(
               "text-[10px] font-bold uppercase",
               action.rightLabel === "ON" || action.rightLabel === "active"
-                ? "text-emerald-500"
+                ? "text-success"
                 : "text-muted-foreground",
             )}
           >

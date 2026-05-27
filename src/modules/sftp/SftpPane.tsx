@@ -452,8 +452,8 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
             {/* Deep search results overlay or normal file list */}
             {deepSearchResults !== null ? (
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-border bg-yellow-500/5">
-                  <span className="text-[10px] text-yellow-500/80 flex-1 truncate">
+                <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-border bg-warning/5">
+                  <span className="text-[10px] text-warning/80 flex-1 truncate">
                     Results in {remotePath} — click to navigate to parent folder
                   </span>
                   <button

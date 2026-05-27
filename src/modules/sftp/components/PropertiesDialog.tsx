@@ -215,7 +215,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
                   className="w-20 h-7 px-2 text-sm font-mono rounded bg-muted/30 border border-border text-foreground focus:outline-none focus:border-primary"
                 />
                 {octalWarning && (
-                  <p className="text-[10px] text-yellow-500/80 max-w-52">{octalWarning}</p>
+                  <p className="text-[10px] text-warning/80 max-w-52">{octalWarning}</p>
                 )}
               </div>
             </div>

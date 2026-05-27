@@ -44,8 +44,7 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
-          className="group relative cursor-default overflow-hidden rounded-md border border-border/40 bg-card transition-all duration-150 hover:border-border/80 hover:bg-card/80"
-          style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.12)" }}
+          className="group relative cursor-default overflow-hidden rounded-md border border-border/40 bg-card shadow-sm transition-all duration-150 hover:border-border/80 hover:bg-card/80"
         >
           {/* Accent stripe with soft glow */}
           <div

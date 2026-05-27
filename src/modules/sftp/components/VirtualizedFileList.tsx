@@ -217,27 +217,27 @@ export function VirtualizedFileList({
           <div className={cn(
             "absolute inset-0 rounded-sm transition-colors duration-150",
             isDropHovered
-              ? (dropDirection === "upload" ? "bg-blue-500/15" : "bg-green-500/15")
+              ? (dropDirection === "upload" ? "bg-info/15" : "bg-success/15")
               : "bg-primary/5"
           )} />
           <div className={cn(
             "relative flex flex-col items-center gap-2 px-6 py-4 rounded-xl backdrop-blur-sm border shadow-lg transition-all duration-150",
             isDropHovered
               ? (dropDirection === "upload"
-                  ? "bg-background/90 border-blue-500/50 scale-105"
-                  : "bg-background/90 border-green-500/50 scale-105")
+                  ? "bg-background/90 border-info/50 scale-105"
+                  : "bg-background/90 border-success/50 scale-105")
               : "bg-background/60 border-primary/20 scale-100"
           )}>
             <HugeiconsIcon
               icon={dropDirection === "upload" ? ArrowUp01Icon : ArrowDown01Icon}
               size={28}
               className={cn(
-                dropDirection === "upload" ? "text-blue-400" : "text-green-400"
+                dropDirection === "upload" ? "text-info" : "text-success"
               )}
             />
             <span className={cn(
               "text-sm font-semibold",
-              dropDirection === "upload" ? "text-blue-400" : "text-green-400"
+              dropDirection === "upload" ? "text-info" : "text-success"
             )}>
               {dropDirection === "upload" ? "Upload here" : "Download here"}
             </span>

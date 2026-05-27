@@ -94,7 +94,7 @@ export function CredentialCard({ credential, hostsCount, isSelected, onClick, on
             {initials(credential.name) || "?"}
             {/* Secret stored dot */}
             {credential.has_secret && (
-              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]" title="Secret stored" />
+              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background bg-success [box-shadow:0_0_6px_color-mix(in_oklch,var(--color-success)_70%,transparent)]" title="Secret stored" />
             )}
           </div>
 

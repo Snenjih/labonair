@@ -200,7 +200,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
             className="w-full bg-transparent text-base font-semibold text-foreground outline-none placeholder:text-muted-foreground"
           />
           {saving && <p className="text-[11px] text-muted-foreground">Saving…</p>}
-          {saved && !saving && <p className="text-[11px] text-green-500">Saved</p>}
+          {saved && !saving && <p className="text-[11px] text-success">Saved</p>}
           {isNew && <p className="text-[11px] text-muted-foreground">New credential</p>}
         </div>
         <button
@@ -263,7 +263,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-muted-foreground">Password</Label>
                 {cred && (
-                  <span className={`text-[11px] ${cred.has_secret ? "text-green-500" : "text-muted-foreground"}`}>
+                  <span className={`text-[11px] ${cred.has_secret ? "text-success" : "text-muted-foreground"}`}>
                     {cred.has_secret ? "Saved" : "Not set"}
                   </span>
                 )}
@@ -320,7 +320,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
                   <div className="flex items-center justify-between">
                     <Label className="text-xs text-muted-foreground">Passphrase (optional)</Label>
                     {cred?.has_secret && (
-                      <span className="text-[11px] text-green-500">Saved</span>
+                      <span className="text-[11px] text-success">Saved</span>
                     )}
                   </div>
                   <Input
@@ -363,7 +363,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
                   <div className="flex items-center justify-between">
                     <Label className="text-xs text-muted-foreground">Passphrase (optional)</Label>
                     {cred?.has_secret && (
-                      <span className="text-[11px] text-green-500">Saved</span>
+                      <span className="text-[11px] text-success">Saved</span>
                     )}
                   </div>
                   <Input

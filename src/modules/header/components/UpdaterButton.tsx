@@ -19,10 +19,10 @@ export function UpdaterButton() {
       <Button
         size="sm"
         variant="outline"
-        className="h-6 shrink-0 gap-1.5 border-emerald-500/40 px-2 text-[11px] text-emerald-500 hover:border-emerald-500/60 hover:bg-emerald-500/10 hover:text-emerald-400"
+        className="h-6 shrink-0 gap-1.5 border-success/40 px-2 text-[11px] text-success hover:border-success/60 hover:bg-success/10 hover:text-success"
         onClick={() => void install()}
       >
-        <span className="size-1.5 shrink-0 rounded-full bg-emerald-500" />
+        <span className="size-1.5 shrink-0 rounded-full bg-success" />
         Update and restart
       </Button>
     );
