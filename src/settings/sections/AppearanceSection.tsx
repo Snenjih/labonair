@@ -58,6 +58,8 @@ type BackgroundInfo = {
   size_bytes: number;
 };
 
+const VALID_IMAGE_EXTS = ["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp"];
+
 export function AppearanceSection() {
   const { theme, setTheme } = useTheme();
   const appFontFamily = usePreferencesStore((s) => s.appFontFamily);
@@ -73,16 +75,14 @@ export function AppearanceSection() {
   const addNotification = useNotificationStore((s) => s.addNotification);
 
   const [backgrounds, setBackgrounds] = useState<BackgroundInfo[]>([]);
-  // filename → base64 data URL for thumbnails (loaded lazily)
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
-  // Track which thumbnail is hovered for the delete button
   const [hoveredFilename, setHoveredFilename] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     invoke<BackgroundInfo[]>("backgrounds_list")
       .then((list) => {
         setBackgrounds(list);
-        // Load data URLs for all thumbnails
         for (const bg of list) {
           invoke<string>("background_read_data_url", { filename: bg.filename })
             .then((url) => setThumbUrls((prev) => ({ ...prev, [bg.filename]: url })))
@@ -104,7 +104,7 @@ export function AppearanceSection() {
     const selected = await open({
       multiple: false,
       filters: [
-        { name: "Image", extensions: ["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp"] },
+        { name: "Image", extensions: VALID_IMAGE_EXTS },
       ],
     });
     if (!selected) return;
@@ -115,7 +115,36 @@ export function AppearanceSection() {
       setBackgrounds((prev) =>
         [...prev, info].sort((a, b) => a.filename.localeCompare(b.filename))
       );
-      // Load data URL for the new thumbnail
+      void invoke<string>("background_read_data_url", { filename: info.filename })
+        .then((url) => setThumbUrls((prev) => ({ ...prev, [info.filename]: url })))
+        .catch(() => {});
+      void setBackgroundImage(info.filename);
+    } catch (err: unknown) {
+      const detail = err instanceof Error ? err.message : String(err);
+      addNotification({
+        type: "error",
+        title: "Failed to import background",
+        message: `The image could not be imported. ${detail}`,
+        source: "Background",
+      });
+    }
+  }
+
+  async function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    // Tauri webview exposes the filesystem path on File objects from OS drag-and-drop
+    const path = (file as File & { path?: string }).path;
+    if (!path) return;
+    const ext = path.split(".").pop()?.toLowerCase();
+    if (!ext || !VALID_IMAGE_EXTS.includes(ext)) return;
+    try {
+      const info = await invoke<BackgroundInfo>("background_import", { sourcePath: path });
+      setBackgrounds((prev) =>
+        [...prev, info].sort((a, b) => a.filename.localeCompare(b.filename))
+      );
       void invoke<string>("background_read_data_url", { filename: info.filename })
         .then((url) => setThumbUrls((prev) => ({ ...prev, [info.filename]: url })))
         .catch(() => {});
@@ -135,7 +164,11 @@ export function AppearanceSection() {
     try {
       await invoke("background_delete", { filename });
       setBackgrounds((prev) => prev.filter((b) => b.filename !== filename));
-      setThumbUrls((prev) => { const next = { ...prev }; delete next[filename]; return next; });
+      setThumbUrls((prev) => {
+        const next = { ...prev };
+        delete next[filename];
+        return next;
+      });
       if (backgroundImage === filename) {
         void setBackgroundImage("");
       }
@@ -187,129 +220,148 @@ export function AppearanceSection() {
       {/* Background image */}
       <div className="flex flex-col gap-3">
         <Label>Background image</Label>
-        <div className="flex flex-wrap gap-2">
-          {/* None tile */}
-          <button
-            type="button"
-            onClick={() => handleSelect("")}
-            className={cn(
-              "relative h-[86px] w-[112px] shrink-0 overflow-hidden rounded-md border transition-all",
-              backgroundImage === ""
-                ? "border-foreground/60 ring-1 ring-foreground/20"
-                : "border-border/60 hover:border-border",
-            )}
-            title="No background"
-          >
-            <div
-              className="absolute inset-0"
-              style={{
-                backgroundImage:
-                  "repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%)",
-                backgroundSize: "10px 10px",
-              }}
-            />
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-muted-foreground">
-              None
-            </span>
-          </button>
 
-          {/* Saved background thumbnails */}
-          {backgrounds.map((bg) => (
-            <div
-              key={bg.filename}
-              className="relative shrink-0"
-              onMouseEnter={() => setHoveredFilename(bg.filename)}
-              onMouseLeave={() => setHoveredFilename(null)}
-            >
+        {/* Drop zone wrapper */}
+        <div
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
+          }}
+          onDrop={(e) => void handleDrop(e)}
+          className={cn(
+            "rounded-xl border-2 border-dashed p-2.5 transition-all duration-150",
+            isDragging
+              ? "border-foreground/40 bg-foreground/5"
+              : "border-transparent",
+          )}
+        >
+          <div className="flex flex-wrap gap-3">
+            {/* None tile */}
+            <TileWrapper label="None">
               <button
                 type="button"
-                onClick={() => handleSelect(bg.filename)}
+                onClick={() => handleSelect("")}
                 className={cn(
-                  "h-[86px] w-[112px] overflow-hidden rounded-md border transition-all",
-                  backgroundImage === bg.filename
-                    ? "border-foreground/60 ring-1 ring-foreground/20"
-                    : "border-border/60 hover:border-border",
+                  "relative h-[100px] w-[150px] overflow-hidden rounded-lg border transition-all",
+                  backgroundImage === ""
+                    ? "border-foreground/50 ring-2 ring-foreground/20 ring-offset-1 ring-offset-background"
+                    : "border-border/50 hover:border-border",
                 )}
-                title={bg.filename}
+                title="No background"
               >
-                <img
-                  src={thumbUrls[bg.filename]}
-                  alt={bg.filename}
-                  className="h-full w-full object-cover"
-                  draggable={false}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage:
+                      "repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%)",
+                    backgroundSize: "12px 12px",
+                  }}
                 />
+                {backgroundImage === "" && <SelectedBadge />}
               </button>
-              {/* Delete button — visible on hover */}
+            </TileWrapper>
+
+            {/* Saved background thumbnails */}
+            {backgrounds.map((bg) => (
+              <TileWrapper
+                key={bg.filename}
+                label={bg.filename.replace(/\.[^.]+$/, "")}
+              >
+                <div
+                  className="relative h-[100px] w-[150px]"
+                  onMouseEnter={() => setHoveredFilename(bg.filename)}
+                  onMouseLeave={() => setHoveredFilename(null)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(bg.filename)}
+                    className={cn(
+                      "h-full w-full overflow-hidden rounded-lg border transition-all",
+                      backgroundImage === bg.filename
+                        ? "border-foreground/50 ring-2 ring-foreground/20 ring-offset-1 ring-offset-background"
+                        : "border-border/50 hover:border-border",
+                    )}
+                    title={bg.filename}
+                  >
+                    <img
+                      src={thumbUrls[bg.filename]}
+                      alt={bg.filename}
+                      className="h-full w-full object-cover"
+                      draggable={false}
+                    />
+                    {backgroundImage === bg.filename && <SelectedBadge />}
+                  </button>
+
+                  {/* Delete button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleDelete(bg.filename);
+                    }}
+                    className={cn(
+                      "absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground shadow-sm transition-all hover:bg-destructive/90 hover:text-white",
+                      hoveredFilename === bg.filename
+                        ? "opacity-100 scale-100"
+                        : "opacity-0 scale-75",
+                    )}
+                    title={`Delete ${bg.filename}`}
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2.5} />
+                  </button>
+                </div>
+              </TileWrapper>
+            ))}
+
+            {/* Add button */}
+            <TileWrapper label="">
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void handleDelete(bg.filename);
-                }}
-                className={cn(
-                  "absolute -right-1 -top-1 flex h-[18px] w-[18px] items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground transition-all hover:bg-destructive/90 hover:text-white",
-                  hoveredFilename === bg.filename ? "opacity-100" : "opacity-0",
-                )}
-                title={`Delete ${bg.filename}`}
+                onClick={() => void handleImport()}
+                className="flex h-[100px] w-[150px] flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border/60 text-muted-foreground transition-all hover:border-border hover:bg-accent/30 hover:text-foreground"
+                title="Add background image"
               >
-                <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2.5} />
+                <HugeiconsIcon icon={Add01Icon} size={18} strokeWidth={1.5} />
+                <span className="text-[10px]">Add image</span>
               </button>
-            </div>
-          ))}
+            </TileWrapper>
+          </div>
 
-          {/* Add button */}
-          <button
-            type="button"
-            onClick={() => void handleImport()}
-            className="flex h-[86px] w-[112px] shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border/60 text-muted-foreground transition-all hover:border-border hover:text-foreground"
-            title="Add background image"
-          >
-            <HugeiconsIcon icon={Add01Icon} size={16} strokeWidth={1.5} />
-            <span className="text-[10px]">Add image</span>
-          </button>
+          {backgrounds.length === 0 && !isDragging && (
+            <p className="mt-2 text-center text-[10px] text-muted-foreground/60">
+              No backgrounds yet — drop an image here or click "Add image"
+            </p>
+          )}
+          {isDragging && (
+            <p className="mt-2 text-center text-[10.5px] font-medium text-foreground/70">
+              Drop to import
+            </p>
+          )}
         </div>
 
-        {/* Opacity & blur — only shown when a background is set */}
+        {/* Opacity & blur controls */}
         {backgroundImage !== "" && (
-          <div className="flex flex-col gap-2 mt-1">
-            <SettingRow
-              title="UI opacity"
-              description="How transparent UI surfaces are — higher value lets more of the background image show through."
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min={0}
-                  max={90}
-                  step={5}
-                  value={backgroundOpacity}
-                  onChange={(e) => void setBackgroundOpacity(Number(e.target.value))}
-                  className="w-24 accent-foreground"
-                />
-                <span className="w-8 text-right text-[11px] tabular-nums text-muted-foreground">
-                  {backgroundOpacity}%
-                </span>
-              </div>
-            </SettingRow>
-            <SettingRow
-              title="Image blur"
-              description="Gaussian blur applied to the background image."
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min={0}
-                  max={20}
-                  step={1}
-                  value={backgroundBlur}
-                  onChange={(e) => void setBackgroundBlur(Number(e.target.value))}
-                  className="w-24 accent-foreground"
-                />
-                <span className="w-8 text-right text-[11px] tabular-nums text-muted-foreground">
-                  {backgroundBlur}px
-                </span>
-              </div>
-            </SettingRow>
+          <div className="flex flex-col gap-4 rounded-lg border border-border/50 bg-card/40 px-4 py-3.5">
+            <SliderControl
+              label="UI opacity"
+              description="Higher values reveal more of the background"
+              value={backgroundOpacity}
+              min={0}
+              max={90}
+              step={5}
+              suffix="%"
+              onChange={(v) => void setBackgroundOpacity(v)}
+            />
+            <SliderControl
+              label="Image blur"
+              description="Gaussian blur applied to the wallpaper"
+              value={backgroundBlur}
+              min={0}
+              max={20}
+              step={1}
+              suffix="px"
+              onChange={(v) => void setBackgroundBlur(v)}
+            />
           </div>
         )}
       </div>
@@ -426,5 +478,72 @@ function Label({ children }: { children: React.ReactNode }) {
     <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
       {children}
     </span>
+  );
+}
+
+function TileWrapper({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      {children}
+      <span className="w-[150px] truncate px-1 text-center text-[9px] text-muted-foreground">
+        {label || " "}
+      </span>
+    </div>
+  );
+}
+
+function SelectedBadge() {
+  return (
+    <div className="absolute bottom-1.5 right-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-foreground shadow-sm">
+      <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden>
+        <path
+          d="M1.5 4.5L3.5 6.5L7.5 2.5"
+          stroke="hsl(var(--background))"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
+type SliderControlProps = {
+  label: string;
+  description: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  suffix: string;
+  onChange: (v: number) => void;
+};
+
+function SliderControl({ label, description, value, min, max, step, suffix, onChange }: SliderControlProps) {
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[12px] font-medium">{label}</span>
+          <span className="text-[10px] text-muted-foreground">{description}</span>
+        </div>
+        <span className="shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+          {value}{suffix}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{
+          background: `linear-gradient(to right, hsl(var(--foreground)) 0%, hsl(var(--foreground)) ${pct}%, hsl(var(--border)) ${pct}%, hsl(var(--border)) 100%)`,
+        }}
+        className="h-1.5 w-full cursor-pointer appearance-none rounded-full [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-foreground [&::-webkit-slider-thumb]:bg-background [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+      />
+    </div>
   );
 }
