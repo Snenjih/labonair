@@ -177,6 +177,12 @@ pub async fn theme_create(app: tauri::AppHandle, name: String) -> Result<(ThemeM
     Ok((meta, path_str))
 }
 
+/// Return the absolute path to the user themes directory so the frontend can open it.
+#[tauri::command]
+pub async fn themes_get_dir(app: tauri::AppHandle) -> Result<String, String> {
+    themes_dir(&app).map(|p| p.to_string_lossy().into_owned())
+}
+
 /// Fetch the remote theme index JSON via reqwest (bypasses Tauri CSP / CORS).
 /// Returns the raw JSON string; React parses it with JSON.parse().
 #[tauri::command]
@@ -208,17 +214,32 @@ pub async fn theme_download(app: tauri::AppHandle, url: String) -> Result<ThemeM
     let theme: Theme = serde_json::from_str(&raw_json)
         .map_err(|e| format!("Invalid theme JSON: {}", e))?;
 
-    // Derive a safe filesystem ID from the name
-    let id: String = theme
-        .name
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
-        .collect::<String>()
-        .split('-')
+    // Derive the ID from the URL filename stem so it always matches the community
+    // index convention (index id == file stem == rawUrl file stem).
+    let id: String = url
+        .rsplit('/')
+        .next()
+        .map(|fname| fname.split('?').next().unwrap_or(fname))
+        .and_then(|fname| {
+            std::path::Path::new(fname)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
+        })
         .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-");
+        .unwrap_or_else(|| {
+            // Fallback: slugify the theme name
+            theme
+                .name
+                .to_lowercase()
+                .chars()
+                .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+                .collect::<String>()
+                .split('-')
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join("-")
+        });
     let id = if id.is_empty() { "imported-theme".to_string() } else { id };
 
     let dest = themes_dir(&app)?.join(format!("{}.json", id));

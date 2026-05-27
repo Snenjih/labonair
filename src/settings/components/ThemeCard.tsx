@@ -13,6 +13,8 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ThemeThumbnail } from "./ThemeThumbnail";
+import { setAppTheme } from "@/modules/settings/store";
+import { applyThemeColors, revertThemeColors } from "@/lib/useThemeEngine";
 
 type InstalledCardProps = {
   meta: ThemeMeta;
@@ -152,65 +154,144 @@ function CommunityCard({
   remote: RemoteTheme;
   installedMeta?: ThemeMeta;
 }) {
-  const { installingIds, installTheme } = useThemeStore();
+  const { installingIds, installTheme, uninstallTheme } = useThemeStore();
+  const savedTheme = usePreferencesStore((s) => s.appTheme);
 
   const isInstalling = installingIds.has(remote.id);
+  const isActive = !!installedMeta && savedTheme === installedMeta.id;
 
-  if (installedMeta) {
-    return <InstalledCard meta={installedMeta} isBuiltin={false} />;
-  }
+  const handleApply = async () => {
+    if (!installedMeta) return;
+    await setAppTheme(installedMeta.id);
+    applyThemeColors(installedMeta);
+  };
+
+  const handleUninstall = async () => {
+    if (!installedMeta) return;
+    await uninstallTheme(installedMeta.id);
+    if (isActive) revertThemeColors();
+  };
 
   return (
-    <div className="group flex items-start justify-between rounded-lg px-4 py-3 transition-colors hover:bg-accent/60">
-      {/* Left: metadata */}
-      <div className="flex min-w-0 flex-col gap-0.5 pr-4">
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold">{remote.name}</span>
-          <span className="text-[10px] text-muted-foreground">v{remote.version}</span>
+    <div
+      className={cn(
+        "group flex items-start justify-between rounded-lg px-4 py-3 transition-colors",
+        installedMeta
+          ? isActive
+            ? "border border-primary/30 bg-primary/5"
+            : "border border-transparent hover:bg-accent/50"
+          : "border border-transparent hover:bg-accent/60",
+      )}
+    >
+      {/* Active ribbon for installed+active */}
+      {installedMeta && isActive && (
+        <div className="absolute left-0 top-1/2 h-8 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+      )}
+
+      {/* Left: thumbnail (installed only) + metadata */}
+      <div className="flex min-w-0 items-start gap-3 pr-4">
+        {installedMeta && (
+          <div className="mt-0.5 shrink-0">
+            <ThemeThumbnail colors={installedMeta.colors} />
+          </div>
+        )}
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] font-semibold">{remote.name}</span>
+            {installedMeta ? (
+              <>
+                <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[10px] font-medium text-success">
+                  Installed
+                </span>
+                {isActive && (
+                  <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                    Active
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">v{remote.version}</span>
+            )}
+          </div>
+          {remote.description && (
+            <span className="text-[11.5px] text-muted-foreground">{remote.description}</span>
+          )}
+          {remote.author && (
+            <a
+              href={remote.authorUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              <HugeiconsIcon icon={User03Icon} size={11} strokeWidth={1.5} />
+              <span>{remote.author}</span>
+            </a>
+          )}
         </div>
-        {remote.description && (
-          <span className="text-[11.5px] text-muted-foreground">{remote.description}</span>
-        )}
-        {remote.author && (
-          <a
-            href={remote.authorUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
-          >
-            <HugeiconsIcon icon={User03Icon} size={11} strokeWidth={1.5} />
-            <span>{remote.author}</span>
-          </a>
-        )}
       </div>
 
       {/* Right: actions */}
       <div className="flex shrink-0 items-center gap-1.5">
-        {remote.rawUrl && (
-          <a
-            href={remote.rawUrl}
-            target="_blank"
-            rel="noreferrer"
-            title="View theme source JSON"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent/60 hover:text-foreground group-hover:opacity-100"
-          >
-            <HugeiconsIcon icon={SourceCodeIcon} size={13} strokeWidth={2} />
-          </a>
+        {installedMeta ? (
+          <>
+            {isActive ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 cursor-default px-2.5 text-[11.5px] opacity-60"
+                disabled
+              >
+                <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="mr-1" />
+                Applied
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-[11.5px]"
+                onClick={() => void handleApply()}
+              >
+                Apply
+              </Button>
+            )}
+            <button
+              type="button"
+              title="Uninstall theme"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+              onClick={() => void handleUninstall()}
+            >
+              <HugeiconsIcon icon={Delete02Icon} size={13} strokeWidth={2} />
+            </button>
+          </>
+        ) : (
+          <>
+            {remote.rawUrl && (
+              <a
+                href={remote.rawUrl}
+                target="_blank"
+                rel="noreferrer"
+                title="View theme source JSON"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent/60 hover:text-foreground group-hover:opacity-100"
+              >
+                <HugeiconsIcon icon={SourceCodeIcon} size={13} strokeWidth={2} />
+              </a>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-[11.5px]"
+              disabled={isInstalling}
+              onClick={() => void installTheme(remote)}
+            >
+              {isInstalling ? (
+                <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+              ) : (
+                <HugeiconsIcon icon={Download02Icon} size={12} strokeWidth={2} />
+              )}
+              {isInstalling ? "Installing…" : "Install"}
+            </Button>
+          </>
         )}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 gap-1.5 px-2.5 text-[11.5px]"
-          disabled={isInstalling}
-          onClick={() => void installTheme(remote)}
-        >
-          {isInstalling ? (
-            <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
-          ) : (
-            <HugeiconsIcon icon={Download02Icon} size={12} strokeWidth={2} />
-          )}
-          {isInstalling ? "Installing…" : "Install"}
-        </Button>
       </div>
     </div>
   );

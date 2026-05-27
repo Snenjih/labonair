@@ -5,7 +5,8 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
-import { Add01Icon, AlertCircleIcon, Cancel01Icon, GithubIcon, Tick02Icon, Upload02Icon } from "@hugeicons/core-free-icons";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { Add01Icon, AlertCircleIcon, Cancel01Icon, FolderOpenIcon, GithubIcon, Tick02Icon, Upload02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { AnimatePresence, motion } from "motion/react";
@@ -149,6 +150,18 @@ export function ThemeMarketplace() {
           >
             <HugeiconsIcon icon={GithubIcon} size={12} strokeWidth={2} />
             Contribute
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 px-2.5 text-[11.5px]"
+            onClick={async () => {
+              const dir = await invoke<string>("themes_get_dir");
+              await revealItemInDir(dir);
+            }}
+          >
+            <HugeiconsIcon icon={FolderOpenIcon} size={12} strokeWidth={2} />
+            Open Folder
           </Button>
           <Button
             variant="ghost"
