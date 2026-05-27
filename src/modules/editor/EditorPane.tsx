@@ -10,15 +10,6 @@ import { lineNumbers } from "@codemirror/view";
 import { keymap, EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import {
-  setEditorBracketMatching,
-  setEditorFormatOnSave,
-  setEditorIndentationGuides,
-  setEditorLineNumbers,
-  setEditorShowOutline,
-  setEditorShowSelectionStats,
-  setEditorWordWrap,
-} from "@/modules/settings/store";
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { EDITOR_THEME_EXT } from "./lib/themes";
 import {
@@ -31,16 +22,6 @@ import {
   useState,
   startTransition,
 } from "react";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { Settings01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Streamdown } from "streamdown";
 import { Prec } from "@codemirror/state";
@@ -63,12 +44,14 @@ initVimGlobals();
 import { resolveLanguage } from "./lib/languageResolver";
 import { useDocument } from "./lib/useDocument";
 import { inlineCompletion } from "./lib/autocomplete/inlineExtension";
-import { getKey } from "@/modules/ai/lib/keyring";
-import { onKeysChanged } from "@/modules/settings/store";
 import { useEditorCursorStore } from "./lib/cursorStore";
 import { extractOutline, type OutlineItem } from "./lib/outline";
 import { OutlinePanel } from "./OutlinePanel";
 import { formatDocument } from "./lib/formatter";
+import { useCompartmentEffect } from "./lib/useCompartmentEffect";
+import { useApiKeys } from "./lib/useApiKeys";
+import { useAutoSave } from "./lib/useAutoSave";
+import { EditorToolbar } from "./EditorToolbar";
 
 export type EditorPaneHandle = {
   setQuery: (q: string) => void;
@@ -117,7 +100,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
     const editorTabSize = usePreferencesStore((s) => s.editorTabSize);
     const editorBracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
-    const editorShowSelectionStats = usePreferencesStore((s) => s.editorShowSelectionStats);
     const editorShowOutline = usePreferencesStore((s) => s.editorShowOutline);
     const editorFormatOnSave = usePreferencesStore((s) => s.editorFormatOnSave);
     const editorIndentationGuides = usePreferencesStore((s) => s.editorIndentationGuides);
@@ -164,48 +146,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         }, 150);
       }
     }, [_onChange]);
-    const apiKeyRef = useRef<string | null>(null);
-    const openaiCompatibleKeyRef = useRef<string | null>(null);
 
-    useEffect(() => {
-      let cancelled = false;
-      const refresh = async () => {
-        const provider = usePreferencesStore.getState().autocompleteProvider;
-        if (provider === "lmstudio") {
-          apiKeyRef.current = null;
-          return;
-        }
-        const k = await getKey(provider);
-        if (!cancelled) {
-          if (provider === "openai-compatible") {
-            openaiCompatibleKeyRef.current = k;
-          } else {
-            apiKeyRef.current = k;
-          }
-        }
-      };
-      // Always keep the openai-compatible key up-to-date regardless of active provider
-      const refreshCompat = async () => {
-        const k = await getKey("openai-compatible");
-        if (!cancelled) openaiCompatibleKeyRef.current = k;
-      };
-      void refresh();
-      void refreshCompat();
-      let unlistenKeys: (() => void) | undefined;
-      void onKeysChanged(() => { void refresh(); void refreshCompat(); }).then((un) => {
-        unlistenKeys = un;
-      });
-      const unsubPrefs = usePreferencesStore.subscribe((state, prev) => {
-        if (state.autocompleteProvider !== prev.autocompleteProvider) {
-          void refresh();
-        }
-      });
-      return () => {
-        cancelled = true;
-        unlistenKeys?.();
-        unsubPrefs();
-      };
-    }, []);
+    const { apiKeyRef, openaiCompatibleKeyRef } = useApiKeys();
+
     const themeExt = EDITOR_THEME_EXT[editorThemeId] ?? EDITOR_THEME_EXT.atomone;
 
     // Stabilize save + onSaved via refs so the extensions array never changes
@@ -221,65 +164,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const pathRef = useRef(path);
     pathRef.current = path;
 
-    // Reconfigure line numbers compartment when pref changes.
-    useEffect(() => {
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({
-        effects: lineNumbersCompartment.reconfigure(
-          editorLineNumbers ? lineNumbers() : [],
-        ),
-      });
-    }, [editorLineNumbers]);
-
-    // Reconfigure word wrap compartment when pref changes.
-    useEffect(() => {
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({
-        effects: wrapCompartment.reconfigure(
-          editorWordWrap ? EditorView.lineWrapping : [],
-        ),
-      });
-    }, [editorWordWrap]);
-
-    // Reconfigure tab size compartment when pref changes.
-    useEffect(() => {
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({
-        effects: tabSizeCompartment.reconfigure(
-          EditorState.tabSize.of(editorTabSize),
-        ),
-      });
-    }, [editorTabSize]);
-
-    // Reconfigure bracket matching compartment when pref changes.
-    useEffect(() => {
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({
-        effects: bracketMatchingCompartment.reconfigure(
-          editorBracketMatching ? bracketMatching() : [],
-        ),
-      });
-    }, [editorBracketMatching]);
-
-    // Reconfigure indentation guides compartment when pref changes.
-    useEffect(() => {
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({
-        effects: indentGuidesCompartment.reconfigure(
-          editorIndentationGuides ? indentationGuides : [],
-        ),
-      });
-    }, [editorIndentationGuides]);
-
-    // Auto-save: afterDelay — debounced 5 s after doc changes.
-    const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const docContentRef = useRef(doc.status === "ready" ? doc.content : "");
-    if (doc.status === "ready") docContentRef.current = doc.content;
+    useCompartmentEffect(cmRef, lineNumbersCompartment, editorLineNumbers ? lineNumbers() : [], editorLineNumbers);
+    useCompartmentEffect(cmRef, wrapCompartment, editorWordWrap ? EditorView.lineWrapping : [], editorWordWrap);
+    useCompartmentEffect(cmRef, tabSizeCompartment, EditorState.tabSize.of(editorTabSize), editorTabSize);
+    useCompartmentEffect(cmRef, bracketMatchingCompartment, editorBracketMatching ? bracketMatching() : [], editorBracketMatching);
+    useCompartmentEffect(cmRef, indentGuidesCompartment, editorIndentationGuides ? indentationGuides : [], editorIndentationGuides);
 
     // Seed previewContent when doc first loads
     useEffect(() => {
@@ -314,30 +203,22 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       return true;
     }, []);
 
-    useEffect(() => {
-      if (editorAutoSave !== "afterDelay") return;
-      if (doc.status !== "ready") return;
-      if (isUntitled) return;
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = setTimeout(async () => {
-        autoSaveTimerRef.current = null;
-        if (editorFormatOnSaveRef.current) await runFormat();
-        await saveRef.current();
-        onSavedRef.current?.();
-      }, editorAutoSaveDelay);
-      return () => {
-        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-      };
-    }, [editorAutoSave, editorAutoSaveDelay, doc, isUntitled, runFormat]);
+    const performSaveRef = useRef<() => Promise<void>>(async () => {});
+    const performSave = useCallback(async () => {
+      if (editorFormatOnSaveRef.current) await runFormat();
+      await saveRef.current();
+      onSavedRef.current?.();
+    }, [runFormat]);
+    performSaveRef.current = performSave;
+
+    useAutoSave({ performSaveRef, doc, editorAutoSave, editorAutoSaveDelay, isUntitled });
 
     // Auto-save: onFocusChange — attach blur listener to CodeMirror's DOM.
     const handleBlur = useCallback(async () => {
       if (editorAutoSave !== "onFocusChange") return;
       if (isUntitled) return;
-      if (editorFormatOnSaveRef.current) await runFormat();
-      await saveRef.current();
-      onSavedRef.current?.();
-    }, [editorAutoSave, isUntitled, runFormat]);
+      await performSaveRef.current();
+    }, [editorAutoSave, isUntitled]);
 
     const extensions = useMemo(
       () => {
@@ -349,13 +230,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             prefs.vimMode ? Prec.highest(vim()) : [],
           ),
           vimHandlersExtension(() => ({
-            save: () => {
-              void (async () => {
-                if (editorFormatOnSaveRef.current) await runFormat();
-                await saveRef.current();
-                onSavedRef.current?.();
-              })();
-            },
+            save: () => { void performSaveRef.current(); },
             close: () => onCloseRef.current?.(),
           })),
           ...buildSharedExtensions(prefs.editorFontSize),
@@ -406,14 +281,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             {
               key: "Mod-s",
               preventDefault: true,
-              run: () => {
-                void (async () => {
-                  if (editorFormatOnSaveRef.current) await runFormat();
-                  await saveRef.current();
-                  onSavedRef.current?.();
-                })();
-                return true;
-              },
+              run: () => { void performSaveRef.current(); return true; },
             },
             {
               key: "Mod-Shift-f",
@@ -476,9 +344,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [path, doc.status]);
 
-    const selectionChars = useEditorCursorStore((s) => s.selectionChars);
-    const selectionLines = useEditorCursorStore((s) => s.selectionLines);
-
     useImperativeHandle(
       ref,
       () => ({
@@ -516,11 +381,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         },
         getPath: () => path,
         reload: () => reloadRef.current(),
-        save: async () => {
-          if (editorFormatOnSaveRef.current) await runFormat();
-          await saveRef.current();
-          onSavedRef.current?.();
-        },
+        save: () => performSaveRef.current(),
         focus: () => {
           const view = cmRef.current?.view;
           if (view) view.focus();
@@ -528,7 +389,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         openFind: () => setFindOpen(true),
         closeFind: () => setFindOpen(false),
       }),
-      [path, runFormat],
+      [path],
     );
 
     const handleJump = useCallback((pos: number) => {
@@ -536,6 +397,13 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       if (!view) return;
       view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
       view.focus();
+    }, []);
+
+    const handleOutlineToggle = useCallback((v: boolean) => {
+      if (v) {
+        const view = cmRef.current?.view;
+        if (view) setOutline(extractOutline(view));
+      }
     }, []);
 
     if (doc.status === "loading") {
@@ -573,99 +441,6 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       );
     }
 
-
-    const toolbar = (
-      <div className="h-8 bg-card border-b border-border px-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="truncate text-xs text-foreground/80 font-medium">{fileName}</span>
-          {dirty && (
-            <span className="size-2 rounded-full bg-foreground/60 animate-pulse shrink-0" title="Unsaved changes" />
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {editorShowSelectionStats && selectionChars > 0 && (
-            <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-              {selectionChars} chars · {selectionLines} lines
-            </span>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <HugeiconsIcon icon={Settings01Icon} size={13} strokeWidth={1.75} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-44">
-              <DropdownMenuCheckboxItem
-                checked={editorWordWrap}
-                onCheckedChange={(v) => void setEditorWordWrap(v)}
-              >
-                Word Wrap
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={editorLineNumbers}
-                onCheckedChange={(v) => void setEditorLineNumbers(v)}
-              >
-                Line Numbers
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={editorBracketMatching}
-                onCheckedChange={(v) => void setEditorBracketMatching(v)}
-              >
-                Bracket Matching
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={editorShowSelectionStats}
-                onCheckedChange={(v) => void setEditorShowSelectionStats(v)}
-              >
-                Selection Stats
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={editorIndentationGuides}
-                onCheckedChange={(v) => void setEditorIndentationGuides(v)}
-              >
-                Indentation Guides
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                checked={editorShowOutline}
-                onCheckedChange={(v) => {
-                  void setEditorShowOutline(v);
-                  if (v) {
-                    const view = cmRef.current?.view;
-                    if (view) setOutline(extractOutline(view));
-                  }
-                }}
-              >
-                Outline
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={editorFormatOnSave}
-                onCheckedChange={(v) => void setEditorFormatOnSave(v)}
-              >
-                Format on Save
-              </DropdownMenuCheckboxItem>
-              {isMarkdownFile && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuCheckboxItem
-                    checked={markdownPreviewOpen}
-                    onCheckedChange={setMarkdownPreviewOpen}
-                  >
-                    Markdown Preview
-                  </DropdownMenuCheckboxItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-    );
-
     const codeMirrorEl = (
       <CodeMirror
         ref={cmRef}
@@ -689,10 +464,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       />
     );
 
-    // Determine if outline panel should be shown alongside the editor
-    const showOutlinePanel = editorShowOutline && outline.length >= 0;
+    const showOutlinePanel = editorShowOutline && outline.length > 0;
 
-    // Build the editor area (possibly wrapped with outline)
     const editorWithOutline = showOutlinePanel ? (
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
         <ResizablePanel defaultSize={78} minSize={40}>
@@ -709,7 +482,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
 
     return (
       <div className="flex h-full min-h-0 flex-col" onBlur={handleBlur}>
-        {toolbar}
+        <EditorToolbar
+          fileName={fileName}
+          dirty={dirty}
+          isMarkdownFile={isMarkdownFile}
+          markdownPreviewOpen={markdownPreviewOpen}
+          onMarkdownPreviewToggle={setMarkdownPreviewOpen}
+          onOutlineToggle={handleOutlineToggle}
+        />
         <FindWidget
           isOpen={findOpen}
           onClose={() => setFindOpen(false)}

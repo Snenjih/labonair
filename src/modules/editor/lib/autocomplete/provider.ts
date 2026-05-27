@@ -45,7 +45,9 @@ export async function requestCompletion(
     openaiCompatibleBaseURL: deps.openaiCompatibleBaseURL || undefined,
   });
 
-  const isReasoning = /\bgpt-oss\b/i.test(modelId);
+  // Reasoning models need a higher token cap because they consume tokens on
+  // internal chain-of-thought before emitting visible text.
+  const isReasoning = /\b(o1|o3|o4(-mini)?|r1|deepseek-r1)\b/i.test(modelId);
   const providerOptions = isReasoning
     ? {
         cerebras: { reasoningEffort: "low" },

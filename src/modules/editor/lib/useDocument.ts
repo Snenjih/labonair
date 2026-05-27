@@ -95,10 +95,15 @@ export function useDocument({ path, isUntitled, onDirtyChange, onSaveAs }: Optio
   const onSaveAsRef = useRef(onSaveAs);
   useEffect(() => { onSaveAsRef.current = onSaveAs; }, [onSaveAs]);
 
+  const pathRef = useRef(path);
+  pathRef.current = path;
+  const isUntitledRef = useRef(isUntitled);
+  isUntitledRef.current = isUntitled;
+
   const save = useCallback(async () => {
-    if (!dirty && !isUntitled) return;
+    if (!dirtyRef.current && !isUntitledRef.current) return;
     const content = bufferRef.current;
-    if (isUntitled) {
+    if (isUntitledRef.current) {
       const chosen = await dialogSave({
         defaultPath: "untitled.txt",
         filters: [{ name: "All Files", extensions: ["*"] }],
@@ -110,10 +115,10 @@ export function useDocument({ path, isUntitled, onDirtyChange, onSaveAs }: Optio
       onSaveAsRef.current?.(chosen);
       return;
     }
-    await invoke("fs_write_file", { path, content });
+    await invoke("fs_write_file", { path: pathRef.current, content });
     savedRef.current = content;
     setDirty(false);
-  }, [path, dirty, isUntitled]);
+  }, []);
 
   return { doc, dirty, onChange, save, reload };
 }

@@ -20,6 +20,20 @@ const PARSER_MAP: Record<string, PluginEntry> = {
       await import("prettier/plugins/estree"),
     ],
   },
+  mjs: {
+    parser: "babel",
+    plugins: async () => [
+      await import("prettier/plugins/babel"),
+      await import("prettier/plugins/estree"),
+    ],
+  },
+  cjs: {
+    parser: "babel",
+    plugins: async () => [
+      await import("prettier/plugins/babel"),
+      await import("prettier/plugins/estree"),
+    ],
+  },
   ts: {
     parser: "typescript",
     plugins: async () => [

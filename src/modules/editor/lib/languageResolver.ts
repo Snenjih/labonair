@@ -29,6 +29,12 @@ const loaders: Record<string, LanguageLoader> = {
 
   rs: () => import("@codemirror/lang-rust").then((m) => m.rust()),
   py: () => import("@codemirror/lang-python").then((m) => m.python()),
+  c: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  cpp: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  cc: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  cxx: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  h: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
+  hpp: () => import("@codemirror/lang-cpp").then((m) => m.cpp()),
   json: () => import("@codemirror/lang-json").then((m) => m.json()),
 
   go: () => import("@codemirror/lang-go").then((m) => m.go()),
