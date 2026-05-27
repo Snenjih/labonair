@@ -9,6 +9,7 @@ import {
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
+  setEditorAutoSaveDelay,
   setEditorBracketMatching,
   setEditorFormatOnSave,
   setEditorIndentationGuides,
@@ -29,6 +30,7 @@ import { SettingRow } from "../components/SettingRow";
 export function EditorSection() {
   const editorTheme = usePreferencesStore((s) => s.editorTheme);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
+  const editorAutoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
   const editorTabSize = usePreferencesStore((s) => s.editorTabSize);
   const editorLineNumbers = usePreferencesStore((s) => s.editorLineNumbers);
   const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
@@ -97,11 +99,30 @@ export function EditorSection() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="off" className="text-[11.5px]">Off</SelectItem>
-                <SelectItem value="afterDelay" className="text-[11.5px]">After delay (5s)</SelectItem>
+                <SelectItem value="afterDelay" className="text-[11.5px]">After delay</SelectItem>
                 <SelectItem value="onFocusChange" className="text-[11.5px]">On focus change</SelectItem>
               </SelectContent>
             </Select>
           </SettingRow>
+          {editorAutoSave === "afterDelay" && (
+            <SettingRow
+              title="Auto save delay"
+              description="Milliseconds of inactivity before the file is auto-saved (100 – 60 000 ms)."
+            >
+              <input
+                type="number"
+                min={100}
+                max={60000}
+                step={100}
+                value={editorAutoSaveDelay}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (!Number.isNaN(v)) void setEditorAutoSaveDelay(v);
+                }}
+                className="h-7 w-24 rounded-md border border-border/60 bg-transparent px-2 text-center text-[11.5px] [appearance:textfield] focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </SettingRow>
+          )}
           <SettingRow
             title="Tab size"
             description="Number of spaces per indentation level."

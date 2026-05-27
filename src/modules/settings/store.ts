@@ -84,6 +84,7 @@ export type Preferences = {
   // --- Editor ---
   editorFontSize: number;
   editorAutoSave: "off" | "afterDelay" | "onFocusChange";
+  editorAutoSaveDelay: number;
   editorLineNumbers: boolean;
   editorWordWrap: boolean;
   editorTabSize: 2 | 4 | 8;
@@ -197,6 +198,7 @@ const KEY_TERMINAL_BELL = "terminalBell";
 
 const KEY_EDITOR_FONT_SIZE = "editorFontSize";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
+const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
 const KEY_EDITOR_LINE_NUMBERS = "editorLineNumbers";
 const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
 const KEY_EDITOR_TAB_SIZE = "editorTabSize";
@@ -289,6 +291,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
   editorFontSize: 13,
   editorAutoSave: "off",
+  editorAutoSaveDelay: 1000,
   editorLineNumbers: true,
   editorWordWrap: false,
   editorTabSize: 2,
@@ -457,6 +460,14 @@ export async function loadPreferences(): Promise<Preferences> {
     editorAutoSave:
       get<"off" | "afterDelay" | "onFocusChange">(KEY_EDITOR_AUTO_SAVE) ??
       DEFAULT_PREFERENCES.editorAutoSave,
+    editorAutoSaveDelay: Math.min(
+      60000,
+      Math.max(
+        100,
+        get<number>(KEY_EDITOR_AUTO_SAVE_DELAY) ??
+          DEFAULT_PREFERENCES.editorAutoSaveDelay,
+      ),
+    ),
     editorLineNumbers:
       get<boolean>(KEY_EDITOR_LINE_NUMBERS) ??
       DEFAULT_PREFERENCES.editorLineNumbers,
@@ -775,6 +786,12 @@ export async function setEditorAutoSave(
   await (await getStore()).save();
 }
 
+export async function setEditorAutoSaveDelay(value: number): Promise<void> {
+  const clamped = Math.min(60000, Math.max(100, value));
+  await (await getStore()).set(KEY_EDITOR_AUTO_SAVE_DELAY, clamped);
+  await (await getStore()).save();
+}
+
 export async function setEditorLineNumbers(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_EDITOR_LINE_NUMBERS, value);
   await (await getStore()).save();
@@ -1065,6 +1082,7 @@ export async function onPreferencesChange(
 
     [KEY_EDITOR_FONT_SIZE]: "editorFontSize",
     [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
+    [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",
     [KEY_EDITOR_LINE_NUMBERS]: "editorLineNumbers",
     [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
     [KEY_EDITOR_TAB_SIZE]: "editorTabSize",

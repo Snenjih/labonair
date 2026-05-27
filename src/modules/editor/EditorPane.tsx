@@ -112,6 +112,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const editorThemeId = usePreferencesStore((s) => s.editorTheme);
     const vimMode = usePreferencesStore((s) => s.vimMode);
     const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
+    const editorAutoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
     const editorLineNumbers = usePreferencesStore((s) => s.editorLineNumbers);
     const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
     const editorTabSize = usePreferencesStore((s) => s.editorTabSize);
@@ -323,11 +324,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         if (editorFormatOnSaveRef.current) await runFormat();
         await saveRef.current();
         onSavedRef.current?.();
-      }, 5000);
+      }, editorAutoSaveDelay);
       return () => {
         if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
       };
-    }, [editorAutoSave, doc, isUntitled, runFormat]);
+    }, [editorAutoSave, editorAutoSaveDelay, doc, isUntitled, runFormat]);
 
     // Auto-save: onFocusChange — attach blur listener to CodeMirror's DOM.
     const handleBlur = useCallback(async () => {
