@@ -185,6 +185,12 @@ export default function App() {
     homeDir().then(setHome).catch(() => setHome(null));
   }, []);
 
+  useEffect(() => {
+    invoke<number>("get_display_hz")
+      .then((hz) => usePreferencesStore.setState({ displayHz: hz }))
+      .catch(() => {});
+  }, []);
+
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const toggleCommandPalette = useCommandStore((s) => s.toggle);
   const miniOpen = useChatStore((s) => s.mini.open);
@@ -225,7 +231,6 @@ export default function App() {
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
-  const reduceMotion = usePreferencesStore((s) => s.reduceMotion);
   const newTabInheritsCwd = usePreferencesStore((s) => s.newTabInheritsCwd);
   const confirmCloseTerminalTab = usePreferencesStore((s) => s.confirmCloseTerminalTab);
   const confirmQuitWithSsh = usePreferencesStore((s) => s.confirmQuitWithSsh);
@@ -1035,7 +1040,7 @@ export default function App() {
   );
 
   const shell = (
-    <MotionConfig reducedMotion={reduceMotion ? "always" : "never"}>
+    <MotionConfig reducedMotion="user">
     <ThemeProvider>
       <TooltipProvider>
         <div className="relative z-[1] flex h-screen flex-col overflow-hidden bg-background text-foreground">

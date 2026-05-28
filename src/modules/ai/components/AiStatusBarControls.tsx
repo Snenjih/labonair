@@ -53,6 +53,7 @@ export function AiOpenButton({ onOpen }: { onOpen: () => void }) {
       animate={{ y: 0 }}
       type="button"
       onClick={onOpen}
+      style={{ willChange: "transform, opacity" }}
       className={cn(
         "flex h-6 items-center gap-1.5 rounded-md border border-border/60 bg-card px-2 text-xs",
         "text-muted-foreground transition-colors hover:border-border hover:bg-accent hover:text-foreground",

@@ -530,7 +530,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           </div>
         )}
         {isDisconnected && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80">
             <div className="rounded-xl border border-border bg-card p-6 shadow-xl flex flex-col items-center gap-3 max-w-xs text-center">
               <span className="text-base font-semibold text-foreground">Connection Lost</span>
               <span className="text-sm text-muted-foreground">{disconnectReason}</span>

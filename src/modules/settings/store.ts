@@ -155,6 +155,9 @@ export type Preferences = {
 
   // --- Tabs ---
   tabsLocation: "titlebar" | "sidebar";
+
+  // --- Display ---
+  displayHz: number;
 };
 
 const KEY_THEME = "theme";
@@ -347,6 +350,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   titlebarsIconsPosition: "auto",
 
   tabsLocation: "titlebar",
+
+  displayHz: 60,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -583,6 +588,8 @@ export async function loadPreferences(): Promise<Preferences> {
 
     tabsLocation:
       get<"titlebar" | "sidebar">(KEY_TABS_LOCATION) ?? DEFAULT_PREFERENCES.tabsLocation,
+
+    displayHz: DEFAULT_PREFERENCES.displayHz,
   };
 }
 

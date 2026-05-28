@@ -39,6 +39,7 @@ export function AiTools({ aiOpen, canSubmit, onOpenAi, onSubmit }: Props) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -2 }}
           transition={{ duration: 0.12, ease: "easeOut" }}
+          style={{ willChange: "transform, opacity" }}
           className="flex items-center gap-0.5"
         >
           <ModelSelector />
@@ -61,6 +62,7 @@ export function AiTools({ aiOpen, canSubmit, onOpenAi, onSubmit }: Props) {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -2 }}
           transition={{ duration: 0.12, ease: "easeOut" }}
+          style={{ willChange: "transform, opacity" }}
           onClick={onOpenAi}
           className="flex h-7 items-center gap-2 rounded-md border border-border/60 bg-card px-2 text-xs text-muted-foreground hover:text-foreground"
         >

@@ -93,7 +93,7 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3 sticky top-0 bg-background/95 backdrop-blur-sm z-10">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3 sticky top-0 bg-background z-10">
         <div className="min-w-0 flex-1">
           <input
             value={current.name}

@@ -330,6 +330,31 @@ fn build_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
     ])
 }
 
+#[tauri::command]
+fn get_display_hz() -> u32 {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::runtime::AnyClass;
+        use objc2::msg_send;
+        unsafe {
+            let cls = match AnyClass::get(c"NSScreen") {
+                Some(c) => c,
+                None => return 60,
+            };
+            let main_screen: *mut objc2::runtime::AnyObject = msg_send![cls, mainScreen];
+            if main_screen.is_null() {
+                return 60;
+            }
+            let hz: f64 = msg_send![main_screen, maximumFramesPerSecond];
+            hz as u32
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        60
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -413,6 +438,27 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             modules::dock_menu::setup(&app.app_handle());
+
+            // macOS: enable asynchronous CAMetalLayer rendering to reduce latency
+            // on ProMotion / high-refresh-rate displays. Done after the window is
+            // realized so the WKWebView layer hierarchy is already set up.
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.with_webview(|webview| {
+                        use objc2::msg_send;
+                        use objc2::runtime::AnyObject;
+                        unsafe {
+                            let ns_view: *mut AnyObject = webview.inner() as *mut AnyObject;
+                            let layer: *mut AnyObject = msg_send![ns_view, layer];
+                            if !layer.is_null() {
+                                let _: () = msg_send![layer, setDrawsAsynchronously: true];
+                                let _: () = msg_send![layer, setPresentsWithTransaction: false];
+                            }
+                        }
+                    });
+                }
+            }
 
             app.on_menu_event(|app, event| {
                 match event.id().as_ref() {
@@ -544,6 +590,7 @@ pub fn run() {
             background_import,
             background_delete,
             background_read_data_url,
+            get_display_hz,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
