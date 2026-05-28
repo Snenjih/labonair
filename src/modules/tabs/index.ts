@@ -1,5 +1,6 @@
 export { TabBar } from "./TabBar";
 export { SidebarTabList } from "./SidebarTabList";
+export { TabIconFor, labelFor, useRecentHosts, NewTabDropdownItems } from "./lib/tabUtils";
 export {
   useTabs,
   type Tab,

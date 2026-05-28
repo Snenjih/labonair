@@ -130,6 +130,8 @@ export type Preferences = {
 
   // --- Host Manager ---
   hostPingInterval: number;
+  hmLayout: "grid" | "list";
+  hmSort: "last_connected" | "a_z" | "z_a";
 
   // --- AI ---
   aiEnabled: boolean;
@@ -243,6 +245,8 @@ const KEY_SIDEBAR_POSITION = "sidebarPosition";
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 const KEY_HOST_PING_INTERVAL = "hostPingInterval";
+const KEY_HM_LAYOUT = "hmLayout";
+const KEY_HM_SORT = "hmSort";
 const KEY_AI_ENABLED = "aiEnabled";
 const KEY_SHOW_EDIT_PREDICTION = "showEditPrediction";
 const KEY_AI_MAX_AGENT_STEPS = "aiMaxAgentSteps";
@@ -343,6 +347,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   checkForUpdates: true,
 
   hostPingInterval: 60,
+  hmLayout: "grid",
+  hmSort: "last_connected",
 
   aiEnabled: true,
   showEditPrediction: true,
@@ -589,6 +595,10 @@ export async function loadPreferences(): Promise<Preferences> {
 
     hostPingInterval:
       get<number>(KEY_HOST_PING_INTERVAL) ?? DEFAULT_PREFERENCES.hostPingInterval,
+    hmLayout:
+      get<"grid" | "list">(KEY_HM_LAYOUT) ?? DEFAULT_PREFERENCES.hmLayout,
+    hmSort:
+      get<"last_connected" | "a_z" | "z_a">(KEY_HM_SORT) ?? DEFAULT_PREFERENCES.hmSort,
 
     aiEnabled:
       get<boolean>(KEY_AI_ENABLED) ?? DEFAULT_PREFERENCES.aiEnabled,
@@ -963,6 +973,16 @@ export async function setHostPingInterval(value: number): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setHmLayout(value: "grid" | "list"): Promise<void> {
+  await (await getStore()).set(KEY_HM_LAYOUT, value);
+  await (await getStore()).save();
+}
+
+export async function setHmSort(value: "last_connected" | "a_z" | "z_a"): Promise<void> {
+  await (await getStore()).set(KEY_HM_SORT, value);
+  await (await getStore()).save();
+}
+
 export async function setAiEnabled(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_AI_ENABLED, value);
   await (await getStore()).save();
@@ -1194,6 +1214,8 @@ export async function onPreferencesChange(
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_HOST_PING_INTERVAL]: "hostPingInterval",
+    [KEY_HM_LAYOUT]: "hmLayout",
+    [KEY_HM_SORT]: "hmSort",
     [KEY_AI_ENABLED]: "aiEnabled",
     [KEY_SHOW_EDIT_PREDICTION]: "showEditPrediction",
     [KEY_AI_MAX_AGENT_STEPS]: "aiMaxAgentSteps",
