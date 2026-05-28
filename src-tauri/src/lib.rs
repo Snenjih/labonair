@@ -453,7 +453,6 @@ pub fn run() {
                             let layer: *mut AnyObject = msg_send![ns_view, layer];
                             if !layer.is_null() {
                                 let _: () = msg_send![layer, setDrawsAsynchronously: true];
-                                let _: () = msg_send![layer, setPresentsWithTransaction: false];
                             }
                         }
                     });
