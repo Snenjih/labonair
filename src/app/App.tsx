@@ -727,6 +727,14 @@ export default function App() {
       openHomeTab();
       setTimeout(() => setSelectedHost("__new__"), 150);
     },
+    jumpToEditorPosition: (pos: number) => {
+      const { activeId: aid } = useTabsStore.getState();
+      editorRefs.current.get(aid)?.jumpToPosition(pos);
+    },
+    formatEditorDocument: () => {
+      const { activeId: aid } = useTabsStore.getState();
+      editorRefs.current.get(aid)?.format();
+    },
   }), [
     openNewTab,
     openUntitledTab,

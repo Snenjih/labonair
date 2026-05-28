@@ -6,6 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setEditorAutoSave,
@@ -20,6 +21,12 @@ import {
   setEditorTabSize,
   setEditorWordWrap,
   setEditorTheme,
+  setEditorFontFamily,
+  setEditorLineHeight,
+  setEditorIndentWithTabs,
+  setEditorTrimTrailingWhitespace,
+  setEditorInsertFinalNewline,
+  setEditorAutocompleteDebounceMs,
   EDITOR_THEMES,
   EDITOR_THEME_LABELS,
   type EditorThemeId,
@@ -29,9 +36,12 @@ import { SettingRow } from "../components/SettingRow";
 
 export function EditorSection() {
   const editorTheme = usePreferencesStore((s) => s.editorTheme);
+  const editorFontFamily = usePreferencesStore((s) => s.editorFontFamily);
+  const editorLineHeight = usePreferencesStore((s) => s.editorLineHeight);
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const editorAutoSaveDelay = usePreferencesStore((s) => s.editorAutoSaveDelay);
   const editorTabSize = usePreferencesStore((s) => s.editorTabSize);
+  const editorIndentWithTabs = usePreferencesStore((s) => s.editorIndentWithTabs);
   const editorLineNumbers = usePreferencesStore((s) => s.editorLineNumbers);
   const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
   const editorBracketMatching = usePreferencesStore((s) => s.editorBracketMatching);
@@ -40,6 +50,9 @@ export function EditorSection() {
   const editorShowOutline = usePreferencesStore((s) => s.editorShowOutline);
   const editorFormatOnSave = usePreferencesStore((s) => s.editorFormatOnSave);
   const editorIndentationGuides = usePreferencesStore((s) => s.editorIndentationGuides);
+  const editorTrimTrailingWhitespace = usePreferencesStore((s) => s.editorTrimTrailingWhitespace);
+  const editorInsertFinalNewline = usePreferencesStore((s) => s.editorInsertFinalNewline);
+  const editorAutocompleteDebounceMs = usePreferencesStore((s) => s.editorAutocompleteDebounceMs);
 
   return (
     <div className="flex flex-col gap-6">
@@ -70,6 +83,34 @@ export function EditorSection() {
             </SelectContent>
           </Select>
         </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Font</Label>
+        <div className="flex flex-col gap-2">
+          <SettingRow
+            title="Font family"
+            description="Monospace font used in the code editor."
+          >
+            <Input
+              value={editorFontFamily}
+              onChange={(e) => void setEditorFontFamily(e.target.value)}
+              className="h-7 w-52 text-[11.5px]"
+            />
+          </SettingRow>
+          <SettingRow
+            title="Line height"
+            description="Vertical spacing between lines in the code editor (1.0 – 3.0)."
+          >
+            <NumInput
+              value={editorLineHeight}
+              min={1.0}
+              max={3.0}
+              step={0.05}
+              onChange={(v) => void setEditorLineHeight(v)}
+            />
+          </SettingRow>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -145,6 +186,19 @@ export function EditorSection() {
       </div>
 
       <div className="flex flex-col gap-2">
+        <Label>Indentation</Label>
+        <SettingRow
+          title="Indent with tabs"
+          description="Use tab characters for indentation instead of spaces."
+        >
+          <Switch
+            checked={editorIndentWithTabs}
+            onCheckedChange={(v) => void setEditorIndentWithTabs(v)}
+          />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Label>Display</Label>
         <div className="flex flex-col gap-2">
           <SettingRow
@@ -212,6 +266,46 @@ export function EditorSection() {
           </SettingRow>
         </div>
       </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>On Save</Label>
+        <div className="flex flex-col gap-2">
+          <SettingRow
+            title="Trim trailing whitespace"
+            description="Remove trailing whitespace from each line when saving."
+          >
+            <Switch
+              checked={editorTrimTrailingWhitespace}
+              onCheckedChange={(v) => void setEditorTrimTrailingWhitespace(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Insert final newline"
+            description="Ensure files end with a newline character when saving."
+          >
+            <Switch
+              checked={editorInsertFinalNewline}
+              onCheckedChange={(v) => void setEditorInsertFinalNewline(v)}
+            />
+          </SettingRow>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>AI Completion</Label>
+        <SettingRow
+          title="Autocomplete debounce (ms)"
+          description="Delay in milliseconds before autocomplete suggestions are triggered (50 – 2000 ms)."
+        >
+          <NumInput
+            value={editorAutocompleteDebounceMs}
+            min={50}
+            max={2000}
+            step={50}
+            onChange={(v) => void setEditorAutocompleteDebounceMs(v)}
+          />
+        </SettingRow>
+      </div>
     </div>
   );
 }
@@ -221,5 +315,31 @@ function Label({ children }: { children: React.ReactNode }) {
     <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
       {children}
     </span>
+  );
+}
+
+function NumInput({
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="h-7 w-20 rounded-md border border-border/60 bg-transparent px-2 text-center text-[11.5px] focus:outline-none focus:ring-1 focus:ring-ring"
+    />
   );
 }

@@ -11,6 +11,7 @@ import { useSnippetCommands } from "./hooks/useSnippetCommands";
 import { useAiSessionCommands } from "./hooks/useAiSessionCommands";
 import { useTerminalCommands } from "./hooks/useTerminalCommands";
 import { useSftpCommands } from "./hooks/useSftpCommands";
+import { useEditorCommands } from "./hooks/useEditorCommands";
 
 type Registry = Record<string, CommandPage>;
 
@@ -31,6 +32,7 @@ export function useCommandRegistry(
   const { rootActions: aiRootActions, aiSessionsPage } = useAiSessionCommands(cb);
   const terminalPage = useTerminalCommands(cb);
   const { rootActions: sftpActionRoots } = useSftpCommands(activeTabId);
+  const { rootActions: editorRootActions, outlinePage } = useEditorCommands(cb);
 
   return useMemo(() => {
     const filterByContext = (actions: CommandAction[]): CommandAction[] => {
@@ -51,6 +53,7 @@ export function useCommandRegistry(
       ...filterByContext(snippetRootActions),
       ...filterByContext(aiRootActions),
       ...filterByContext(settingsRootActions),
+      ...filterByContext(editorRootActions),
     ];
 
     const rootPage: CommandPage = {
@@ -70,6 +73,7 @@ export function useCommandRegistry(
       tabs: tabsPage,
       snippets: snippetsPage,
       "ai-sessions": aiSessionsPage,
+      outline: outlinePage,
     };
   }, [
     systemPage,
@@ -92,5 +96,7 @@ export function useCommandRegistry(
     terminalPage,
     sftpActionRoots,
     activeContext,
+    editorRootActions,
+    outlinePage,
   ]);
 }

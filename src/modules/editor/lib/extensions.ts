@@ -13,14 +13,21 @@ export const lineNumbersCompartment = new Compartment();
 export const bracketMatchingCompartment = new Compartment();
 export const tabSizeCompartment = new Compartment();
 export const indentGuidesCompartment = new Compartment();
+export const fontFamilyCompartment = new Compartment();
+export const lineHeightCompartment = new Compartment();
+export const indentWithTabsCompartment = new Compartment();
 
 // Only what basicSetup doesn't already cover, to avoid duplicate extensions.
 // basicSetup gives us line numbers, fold gutter, history, indentOnInput,
 // bracketMatching, closeBrackets, autocompletion, highlightActiveLine,
 // highlightSelectionMatches and the search keymap.
-export function buildSharedExtensions(fontSize = 13): Extension[] {
+export function buildSharedExtensions(
+  fontSize = 13,
+  fontFamily = '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
+  lineHeight = 1.55,
+): Extension[] {
   return [
-    indentUnit.of("  "),
+    indentWithTabsCompartment.of(indentUnit.of("  ")),
     EditorState.tabSize.of(2),
     keymap.of([{ key: "Mod-f", run: () => true }]),
     lintGutter(),
@@ -29,6 +36,8 @@ export function buildSharedExtensions(fontSize = 13): Extension[] {
         ".cm-scroller": { fontSize: `${fontSize}px` },
       }),
     ),
+    fontFamilyCompartment.of(EditorView.theme({ ".cm-scroller": { fontFamily } })),
+    lineHeightCompartment.of(EditorView.theme({ ".cm-scroller": { lineHeight: String(lineHeight) } })),
     EditorView.theme({
       "&, &.cm-editor, &.cm-editor.cm-focused": {
         backgroundColor: "transparent !important",
@@ -37,8 +46,6 @@ export function buildSharedExtensions(fontSize = 13): Extension[] {
         padding: "8px",
       },
       ".cm-scroller": {
-        fontFamily: '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
-        lineHeight: "1.55",
         backgroundColor: "transparent !important",
       },
       ".cm-content": {

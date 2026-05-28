@@ -268,6 +268,48 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Editor ---
   {
+    id: "editorFontFamily",
+    label: "Editor font family",
+    description: "Monospace font used in the code editor.",
+    category: "Editor",
+    controlType: "Input",
+  },
+  {
+    id: "editorLineHeight",
+    label: "Editor line height",
+    description: "Vertical spacing between lines in the code editor (1.0 – 3.0).",
+    category: "Editor",
+    controlType: "NumberInput",
+  },
+  {
+    id: "editorIndentWithTabs",
+    label: "Indent with tabs",
+    description: "Use tab characters for indentation instead of spaces.",
+    category: "Editor",
+    controlType: "Switch",
+  },
+  {
+    id: "editorTrimTrailingWhitespace",
+    label: "Trim trailing whitespace",
+    description: "Remove trailing whitespace from each line when saving.",
+    category: "Editor",
+    controlType: "Switch",
+  },
+  {
+    id: "editorInsertFinalNewline",
+    label: "Insert final newline",
+    description: "Ensure files end with a newline character when saving.",
+    category: "Editor",
+    controlType: "Switch",
+  },
+  {
+    id: "editorAutocompleteDebounceMs",
+    label: "Autocomplete debounce (ms)",
+    description: "Delay in milliseconds before autocomplete suggestions are triggered (50 – 2000 ms).",
+    category: "Editor",
+    controlType: "NumberInput",
+  },
+  {
     id: "editorAutoSave",
     label: "Auto save",
     description: "Automatically save files when idle or on focus change.",
