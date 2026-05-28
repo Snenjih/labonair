@@ -3,9 +3,11 @@ import {
   findPrevious,
   SearchQuery,
   setSearchQuery,
+  gotoLine,
 } from "@codemirror/search";
+import { toggleComment } from "@codemirror/commands";
 import { FindWidget } from "@/modules/search";
-import { bracketMatching } from "@codemirror/language";
+import { bracketMatching, foldCode, unfoldCode, foldAll, unfoldAll, indentUnit } from "@codemirror/language";
 import { lineNumbers } from "@codemirror/view";
 import { keymap, EditorView } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
@@ -29,9 +31,12 @@ import { vim } from "@replit/codemirror-vim";
 import {
   bracketMatchingCompartment,
   buildSharedExtensions,
+  fontFamilyCompartment,
   fontSizeCompartment,
   indentGuidesCompartment,
+  indentWithTabsCompartment,
   languageCompartment,
+  lineHeightCompartment,
   lineNumbersCompartment,
   tabSizeCompartment,
   vimCompartment,
@@ -46,6 +51,7 @@ import { useDocument } from "./lib/useDocument";
 import { inlineCompletion } from "./lib/autocomplete/inlineExtension";
 import { useEditorCursorStore } from "./lib/cursorStore";
 import { extractOutline, type OutlineItem } from "./lib/outline";
+import { useEditorMetaStore } from "./lib/editorMetaStore";
 import { OutlinePanel } from "./OutlinePanel";
 import { formatDocument } from "./lib/formatter";
 import { useCompartmentEffect } from "./lib/useCompartmentEffect";
@@ -67,6 +73,10 @@ export type EditorPaneHandle = {
   focus: () => void;
   openFind: () => void;
   closeFind: () => void;
+  /** Jump to a character position in the document. */
+  jumpToPosition: (pos: number) => void;
+  /** Format the current buffer via Prettier. */
+  format: () => void;
 };
 
 type Props = {
@@ -103,6 +113,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const editorShowOutline = usePreferencesStore((s) => s.editorShowOutline);
     const editorFormatOnSave = usePreferencesStore((s) => s.editorFormatOnSave);
     const editorIndentationGuides = usePreferencesStore((s) => s.editorIndentationGuides);
+    const editorFontFamily = usePreferencesStore((s) => s.editorFontFamily);
+    const editorLineHeight = usePreferencesStore((s) => s.editorLineHeight);
+    const editorIndentWithTabs = usePreferencesStore((s) => s.editorIndentWithTabs);
+    const editorTrimTrailingWhitespace = usePreferencesStore((s) => s.editorTrimTrailingWhitespace);
+    const editorInsertFinalNewline = usePreferencesStore((s) => s.editorInsertFinalNewline);
     const languageRef = useRef<string | null>(null);
 
     const fileName = path.split("/").pop() ?? (isUntitled ? "Untitled" : path);
@@ -112,7 +127,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const [markdownPreviewOpen, setMarkdownPreviewOpen] = useState(false);
     const [previewContent, setPreviewContent] = useState("");
     const [findOpen, setFindOpen] = useState(false);
+    const [showReplaceInFind, setShowReplaceInFind] = useState(false);
     const [outline, setOutline] = useState<OutlineItem[]>([]);
+    const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
+    const languageOverrideRef = useRef<string | null>(null);
     const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const outlineDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -169,6 +187,9 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     useCompartmentEffect(cmRef, tabSizeCompartment, EditorState.tabSize.of(editorTabSize), editorTabSize);
     useCompartmentEffect(cmRef, bracketMatchingCompartment, editorBracketMatching ? bracketMatching() : [], editorBracketMatching);
     useCompartmentEffect(cmRef, indentGuidesCompartment, editorIndentationGuides ? indentationGuides : [], editorIndentationGuides);
+    useCompartmentEffect(cmRef, fontFamilyCompartment, EditorView.theme({ ".cm-scroller": { fontFamily: editorFontFamily } }), editorFontFamily);
+    useCompartmentEffect(cmRef, lineHeightCompartment, EditorView.theme({ ".cm-scroller": { lineHeight: String(editorLineHeight) } }), editorLineHeight);
+    useCompartmentEffect(cmRef, indentWithTabsCompartment, indentUnit.of(editorIndentWithTabs ? "\t" : "  "), editorIndentWithTabs);
 
     // Seed previewContent when doc first loads
     useEffect(() => {
@@ -182,13 +203,25 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     useEffect(() => {
       if (doc.status === "ready" && editorShowOutline) {
         const view = cmRef.current?.view;
-        if (view) setOutline(extractOutline(view));
+        if (view) {
+          const items = extractOutline(view);
+          setOutline(items);
+          if (isActive) {
+            useEditorMetaStore.getState().setOutline(items);
+          }
+        }
       }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [doc.status]);
 
     const editorFormatOnSaveRef = useRef(editorFormatOnSave);
     editorFormatOnSaveRef.current = editorFormatOnSave;
+    const editorTrimTrailingWhitespaceRef = useRef(editorTrimTrailingWhitespace);
+    editorTrimTrailingWhitespaceRef.current = editorTrimTrailingWhitespace;
+    const editorInsertFinalNewlineRef = useRef(editorInsertFinalNewline);
+    editorInsertFinalNewlineRef.current = editorInsertFinalNewline;
+    const editorShowOutlineRef = useRef(editorShowOutline);
+    editorShowOutlineRef.current = editorShowOutline;
 
     /** Format the current buffer via Prettier and apply to the editor. Returns whether formatting ran. */
     const runFormat = useCallback(async (): Promise<boolean> => {
@@ -206,6 +239,21 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const performSaveRef = useRef<() => Promise<void>>(async () => {});
     const performSave = useCallback(async () => {
       if (editorFormatOnSaveRef.current) await runFormat();
+      // Apply on-save transforms (trim whitespace, insert final newline)
+      const view = cmRef.current?.view;
+      if (view && (editorTrimTrailingWhitespaceRef.current || editorInsertFinalNewlineRef.current)) {
+        const current = view.state.doc.toString();
+        let processed = current;
+        if (editorTrimTrailingWhitespaceRef.current) {
+          processed = processed.split('\n').map((l) => l.trimEnd()).join('\n');
+        }
+        if (editorInsertFinalNewlineRef.current && !processed.endsWith('\n')) {
+          processed += '\n';
+        }
+        if (processed !== current) {
+          view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: processed } });
+        }
+      }
       await saveRef.current();
       onSavedRef.current?.();
     }, [runFormat]);
@@ -233,7 +281,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             save: () => { void performSaveRef.current(); },
             close: () => onCloseRef.current?.(),
           })),
-          ...buildSharedExtensions(prefs.editorFontSize),
+          ...buildSharedExtensions(prefs.editorFontSize, prefs.editorFontFamily, prefs.editorLineHeight),
           lineNumbersCompartment.of(prefs.editorLineNumbers ? lineNumbers() : []),
           bracketMatchingCompartment.of(prefs.editorBracketMatching ? bracketMatching() : []),
           tabSizeCompartment.of(EditorState.tabSize.of(prefs.editorTabSize)),
@@ -251,6 +299,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
                 lmstudioBaseURL: s.lmstudioBaseURL,
                 openaiCompatibleBaseURL: s.openaiCompatibleBaseURL,
                 openaiCompatibleApiKey: openaiCompatibleKeyRef.current,
+                debounceMs: s.editorAutocompleteDebounceMs,
               };
             },
             getPath: () => pathRef.current,
@@ -270,10 +319,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
                 update.state.doc.lineAt(sel.from).number + 1;
             useEditorCursorStore.getState().set(line.number, col, chars, lines);
 
-            if (update.docChanged) {
+            if (update.docChanged && editorShowOutlineRef.current) {
               if (outlineDebounceRef.current) clearTimeout(outlineDebounceRef.current);
               outlineDebounceRef.current = setTimeout(() => {
-                setOutline(extractOutline(update.view));
+                const items = extractOutline(update.view);
+                setOutline(items);
+                if (isActiveRef.current) {
+                  useEditorMetaStore.getState().setOutline(items);
+                }
               }, 250);
             }
           }),
@@ -286,11 +339,16 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
             {
               key: "Mod-Shift-f",
               preventDefault: true,
-              run: () => {
-                void runFormat();
-                return true;
-              },
+              run: () => { void runFormat(); return true; },
             },
+            { key: "Mod-f",       preventDefault: true, run: () => { setFindOpen(true); setShowReplaceInFind(false); return true; } },
+            { key: "Mod-Alt-f",   preventDefault: true, run: () => { setFindOpen(true); setShowReplaceInFind(true); return true; } },
+            { key: "Mod-g",       run: gotoLine,        preventDefault: true },
+            { key: "Mod-[",       run: foldCode,        preventDefault: true },
+            { key: "Mod-]",       run: unfoldCode,      preventDefault: true },
+            { key: "Mod-Shift-[", run: foldAll,         preventDefault: true },
+            { key: "Mod-Shift-]", run: unfoldAll,       preventDefault: true },
+            { key: "Mod-/",       run: toggleComment,   preventDefault: true },
           ]),
         ];
       },
@@ -322,10 +380,41 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       });
     }, []);
 
+    // Reconfigure font family compartment when editorFontFamily pref changes.
+    useEffect(() => {
+      return usePreferencesStore.subscribe((state, prev) => {
+        if (state.editorFontFamily === prev.editorFontFamily) return;
+        const view = cmRef.current?.view;
+        if (!view) return;
+        view.dispatch({
+          effects: fontFamilyCompartment.reconfigure(
+            EditorView.theme({ ".cm-scroller": { fontFamily: state.editorFontFamily } }),
+          ),
+        });
+      });
+    }, []);
+
+    // Reconfigure line height compartment when editorLineHeight pref changes.
+    useEffect(() => {
+      return usePreferencesStore.subscribe((state, prev) => {
+        if (state.editorLineHeight === prev.editorLineHeight) return;
+        const view = cmRef.current?.view;
+        if (!view) return;
+        view.dispatch({
+          effects: lineHeightCompartment.reconfigure(
+            EditorView.theme({ ".cm-scroller": { lineHeight: String(state.editorLineHeight) } }),
+          ),
+        });
+      });
+    }, []);
+
     useEffect(() => {
       let cancelled = false;
       const extStr = path.split(".").pop()?.toLowerCase() ?? null;
       languageRef.current = extStr;
+      // Clear any manual language override when the file path changes
+      languageOverrideRef.current = null;
+      setDetectedLanguage(extStr ?? null);
       resolveLanguage(path).then((ext) => {
         if (cancelled) return;
         const view = cmRef.current?.view;
@@ -343,6 +432,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
       };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [path, doc.status]);
+
+    const handleLanguageOverride = useCallback(async (ext: string) => {
+      languageOverrideRef.current = ext || null;
+      setDetectedLanguage(ext || null);
+      const lang = ext ? await resolveLanguage(`file.${ext}`) : null;
+      const view = cmRef.current?.view;
+      if (!view) return;
+      view.dispatch({
+        effects: languageCompartment.reconfigure(lang ?? []),
+      });
+    }, []);
 
     useImperativeHandle(
       ref,
@@ -386,10 +486,17 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           const view = cmRef.current?.view;
           if (view) view.focus();
         },
-        openFind: () => setFindOpen(true),
+        openFind: () => { setFindOpen(true); setShowReplaceInFind(false); },
         closeFind: () => setFindOpen(false),
+        jumpToPosition: (pos: number) => {
+          const view = cmRef.current?.view;
+          if (!view) return;
+          view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+          view.focus();
+        },
+        format: () => { void runFormat(); },
       }),
-      [path],
+      [path, runFormat],
     );
 
     const handleJump = useCallback((pos: number) => {
@@ -489,12 +596,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           markdownPreviewOpen={markdownPreviewOpen}
           onMarkdownPreviewToggle={setMarkdownPreviewOpen}
           onOutlineToggle={handleOutlineToggle}
+          detectedLanguage={detectedLanguage}
+          onLanguageOverride={handleLanguageOverride}
         />
         <FindWidget
           isOpen={findOpen}
           onClose={() => setFindOpen(false)}
           editorView={cmRef.current?.view ?? null}
-          showReplace={true}
+          showReplace={showReplaceInFind}
         />
         {isMarkdownFile && markdownPreviewOpen ? (
           <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">

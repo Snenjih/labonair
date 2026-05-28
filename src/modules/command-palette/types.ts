@@ -62,4 +62,7 @@ export type RegistryCallbacks = {
   reconnectCurrentSsh: () => void;
   // Hosts
   openNewHostForm: () => void;
+  // Editor
+  jumpToEditorPosition: (pos: number) => void;
+  formatEditorDocument: () => void;
 };

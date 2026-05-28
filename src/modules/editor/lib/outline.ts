@@ -6,6 +6,7 @@ export type OutlineItem = {
   level: number;
   line: number;
   pos: number;
+  kind: "function" | "class" | "struct" | "enum" | "method" | "heading" | "other";
 };
 
 const HEADING_NAMES = new Set([
@@ -47,7 +48,7 @@ export function extractOutline(view: EditorView): OutlineItem[] {
       const raw = view.state.sliceDoc(node.from, node.to);
       const label = raw.replace(/^#+\s*/, "").split("\n")[0]?.trim() ?? "";
       const line = view.state.doc.lineAt(node.from).number;
-      if (label) items.push({ label, level, line, pos: node.from });
+      if (label) items.push({ label, level, line, pos: node.from, kind: "heading" });
       return false;
     }
 
@@ -64,7 +65,23 @@ export function extractOutline(view: EditorView): OutlineItem[] {
       }
       if (name) {
         const line = view.state.doc.lineAt(node.from).number;
-        items.push({ label: name, level: 1, line, pos: node.from });
+        let kind: OutlineItem["kind"] = "other";
+        if (
+          node.name === "FunctionDeclaration" ||
+          node.name === "FunctionDefinition" ||
+          node.name === "FunctionItem"
+        ) {
+          kind = "function";
+        } else if (node.name === "ClassDeclaration" || node.name === "ClassDefinition") {
+          kind = "class";
+        } else if (node.name === "StructItem" || node.name === "ImplItem") {
+          kind = "struct";
+        } else if (node.name === "EnumItem") {
+          kind = "enum";
+        } else if (node.name === "MethodDefinition") {
+          kind = "method";
+        }
+        items.push({ label: name, level: 1, line, pos: node.from, kind });
       }
       return false;
     }

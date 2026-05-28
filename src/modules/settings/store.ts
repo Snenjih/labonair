@@ -83,17 +83,23 @@ export type Preferences = {
 
   // --- Editor ---
   editorFontSize: number;
+  editorFontFamily: string;
+  editorLineHeight: number;
   editorAutoSave: "off" | "afterDelay" | "onFocusChange";
   editorAutoSaveDelay: number;
   editorLineNumbers: boolean;
   editorWordWrap: boolean;
   editorTabSize: 2 | 4 | 8;
+  editorIndentWithTabs: boolean;
   editorBracketMatching: boolean;
   editorShowCursorPosition: boolean;
   editorShowSelectionStats: boolean;
   editorShowOutline: boolean;
   editorFormatOnSave: boolean;
   editorIndentationGuides: boolean;
+  editorTrimTrailingWhitespace: boolean;
+  editorInsertFinalNewline: boolean;
+  editorAutocompleteDebounceMs: number;
 
   // --- File Manager ---
   sftpFontSize: number;
@@ -197,17 +203,23 @@ const KEY_TERMINAL_USE_WEBGL = "terminalUseWebGL";
 const KEY_TERMINAL_BELL = "terminalBell";
 
 const KEY_EDITOR_FONT_SIZE = "editorFontSize";
+const KEY_EDITOR_FONT_FAMILY = "editor.fontFamily";
+const KEY_EDITOR_LINE_HEIGHT = "editor.lineHeight";
 const KEY_EDITOR_AUTO_SAVE = "editorAutoSave";
 const KEY_EDITOR_AUTO_SAVE_DELAY = "editorAutoSaveDelay";
 const KEY_EDITOR_LINE_NUMBERS = "editorLineNumbers";
 const KEY_EDITOR_WORD_WRAP = "editorWordWrap";
 const KEY_EDITOR_TAB_SIZE = "editorTabSize";
+const KEY_EDITOR_INDENT_WITH_TABS = "editor.indentWithTabs";
 const KEY_EDITOR_BRACKET_MATCHING = "editorBracketMatching";
 const KEY_EDITOR_SHOW_CURSOR_POSITION = "editor.showCursorPosition";
 const KEY_EDITOR_SHOW_SELECTION_STATS = "editor.showSelectionStats";
 const KEY_EDITOR_SHOW_OUTLINE = "editor.showOutline";
 const KEY_EDITOR_FORMAT_ON_SAVE = "editor.formatOnSave";
 const KEY_EDITOR_INDENTATION_GUIDES = "editor.indentationGuides";
+const KEY_EDITOR_TRIM_TRAILING_WHITESPACE = "editor.trimTrailingWhitespace";
+const KEY_EDITOR_INSERT_FINAL_NEWLINE = "editor.insertFinalNewline";
+const KEY_EDITOR_AUTOCOMPLETE_DEBOUNCE_MS = "editor.autocompleteDebounceMs";
 
 const KEY_SFTP_FONT_SIZE = "sftpFontSize";
 const KEY_SFTP_SHOW_HIDDEN = "sftpShowHiddenFiles";
@@ -290,17 +302,23 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalBell: false,
 
   editorFontSize: 13,
+  editorFontFamily: '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
+  editorLineHeight: 1.55,
   editorAutoSave: "off",
   editorAutoSaveDelay: 1000,
   editorLineNumbers: true,
   editorWordWrap: false,
   editorTabSize: 2,
+  editorIndentWithTabs: false,
   editorBracketMatching: true,
   editorShowCursorPosition: true,
   editorShowSelectionStats: true,
   editorShowOutline: false,
   editorFormatOnSave: false,
   editorIndentationGuides: true,
+  editorTrimTrailingWhitespace: false,
+  editorInsertFinalNewline: false,
+  editorAutocompleteDebounceMs: 350,
 
   sftpFontSize: 13,
   sftpShowHiddenFiles: false,
@@ -457,6 +475,15 @@ export async function loadPreferences(): Promise<Preferences> {
 
     editorFontSize:
       get<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
+    editorFontFamily:
+      get<string>(KEY_EDITOR_FONT_FAMILY) ?? DEFAULT_PREFERENCES.editorFontFamily,
+    editorLineHeight: Math.min(
+      3.0,
+      Math.max(
+        1.0,
+        get<number>(KEY_EDITOR_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.editorLineHeight,
+      ),
+    ),
     editorAutoSave:
       get<"off" | "afterDelay" | "onFocusChange">(KEY_EDITOR_AUTO_SAVE) ??
       DEFAULT_PREFERENCES.editorAutoSave,
@@ -475,6 +502,8 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_EDITOR_WORD_WRAP) ?? DEFAULT_PREFERENCES.editorWordWrap,
     editorTabSize:
       get<2 | 4 | 8>(KEY_EDITOR_TAB_SIZE) ?? DEFAULT_PREFERENCES.editorTabSize,
+    editorIndentWithTabs:
+      get<boolean>(KEY_EDITOR_INDENT_WITH_TABS) ?? DEFAULT_PREFERENCES.editorIndentWithTabs,
     editorBracketMatching:
       get<boolean>(KEY_EDITOR_BRACKET_MATCHING) ??
       DEFAULT_PREFERENCES.editorBracketMatching,
@@ -493,6 +522,20 @@ export async function loadPreferences(): Promise<Preferences> {
     editorIndentationGuides:
       get<boolean>(KEY_EDITOR_INDENTATION_GUIDES) ??
       DEFAULT_PREFERENCES.editorIndentationGuides,
+    editorTrimTrailingWhitespace:
+      get<boolean>(KEY_EDITOR_TRIM_TRAILING_WHITESPACE) ??
+      DEFAULT_PREFERENCES.editorTrimTrailingWhitespace,
+    editorInsertFinalNewline:
+      get<boolean>(KEY_EDITOR_INSERT_FINAL_NEWLINE) ??
+      DEFAULT_PREFERENCES.editorInsertFinalNewline,
+    editorAutocompleteDebounceMs: Math.min(
+      2000,
+      Math.max(
+        50,
+        get<number>(KEY_EDITOR_AUTOCOMPLETE_DEBOUNCE_MS) ??
+          DEFAULT_PREFERENCES.editorAutocompleteDebounceMs,
+      ),
+    ),
 
     sftpFontSize:
       get<number>(KEY_SFTP_FONT_SIZE) ?? DEFAULT_PREFERENCES.sftpFontSize,
@@ -1029,6 +1072,38 @@ export async function setEditorIndentationGuides(value: boolean): Promise<void> 
   await (await getStore()).save();
 }
 
+export async function setEditorFontFamily(value: string): Promise<void> {
+  await (await getStore()).set(KEY_EDITOR_FONT_FAMILY, value);
+  await (await getStore()).save();
+}
+
+export async function setEditorLineHeight(value: number): Promise<void> {
+  const clamped = Math.min(3.0, Math.max(1.0, value));
+  await (await getStore()).set(KEY_EDITOR_LINE_HEIGHT, clamped);
+  await (await getStore()).save();
+}
+
+export async function setEditorIndentWithTabs(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EDITOR_INDENT_WITH_TABS, value);
+  await (await getStore()).save();
+}
+
+export async function setEditorTrimTrailingWhitespace(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EDITOR_TRIM_TRAILING_WHITESPACE, value);
+  await (await getStore()).save();
+}
+
+export async function setEditorInsertFinalNewline(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EDITOR_INSERT_FINAL_NEWLINE, value);
+  await (await getStore()).save();
+}
+
+export async function setEditorAutocompleteDebounceMs(value: number): Promise<void> {
+  const clamped = Math.min(2000, Math.max(50, value));
+  await (await getStore()).set(KEY_EDITOR_AUTOCOMPLETE_DEBOUNCE_MS, clamped);
+  await (await getStore()).save();
+}
+
 export async function setTabsLocation(value: "titlebar" | "sidebar"): Promise<void> {
   await (await getStore()).set(KEY_TABS_LOCATION, value);
   await (await getStore()).save();
@@ -1081,17 +1156,23 @@ export async function onPreferencesChange(
     [KEY_TERMINAL_BELL]: "terminalBell",
 
     [KEY_EDITOR_FONT_SIZE]: "editorFontSize",
+    [KEY_EDITOR_FONT_FAMILY]: "editorFontFamily",
+    [KEY_EDITOR_LINE_HEIGHT]: "editorLineHeight",
     [KEY_EDITOR_AUTO_SAVE]: "editorAutoSave",
     [KEY_EDITOR_AUTO_SAVE_DELAY]: "editorAutoSaveDelay",
     [KEY_EDITOR_LINE_NUMBERS]: "editorLineNumbers",
     [KEY_EDITOR_WORD_WRAP]: "editorWordWrap",
     [KEY_EDITOR_TAB_SIZE]: "editorTabSize",
+    [KEY_EDITOR_INDENT_WITH_TABS]: "editorIndentWithTabs",
     [KEY_EDITOR_BRACKET_MATCHING]: "editorBracketMatching",
     [KEY_EDITOR_SHOW_CURSOR_POSITION]: "editorShowCursorPosition",
     [KEY_EDITOR_SHOW_SELECTION_STATS]: "editorShowSelectionStats",
     [KEY_EDITOR_SHOW_OUTLINE]: "editorShowOutline",
     [KEY_EDITOR_FORMAT_ON_SAVE]: "editorFormatOnSave",
     [KEY_EDITOR_INDENTATION_GUIDES]: "editorIndentationGuides",
+    [KEY_EDITOR_TRIM_TRAILING_WHITESPACE]: "editorTrimTrailingWhitespace",
+    [KEY_EDITOR_INSERT_FINAL_NEWLINE]: "editorInsertFinalNewline",
+    [KEY_EDITOR_AUTOCOMPLETE_DEBOUNCE_MS]: "editorAutocompleteDebounceMs",
 
     [KEY_SFTP_FONT_SIZE]: "sftpFontSize",
     [KEY_SFTP_SHOW_HIDDEN]: "sftpShowHiddenFiles",
