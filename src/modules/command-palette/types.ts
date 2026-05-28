@@ -45,8 +45,6 @@ export type RegistryCallbacks = {
   toggleAi: () => void;
   askSelection: () => void;
   // Tab switcher
-  tabs: TabEntry[];
-  activeTabId: number;
   switchTab: (id: number) => void;
   // Snippets
   injectIntoTerminal: (text: string) => void;

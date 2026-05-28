@@ -18,3 +18,9 @@ export {
   type HomeTab,
 } from "./lib/useTabs";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
+export {
+  useTabsStore,
+  selectActiveTab,
+  selectActiveTabKind,
+  selectActivePaneId,
+} from "./store/tabsStore";

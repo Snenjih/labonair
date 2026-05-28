@@ -18,7 +18,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import type { Tab } from "@/modules/tabs";
 import {
   DndContext,
   DragEndEvent,
@@ -138,12 +137,11 @@ interface SortableHostCardProps {
   group?: import("../types").Group;
   newSshTab: ConnectFn;
   newSftpTab: ConnectFn;
-  tabs: Tab[];
   pingStatus?: "online" | "offline" | "checking";
   layoutMode: LayoutMode;
 }
 
-function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, tabs, pingStatus, layoutMode }: SortableHostCardProps) {
+function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, pingStatus, layoutMode }: SortableHostCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: host.id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -163,7 +161,6 @@ function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit,
           dragHandleProps={{ ...attributes, ...listeners }}
           newSshTab={newSshTab}
           newSftpTab={newSftpTab}
-          tabs={tabs}
           pingStatus={pingStatus}
         />
       ) : (
@@ -177,7 +174,6 @@ function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit,
           dragHandleProps={{ ...attributes, ...listeners }}
           newSshTab={newSshTab}
           newSftpTab={newSftpTab}
-          tabs={tabs}
           pingStatus={pingStatus}
         />
       )}
@@ -193,7 +189,7 @@ const SORT_LABELS: Record<SortMode, string> = {
   z_a: "Z–A",
 };
 
-export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: { newSshTab: ConnectFn; newQuickSshTab: QuickConnectFn; newSftpTab: ConnectFn; tabs: Tab[] }) {
+export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSshTab: ConnectFn; newQuickSshTab: QuickConnectFn; newSftpTab: ConnectFn }) {
   const hosts = useHostsStore((s) => s.hosts);
   const groups = useHostsStore((s) => s.groups);
   const selectedHostId = useHostsStore((s) => s.selectedHostId);
@@ -665,7 +661,6 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
                               group={groups.find((g) => g.id === host.group_id)}
                               newSshTab={newSshTab}
                               newSftpTab={newSftpTab}
-                              tabs={tabs}
                               pingStatus={hostStatuses[host.id]}
                               layoutMode={layoutMode}
                             />
@@ -685,7 +680,6 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab, tabs }: {
                             group={groups.find((g) => g.id === host.group_id)}
                             newSshTab={newSshTab}
                             newSftpTab={newSftpTab}
-                            tabs={tabs}
                             pingStatus={hostStatuses[host.id]}
                             layoutMode={layoutMode}
                           />

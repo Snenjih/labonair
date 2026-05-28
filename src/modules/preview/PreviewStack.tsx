@@ -1,22 +1,23 @@
 import { cn } from "@/lib/utils";
-import type { PreviewTab, Tab } from "@/modules/tabs";
+import type { PreviewTab } from "@/modules/tabs";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import { useEffect, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { PreviewPane, type PreviewPaneHandle } from "./PreviewPane";
 
 type Props = {
-  tabs: Tab[];
-  activeId: number;
   onUrlChange: (id: number, url: string) => void;
   registerHandle: (id: number, handle: PreviewPaneHandle | null) => void;
 };
 
 export function PreviewStack({
-  tabs,
-  activeId,
   onUrlChange,
   registerHandle,
 }: Props) {
-  const previews = tabs.filter((t): t is PreviewTab => t.kind === "preview");
+  const previews = useTabsStore(
+    useShallow((s) => s.tabs.filter((t): t is PreviewTab => t.kind === "preview")),
+  );
+  const activeId = useTabsStore((s) => s.activeId);
 
   const registerRef = useRef(registerHandle);
   const urlChangeRef = useRef(onUrlChange);

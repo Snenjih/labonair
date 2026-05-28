@@ -29,7 +29,7 @@ import { useState } from "react";
 import type { Group, Host } from "../types";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
-import type { Tab } from "@/modules/tabs";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 
 interface HostCardProps {
   host: Host;
@@ -41,7 +41,6 @@ interface HostCardProps {
   dragHandleProps?: React.HTMLAttributes<HTMLElement>;
   newSshTab: (hostId: string, title: string) => void;
   newSftpTab: (hostId: string, title: string) => void;
-  tabs: Tab[];
   pingStatus?: "online" | "offline" | "checking";
 }
 
@@ -74,7 +73,6 @@ export function HostCard({
   dragHandleProps,
   newSshTab,
   newSftpTab,
-  tabs,
   pingStatus,
 }: HostCardProps) {
   const selectedHostIds = useHostsStore((s) => s.selectedHostIds);
@@ -93,15 +91,15 @@ export function HostCard({
   const bulkIds = Array.from(selectedHostIds);
   const highlighted = isSelected || isMultiSelected;
 
-  const hasActiveSshTab = tabs.some(
-    (t) =>
-      t.kind === "workspace" &&
-      Object.values(t.sessions).some(
-        (s) => s.kind === "ssh" && s.hostId === host.id,
-      ),
+  const hasActiveSshTab = useTabsStore((s) =>
+    s.tabs.some(
+      (t) =>
+        t.kind === "workspace" &&
+        Object.values(t.sessions).some((sess) => sess.kind === "ssh" && sess.hostId === host.id),
+    ),
   );
-  const hasActiveSftpTab = tabs.some(
-    (t) => t.kind === "sftp" && (t as { hostId: string }).hostId === host.id,
+  const hasActiveSftpTab = useTabsStore((s) =>
+    s.tabs.some((t) => t.kind === "sftp" && (t as { hostId: string }).hostId === host.id),
   );
 
   const connectSsh = (e: React.MouseEvent) => {

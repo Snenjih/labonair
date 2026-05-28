@@ -1,6 +1,43 @@
 # Handshake — Session State
 
-## Last Session: 2026-05-24 (V1.1 Final Architecture Polish)
+## Last Session: 2026-05-27 (Tab State → Zustand Migration)
+
+### What Was Done
+Completed the full `useTabs` → `useTabsStore` performance migration (plan: `~/.claude/plans/clever-juggling-zebra.md`). `tsc --noEmit` ✅
+
+**New files created:**
+- `src/modules/tabs/types.ts` — all types extracted from useTabs.ts
+- `src/modules/tabs/store/tabsStore.ts` — Zustand store with 24 actions + selectors
+- `src/modules/terminal/WorkspaceStack.tsx` — per-tab WorkspacePaneContainer subscribes to own tab ID
+- `src/modules/sftp/SftpStack.tsx` — SFTP tab stack reads from store
+
+**Files modified (all migrated to store):**
+- `src/modules/editor/EditorStack.tsx` — `useShallow` selector, no tabs/activeId props
+- `src/modules/editor/AiDiffStack.tsx` — same
+- `src/modules/preview/PreviewStack.tsx` — same
+- `src/modules/tabs/TabBar.tsx` — reads from store directly
+- `src/modules/tabs/SidebarTabList.tsx` — reads from store directly
+- `src/modules/header/Header.tsx` — React.memo, reads TabBar from store
+- `src/modules/tabs/lib/useWorkspaceCwd.ts` — signature `(home)` only, reads from store
+- `src/modules/command-palette/hooks/useTabCommands.ts` — reads from store
+- `src/modules/command-palette/types.ts` — removed `tabs`, `activeTabId` from RegistryCallbacks
+- `src/modules/session/capture.ts` — `captureAndSave()` no args, reads from store
+- `src/modules/session/restore.ts` — `TabActions` has no `tabs` field, reads from store
+- `src/modules/hosts/components/HostCard.tsx` — reads from store, no tabs prop
+- `src/modules/hosts/components/HostListItem.tsx` — same
+- `src/modules/hosts/components/HomeDashboard.tsx` — removed tabs prop
+- `src/modules/tabs/index.ts` — exports useTabsStore + selectors
+- `src/app/App.tsx` — complete rewrite: no useTabs(), menuHandlersRef pattern (menu registered once), subscribe() for session save/sessionSaveRef/appliedDiffs, getState() in all callbacks
+
+**Key architectural changes:**
+- Zustand v5: uses `useShallow` from `zustand/react/shallow` (not `shallow` as 2nd arg)
+- Menu listeners: `menuHandlersRef` updated every render, effect registered once (empty deps) — eliminates 20+ re-registrations per tab switch
+- `captureAndSave()` / `captureSnapshot()` are no-arg — read from store internally
+- All callbacks in App.tsx use `useTabsStore.getState()` inside → stable references, fewer cascading rerenders
+
+---
+
+## Previous Session: 2026-05-24 (V1.1 Final Architecture Polish)
 
 ### What Was Done
 Completed all 3 phases of `tasks/v1.1_final_architecture_polish.md`. `cargo check` ✅ · `tsc --noEmit` ✅
@@ -8,140 +45,25 @@ Completed all 3 phases of `tasks/v1.1_final_architecture_polish.md`. `cargo chec
 **Phase 1 — Editor Focus Restoration**
 - Added `focus: () => void` to `EditorPaneHandle` type in `EditorPane.tsx`
 - Added `focus` implementation in `useImperativeHandle`: calls `cmRef.current?.view.focus()`
-- Updated `restoreFocus` callback in `App.tsx`: now handles `kind === "editor"` tabs by calling `editorRefs.current.get(activeId)?.focus()`
+- Updated `restoreFocus` callback in `App.tsx`
 
 **Phase 2 — SFTP Error-Handling Purge**
-- `SftpContextMenu.tsx`: replaced all `console.error` in `handleDelete`, `handleChmod`, `handleCopyPath`, `handleDownloadTo`, `handleUploadHere` with `handleApiError`
-- `SftpPane.tsx`: replaced all `console.error` in `sftp_disconnect` cleanup, `commitRename`, `enqueueDownloads`, `enqueueUploads`, `commitNewFolder`, `handleDeepSearch` with `handleApiError`
+- All `console.error` in `SftpContextMenu.tsx` and `SftpPane.tsx` replaced with `handleApiError`
 
 **Phase 3 — Rust `NexumError` Migration**
-- `src-tauri/src/modules/hosts/db.rs`: all Tauri commands (`hosts_get_all`, `hosts_create`, `hosts_update`, `hosts_delete`, `hosts_reorder`, `get_sudo_password`, `groups_get_all`, `groups_create`, `groups_delete`) now return `Result<T, NexumError>` instead of `Result<T, String>`
-- rusqlite `?` operator works directly via `From<rusqlite::Error>` impl in `errors.rs`
-- Mutex lock errors use `.map_err(|e| NexumError::Internal(e.to_string()))?`
-- Secrets function errors use `.map_err(NexumError::Internal)?`
-- `initialize_db` left as `Result<_, String>` (not a Tauri command)
-
----
-
-## Previous Session: 2026-05-24 (Editor Feature Expansion)
-
-### What Was Done
-Added **5 editor improvements** (committed `632e736`). `tsc --noEmit` ✅
-
-**Feature 1 — Cursor Position in StatusBar**
-- New `editorShowCursorPosition: boolean` preference (default: true)
-- New `src/modules/editor/lib/cursorStore.ts` — Zustand micro-store `{line, col, selectionChars, selectionLines}`
-- `EditorPane` now accepts `isActive` prop; `EditorView.updateListener` writes to cursorStore only when active
-- `EditorStack` passes `isActive={visible}` to each EditorPane
-- `StatusBar` reads cursorStore → shows `Ln X, Col Y` when editor tab is active
-
-**Feature 3 — More Languages**
-- Installed: `@codemirror/lang-go`, `@codemirror/lang-java`, `@codemirror/lang-sql`, `@codemirror/lang-php`, `@codemirror/lang-xml`
-- Added to `languageResolver.ts`: go, java, sql, php, xml, svg, rb (ruby), swift, kt/kts (kotlin via legacy-modes/clike)
-
-**Feature 5 — Prettier Formatting**
-- Installed: `prettier@3.8.3`
-- New `src/modules/editor/lib/formatter.ts` — dynamic Prettier standalone with per-extension plugin loading
-- New `editorFormatOnSave: boolean` preference (default: false)
-- `Cmd+Shift+F` → format now; `Cmd+S` runs format first if pref enabled
-- Gear dropdown: "Format on Save" toggle
-- Settings → Editor: "Format on Save" row in Behaviour group
-
-**Feature 6 — Selection Stats**
-- New `editorShowSelectionStats: boolean` preference (default: true)
-- Toolbar shows `N chars · M lines` when text is selected and pref enabled
-- Gear dropdown: "Selection Stats" toggle
-- Settings → Editor: "Selection Stats" row in Display group
-
-**Feature 7 — Document Outline**
-- New `editorShowOutline: boolean` preference (default: false)
-- New `src/modules/editor/lib/outline.ts` — walks CodeMirror syntaxTree, extracts Markdown headings + code declarations
-- New `src/modules/editor/OutlinePanel.tsx` — clickable outline sidebar (resizable, right side)
-- Outline updates on every doc change (debounced 250ms)
-- Gear dropdown: "Outline" toggle
-- Settings → Editor: "Outline panel" row in Display group
-
----
-
-## Previous Session: 2026-05-23 (Settings Expansion)
-
-### What Was Done
-Added **13 new user-configurable settings** across Terminal, General, Security, and AI (committed `ca3dd9e`). All settings persist via `tauri-plugin-store`. `tsc --noEmit` ✅
-
-**Terminal (5 settings) — `TerminalSection.tsx`, `useTerminalSession.ts`, `SshTerminalPane.tsx`**
-- Copy on select — implemented via `onSelectionChange` + `navigator.clipboard` (xterm v6 removed the native option)
-- Right-click pastes — `rightClickSelectsWord: !pref`
-- Word separators — `wordSeparator` option
-- Scroll sensitivity — `scrollSensitivity` option
-- Fast scroll modifier — `fastScrollModifier` via type-cast (runtime option in xterm v6, not in public types)
-
-**General (4 settings) — `App.tsx`, `GeneralSection.tsx`**
-- Reduce motion — wraps entire app in `<MotionConfig reducedMotion="always">` (no per-file changes needed)
-- New tab inherits cwd — toggle in `openNewTab` callback
-- Confirm before closing terminal tab — `AlertDialog` via `pendingCloseTabId` state
-- Confirm quit with active SSH — `window.confirm()` inside the existing `onCloseRequested` handler (merged with sessionRestore logic)
-
-**Security (1 setting) — `security.ts`, `AiToolApproval.tsx`, `AiSection.tsx`**
-- Warn on destructive commands — new `checkDestructiveCommand()` function with DESTRUCTIVE_PATTERNS; amber warning badge appears in the approval card header when matched
-
-**AI (3 settings) — `agent.ts`, `transport.ts`, `chatStore.ts`, `AiSection.tsx`**
-- Max agent steps — `maxAgentSteps` param in `createNexumAgent`, default falls back to `MAX_AGENT_STEPS` constant
-- Temperature — `model.withSettings({ temperature })` via runtime cast (type `withSettings` absent from `LanguageModel` union)
-- Terminal context lines — `getTerminalContextLines` dep in `createContextAwareTransport`, replaces hard-coded `TERMINAL_BUFFER_LINES`
-
-**Store boilerplate** — `store.ts` updated in all 6 places (type, KEY constant, default, loadPreferences, setter, onPreferencesChange map)
-
----
-
-## Previous Session: 2026-05-23 (V1.1 Architecture Hardening)
-
-### What Was Done
-Completed **V1.1 Architecture Hardening** (all 3 phases, committed `752da0f`):
-
-**Phase 1 — Structured Error Handling (thiserror)**
-- Added `thiserror = "1"` to `Cargo.toml`
-- Created `src-tauri/src/modules/errors.rs` with `NexumError` enum (AuthFailed, NetworkError, HostKeyMismatch, IoError, Internal) + `Serialize` + `From` impls for `ssh2::Error`, `std::io::Error`, `rusqlite::Error`
-- `ssh_connect` and all `sftp_*` commands now return `Result<T, NexumError>` — frontend can distinguish error types programmatically
-- Created `src/types.ts` with `NexumError` type + `isNexumError` guard
-- Updated `SshLoadingScreen.tsx` and `sftpStore.ts` catch blocks to handle structured errors
-
-**Phase 2 — SFTP Mutex Decoupling**
-- Created `sftp/state.rs` — `SftpState` / `SftpSession` (hold own SSH session + SFTP handle)
-- Created `sftp/connection.rs` — `sftp_connect` / `sftp_disconnect` commands
-- Extracted `establish_authenticated_session()` from `client.rs` — shared by both PTY and SFTP connections; emits all the same events
-- All `sftp_*` file-op commands now use `SftpState` instead of `SshState`
-- Transfer worker (`worker.rs`) updated to use `SftpState` — SFTP I/O no longer blocks the PTY mutex
-- Removed `sftp` field from `SshSession` (now fully decoupled)
-- `SshLoadingScreen.tsx` branches `sftp_connect` vs `ssh_connect` by `connectionType`
-- `SftpPane.tsx` calls `sftp_disconnect` on unmount
-
-**Phase 3 — Connection Lost Detection & Reconnect Overlay**
-- `pty.rs` reader thread tracks `disconnect_reason`; emits `ssh_connection_lost` event on unexpected exits (not on clean `ssh_disconnect`)
-- `SshTerminalPane.tsx`: added `isDisconnected` + `disconnectReason` state, `ssh_connection_lost` listener
-- Glassmorphism overlay (`bg-background/50 backdrop-blur-sm`) with reason text + Reconnect button
-- `handleReconnect`: disposes terminal, resets state → `SshLoadingScreen` re-mounts for fresh connection
-
-**Verification**: `cargo check` ✅ · `tsc --noEmit` ✅
-
----
-
-## Previous Session: 2026-05-18
-
-See `handshake.md` git history for full details of the Terminal Split Panes feature.
+- All Tauri host/group commands now return `Result<T, NexumError>`
 
 ---
 
 ### Current State
-- 13 new settings implemented and committed (`ca3dd9e`)
-- `tsc --noEmit` ✅
-- No Rust changes in this session — `cargo check` not needed
+- `useTabs` migration complete — `tsc --noEmit` ✅
+- `useTabs.ts` still exists but is no longer used by App.tsx (can be deleted in a future cleanup)
+- No Rust changes this session
 
 ### What's Next
+- Delete `src/modules/tabs/lib/useTabs.ts` (now dead code) and clean up re-exports in `tabs/index.ts`
+- Functional testing: verify tab open/close, SSH, session restore, command palette, menu items
 - The GitHub repo `Snenjih/nexum-themes` still needs to be created for community themes
-- (Optional) SSH Agent Forwarding — excluded this session, requires Rust change to `ssh_connect` + `channel.request_agent_forwarding()`
-- (Optional) Add pane navigation shortcuts (⌘← / ⌘→ to cycle active pane)
-- (Optional) Persist split layout across app restarts
-- (Optional) Auto-reconnect with exponential backoff on the reconnect overlay
 
 ### Blockers
 - None

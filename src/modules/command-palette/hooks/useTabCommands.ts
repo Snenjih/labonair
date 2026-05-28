@@ -8,6 +8,8 @@ import {
   Cancel01Icon,
 } from "@hugeicons/core-free-icons";
 import { createElement } from "react";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import { useShallow } from "zustand/react/shallow";
 import type { CommandAction, CommandPage } from "../types";
 import type { RegistryCallbacks } from "../types";
 
@@ -15,7 +17,9 @@ export function useTabCommands(cb: RegistryCallbacks): {
   rootAction: CommandAction;
   tabsPage: CommandPage;
 } {
-  const { tabs, activeTabId, switchTab } = cb;
+  const tabs = useTabsStore(useShallow((s) => s.tabs.map((t) => ({ id: t.id, kind: t.kind, title: t.title }))));
+  const activeTabId = useTabsStore((s) => s.activeId);
+  const { switchTab } = cb;
 
   function iconForKind(kind: string) {
     switch (kind) {

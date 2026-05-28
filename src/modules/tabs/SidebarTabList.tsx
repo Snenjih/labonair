@@ -33,10 +33,9 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef } from "react";
 import type { Tab, WorkspaceTab } from "./lib/useTabs";
+import { useTabsStore } from "./store/tabsStore";
 
 type Props = {
-  tabs: Tab[];
-  activeId: number;
   onSelect: (id: number) => void;
   onNew: () => void;
   onNewPreview: () => void;
@@ -50,8 +49,6 @@ type Props = {
 };
 
 export function SidebarTabList({
-  tabs,
-  activeId,
   onSelect,
   onNew,
   onNewPreview,
@@ -63,6 +60,8 @@ export function SidebarTabList({
   onCloseOthers,
   onCloseAll,
 }: Props) {
+  const tabs = useTabsStore((s) => s.tabs);
+  const activeId = useTabsStore((s) => s.activeId);
   const hosts = useHostsStore((s) => s.hosts);
   const recentHosts = [...hosts]
     .sort((a, b) => (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0))

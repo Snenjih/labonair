@@ -1,4 +1,4 @@
-import type { Tab } from "@/modules/tabs";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import {
   SESSION_SNAPSHOT_VERSION,
   type EditorTabSnapshot,
@@ -32,7 +32,8 @@ function toSessionDataSnapshot(s: {
   };
 }
 
-export function captureSnapshot(tabs: Tab[], activeId: number): SessionSnapshot {
+export function captureSnapshot(): SessionSnapshot {
+  const { tabs, activeId } = useTabsStore.getState();
   const snapshots: TabSnapshot[] = [];
 
   for (const tab of tabs) {
@@ -91,9 +92,9 @@ export function captureSnapshot(tabs: Tab[], activeId: number): SessionSnapshot 
   };
 }
 
-export async function captureAndSave(tabs: Tab[], activeId: number): Promise<void> {
+export async function captureAndSave(): Promise<void> {
   try {
-    const snapshot = captureSnapshot(tabs, activeId);
+    const snapshot = captureSnapshot();
     await saveSnapshot(snapshot);
   } catch (e) {
     console.warn("[session] capture failed:", e);

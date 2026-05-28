@@ -1,3 +1,4 @@
+import React from "react";
 import { AgentStatusPill } from "@/modules/ai/components/AgentStatusPill";
 import {
   AiOpenButton,
@@ -39,7 +40,7 @@ const PANEL_BUTTONS: Array<{ panel: SidebarPanel; icon: typeof SidebarLeft01Icon
   { panel: "snippets", icon: FlashIcon, title: "Snippets" },
 ];
 
-export function StatusBar({
+export const StatusBar = React.memo(function StatusBar({
   cwd,
   filePath,
   home,
@@ -137,7 +138,7 @@ export function StatusBar({
       </div>
     </footer>
   );
-}
+});
 
 function hostFromUrl(url: string): string {
   try {

@@ -1,3 +1,4 @@
+import React from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,7 +17,6 @@ import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setSidebarPosition } from "@/modules/settings/store";
-import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
 import {
   KeyboardIcon,
@@ -34,8 +34,6 @@ import { TransferDropdown } from "./components/TransferDropdown";
 import { UpdaterButton } from "./components/UpdaterButton";
 
 type Props = {
-  tabs: Tab[];
-  activeId: number;
   onSelect: (id: number) => void;
   onNew: () => void;
   onNewPreview: () => void;
@@ -51,9 +49,7 @@ type Props = {
   onOpenThemes: () => void;
 };
 
-export function Header({
-  tabs,
-  activeId,
+export const Header = React.memo(function Header({
   onSelect,
   onNew,
   onNewPreview,
@@ -173,8 +169,6 @@ export function Header({
       >
         {tabsLocation === "titlebar" && (
           <TabBar
-            tabs={tabs}
-            activeId={activeId}
             onSelect={onSelect}
             onNew={onNew}
             onNewPreview={onNewPreview}
@@ -203,4 +197,4 @@ export function Header({
       )}
     </div>
   );
-}
+});

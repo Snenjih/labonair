@@ -1,14 +1,14 @@
 import { cn } from "@/lib/utils";
-import type { EditorTab, Tab } from "@/modules/tabs";
+import type { EditorTab } from "@/modules/tabs";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTransferStore } from "@/modules/sftp/store/transferStore";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { EditorPane, type EditorPaneHandle } from "./EditorPane";
 
 type Props = {
-  tabs: Tab[];
-  activeId: number;
   onDirtyChange: (id: number, dirty: boolean) => void;
   registerHandle: (id: number, handle: EditorPaneHandle | null) => void;
   onCloseTab: (id: number) => void;
@@ -16,14 +16,15 @@ type Props = {
 };
 
 export function EditorStack({
-  tabs,
-  activeId,
   onDirtyChange,
   registerHandle,
   onCloseTab,
   onSaveAs,
 }: Props) {
-  const editors = tabs.filter((t): t is EditorTab => t.kind === "editor");
+  const editors = useTabsStore(
+    useShallow((s) => s.tabs.filter((t): t is EditorTab => t.kind === "editor")),
+  );
+  const activeId = useTabsStore((s) => s.activeId);
 
   // Stable per-tab callbacks. Inline arrows in `ref` and `onDirtyChange`
   // change identity every render, which makes React detach+reattach the ref

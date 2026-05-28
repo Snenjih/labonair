@@ -1,57 +1,49 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { Tab } from "./useTabs";
+import { useCallback, useEffect, useRef } from "react";
+import { useTabsStore } from "../store/tabsStore";
 
 type Result = {
   explorerRoot: string | null;
   inheritedCwdForNewTab: () => string | undefined;
 };
 
-function getActivePaneCwd(tab: Tab): string | undefined {
-  if (tab.kind !== "workspace") return undefined;
-  const session = tab.sessions[tab.activePaneId];
-  return session?.cwd;
-}
-
-function getAnyWorkspaceCwd(tabs: Tab[]): string | undefined {
-  for (let i = tabs.length - 1; i >= 0; i--) {
-    const t = tabs[i];
-    if (t.kind !== "workspace") continue;
-    for (const session of Object.values(t.sessions)) {
-      if (session.kind === "local" && session.cwd) return session.cwd;
-    }
-  }
-  return undefined;
-}
-
-export function useWorkspaceCwd(
-  activeTab: Tab | undefined,
-  tabs: Tab[],
-  home: string | null,
-): Result {
+export function useWorkspaceCwd(home: string | null): Result {
   const lastLocalCwd = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!activeTab || activeTab.kind !== "workspace") return;
-    const session = activeTab.sessions[activeTab.activePaneId];
-    if (session?.kind === "local" && session.cwd) {
-      lastLocalCwd.current = session.cwd;
+  const explorerRoot = useTabsStore((s) => {
+    const activeTab = s.tabs.find((t) => t.id === s.activeId);
+    if (activeTab?.kind === "workspace") {
+      const cwd = activeTab.sessions[activeTab.activePaneId]?.cwd;
+      if (cwd) return cwd;
     }
-  }, [activeTab]);
-
-  const explorerRoot = useMemo<string | null>(() => {
-    const activeCwd = activeTab ? getActivePaneCwd(activeTab) : undefined;
-    if (activeCwd) return activeCwd;
     if (lastLocalCwd.current) return lastLocalCwd.current;
-    const anyCwd = getAnyWorkspaceCwd(tabs);
-    if (anyCwd) return anyCwd;
+    for (let i = s.tabs.length - 1; i >= 0; i--) {
+      const t = s.tabs[i];
+      if (t.kind !== "workspace") continue;
+      for (const sess of Object.values(t.sessions)) {
+        if (sess.kind === "local" && sess.cwd) return sess.cwd;
+      }
+    }
     return home;
-  }, [activeTab, tabs, home]);
+  });
+
+  useEffect(() => {
+    return useTabsStore.subscribe((s) => {
+      const tab = s.tabs.find((t) => t.id === s.activeId);
+      if (tab?.kind !== "workspace") return;
+      const sess = tab.sessions[tab.activePaneId];
+      if (sess?.kind === "local" && sess.cwd) lastLocalCwd.current = sess.cwd;
+    });
+  }, []);
 
   const inheritedCwdForNewTab = useCallback((): string | undefined => {
-    const activeCwd = activeTab ? getActivePaneCwd(activeTab) : undefined;
-    if (activeCwd) return activeCwd;
+    const { tabs, activeId } = useTabsStore.getState();
+    const activeTab = tabs.find((t) => t.id === activeId);
+    if (activeTab?.kind === "workspace") {
+      const cwd = activeTab.sessions[activeTab.activePaneId]?.cwd;
+      if (cwd) return cwd;
+    }
     return lastLocalCwd.current ?? home ?? undefined;
-  }, [activeTab, home]);
+  }, [home]);
 
   return { explorerRoot, inheritedCwdForNewTab };
 }

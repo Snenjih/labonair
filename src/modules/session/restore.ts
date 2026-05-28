@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { PaneLeaf, PaneNode, PaneSplit } from "@/modules/tabs";
 import { loadSnapshot } from "./store";
 import type {
@@ -11,7 +12,6 @@ import type {
 } from "./types";
 
 export interface TabActions {
-  tabs: { id: number; kind: string }[];
   setActiveId: (id: number) => void;
   newTab: (cwd?: string) => number;
   newSshTab: (hostId: string, title: string, cwd?: string) => number;
@@ -129,9 +129,7 @@ async function restoreTab(
   switch (snap.kind) {
     case "home": {
       actions.openHomeTab();
-      const homeTab = (actions.tabs as { id: number; kind: string }[]).find(
-        (t) => t.kind === "home",
-      );
+      const homeTab = useTabsStore.getState().tabs.find((t) => t.kind === "home");
       return homeTab?.id ?? null;
     }
 

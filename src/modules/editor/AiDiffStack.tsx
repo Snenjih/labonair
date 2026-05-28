@@ -1,16 +1,19 @@
 import { cn } from "@/lib/utils";
-import type { AiDiffTab, Tab } from "@/modules/tabs";
+import type { AiDiffTab } from "@/modules/tabs";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import { useShallow } from "zustand/react/shallow";
 import { AiDiffPane } from "./AiDiffPane";
 
 type Props = {
-  tabs: Tab[];
-  activeId: number;
   onAccept: (approvalId: string) => void;
   onReject: (approvalId: string) => void;
 };
 
-export function AiDiffStack({ tabs, activeId, onAccept, onReject }: Props) {
-  const diffs = tabs.filter((t): t is AiDiffTab => t.kind === "ai-diff");
+export function AiDiffStack({ onAccept, onReject }: Props) {
+  const diffs = useTabsStore(
+    useShallow((s) => s.tabs.filter((t): t is AiDiffTab => t.kind === "ai-diff")),
+  );
+  const activeId = useTabsStore((s) => s.activeId);
   if (diffs.length === 0) return null;
   return (
     <div className="relative h-full w-full">
