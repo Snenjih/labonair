@@ -48,6 +48,7 @@ export type EditorTab = {
   isUntitled?: boolean;
   remoteHostTabId?: string;
   remotePath?: string;
+  languageOverride?: string;
 };
 
 export type PreviewTab = {
@@ -100,6 +101,7 @@ export type TabPatch = Partial<{
   path: string;
   dirty: boolean;
   url: string;
+  languageOverride: string | null;
 }>;
 
 // ─── Tree helpers (used by tabsStore) ────────────────────────────────────────

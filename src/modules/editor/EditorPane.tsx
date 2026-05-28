@@ -50,8 +50,8 @@ import { resolveLanguage } from "./lib/languageResolver";
 import { useDocument } from "./lib/useDocument";
 import { inlineCompletion } from "./lib/autocomplete/inlineExtension";
 import { useEditorCursorStore } from "./lib/cursorStore";
-import { extractOutline, type OutlineItem } from "./lib/outline";
 import { useEditorMetaStore } from "./lib/editorMetaStore";
+import { extractOutline, type OutlineItem } from "./lib/outline";
 import { OutlinePanel } from "./OutlinePanel";
 import { formatDocument } from "./lib/formatter";
 import { useCompartmentEffect } from "./lib/useCompartmentEffect";
@@ -83,10 +83,12 @@ type Props = {
   path: string;
   isUntitled?: boolean;
   isActive?: boolean;
+  languageOverride?: string;
   onDirtyChange?: (dirty: boolean) => void;
   onSaved?: () => void;
   onSaveAs?: (newPath: string) => void;
   onClose?: () => void;
+  onLanguageChange?: (lang: string | undefined) => void;
 };
 
 function formatBytes(n: number): string {
@@ -96,7 +98,7 @@ function formatBytes(n: number): string {
 }
 
 export const EditorPane = forwardRef<EditorPaneHandle, Props>(
-  function EditorPane({ path, isUntitled, isActive = false, onDirtyChange, onSaved, onSaveAs, onClose }, ref) {
+  function EditorPane({ path, isUntitled, isActive = false, languageOverride, onDirtyChange, onSaved, onSaveAs, onClose, onLanguageChange }, ref) {
     const { doc, dirty, onChange: _onChange, save, reload } = useDocument({ path, isUntitled, onDirtyChange, onSaveAs });
     const isMarkdownRef = useRef(false);
     const reloadRef = useRef(reload);
@@ -133,6 +135,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     const languageOverrideRef = useRef<string | null>(null);
     const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const outlineDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+      if (isActive) {
+        useEditorMetaStore.getState().setOutline(outline);
+      }
+    }, [isActive, outline]);
 
     // Keep isActive in a ref so listener closures never capture stale value
     const isActiveRef = useRef(isActive);
@@ -411,11 +419,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
     useEffect(() => {
       let cancelled = false;
       const extStr = path.split(".").pop()?.toLowerCase() ?? null;
-      languageRef.current = extStr;
-      // Clear any manual language override when the file path changes
+      languageRef.current = languageOverride ?? extStr;
       languageOverrideRef.current = null;
       setDetectedLanguage(extStr ?? null);
-      resolveLanguage(path).then((ext) => {
+      const langSource = languageOverride ? `file.${languageOverride}` : path;
+      resolveLanguage(langSource).then((ext) => {
         if (cancelled) return;
         const view = cmRef.current?.view;
         if (!view) return;
@@ -431,18 +439,8 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         cancelled = true;
       };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [path, doc.status]);
+    }, [path, doc.status, languageOverride]);
 
-    const handleLanguageOverride = useCallback(async (ext: string) => {
-      languageOverrideRef.current = ext || null;
-      setDetectedLanguage(ext || null);
-      const lang = ext ? await resolveLanguage(`file.${ext}`) : null;
-      const view = cmRef.current?.view;
-      if (!view) return;
-      view.dispatch({
-        effects: languageCompartment.reconfigure(lang ?? []),
-      });
-    }, []);
 
     useImperativeHandle(
       ref,
@@ -594,10 +592,11 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           dirty={dirty}
           isMarkdownFile={isMarkdownFile}
           markdownPreviewOpen={markdownPreviewOpen}
+          languageOverride={languageOverride}
           onMarkdownPreviewToggle={setMarkdownPreviewOpen}
           onOutlineToggle={handleOutlineToggle}
           detectedLanguage={detectedLanguage}
-          onLanguageOverride={handleLanguageOverride}
+          onLanguageChange={onLanguageChange ?? (() => {})}
         />
         <FindWidget
           isOpen={findOpen}

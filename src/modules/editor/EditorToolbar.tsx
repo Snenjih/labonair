@@ -74,10 +74,11 @@ type Props = {
   dirty: boolean;
   isMarkdownFile: boolean;
   markdownPreviewOpen: boolean;
+  languageOverride?: string;
+  detectedLanguage: string | null;
   onMarkdownPreviewToggle: (v: boolean) => void;
   onOutlineToggle: (v: boolean) => void;
-  detectedLanguage: string | null;
-  onLanguageOverride: (ext: string) => void;
+  onLanguageChange: (ext: string | undefined) => void;
 };
 
 export function EditorToolbar({
@@ -85,10 +86,11 @@ export function EditorToolbar({
   dirty,
   isMarkdownFile,
   markdownPreviewOpen,
+  languageOverride,
+  detectedLanguage,
   onMarkdownPreviewToggle,
   onOutlineToggle,
-  detectedLanguage,
-  onLanguageOverride,
+  onLanguageChange,
 }: Props) {
   const editorWordWrap = usePreferencesStore((s) => s.editorWordWrap);
   const editorLineNumbers = usePreferencesStore((s) => s.editorLineNumbers);
@@ -102,6 +104,9 @@ export function EditorToolbar({
   const selectionLines = useEditorCursorStore((s) => s.selectionLines);
   const cursorLine = useEditorCursorStore((s) => s.line);
   const cursorCol = useEditorCursorStore((s) => s.col);
+
+  const effectiveLang = languageOverride ?? detectedLanguage;
+  const langLabel = effectiveLang ? (LANGUAGE_LABELS[effectiveLang] ?? effectiveLang.toUpperCase()) : "Plain Text";
 
   return (
     <div className="h-8 bg-card border-b border-border px-3 flex items-center justify-between shrink-0">
@@ -132,22 +137,24 @@ export function EditorToolbar({
             <button
               type="button"
               className="text-[10px] text-muted-foreground/60 hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-accent/50 shrink-0"
+              title={languageOverride ? `Language override: ${langLabel}` : "Auto-detected language"}
             >
-              {LANGUAGE_LABELS[detectedLanguage ?? ""] ?? "Plain Text"}
+              {langLabel}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="max-h-60 overflow-y-auto min-w-40">
             <DropdownMenuItem
-              onSelect={() => onLanguageOverride("")}
-              className="text-xs"
+              onSelect={() => onLanguageChange(undefined)}
+              className={!languageOverride ? "font-medium text-xs" : "text-xs"}
             >
-              Plain Text
+              Auto-detect
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
             {LANGUAGE_LIST_DEDUPED.map((lang) => (
               <DropdownMenuItem
                 key={lang.ext}
-                onSelect={() => onLanguageOverride(lang.ext)}
-                className="text-xs"
+                onSelect={() => onLanguageChange(lang.ext)}
+                className={languageOverride === lang.ext ? "font-medium text-xs" : "text-xs"}
               >
                 {lang.label}
               </DropdownMenuItem>
