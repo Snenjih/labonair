@@ -28,7 +28,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { motion } from "motion/react";
-import React, { useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { getModel, getModelContextLimit } from "../config";
 import type { SessionMeta } from "../lib/sessions";
 import { useAgentsStore } from "../store/agentsStore";
@@ -89,7 +89,7 @@ export function AiMiniWindow() {
       exit={{ opacity: 0, y: 12, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 320, damping: 32 }}
       data-ai-mini-window
-      style={{ willChange: "transform, opacity", contain: "layout style paint" } as React.CSSProperties}
+      style={{ willChange: "transform, opacity" }}
       className={cn(
         "no-scrollbar-deep fixed right-4 bottom-12 z-40 flex h-[42rem] w-[34rem] flex-col overflow-hidden",
         "rounded-2xl border border-border/40 bg-card shadow-2xl ring-1 ring-black/5 dark:ring-white/5",

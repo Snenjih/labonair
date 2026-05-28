@@ -330,30 +330,6 @@ fn build_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
     ])
 }
 
-#[tauri::command]
-fn get_display_hz() -> u32 {
-    #[cfg(target_os = "macos")]
-    {
-        use objc2::runtime::AnyClass;
-        use objc2::msg_send;
-        unsafe {
-            let cls = match AnyClass::get(c"NSScreen") {
-                Some(c) => c,
-                None => return 60,
-            };
-            let main_screen: *mut objc2::runtime::AnyObject = msg_send![cls, mainScreen];
-            if main_screen.is_null() {
-                return 60;
-            }
-            let hz: f64 = msg_send![main_screen, maximumFramesPerSecond];
-            hz as u32
-        }
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        60
-    }
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -589,7 +565,6 @@ pub fn run() {
             background_import,
             background_delete,
             background_read_data_url,
-            get_display_hz,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

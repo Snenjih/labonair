@@ -37,11 +37,11 @@ export function SnippetLogDrawer({ open, onClose }: Props) {
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ scaleY: 0, opacity: 0 }}
-          animate={{ scaleY: 1, opacity: 1 }}
-          exit={{ scaleY: 0, opacity: 0 }}
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 260, opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
           transition={{ duration: 0.15, ease: "easeOut" }}
-          style={{ transformOrigin: "bottom", height: 260, willChange: "transform, opacity" }}
+          style={{ willChange: "height, opacity" }}
           className="overflow-hidden border-t border-border/60 bg-card"
         >
           <div className="flex h-full flex-col">
