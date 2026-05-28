@@ -77,6 +77,23 @@ Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. I
 2. Pick a provider and paste your API key. For local inference, point Nexum at your LM Studio endpoint.
 3. Keys are written to the macOS Keychain — they never touch disk or `localStorage`.
 
+## Installation
+
+### Homebrew (recommended)
+
+```sh
+brew tap snenjih/nexum
+brew install --cask nexum
+```
+
+> Nexum is not yet notarized. If macOS blocks the app on first launch, right-click `Nexum.app` in `/Applications` → **Open** → **Open** in the dialog.
+
+### Manual
+
+Download the latest `.dmg` from [Releases](https://github.com/Snenjih/nexum/releases), open it, and drag `Nexum.app` to `/Applications`.
+
+---
+
 ## Build from source
 
 **Prerequisites**
