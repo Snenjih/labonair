@@ -304,6 +304,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           ...(patch.title !== undefined && { title: patch.title }),
           ...(patch.dirty !== undefined && { dirty: patch.dirty }),
           ...(patch.path !== undefined && { path: patch.path, isUntitled: false }),
+          ...(patch.languageOverride !== undefined && {
+            languageOverride: patch.languageOverride ?? undefined,
+          }),
         };
       }),
     }));

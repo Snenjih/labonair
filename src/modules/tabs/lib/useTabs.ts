@@ -55,6 +55,7 @@ export type EditorTab = {
   isUntitled?: boolean;
   remoteHostTabId?: string;
   remotePath?: string;
+  languageOverride?: string;
 };
 
 export type PreviewTab = {
@@ -107,6 +108,7 @@ export type TabPatch = Partial<{
   path: string;
   dirty: boolean;
   url: string;
+  languageOverride: string | null;
 }>;
 
 // ─── Tree helpers ─────────────────────────────────────────────────────────────
@@ -560,6 +562,9 @@ export function useTabs() {
           ...(patch.title !== undefined && { title: patch.title }),
           ...(patch.dirty !== undefined && { dirty: patch.dirty }),
           ...(patch.path !== undefined && { path: patch.path, isUntitled: false }),
+          ...(patch.languageOverride !== undefined && {
+            languageOverride: patch.languageOverride ?? undefined,
+          }),
         };
       }),
     );

@@ -88,6 +88,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
@@ -240,6 +241,8 @@ export default function App() {
 
   const [sessionRestored, setSessionRestored] = useState(false);
   const [pendingCloseTabId, setPendingCloseTabId] = useState<number | null>(null);
+  const [pendingSaveTab, setPendingSaveTab] = useState<{ id: number; title: string } | null>(null);
+  const [pendingDirtyTab, setPendingDirtyTab] = useState<{ id: number; title: string } | null>(null);
   useEffect(() => { void initPrefs(); }, [initPrefs]);
 
   const initKeybinds = useKeybindsStore((s) => s.init);
@@ -351,8 +354,9 @@ export default function App() {
           (t) => t.kind === "workspace" && Object.values((t as WorkspaceTab).sessions).some((s) => s.kind === "ssh"),
         ).length;
         if (sshCount > 0) {
-          const ok = window.confirm(
+          const ok = await ask(
             `You have ${sshCount} active SSH connection${sshCount > 1 ? "s" : ""}. Quit anyway?`,
+            { title: "Active SSH Connections", kind: "warning", okLabel: "Quit", cancelLabel: "Cancel" },
           );
           if (!ok) return;
         }
@@ -433,20 +437,12 @@ export default function App() {
       return;
     }
     if (t?.kind === "editor" && (t as { isUntitled: boolean }).isUntitled) {
-      const choice = window.confirm(`"${t.title}" has not been saved. Save before closing?`);
-      if (choice) {
-        const handle = editorRefs.current.get(id);
-        if (handle) {
-          void handle.save().then(() => disposeTab(id));
-          return;
-        }
-      }
-      disposeTab(id);
+      setPendingSaveTab({ id, title: t.title });
       return;
     }
     if (t?.kind === "editor" && (t as { dirty: boolean }).dirty) {
-      const ok = window.confirm(`"${t.title}" has unsaved changes. Close anyway?`);
-      if (!ok) return;
+      setPendingDirtyTab({ id, title: t.title });
+      return;
     }
     disposeTab(id);
   }, [disposeTab, confirmCloseTerminalTab]);
@@ -461,6 +457,20 @@ export default function App() {
     const { tabs } = useTabsStore.getState();
     tabs.forEach((t) => handleClose(t.id));
   }, [handleClose]);
+
+  const handleDuplicateTab = useCallback((id: number) => {
+    const { tabs } = useTabsStore.getState();
+    const tab = tabs.find((t) => t.id === id);
+    if (!tab) return;
+    if (tab.kind === "workspace") {
+      const wt = tab as WorkspaceTab;
+      const session = wt.sessions[wt.activePaneId] ?? null;
+      if (session?.kind === "ssh" && session.hostId) newSshTab(session.hostId, tab.title);
+      else newTab(session?.cwd);
+    } else if (tab.kind === "editor") {
+      openFileTab((tab as { path: string }).path);
+    }
+  }, [newTab, newSshTab, openFileTab]);
 
   const cycleTab = useCallback((delta: 1 | -1) => {
     const { tabs, activeId: aid } = useTabsStore.getState();
@@ -1024,6 +1034,7 @@ export default function App() {
             onClose={handleClose}
             onCloseOthers={handleCloseOthers}
             onCloseAll={handleCloseAll}
+            onDuplicate={handleDuplicateTab}
           />
         ) : activePanel === "snippets" ? (
           <SnippetsPanel onRun={handleSnippetRun} />
@@ -1058,6 +1069,7 @@ export default function App() {
             onClose={handleClose}
             onCloseOthers={handleCloseOthers}
             onCloseAll={handleCloseAll}
+            onDuplicate={handleDuplicateTab}
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onOpenSettings={() => void openSettingsWindow()}
             onOpenHostManager={onOpenHostManager}
@@ -1214,6 +1226,50 @@ export default function App() {
           />
 
           <UpdaterDialog />
+
+          <AlertDialog open={pendingSaveTab !== null} onOpenChange={(open) => { if (!open) setPendingSaveTab(null); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Save before closing?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  "{pendingSaveTab?.title}" has not been saved.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => { disposeTab(pendingSaveTab!.id); setPendingSaveTab(null); }}>
+                  Don't Save
+                </AlertDialogCancel>
+                <AlertDialogAction onClick={async () => {
+                  const h = editorRefs.current.get(pendingSaveTab!.id);
+                  if (h) await h.save();
+                  disposeTab(pendingSaveTab!.id);
+                  setPendingSaveTab(null);
+                }}>
+                  Save
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          <AlertDialog open={pendingDirtyTab !== null} onOpenChange={(open) => { if (!open) setPendingDirtyTab(null); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Close with unsaved changes?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  "{pendingDirtyTab?.title}" has unsaved changes. They will be lost.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => { disposeTab(pendingDirtyTab!.id); setPendingDirtyTab(null); }}
+                >
+                  Close Anyway
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <AlertDialog
             open={pendingCloseTabId !== null}

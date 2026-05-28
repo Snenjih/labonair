@@ -43,6 +43,7 @@ type Props = {
   onClose: (id: number) => void;
   onCloseOthers: (id: number) => void;
   onCloseAll: () => void;
+  onDuplicate: (id: number) => void;
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
   onOpenHostManager: () => void;
@@ -59,6 +60,7 @@ export const Header = React.memo(function Header({
   onClose,
   onCloseOthers,
   onCloseAll,
+  onDuplicate,
   onOpenShortcuts,
   onOpenSettings,
   onOpenHostManager,
@@ -75,6 +77,15 @@ export const Header = React.memo(function Header({
       <UpdaterButton />
       <NotificationDropdown />
       <TransferDropdown />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+        title="Host Manager"
+        onClick={onOpenHostManager}
+      >
+        <HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.75} />
+      </Button>
     </>
   );
 
@@ -103,10 +114,6 @@ export const Header = React.memo(function Header({
         <DropdownMenuItem onClick={onOpenThemes}>
           <HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.75} />
           <span className="flex-1">Themes...</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenHostManager}>
-          <HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.75} />
-          <span className="flex-1">Host Manager</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuSub>
@@ -179,6 +186,7 @@ export const Header = React.memo(function Header({
             onClose={onClose}
             onCloseOthers={onCloseOthers}
             onCloseAll={onCloseAll}
+            onDuplicate={onDuplicate}
             compact={false}
           />
         )}

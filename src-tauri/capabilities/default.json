@@ -20,6 +20,7 @@
     "autostart:allow-is-enabled",
     "dialog:allow-open",
     "dialog:allow-save",
-    "dialog:allow-confirm"
+    "dialog:allow-confirm",
+    "dialog:allow-ask"
   ]
 }

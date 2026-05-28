@@ -46,6 +46,7 @@ import { CredentialCard } from "./CredentialCard";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setHmLayout, setHmSort } from "@/modules/settings/store";
 import type { Group, Host } from "../types";
 
 type LayoutMode = "grid" | "list";
@@ -139,10 +140,11 @@ interface SortableHostCardProps {
   newSftpTab: ConnectFn;
   pingStatus?: "online" | "offline" | "checking";
   layoutMode: LayoutMode;
+  dndDisabled: boolean;
 }
 
-function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, pingStatus, layoutMode }: SortableHostCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: host.id });
+function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, pingStatus, layoutMode, dndDisabled }: SortableHostCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: host.id, disabled: dndDisabled });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -225,22 +227,10 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
   const groupInputRef = useRef<HTMLInputElement>(null);
 
-  // Layout and sort preferences — persisted in localStorage
-  const [layoutMode, setLayoutModeState] = useState<LayoutMode>(
-    () => (localStorage.getItem("hm_layout") as LayoutMode) ?? "grid"
-  );
-  const [sortMode, setSortModeState] = useState<SortMode>(
-    () => (localStorage.getItem("hm_sort") as SortMode) ?? "last_connected"
-  );
-
-  const setLayoutMode = (m: LayoutMode) => {
-    setLayoutModeState(m);
-    localStorage.setItem("hm_layout", m);
-  };
-  const setSortMode = (m: SortMode) => {
-    setSortModeState(m);
-    localStorage.setItem("hm_sort", m);
-  };
+  const layoutMode = usePreferencesStore((s) => s.hmLayout);
+  const sortMode = usePreferencesStore((s) => s.hmSort);
+  const setLayoutMode = (m: LayoutMode) => void setHmLayout(m);
+  const setSortMode = (m: SortMode) => void setHmSort(m);
 
   // Local ordered list for dnd (mirrors store but allows optimistic reorder)
   const [localHosts, setLocalHosts] = useState<Host[]>([]);
@@ -380,7 +370,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
             </svg>
             <Input
               className="h-9 pl-9 text-sm bg-muted border-0 focus-visible:ring-1"
-              placeholder={viewMode === "hosts" ? "Find a host or ssh user@hostname…" : "Find a credential…"}
+              placeholder={viewMode === "hosts" ? "Find a host or type user@hostname to quick-connect…" : "Find a credential…"}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -485,6 +475,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                 size="sm"
                 variant="outline"
                 className="h-8 px-2.5 text-xs rounded-2xl gap-1.5 shrink-0"
+                title={dndDisabled ? "Switch to 'Last Connected' to enable drag reorder" : "Sort order"}
               >
                 {/* Sort icon */}
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -517,6 +508,9 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Separator */}
+          <div className="h-5 w-px bg-border/60 shrink-0" />
 
           {/* View toggle: Hosts / Credentials — right side */}
           <div className="flex rounded-2xl border border-input overflow-hidden shrink-0">
@@ -646,10 +640,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                     strategy={layoutMode === "list" ? verticalListSortingStrategy : rectSortingStrategy}
                   >
                     {layoutMode === "list" ? (
-                      <div className={cn(
-                        "flex flex-col rounded-xl border border-border overflow-hidden",
-                        dndDisabled && "opacity-[0.99]" // no-op class to keep structure
-                      )}>
+                      <div className="flex flex-col rounded-xl border border-border overflow-hidden">
                         {sortedHosts.map((host) => (
                           <div key={host.id} className="border-b border-border/40 last:border-0">
                             <SortableHostCard
@@ -663,6 +654,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                               newSftpTab={newSftpTab}
                               pingStatus={hostStatuses[host.id]}
                               layoutMode={layoutMode}
+                              dndDisabled={dndDisabled}
                             />
                           </div>
                         ))}
@@ -682,6 +674,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                             newSftpTab={newSftpTab}
                             pingStatus={hostStatuses[host.id]}
                             layoutMode={layoutMode}
+                            dndDisabled={dndDisabled}
                           />
                         ))}
                       </div>

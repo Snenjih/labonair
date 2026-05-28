@@ -189,10 +189,14 @@ export function EditorStack({
               path={t.path}
               isUntitled={t.isUntitled}
               isActive={visible}
+              languageOverride={t.languageOverride}
               onDirtyChange={getDirtyCallback(t.id)}
               onClose={getCloseCallback(t.id)}
               onSaved={getSavedCallback(t)}
               onSaveAs={getSaveAsCallback(t)}
+              onLanguageChange={(lang) =>
+                useTabsStore.getState().updateTab(t.id, { languageOverride: lang ?? null })
+              }
             />
           </div>
         );
