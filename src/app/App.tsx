@@ -131,18 +131,6 @@ export default function App() {
   const activeId = useTabsStore((s) => s.activeId);
   const activeTabKind = useTabsStore(selectActiveTabKind);
   const activePaneId = useTabsStore(selectActivePaneId);
-  const activeCwd = useTabsStore((s) => {
-    const tab = s.tabs.find((t) => t.id === s.activeId);
-    if (tab?.kind !== "workspace") return null;
-    const session = (tab as WorkspaceTab).sessions[(tab as WorkspaceTab).activePaneId];
-    return session?.kind === "local" ? session.cwd ?? null : null;
-  });
-  const activeFilePath = useTabsStore((s) => {
-    const tab = s.tabs.find((t) => t.id === s.activeId);
-    if (tab?.kind !== "editor") return null;
-    const et = tab as { isUntitled: boolean; path: string };
-    return et.isUntitled ? et.path.split("/").pop() ?? "untitled.txt" : et.path;
-  });
   const workspaceTabs = useTabsStore(
     useShallow((s) => s.tabs.filter((t): t is WorkspaceTab => t.kind === "workspace")),
   );
@@ -1175,8 +1163,6 @@ export default function App() {
           />
 
           <StatusBar
-            cwd={activeCwd}
-            filePath={activeFilePath}
             home={home}
             onCd={sendCd}
             onOpenMini={openMini}

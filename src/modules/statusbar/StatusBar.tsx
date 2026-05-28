@@ -16,12 +16,12 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { CwdBreadcrumb } from "./CwdBreadcrumb";
 import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import type { WorkspaceTab } from "@/modules/tabs/types";
 
 export type SidebarPanel = "explorer" | "snippets" | "hosts" | "tabs" | null;
 
 type Props = {
-  cwd: string | null;
-  filePath?: string | null;
   home: string | null;
   onCd: (path: string) => void;
   onOpenMini: () => void;
@@ -41,8 +41,6 @@ const PANEL_BUTTONS: Array<{ panel: SidebarPanel; icon: typeof SidebarLeft01Icon
 ];
 
 export const StatusBar = React.memo(function StatusBar({
-  cwd,
-  filePath,
   home,
   onCd,
   onOpenMini,
@@ -59,6 +57,20 @@ export const StatusBar = React.memo(function StatusBar({
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
   const cursorLine = useEditorCursorStore((s) => s.line);
   const cursorCol = useEditorCursorStore((s) => s.col);
+
+  const cwd = useTabsStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    if (tab?.kind !== "workspace") return null;
+    const wt = tab as WorkspaceTab;
+    const session = wt.sessions[wt.activePaneId];
+    return session?.kind === "local" ? session.cwd ?? null : null;
+  });
+  const filePath = useTabsStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    if (tab?.kind !== "editor") return null;
+    const et = tab as { isUntitled: boolean; path: string };
+    return et.isUntitled ? et.path.split("/").pop() ?? "untitled.txt" : et.path;
+  });
 
   return (
     <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-status-bar px-3 text-[11px]">

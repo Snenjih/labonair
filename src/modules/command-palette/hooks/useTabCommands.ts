@@ -17,7 +17,7 @@ export function useTabCommands(cb: RegistryCallbacks): {
   rootAction: CommandAction;
   tabsPage: CommandPage;
 } {
-  const tabs = useTabsStore(useShallow((s) => s.tabs.map((t) => ({ id: t.id, kind: t.kind, title: t.title }))));
+  const tabs = useTabsStore(useShallow((s) => s.tabs));
   const activeTabId = useTabsStore((s) => s.activeId);
   const { switchTab } = cb;
 
