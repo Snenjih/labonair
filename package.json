@@ -1,7 +1,7 @@
 {
   "name": "nexum",
   "private": true,
-  "version": "1.4.5",
+  "version": "1.5.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
