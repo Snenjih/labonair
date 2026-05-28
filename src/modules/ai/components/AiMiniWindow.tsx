@@ -89,9 +89,10 @@ export function AiMiniWindow() {
       exit={{ opacity: 0, y: 12, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 320, damping: 32 }}
       data-ai-mini-window
+      style={{ willChange: "transform, opacity" }}
       className={cn(
         "no-scrollbar-deep fixed right-4 bottom-12 z-40 flex h-[42rem] w-[34rem] flex-col overflow-hidden",
-        "rounded-2xl border border-border/40 bg-card/90 shadow-2xl ring-1 ring-black/5 backdrop-blur-2xl dark:ring-white/5",
+        "rounded-2xl border border-border/40 bg-card shadow-2xl ring-1 ring-black/5 dark:ring-white/5",
         "text-[12px]",
       )}
     >

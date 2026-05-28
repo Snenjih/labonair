@@ -245,7 +245,7 @@ export function AiInputBar() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.12 }}
+              transition={{ duration: 0.08 }}
               className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground"
             >
               {c.voice.recording ? (

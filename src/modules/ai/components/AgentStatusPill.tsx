@@ -29,6 +29,7 @@ export function AgentStatusPill({ onClick }: Props) {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -2 }}
         transition={{ duration: 0.12, ease: "easeOut" }}
+        style={{ willChange: "transform, opacity" }}
         className={cn(
           "flex h-6 items-center gap-1.5 rounded-md border px-1.5 text-[11px] transition-colors",
           tone,

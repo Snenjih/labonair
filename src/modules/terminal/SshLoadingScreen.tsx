@@ -229,6 +229,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
+            style={{ willChange: "transform, opacity" }}
             className="flex w-[400px] flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg"
           >
             <div className="flex flex-col gap-1">
@@ -275,6 +276,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
+            style={{ willChange: "transform, opacity" }}
             className="flex flex-col items-center gap-5"
           >
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
@@ -334,6 +336,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
+            style={{ willChange: "transform, opacity" }}
             className={cn(
               "flex w-[480px] flex-col gap-4 rounded-xl border bg-card p-6 shadow-lg",
               isMismatch ? "border-destructive/40" : "border-border",
@@ -392,6 +395,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
+            style={{ willChange: "transform, opacity" }}
             className="flex w-[400px] flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg"
           >
             <div className="flex flex-col gap-1">
@@ -436,6 +440,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
+            style={{ willChange: "transform, opacity" }}
             className="flex w-[400px] flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg"
           >
             <div className="flex flex-col gap-1">
@@ -482,6 +487,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
+            style={{ willChange: "transform, opacity" }}
             className="flex w-[420px] flex-col gap-4 rounded-xl border border-destructive/40 bg-card p-6 shadow-lg"
           >
             <p className="text-sm font-medium text-destructive">Connection failed</p>
@@ -509,6 +515,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
+          style={{ willChange: "transform, opacity" }}
           className="w-[480px] rounded-lg border border-border bg-muted/30 overflow-hidden"
         >
           <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">

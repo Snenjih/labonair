@@ -330,6 +330,7 @@ fn build_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
     ])
 }
 
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -413,6 +414,26 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             modules::dock_menu::setup(&app.app_handle());
+
+            // macOS: enable asynchronous CAMetalLayer rendering to reduce latency
+            // on ProMotion / high-refresh-rate displays. Done after the window is
+            // realized so the WKWebView layer hierarchy is already set up.
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.with_webview(|webview| {
+                        use objc2::msg_send;
+                        use objc2::runtime::AnyObject;
+                        unsafe {
+                            let ns_view: *mut AnyObject = webview.inner() as *mut AnyObject;
+                            let layer: *mut AnyObject = msg_send![ns_view, layer];
+                            if !layer.is_null() {
+                                let _: () = msg_send![layer, setDrawsAsynchronously: true];
+                            }
+                        }
+                    });
+                }
+            }
 
             app.on_menu_event(|app, event| {
                 match event.id().as_ref() {

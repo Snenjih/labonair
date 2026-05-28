@@ -1035,7 +1035,7 @@ export default function App() {
   );
 
   const shell = (
-    <MotionConfig reducedMotion={reduceMotion ? "always" : "never"}>
+    <MotionConfig reducedMotion={reduceMotion ? "always" : "user"}>
     <ThemeProvider>
       <TooltipProvider>
         <div className="relative z-[1] flex h-screen flex-col overflow-hidden bg-background text-foreground">

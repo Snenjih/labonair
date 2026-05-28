@@ -40,7 +40,8 @@ export function SnippetLogDrawer({ open, onClose }: Props) {
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 260, opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.2, ease: "easeInOut" }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
+          style={{ willChange: "height, opacity" }}
           className="overflow-hidden border-t border-border/60 bg-card"
         >
           <div className="flex h-full flex-col">

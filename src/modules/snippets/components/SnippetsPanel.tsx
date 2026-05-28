@@ -161,7 +161,7 @@ export function SnippetsPanel({ onRun }: Props) {
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.12 }}
+                  transition={{ duration: 0.08 }}
                   className="overflow-hidden border-b border-border/30"
                 >
                   <div className="relative px-2 py-1.5">

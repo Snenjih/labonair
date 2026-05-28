@@ -31,7 +31,7 @@ export function SelectionAskAi({ x, y, onAsk, onDismiss }: Props) {
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 4, scale: 0.95 }}
       transition={{ duration: 0.12, ease: "easeOut" }}
-      style={{ top, left, width: W }}
+      style={{ top, left, width: W, willChange: "transform, opacity" }}
       className="fixed z-50"
     >
       <button
@@ -40,7 +40,7 @@ export function SelectionAskAi({ x, y, onAsk, onDismiss }: Props) {
           e.stopPropagation();
           onAsk();
         }}
-        className="flex h-7 w-full items-center justify-between gap-1.5 rounded-md border border-border/60 bg-card/95 px-2 text-xs shadow-lg backdrop-blur-md hover:border-border hover:bg-accent"
+        className="flex h-7 w-full items-center justify-between gap-1.5 rounded-md border border-border/60 bg-card px-2 text-xs shadow-lg hover:border-border hover:bg-accent"
       >
         <span>Ask Nexum</span>
         <KbdGroup>
