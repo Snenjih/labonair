@@ -22,6 +22,7 @@ import {
   useState,
 } from "react";
 import { Button } from "@/components/ui/button";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { SshLoadingScreen } from "./SshLoadingScreen";
 import { SudoFillPopup } from "./SudoFillPopup";
 import type { TerminalPaneHandle } from "./TerminalPane";
@@ -300,6 +301,12 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         if (payload.session_id !== sessionId) return;
         setIsDisconnected(true);
         setDisconnectReason(payload.reason);
+        useNotificationStore.getState().addNotification({
+          type: "error",
+          title: "SSH Connection Lost",
+          message: payload.reason || "The connection was dropped unexpectedly.",
+          source: session.title || "SSH",
+        });
       }).then((unlisten) => cleanups.push(unlisten));
 
       (async () => {

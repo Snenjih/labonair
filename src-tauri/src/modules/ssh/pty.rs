@@ -132,7 +132,7 @@ pub fn open_shell_channel(
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => None,
                     Err(e) => {
-                        disconnect_reason = Some(e.to_string());
+                        disconnect_reason = Some(humanize_disconnect_reason(&e.to_string()));
                         break;
                     }
                 }
@@ -168,4 +168,30 @@ pub fn open_shell_channel(
     });
 
     Ok((channel, shutdown))
+}
+
+fn humanize_disconnect_reason(raw: &str) -> String {
+    let lower = raw.to_lowercase();
+    if lower.contains("transport read") || lower.contains("transport write") {
+        "Network transport failure — the connection was dropped by the server or network".to_string()
+    } else if lower.contains("connection reset") {
+        "Connection reset by the server".to_string()
+    } else if lower.contains("broken pipe") {
+        "Connection interrupted — the pipe to the server was broken".to_string()
+    } else if lower.contains("timed out") {
+        "Connection timed out".to_string()
+    } else if lower.contains("network is unreachable") || lower.contains("no route to host") {
+        "Network unreachable — no route to host".to_string()
+    } else if lower.contains("connection refused") {
+        "Connection refused by the server".to_string()
+    } else if lower.contains("eof") || lower.contains("end of file") {
+        "Connection closed by the remote host (EOF)".to_string()
+    } else {
+        // Capitalize and keep original for unknown errors
+        let mut chars = raw.chars();
+        match chars.next() {
+            None => String::new(),
+            Some(c) => c.to_uppercase().to_string() + chars.as_str(),
+        }
+    }
 }
