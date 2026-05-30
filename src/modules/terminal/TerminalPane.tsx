@@ -1,3 +1,4 @@
+import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { useTheme } from "@/modules/theme";
 import type { SearchAddon } from "@xterm/addon-search";
 import {
@@ -6,6 +7,7 @@ import {
   useImperativeHandle,
   useRef,
 } from "react";
+import { dropPaths } from "./lib/drop-paths";
 import { useTerminalSession } from "./lib/useTerminalSession";
 
 export type TerminalPaneHandle = {
@@ -42,7 +44,6 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
     const { resolvedTheme } = useTheme();
-
     const session = useTerminalSession({
       container: containerRef,
       visible,
@@ -59,6 +60,26 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       const id = requestAnimationFrame(() => session.applyTheme());
       return () => cancelAnimationFrame(id);
     }, [resolvedTheme, session]);
+
+    // Capture-phase pointerup so the drop fires even if xterm consumes the event.
+    useEffect(() => {
+      function onUp(e: PointerEvent) {
+        const paths = explorerDrag.get();
+        if (!paths) return;
+        const el = containerRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        if (
+          e.clientX >= r.left && e.clientX <= r.right &&
+          e.clientY >= r.top  && e.clientY <= r.bottom
+        ) {
+          session.write(dropPaths(paths));
+          session.focus();
+        }
+      }
+      document.addEventListener("pointerup", onUp, { capture: true });
+      return () => document.removeEventListener("pointerup", onUp, { capture: true });
+    }, [session]);
 
     useImperativeHandle(
       ref,

@@ -15,6 +15,7 @@ import {
   relativePath,
   revealInFinder,
 } from "./lib/contextActions";
+import { explorerDrag } from "./lib/explorerDrag";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import type { DirEntry, useFileTree } from "./lib/useFileTree";
@@ -111,6 +112,28 @@ function FileTreeNodeImpl({
               data-fs-path={path}
               onClick={handleClick}
               onDoubleClick={() => !isDir && tree.beginRename(path)}
+              onPointerDown={(e) => {
+                if (e.button !== 0 || tree.renaming) return;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                let dragging = false;
+
+                function onMove(ev: PointerEvent) {
+                  if (dragging) return;
+                  if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 6) {
+                    dragging = true;
+                    document.removeEventListener("pointermove", onMove);
+                    explorerDrag.start([path]);
+                  }
+                }
+                function onUp() {
+                  document.removeEventListener("pointermove", onMove);
+                  document.removeEventListener("pointerup", onUp);
+                  explorerDrag.end();
+                }
+                document.addEventListener("pointermove", onMove);
+                document.addEventListener("pointerup", onUp);
+              }}
               className={cn(
                 "group flex w-full items-center gap-2 rounded-sm px-1.5 py-0.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70 cursor-pointer",
                 isSelected && "bg-accent text-foreground",

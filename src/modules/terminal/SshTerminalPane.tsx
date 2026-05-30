@@ -23,6 +23,8 @@ import {
 } from "react";
 import { Button } from "@/components/ui/button";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
+import { dropPaths } from "./lib/drop-paths";
 import { SshLoadingScreen } from "./SshLoadingScreen";
 import { SudoFillPopup } from "./SudoFillPopup";
 import type { TerminalPaneHandle } from "./TerminalPane";
@@ -181,6 +183,28 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       },
       getSelection: () => termRef.current?.getSelection() ?? null,
     }), []);
+
+    // Explorer drag-to-terminal (pointer events, WKWebView-safe)
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      function onUp(e: PointerEvent) {
+        const paths = explorerDrag.get();
+        if (!paths || !isConnected) return;
+        const el = wrapperRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        if (
+          e.clientX >= r.left && e.clientX <= r.right &&
+          e.clientY >= r.top  && e.clientY <= r.bottom
+        ) {
+          invoke("ssh_pty_write", { sessionId, data: dropPaths(paths) }).catch(console.error);
+          termRef.current?.focus();
+        }
+      }
+      document.addEventListener("pointerup", onUp, { capture: true });
+      return () => document.removeEventListener("pointerup", onUp, { capture: true });
+    }, [isConnected, sessionId]);
 
     // Listen for palette-triggered reconnect
     useEffect(() => {
@@ -508,7 +532,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     }, [isActive, isConnected, tabVisible, sessionId]);
 
     return (
-      <div className="relative h-full w-full">
+      <div ref={wrapperRef} className="relative h-full w-full">
         {/* Container is always mounted so the ResizeObserver can measure real
             dimensions once the pane slot becomes visible. Hidden behind the
             overlay during the loading phase. */}
