@@ -89,6 +89,9 @@ pub fn initialize_db(
         )",
         // hosts: reference to a credential
         "ALTER TABLE hosts ADD COLUMN credential_id TEXT REFERENCES credentials(id) ON DELETE SET NULL",
+        // backfill keepalive defaults for hosts that were created before defaults existed
+        "UPDATE hosts SET keep_alive_interval = 60 WHERE keep_alive_interval IS NULL",
+        "UPDATE hosts SET keep_alive_tries = 3 WHERE keep_alive_tries IS NULL",
     ] {
         let _ = conn.execute_batch(sql);
     }

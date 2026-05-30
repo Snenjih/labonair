@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 
 #[tauri::command]
@@ -41,6 +42,7 @@ pub fn ssh_pty_resize(
 /// 2. Send `()` on `ready_tx` to unblock the reader thread.
 ///
 /// `cols`/`rows` set the initial terminal size to avoid a jarring resize on connect.
+#[allow(clippy::too_many_arguments)]
 pub fn open_shell_channel(
     session_arc: std::sync::Arc<std::sync::Mutex<super::SessionHandle>>,
     session_id: &str,
@@ -49,6 +51,8 @@ pub fn open_shell_channel(
     ready_rx: std::sync::mpsc::Receiver<()>,
     cols: u32,
     rows: u32,
+    keep_alive_interval: Option<u32>,
+    keep_alive_tries: Option<u32>,
 ) -> Result<(ssh2::Channel, Arc<AtomicBool>), String> {
     let sess = session_arc.lock().map_err(|e| e.to_string())?;
     let mut channel = sess.0.channel_session().map_err(|e| e.to_string())?;
@@ -70,6 +74,11 @@ pub fn open_shell_channel(
         // Block until the session has been inserted into SshState so we never
         // miss a single byte of output (replaces the old 200×10ms retry loop).
         let _ = ready_rx.recv();
+
+        let ka_interval = Duration::from_secs(keep_alive_interval.unwrap_or(60) as u64);
+        let ka_max_fails = keep_alive_tries.unwrap_or(3);
+        let mut last_keepalive = Instant::now();
+        let mut ka_consecutive_fails: u32 = 0;
 
         // Tracks the reason for an unexpected exit so we can notify the frontend.
         // None means the loop ended normally (ssh_disconnect set the shutdown flag).
@@ -110,6 +119,7 @@ pub fn open_shell_channel(
                 match ch.read(&mut buf) {
                     Ok(0) => None,
                     Ok(n) => {
+                        ka_consecutive_fails = 0; // live data proves connection is alive
                         carry.extend_from_slice(&buf[..n]);
                         // Find the longest valid UTF-8 prefix. Utf8Error::valid_up_to()
                         // points to the byte just past the last complete character.
@@ -147,7 +157,38 @@ pub fn open_shell_channel(
                     }),
                 );
             } else {
-                std::thread::sleep(std::time::Duration::from_millis(5));
+                if last_keepalive.elapsed() >= ka_interval {
+                    let session_arc_opt = {
+                        match state.0.lock() {
+                            Ok(map) => map.get(&session_id_clone).map(|s| s.session.clone()),
+                            Err(_) => None,
+                        }
+                    };
+                    if let Some(arc) = session_arc_opt {
+                        if let Ok(sess) = arc.lock() {
+                            match sess.0.keepalive_send() {
+                                Ok(_) => {
+                                    last_keepalive = Instant::now();
+                                    ka_consecutive_fails = 0;
+                                }
+                                Err(ref e) if matches!(e.code(), ssh2::ErrorCode::Session(-37)) => {
+                                    // LIBSSH2_ERROR_EAGAIN: non-blocking would block.
+                                    // Don't reset last_keepalive — retry next idle iteration.
+                                }
+                                Err(e) => {
+                                    ka_consecutive_fails += 1;
+                                    if ka_consecutive_fails >= ka_max_fails {
+                                        disconnect_reason =
+                                            Some(humanize_disconnect_reason(&e.to_string()));
+                                        break;
+                                    }
+                                    last_keepalive = Instant::now();
+                                }
+                            }
+                        }
+                    }
+                }
+                std::thread::sleep(Duration::from_millis(5));
             }
         }
 

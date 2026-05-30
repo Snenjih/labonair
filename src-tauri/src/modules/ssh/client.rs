@@ -347,9 +347,8 @@ pub(crate) fn establish_authenticated_session(
     session.handshake().map_err(|e| e.to_string())?;
     log_step!(app, session_id, "SSH handshake complete.");
 
-    if let Some(interval) = keep_alive_interval {
-        session.set_keepalive(true, interval as u32);
-    }
+    let effective_interval = keep_alive_interval.unwrap_or(60i64);
+    session.set_keepalive(true, effective_interval as u32);
 
     // Host-key verification
     log_step!(app, session_id, "Verifying host fingerprint…");
@@ -525,6 +524,8 @@ fn ssh_connect_blocking(
         ready_rx,
         initial_cols,
         initial_rows,
+        keep_alive_interval.map(|v| v as u32),
+        keep_alive_tries.map(|v| v as u32),
     )?;
     log_step!(app, session_id, "Shell channel open ✓");
 
@@ -558,7 +559,7 @@ fn ssh_connect_blocking(
 /// Uses socket2 for explicit OS-level socket control and IPv4-only filtering.
 /// This fixes "No route to host" errors on macOS with local network addresses.
 fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
-    use socket2::{Domain, Socket, Type};
+    use socket2::{Domain, Socket, TcpKeepalive, Type};
     use std::net::{IpAddr, ToSocketAddrs};
     use std::time::Duration;
 
@@ -581,6 +582,10 @@ fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
                 let sock_addr: socket2::SockAddr = (*addr).into();
                 match socket.connect_timeout(&sock_addr, Duration::from_secs(10)) {
                     Ok(_) => {
+                        let ka = TcpKeepalive::new()
+                            .with_time(Duration::from_secs(60))
+                            .with_interval(Duration::from_secs(15));
+                        socket.set_tcp_keepalive(&ka).ok();
                         let tcp: std::net::TcpStream = socket.into();
                         tcp.set_nodelay(true).ok();
                         return Ok(tcp);
