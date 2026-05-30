@@ -31,9 +31,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Apple Silicon (M1+) — native ARM runner
           - platform: macos-latest
-            args: "--target universal-apple-darwin"
+            rust-target: aarch64-apple-darwin
+            args: "--target aarch64-apple-darwin"
+          # Intel — native x86_64 runner
+          - platform: macos-13
+            rust-target: x86_64-apple-darwin
+            args: "--target x86_64-apple-darwin"
           - platform: ubuntu-22.04
+            rust-target: ""
             args: ""
 
     runs-on: ${{ matrix.platform }}
@@ -51,11 +58,9 @@ jobs:
             libssl-dev \
             patchelf
 
-      - name: Install macOS Rust targets
-        if: matrix.platform == 'macos-latest'
-        run: |
-          rustup target add aarch64-apple-darwin
-          rustup target add x86_64-apple-darwin
+      - name: Install macOS Rust target
+        if: matrix.rust-target != ''
+        run: rustup target add ${{ matrix.rust-target }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -95,16 +100,24 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
-      - name: Download universal DMG and compute SHA256
+      - name: Download macOS DMGs and compute SHA256
         id: sha
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
+
           gh release download "v${VERSION}" \
             --repo Snenjih/nexum \
-            --pattern "Nexum_${VERSION}_universal.dmg" \
+            --pattern "Nexum_${VERSION}_aarch64.dmg" \
             --dir /tmp/
-          SHA256=$(sha256sum /tmp/Nexum_${VERSION}_universal.dmg | cut -d' ' -f1)
-          echo "SHA256=$SHA256" >> $GITHUB_OUTPUT
+          SHA256_AARCH64=$(sha256sum /tmp/Nexum_${VERSION}_aarch64.dmg | cut -d' ' -f1)
+          echo "SHA256_AARCH64=$SHA256_AARCH64" >> $GITHUB_OUTPUT
+
+          gh release download "v${VERSION}" \
+            --repo Snenjih/nexum \
+            --pattern "Nexum_${VERSION}_x64.dmg" \
+            --dir /tmp/
+          SHA256_X86_64=$(sha256sum /tmp/Nexum_${VERSION}_x64.dmg | cut -d' ' -f1)
+          echo "SHA256_X86_64=$SHA256_X86_64" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -116,4 +129,5 @@ jobs:
           event-type: nexum-release
           client-payload: >-
             {"version": "${{ steps.version.outputs.VERSION }}",
-             "sha256": "${{ steps.sha.outputs.SHA256 }}"}
+             "sha256_aarch64": "${{ steps.sha.outputs.SHA256_AARCH64 }}",
+             "sha256_x86_64": "${{ steps.sha.outputs.SHA256_X86_64 }}"}
