@@ -12,6 +12,7 @@ import {
 } from "@/modules/settings/definitions";
 import {
   AiScanIcon,
+  File01Icon,
   KeyboardIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
@@ -21,8 +22,10 @@ import {
   Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { emit } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { getStoragePaths } from "@/lib/paths";
 import * as store from "@/modules/settings/store";
 import type { PrefKey } from "@/modules/settings/store";
 import { AgentsSection } from "./sections/AgentsSection";
@@ -109,6 +112,11 @@ export function SettingsApp() {
     };
   }, []);
 
+  const handleOpenInEditor = useCallback(async () => {
+    const { config } = await getStoragePaths();
+    await emit("nexum:open-file", { path: `${config}/nexum-settings.json` });
+  }, []);
+
   const trimmed = searchQuery.trim().toLowerCase();
   const isSearching = trimmed.length > 0;
 
@@ -173,6 +181,16 @@ export function SettingsApp() {
               </button>
             ))}
           </nav>
+          <div className="mt-auto border-t border-border/60 pt-2">
+            <button
+              type="button"
+              onClick={() => void handleOpenInEditor()}
+              className="flex w-full items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11.5px] text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+            >
+              <HugeiconsIcon icon={File01Icon} size={12} strokeWidth={1.75} />
+              Open settings.json
+            </button>
+          </div>
         </aside>
 
         {/* Right content */}
