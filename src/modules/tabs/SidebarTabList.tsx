@@ -12,10 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import {
-  Cancel01Icon,
-  PlusSignIcon,
-} from "@hugeicons/core-free-icons";
+import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef } from "react";
 import { useTabsStore } from "./store/tabsStore";
@@ -77,7 +74,7 @@ export function SidebarTabList({
                   className={cn(
                     "group flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors",
                     isActive
-                      ? "bg-accent text-foreground"
+                      ? "bg-accent/60 text-primary!"
                       : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                   )}
                 >
@@ -105,7 +102,11 @@ export function SidebarTabList({
                       }}
                       className="size-5 shrink-0 rounded opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-60"
                     >
-                      <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+                      <HugeiconsIcon
+                        icon={Cancel01Icon}
+                        size={11}
+                        strokeWidth={2}
+                      />
                     </Button>
                   )}
                 </button>
@@ -113,13 +114,21 @@ export function SidebarTabList({
               <ContextMenuContent>
                 {t.kind !== "home" && (
                   <>
-                    <ContextMenuItem onSelect={() => onClose(t.id)}>Close Tab</ContextMenuItem>
-                    <ContextMenuItem onSelect={() => onDuplicate(t.id)}>Duplicate Tab</ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onClose(t.id)}>
+                      Close Tab
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onDuplicate(t.id)}>
+                      Duplicate Tab
+                    </ContextMenuItem>
                     <ContextMenuSeparator />
                   </>
                 )}
-                <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>Close Others</ContextMenuItem>
-                <ContextMenuItem onSelect={onCloseAll}>Close All</ContextMenuItem>
+                <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>
+                  Close Others
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={onCloseAll}>
+                  Close All
+                </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
           );

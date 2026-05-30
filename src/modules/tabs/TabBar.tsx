@@ -13,10 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import {
-  Cancel01Icon,
-  PlusSignIcon,
-} from "@hugeicons/core-free-icons";
+import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef } from "react";
 import { useTabsStore } from "./store/tabsStore";
@@ -96,7 +93,11 @@ export function TabBar({
                     value={String(t.id)}
                     data-tab-id={t.id}
                     onAuxClick={(e) => {
-                      if (e.button === 1 && tabs.length > 1 && t.kind !== "home") {
+                      if (
+                        e.button === 1 &&
+                        tabs.length > 1 &&
+                        t.kind !== "home"
+                      ) {
                         e.preventDefault();
                         e.stopPropagation();
                         onClose(t.id);
@@ -106,7 +107,10 @@ export function TabBar({
                       if (e.button === 1) e.preventDefault();
                     }}
                     className={cn(
-                      "group h-7 shrink-0 gap-1.5 rounded-xl text-xs text-muted-foreground transition-colors data-[state=active]:bg-accent data-[state=active]:text-foreground hover:bg-accent/60 hover:text-foreground justify-between",
+                      "group h-7 shrink-0 gap-1.5 rounded-xl text-xs transition-colors justify-between",
+                      t.id === activeId
+                        ? "bg-accent/60 text-primary!"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                       compact ? "px-1.5!" : "ps-2! pe-1!",
                     )}
                   >
@@ -137,7 +141,11 @@ export function TabBar({
                         }}
                         className="size-5 shrink-0 rounded opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-60"
                       >
-                        <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+                        <HugeiconsIcon
+                          icon={Cancel01Icon}
+                          size={11}
+                          strokeWidth={2}
+                        />
                       </Button>
                     )}
                   </TabsTrigger>
@@ -145,13 +153,21 @@ export function TabBar({
                 <ContextMenuContent>
                   {t.kind !== "home" && (
                     <>
-                      <ContextMenuItem onSelect={() => onClose(t.id)}>Close Tab</ContextMenuItem>
-                      <ContextMenuItem onSelect={() => onDuplicate(t.id)}>Duplicate Tab</ContextMenuItem>
+                      <ContextMenuItem onSelect={() => onClose(t.id)}>
+                        Close Tab
+                      </ContextMenuItem>
+                      <ContextMenuItem onSelect={() => onDuplicate(t.id)}>
+                        Duplicate Tab
+                      </ContextMenuItem>
                       <ContextMenuSeparator />
                     </>
                   )}
-                  <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>Close Others</ContextMenuItem>
-                  <ContextMenuItem onSelect={onCloseAll}>Close All</ContextMenuItem>
+                  <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>
+                    Close Others
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={onCloseAll}>
+                    Close All
+                  </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
             ))}
