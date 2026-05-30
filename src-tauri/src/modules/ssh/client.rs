@@ -347,8 +347,10 @@ pub(crate) fn establish_authenticated_session(
     session.handshake().map_err(|e| e.to_string())?;
     log_step!(app, session_id, "SSH handshake complete.");
 
-    let effective_interval = keep_alive_interval.unwrap_or(60i64);
-    session.set_keepalive(true, effective_interval as u32);
+    // want_reply=false uses SSH_MSG_IGNORE (no server reply expected),
+    // avoiding libssh2 reply-wait state-machine conflicts with ch.read().
+    let effective_interval = keep_alive_interval.unwrap_or(25i64);
+    session.set_keepalive(false, effective_interval as u32);
 
     // Host-key verification
     log_step!(app, session_id, "Verifying host fingerprint…");

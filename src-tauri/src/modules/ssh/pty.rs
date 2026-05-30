@@ -75,7 +75,7 @@ pub fn open_shell_channel(
         // miss a single byte of output (replaces the old 200×10ms retry loop).
         let _ = ready_rx.recv();
 
-        let ka_interval = Duration::from_secs(keep_alive_interval.unwrap_or(60) as u64);
+        let ka_interval = Duration::from_secs(keep_alive_interval.unwrap_or(25) as u64);
         let ka_max_fails = keep_alive_tries.unwrap_or(3);
         let mut last_keepalive = Instant::now();
         let mut ka_consecutive_fails: u32 = 0;
@@ -214,7 +214,7 @@ pub fn open_shell_channel(
 fn humanize_disconnect_reason(raw: &str) -> String {
     let lower = raw.to_lowercase();
     if lower.contains("transport read") || lower.contains("transport write") {
-        "Network transport failure — the connection was dropped by the server or network".to_string()
+        format!("Network transport failure — the connection was dropped by the server or network [{raw}]")
     } else if lower.contains("connection reset") {
         "Connection reset by the server".to_string()
     } else if lower.contains("broken pipe") {
