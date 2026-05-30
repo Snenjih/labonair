@@ -168,22 +168,24 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (_defaultTabOpened) return;
     _defaultTabOpened = true;
     const defaultStartupTab = usePreferencesStore.getState().defaultStartupTab;
-    const id = get()._nextId;
+    const homeId = get()._nextId;
+    const homeTab = { id: homeId, kind: "home" as const, title: "Home" };
     if (defaultStartupTab === "terminal") {
+      const termId = homeId + 1;
       const sessionId = newSessionId();
-      const tab: WorkspaceTab = {
-        id,
+      const termTab: WorkspaceTab = {
+        id: termId,
         kind: "workspace",
         title: "shell",
         activePaneId: sessionId,
         layout: makeLeaf(sessionId),
         sessions: { [sessionId]: { id: sessionId, kind: "local", title: "shell" } },
       };
-      set((s) => ({ tabs: [tab], activeId: id, _nextId: s._nextId + 1 }));
+      set((s) => ({ tabs: [homeTab, termTab], activeId: termId, _nextId: s._nextId + 2 }));
     } else {
       set((s) => ({
-        tabs: [{ id, kind: "home", title: "Home" }],
-        activeId: id,
+        tabs: [homeTab],
+        activeId: homeId,
         _nextId: s._nextId + 1,
       }));
     }
@@ -197,7 +199,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }
     const id = get()._nextId;
     set((s) => ({
-      tabs: [...s.tabs, { id, kind: "home" as const, title: "Home" }],
+      tabs: [{ id, kind: "home" as const, title: "Home" }, ...s.tabs],
       activeId: id,
       _nextId: s._nextId + 1,
     }));
@@ -272,6 +274,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   closeTab: (id) => {
     const { tabs, activeId } = get();
+    if (tabs.find((t) => t.id === id)?.kind === "home") return;
     if (tabs.length <= 1) return;
     const idx = tabs.findIndex((t) => t.id === id);
     const next = tabs.filter((t) => t.id !== id);

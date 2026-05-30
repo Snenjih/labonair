@@ -93,7 +93,7 @@ export function SidebarTabList({
                       />
                     ) : null}
                   </span>
-                  {tabs.length > 1 && (
+                  {tabs.length > 1 && t.kind !== "home" && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -111,9 +111,13 @@ export function SidebarTabList({
                 </button>
               </ContextMenuTrigger>
               <ContextMenuContent>
-                <ContextMenuItem onSelect={() => onClose(t.id)}>Close Tab</ContextMenuItem>
-                <ContextMenuItem onSelect={() => onDuplicate(t.id)}>Duplicate Tab</ContextMenuItem>
-                <ContextMenuSeparator />
+                {t.kind !== "home" && (
+                  <>
+                    <ContextMenuItem onSelect={() => onClose(t.id)}>Close Tab</ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onDuplicate(t.id)}>Duplicate Tab</ContextMenuItem>
+                    <ContextMenuSeparator />
+                  </>
+                )}
                 <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>Close Others</ContextMenuItem>
                 <ContextMenuItem onSelect={onCloseAll}>Close All</ContextMenuItem>
               </ContextMenuContent>

@@ -24,7 +24,6 @@ import {
   SidebarLeftIcon,
   SidebarRightIcon,
   Menu01Icon,
-  Globe02Icon,
   EyeIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -77,15 +76,6 @@ export const Header = React.memo(function Header({
       <UpdaterButton />
       <NotificationDropdown />
       <TransferDropdown />
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-        title="Host Manager"
-        onClick={onOpenHostManager}
-      >
-        <HugeiconsIcon icon={Globe02Icon} size={16} strokeWidth={1.75} />
-      </Button>
     </>
   );
 
