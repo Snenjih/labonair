@@ -68,6 +68,7 @@ export type Preferences = {
 
   // --- Terminal ---
   terminalShell: string;
+  terminalDefaultPath: string;
   terminalCursorBlink: boolean;
   terminalCursorStyle: "block" | "underline" | "bar";
   terminalFontFamily: string;
@@ -191,6 +192,7 @@ const KEY_BG_OPACITY = "backgroundOpacity";
 const KEY_BG_BLUR = "backgroundBlur";
 
 const KEY_TERMINAL_SHELL = "terminalShell";
+const KEY_TERMINAL_DEFAULT_PATH = "terminalDefaultPath";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
 const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
@@ -292,6 +294,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   backgroundBlur: 0,
 
   terminalShell: "",
+  terminalDefaultPath: "",
   terminalCursorBlink: true,
   terminalCursorStyle: "bar",
   terminalFontFamily: '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
@@ -444,6 +447,8 @@ export async function loadPreferences(): Promise<Preferences> {
 
     terminalShell:
       get<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
+    terminalDefaultPath:
+      get<string>(KEY_TERMINAL_DEFAULT_PATH) ?? DEFAULT_PREFERENCES.terminalDefaultPath,
     terminalCursorBlink:
       get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
       DEFAULT_PREFERENCES.terminalCursorBlink,
@@ -824,6 +829,11 @@ export async function setTerminalBell(value: boolean): Promise<void> {
 
 export async function setTerminalShell(value: string): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_SHELL, value);
+  await (await getStore()).save();
+}
+
+export async function setTerminalDefaultPath(value: string): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_DEFAULT_PATH, value);
   await (await getStore()).save();
 }
 

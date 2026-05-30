@@ -27,6 +27,7 @@ import {
   setTerminalScrollSensitivity,
   setTerminalFastScrollModifier,
   setTerminalShell,
+  setTerminalDefaultPath,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -50,6 +51,7 @@ export function TerminalSection() {
   const terminalScrollSensitivity = usePreferencesStore((s) => s.terminalScrollSensitivity);
   const terminalFastScrollModifier = usePreferencesStore((s) => s.terminalFastScrollModifier);
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
+  const terminalDefaultPath = usePreferencesStore((s) => s.terminalDefaultPath);
 
   return (
     <div className="flex flex-col gap-6">
@@ -68,6 +70,17 @@ export function TerminalSection() {
             value={terminalShell}
             onChange={(e) => void setTerminalShell(e.target.value)}
             placeholder="Auto-detect (e.g. /bin/zsh)"
+            className="h-7 w-52 font-mono text-[11.5px]"
+          />
+        </SettingRow>
+        <SettingRow
+          title="Default working directory"
+          description="Path opened when a new terminal tab starts. Leave empty to use $HOME. Ignored when 'Inherit cwd from current tab' is enabled."
+        >
+          <Input
+            value={terminalDefaultPath}
+            onChange={(e) => void setTerminalDefaultPath(e.target.value)}
+            placeholder="/Users/me/Projects"
             className="h-7 w-52 font-mono text-[11.5px]"
           />
         </SettingRow>

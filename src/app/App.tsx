@@ -228,6 +228,7 @@ export default function App() {
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
   const reduceMotion = usePreferencesStore((s) => s.reduceMotion);
   const newTabInheritsCwd = usePreferencesStore((s) => s.newTabInheritsCwd);
+  const terminalDefaultPath = usePreferencesStore((s) => s.terminalDefaultPath);
   const confirmCloseTerminalTab = usePreferencesStore((s) => s.confirmCloseTerminalTab);
   const confirmQuitWithSsh = usePreferencesStore((s) => s.confirmQuitWithSsh);
   useUpdater({ autoCheck: checkForUpdates });
@@ -569,8 +570,11 @@ export default function App() {
   }, [askFromSelection]);
 
   const openNewTab = useCallback(() => {
-    newTab(newTabInheritsCwd ? inheritedCwdForNewTab() : undefined);
-  }, [newTabInheritsCwd, inheritedCwdForNewTab]);
+    const cwd = newTabInheritsCwd
+      ? inheritedCwdForNewTab()
+      : (terminalDefaultPath.trim() || undefined);
+    newTab(cwd);
+  }, [newTabInheritsCwd, inheritedCwdForNewTab, terminalDefaultPath]);
 
   const onOpenHostManager = useCallback(() => { openHomeTab(); }, []);
 
