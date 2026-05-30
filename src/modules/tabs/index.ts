@@ -2,7 +2,6 @@ export { TabBar } from "./TabBar";
 export { SidebarTabList } from "./SidebarTabList";
 export { TabIconFor, labelFor, useRecentHosts, NewTabDropdownItems } from "./lib/tabUtils";
 export {
-  useTabs,
   type Tab,
   type WorkspaceTab,
   type PaneNode,
@@ -17,7 +16,7 @@ export {
   type QuickConnectParams,
   type SftpTab,
   type HomeTab,
-} from "./lib/useTabs";
+} from "./types";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
 export {
   useTabsStore,

@@ -21,7 +21,7 @@ import {
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import type { Tab, WorkspaceTab } from "./useTabs";
+import type { Tab, WorkspaceTab } from "../types";
 
 // --- Shared hook ---
 

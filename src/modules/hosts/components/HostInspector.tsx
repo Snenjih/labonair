@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useTabs } from "@/modules/tabs";
+import { useTabsStore } from "@/modules/tabs";
 import { useCallback, useEffect, useState } from "react";
 import type { Host } from "../types";
 import { useHostsStore } from "../store/hostsStore";
@@ -28,7 +28,7 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
   const updateHost = useHostsStore((s) => s.updateHost);
   const deleteHost = useHostsStore((s) => s.deleteHost);
 
-  const { newSshTab, newSftpTab } = useTabs();
+  const { newSshTab, newSftpTab } = useTabsStore.getState();
 
   const [draft, setDraft] = useState<Partial<Host>>({});
   const [saving, setSaving] = useState(false);
