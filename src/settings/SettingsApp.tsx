@@ -226,6 +226,7 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "vimMode": void store.setVimMode(value as boolean); break;
     case "theme": void store.setTheme(value as store.ThemePref); break;
     case "terminalCursorBlink": void store.setTerminalCursorBlink(value as boolean); break;
+    case "terminalCursorBlinkInterval": void store.setTerminalCursorBlinkInterval(Number(value)); break;
     case "terminalCursorStyle": void store.setTerminalCursorStyle(value as "block" | "underline" | "bar"); break;
     case "terminalFontWeight": void store.setTerminalFontWeight(value as "normal" | "medium" | "bold"); break;
     case "editorAutoSave": void store.setEditorAutoSave(value as "off" | "afterDelay" | "onFocusChange"); break;

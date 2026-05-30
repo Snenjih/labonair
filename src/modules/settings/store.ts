@@ -70,6 +70,7 @@ export type Preferences = {
   terminalShell: string;
   terminalDefaultPath: string;
   terminalCursorBlink: boolean;
+  terminalCursorBlinkInterval: number;
   terminalCursorStyle: "block" | "underline" | "bar";
   terminalFontFamily: string;
   terminalFontSize: number;
@@ -194,6 +195,7 @@ const KEY_BG_BLUR = "backgroundBlur";
 const KEY_TERMINAL_SHELL = "terminalShell";
 const KEY_TERMINAL_DEFAULT_PATH = "terminalDefaultPath";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
+const KEY_TERMINAL_CURSOR_BLINK_INTERVAL = "terminalCursorBlinkInterval";
 const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
 const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
@@ -296,6 +298,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalShell: "",
   terminalDefaultPath: "",
   terminalCursorBlink: true,
+  terminalCursorBlinkInterval: 1000,
   terminalCursorStyle: "bar",
   terminalFontFamily: '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
   terminalFontSize: 14,
@@ -452,6 +455,14 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalCursorBlink:
       get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
       DEFAULT_PREFERENCES.terminalCursorBlink,
+    terminalCursorBlinkInterval: Math.min(
+      2000,
+      Math.max(
+        200,
+        get<number>(KEY_TERMINAL_CURSOR_BLINK_INTERVAL) ??
+          DEFAULT_PREFERENCES.terminalCursorBlinkInterval,
+      ),
+    ),
     terminalCursorStyle:
       get<"block" | "underline" | "bar">(KEY_TERMINAL_CURSOR_STYLE) ??
       DEFAULT_PREFERENCES.terminalCursorStyle,
@@ -765,6 +776,12 @@ export async function setBackgroundBlur(value: number): Promise<void> {
 
 export async function setTerminalCursorBlink(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_CURSOR_BLINK, value);
+  await (await getStore()).save();
+}
+
+export async function setTerminalCursorBlinkInterval(value: number): Promise<void> {
+  const clamped = Math.min(2000, Math.max(200, Math.round(value)));
+  await (await getStore()).set(KEY_TERMINAL_CURSOR_BLINK_INTERVAL, clamped);
   await (await getStore()).save();
 }
 
@@ -1173,6 +1190,7 @@ export async function onPreferencesChange(
 
     [KEY_TERMINAL_SHELL]: "terminalShell",
     [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
+    [KEY_TERMINAL_CURSOR_BLINK_INTERVAL]: "terminalCursorBlinkInterval",
     [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
     [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
     [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",

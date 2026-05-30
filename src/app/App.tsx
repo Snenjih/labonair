@@ -82,6 +82,7 @@ import { ThemeProvider } from "@/modules/theme";
 import { CommandPalette, useCommandStore, type RegistryCallbacks } from "@/modules/command-palette";
 import { UpdaterDialog, useUpdater } from "@/modules/updater";
 import { useThemeEngine } from "@/lib/useThemeEngine";
+import { useTerminalCursorBlinkInterval } from "@/lib/useTerminalCursorBlinkInterval";
 import { handleApiError } from "@/lib/errors";
 import { captureAndSave, clearSnapshot, restoreIfEnabled } from "@/modules/session";
 import { invoke } from "@tauri-apps/api/core";
@@ -249,6 +250,7 @@ export default function App() {
   const initKeybinds = useKeybindsStore((s) => s.init);
   useEffect(() => { void initKeybinds(); }, [initKeybinds]);
   useThemeEngine();
+  useTerminalCursorBlinkInterval();
   useEffect(() => {
     if (!prefsHydrated) return;
     setSelectedModelId(prefDefaultModel);

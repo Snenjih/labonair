@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setTerminalCursorBlink,
+  setTerminalCursorBlinkInterval,
   setTerminalCursorStyle,
   setTerminalFontFamily,
   setTerminalFontSize,
@@ -34,6 +35,7 @@ import { SettingRow } from "../components/SettingRow";
 
 export function TerminalSection() {
   const terminalCursorBlink = usePreferencesStore((s) => s.terminalCursorBlink);
+  const terminalCursorBlinkInterval = usePreferencesStore((s) => s.terminalCursorBlinkInterval);
   const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
@@ -190,6 +192,20 @@ export function TerminalSection() {
               onCheckedChange={(v) => void setTerminalCursorBlink(v)}
             />
           </SettingRow>
+          {terminalCursorBlink && (
+            <SettingRow
+              title="Blink interval"
+              description="Duration of one blink cycle in milliseconds (200–2000 ms)."
+            >
+              <NumInput
+                value={terminalCursorBlinkInterval}
+                min={200}
+                max={2000}
+                step={50}
+                onChange={(v) => void setTerminalCursorBlinkInterval(v)}
+              />
+            </SettingRow>
+          )}
         </div>
       </div>
 

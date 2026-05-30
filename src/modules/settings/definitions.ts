@@ -226,6 +226,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "Switch",
   },
   {
+    id: "terminalCursorBlinkInterval",
+    label: "Cursor blink interval",
+    description: "Duration of one blink cycle in milliseconds (200–2000 ms). Only applies when cursor blink is enabled.",
+    category: "Terminal",
+    controlType: "NumberInput",
+  },
+  {
     id: "terminalBell",
     label: "Terminal bell",
     description: "Play a sound when the terminal bell character (BEL) is received.",
