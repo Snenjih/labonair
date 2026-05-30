@@ -1076,6 +1076,7 @@ export default function App() {
             onDuplicate={handleDuplicateTab}
             onOpenShortcuts={() => setShortcutsOpen(true)}
             onOpenSettings={() => void openSettingsWindow()}
+            onOpenKeybindings={() => void openSettingsWindow("shortcuts")}
             onOpenHostManager={onOpenHostManager}
             onOpenThemes={() => useCommandStore.getState().openToPage("themes")}
           />

@@ -25,6 +25,7 @@ import {
   SidebarRightIcon,
   Menu01Icon,
   EyeIcon,
+  Key01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useRef } from "react";
@@ -45,6 +46,7 @@ type Props = {
   onDuplicate: (id: number) => void;
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
+  onOpenKeybindings: () => void;
   onOpenHostManager: () => void;
   onOpenThemes: () => void;
 };
@@ -62,6 +64,7 @@ export const Header = React.memo(function Header({
   onDuplicate,
   onOpenShortcuts,
   onOpenSettings,
+  onOpenKeybindings,
   onOpenHostManager,
   onOpenThemes,
 }: Props) {
@@ -100,6 +103,10 @@ export const Header = React.memo(function Header({
           <HugeiconsIcon icon={KeyboardIcon} size={16} strokeWidth={1.75} />
           <span className="flex-1">Keyboard Shortcuts</span>
           <DropdownMenuShortcut>⌘?</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onOpenKeybindings}>
+          <HugeiconsIcon icon={Key01Icon} size={16} strokeWidth={1.75} />
+          <span className="flex-1">Keymap</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenThemes}>
           <HugeiconsIcon icon={EyeIcon} size={16} strokeWidth={1.75} />
