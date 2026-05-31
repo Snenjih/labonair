@@ -67,6 +67,10 @@ export function TerminalSection() {
         <SettingRow
           title="Shell path"
           description="Full path to the shell binary. Leave empty to use the system default ($SHELL). Applies to new terminal sessions."
+          hint={{
+            text: "Local terminal only — SSH connections launch the shell configured on the remote server. This path has no effect there.",
+            variant: "local",
+          }}
         >
           <Input
             value={terminalShell}
@@ -78,6 +82,10 @@ export function TerminalSection() {
         <SettingRow
           title="Default working directory"
           description="Path opened when a new terminal tab starts. Leave empty to use $HOME. Ignored when 'Inherit cwd from current tab' is enabled."
+          hint={{
+            text: "Local terminal only — SSH sessions always open in the remote user's home directory, regardless of this setting.",
+            variant: "local",
+          }}
         >
           <Input
             value={terminalDefaultPath}

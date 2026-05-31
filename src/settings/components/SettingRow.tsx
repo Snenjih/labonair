@@ -1,29 +1,67 @@
 import { cn } from "@/lib/utils";
 
+type HintVariant = "local" | "info" | "warning";
+
+type Hint = {
+  text: string;
+  variant?: HintVariant;
+};
+
 type Props = {
   title: string;
   description?: string;
+  hint?: Hint;
   children: React.ReactNode;
   className?: string;
 };
 
-export function SettingRow({ title, description, children, className }: Props) {
+const hintStyles: Record<HintVariant, { bar: string; text: string; dot: string }> = {
+  local: {
+    bar: "border-l-2 border-sky-500/40 bg-sky-500/5",
+    text: "text-sky-400/75",
+    dot: "bg-sky-400/60",
+  },
+  info: {
+    bar: "border-l-2 border-blue-500/40 bg-blue-500/5",
+    text: "text-blue-400/75",
+    dot: "bg-blue-400/60",
+  },
+  warning: {
+    bar: "border-l-2 border-amber-500/40 bg-amber-500/5",
+    text: "text-amber-400/75",
+    dot: "bg-amber-400/60",
+  },
+};
+
+export function SettingRow({ title, description, hint, children, className }: Props) {
+  const hintStyle = hint ? hintStyles[hint.variant ?? "info"] : null;
+
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-4 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5",
+        "flex flex-col rounded-lg border border-border/60 bg-card/60",
         className,
       )}
     >
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[12.5px] font-medium">{title}</span>
-        {description ? (
-          <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-            {description}
-          </span>
-        ) : null}
+      <div className="flex items-start justify-between gap-4 px-3 py-2.5">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[12.5px] font-medium">{title}</span>
+          {description ? (
+            <span className="text-[10.5px] leading-relaxed text-muted-foreground">
+              {description}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center">{children}</div>
       </div>
-      <div className="flex shrink-0 items-center">{children}</div>
+      {hint && hintStyle && (
+        <div className={cn("mx-2.5 mb-2 flex items-center gap-2 rounded px-2.5 py-1.5", hintStyle.bar)}>
+          <span className={cn("mt-px h-1 w-1 shrink-0 rounded-full", hintStyle.dot)} />
+          <span className={cn("text-[10px] leading-snug tracking-wide", hintStyle.text)}>
+            {hint.text}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
