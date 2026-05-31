@@ -89,7 +89,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
         ) : null}
         <div
           className={
-            url
+            url && !isImage
               ? "relative min-h-0 flex-1 bg-white"
               : "relative min-h-0 flex-1 bg-background"
           }
@@ -206,7 +206,7 @@ function ImageViewer({ src }: { src: string }) {
       className="relative h-full w-full overflow-hidden select-none"
       style={{
         background:
-          "repeating-conic-gradient(color-mix(in srgb, var(--color-foreground) 6%, transparent) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px",
+          "repeating-conic-gradient(color-mix(in srgb, var(--color-foreground) 6%, transparent) 0% 25%, transparent 0% 50%) 0 0 / 16px 16px, var(--color-background)",
         cursor: isDragging.current ? "grabbing" : "grab",
       }}
       onMouseDown={onMouseDown}
