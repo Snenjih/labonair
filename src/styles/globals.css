@@ -287,41 +287,6 @@ html[data-chrome="borderless"] #settings-root {
     background: var(--background);
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * Wallpaper mode — activated by BackgroundImageLayer via [data-wallpaper] on <html>
- * Architecture:
- *   • Wallpaper portal: position:fixed; z-index:0  (above body background)
- *   • App root div:     position:relative; z-index:1 (above wallpaper)
- *   • --ui-alpha:       set by BackgroundImageLayer via JS; controls surface transparency
- *     - opacity=0   → --ui-alpha=1.0 (fully opaque surfaces, wallpaper hidden)
- *     - opacity=100 → --ui-alpha=0.1 (very transparent surfaces, wallpaper fully visible)
- * ───────────────────────────────────────────────────────────────────────────── */
-:root {
-    --ui-alpha: 1;
-}
-
-/* Dark mode wallpaper — surfaces become semi-transparent via --ui-alpha */
-html[data-wallpaper].dark {
-    --background: oklch(20.90% 0.0000 259.98 / var(--ui-alpha));
-    --card: oklch(23.93% 0.0000 259.98 / var(--ui-alpha));
-    --popover: oklch(23.93% 0.0000 259.98 / calc(var(--ui-alpha) * 0.95 + 0.05));
-    --sidebar: oklch(20.90% 0.0000 259.98 / var(--ui-alpha));
-    --muted: oklch(31.32% 0.0000 259.98 / var(--ui-alpha));
-    --accent: oklch(35.62% 0.0000 259.98 / var(--ui-alpha));
-    --secondary: oklch(35.62% 0.0000 259.98 / var(--ui-alpha));
-}
-
-/* Light mode wallpaper */
-html[data-wallpaper]:not(.dark) {
-    --background: oklch(97.00% 0.000 0 / var(--ui-alpha));
-    --card: oklch(100.00% 0.000 0 / var(--ui-alpha));
-    --popover: oklch(100.00% 0.000 0 / calc(var(--ui-alpha) * 0.95 + 0.05));
-    --sidebar: oklch(97.00% 0.000 0 / var(--ui-alpha));
-    --muted: oklch(93.00% 0.000 0 / var(--ui-alpha));
-    --accent: oklch(93.00% 0.000 0 / var(--ui-alpha));
-    --secondary: oklch(93.00% 0.000 0 / var(--ui-alpha));
-}
-
 /*
  * xterm.js overrides — kept outside @layer so they win against the addon's
  * own stylesheet (which is not in any layer and would otherwise override).
