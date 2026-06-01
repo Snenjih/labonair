@@ -165,6 +165,10 @@ export type Preferences = {
 
   // --- Tabs ---
   tabsLocation: "titlebar" | "sidebar";
+
+  // --- Zen Mode ---
+  zenModeShowHeader: boolean;
+  zenModeShowStatusbar: boolean;
 };
 
 const KEY_THEME = "theme";
@@ -268,6 +272,8 @@ const KEY_CONFIRM_CLOSE_TERMINAL_TAB = "confirmCloseTerminalTab";
 const KEY_CONFIRM_QUIT_WITH_SSH = "confirmQuitWithSsh";
 const KEY_TITLEBAR_ICONS_POSITION = "titlebarsIconsPosition";
 const KEY_TABS_LOCATION = "tabsLocation";
+const KEY_ZEN_MODE_SHOW_HEADER = "zenModeShowHeader";
+const KEY_ZEN_MODE_SHOW_STATUSBAR = "zenModeShowStatusbar";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -377,6 +383,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   titlebarsIconsPosition: "auto",
 
   tabsLocation: "titlebar",
+
+  zenModeShowHeader: true,
+  zenModeShowStatusbar: true,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -652,6 +661,11 @@ export async function loadPreferences(): Promise<Preferences> {
 
     tabsLocation:
       get<"titlebar" | "sidebar">(KEY_TABS_LOCATION) ?? DEFAULT_PREFERENCES.tabsLocation,
+
+    zenModeShowHeader:
+      get<boolean>(KEY_ZEN_MODE_SHOW_HEADER) ?? DEFAULT_PREFERENCES.zenModeShowHeader,
+    zenModeShowStatusbar:
+      get<boolean>(KEY_ZEN_MODE_SHOW_STATUSBAR) ?? DEFAULT_PREFERENCES.zenModeShowStatusbar,
   };
 }
 
@@ -841,6 +855,16 @@ export async function setTerminalUseWebGL(value: boolean): Promise<void> {
 
 export async function setTerminalBell(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_BELL, value);
+  await (await getStore()).save();
+}
+
+export async function setZenModeShowHeader(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_ZEN_MODE_SHOW_HEADER, value);
+  await (await getStore()).save();
+}
+
+export async function setZenModeShowStatusbar(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_ZEN_MODE_SHOW_STATUSBAR, value);
   await (await getStore()).save();
 }
 
@@ -1261,6 +1285,8 @@ export async function onPreferencesChange(
     [KEY_CONFIRM_QUIT_WITH_SSH]: "confirmQuitWithSsh",
     [KEY_TITLEBAR_ICONS_POSITION]: "titlebarsIconsPosition",
     [KEY_TABS_LOCATION]: "tabsLocation",
+    [KEY_ZEN_MODE_SHOW_HEADER]: "zenModeShowHeader",
+    [KEY_ZEN_MODE_SHOW_STATUSBAR]: "zenModeShowStatusbar",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];

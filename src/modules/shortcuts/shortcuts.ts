@@ -24,6 +24,7 @@ export type ShortcutId =
   | "shortcuts.open"
   | "command.palette"
   | "sidebar.toggle"
+  | "view.zenMode"
   | "view.zoomIn"
   | "view.zoomOut"
   | "view.zoomReset";
@@ -157,6 +158,13 @@ export const SHORTCUTS: Shortcut[] = [
     keys: ["⌘", "B"],
     group: "View",
     match: (e) => isMod(e) && e.key.toLowerCase() === "b",
+  },
+  {
+    id: "view.zenMode",
+    label: "Toggle Zen mode",
+    keys: ["⌘", "⇧", "Z"],
+    group: "View",
+    match: (e) => isMod(e) && e.shiftKey && e.key.toLowerCase() === "z",
   },
   {
     id: "view.zoomIn",

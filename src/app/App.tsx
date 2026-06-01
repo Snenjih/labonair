@@ -54,6 +54,8 @@ import {
   setTerminalFontSize,
   setEditorFontSize,
   setSftpFontSize,
+  setZenModeShowHeader,
+  setZenModeShowStatusbar,
 } from "@/modules/settings/store";
 import {
   ShortcutsDialog,
@@ -224,6 +226,8 @@ export default function App() {
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
+  const zenModeShowHeader = usePreferencesStore((s) => s.zenModeShowHeader);
+  const zenModeShowStatusbar = usePreferencesStore((s) => s.zenModeShowStatusbar);
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
@@ -797,6 +801,12 @@ export default function App() {
     "ai.askSelection": askFromSelection,
     "shortcuts.open": () => setShortcutsOpen((v) => !v),
     "sidebar.toggle": toggleSidebar,
+    "view.zenMode": () => {
+      const { zenModeShowHeader: showH, zenModeShowStatusbar: showS } = usePreferencesStore.getState();
+      const anyVisible = showH || showS;
+      void setZenModeShowHeader(!anyVisible);
+      void setZenModeShowStatusbar(!anyVisible);
+    },
     "pane.splitRight": () => {
       const { tabs, activeId: aid } = useTabsStore.getState();
       if (tabs.find((t) => t.id === aid)?.kind === "workspace") splitPane(aid, "horizontal");
@@ -1065,23 +1075,25 @@ export default function App() {
       <TooltipProvider>
         <div className="relative z-[1] flex h-screen flex-col overflow-hidden bg-background text-foreground">
           <BackgroundImageLayer />
-          <Header
-            onSelect={setActiveId}
-            onNew={openNewTab}
-            onNewPreview={() => openPreviewTab("")}
-            onNewEditor={() => void openUntitledTab()}
-            onNewSsh={newSshTab}
-            onNewSftp={newSftpTab}
-            onClose={handleClose}
-            onCloseOthers={handleCloseOthers}
-            onCloseAll={handleCloseAll}
-            onDuplicate={handleDuplicateTab}
-            onOpenShortcuts={() => setShortcutsOpen(true)}
-            onOpenSettings={() => void openSettingsWindow()}
-            onOpenKeybindings={() => void openSettingsWindow("shortcuts")}
-            onOpenHostManager={onOpenHostManager}
-            onOpenThemes={() => useCommandStore.getState().openToPage("themes")}
-          />
+          {zenModeShowHeader && (
+            <Header
+              onSelect={setActiveId}
+              onNew={openNewTab}
+              onNewPreview={() => openPreviewTab("")}
+              onNewEditor={() => void openUntitledTab()}
+              onNewSsh={newSshTab}
+              onNewSftp={newSftpTab}
+              onClose={handleClose}
+              onCloseOthers={handleCloseOthers}
+              onCloseAll={handleCloseAll}
+              onDuplicate={handleDuplicateTab}
+              onOpenShortcuts={() => setShortcutsOpen(true)}
+              onOpenSettings={() => void openSettingsWindow()}
+              onOpenKeybindings={() => void openSettingsWindow("shortcuts")}
+              onOpenHostManager={onOpenHostManager}
+              onOpenThemes={() => useCommandStore.getState().openToPage("themes")}
+            />
+          )}
 
           <main className="flex min-h-0 flex-1 flex-col">
             <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
@@ -1189,21 +1201,23 @@ export default function App() {
             onClose={() => setSnippetLogDrawerOpen(false)}
           />
 
-          <StatusBar
-            home={home}
-            onCd={sendCd}
-            onOpenMini={openMini}
-            hasComposer={aiEnabled && hasComposer}
-            detectedPreviewUrl={detectedPreviewUrl}
-            onOpenPreview={() => {
-              if (detectedPreviewUrl) openPreviewTab(detectedPreviewUrl);
-            }}
-            activePanel={activePanel}
-            onPanelToggle={(panel) => {
-              if (panel === "hosts") { openHomeTab(); return; }
-              handlePanelToggle(panel);
-            }}
-          />
+          {zenModeShowStatusbar && (
+            <StatusBar
+              home={home}
+              onCd={sendCd}
+              onOpenMini={openMini}
+              hasComposer={aiEnabled && hasComposer}
+              detectedPreviewUrl={detectedPreviewUrl}
+              onOpenPreview={() => {
+                if (detectedPreviewUrl) openPreviewTab(detectedPreviewUrl);
+              }}
+              activePanel={activePanel}
+              onPanelToggle={(panel) => {
+                if (panel === "hosts") { openHomeTab(); return; }
+                handlePanelToggle(panel);
+              }}
+            />
+          )}
 
           {aiEnabled && hasComposer ? (
             <AgentRunBridge openAiDiffTab={openAiDiffTab} setAiDiffStatus={setAiDiffStatus} />

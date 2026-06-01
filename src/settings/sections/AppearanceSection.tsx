@@ -9,12 +9,15 @@ import {
   setSidebarPosition,
   setTabsLocation,
   setTitlebarsIconsPosition,
+  setZenModeShowHeader,
+  setZenModeShowStatusbar,
 } from "@/modules/settings/store";
 import type { ThemePref } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -68,6 +71,8 @@ export function AppearanceSection() {
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
   const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
+  const zenModeShowHeader = usePreferencesStore((s) => s.zenModeShowHeader);
+  const zenModeShowStatusbar = usePreferencesStore((s) => s.zenModeShowStatusbar);
   const backgroundImage = usePreferencesStore((s) => s.backgroundImage);
   const backgroundOpacity = usePreferencesStore((s) => s.backgroundOpacity);
   const backgroundBlur = usePreferencesStore((s) => s.backgroundBlur);
@@ -423,6 +428,24 @@ export function AppearanceSection() {
               <SelectItem value="sidebar" className="text-[11.5px]">Sidebar</SelectItem>
             </SelectContent>
           </Select>
+        </SettingRow>
+        <SettingRow
+          title="Show header bar"
+          description="Display the header bar with tabs and window controls. Hide it to maximise vertical space."
+        >
+          <Switch
+            checked={zenModeShowHeader}
+            onCheckedChange={(v) => void setZenModeShowHeader(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Show status bar"
+          description="Display the status bar at the bottom. Hide it to maximise vertical space."
+        >
+          <Switch
+            checked={zenModeShowStatusbar}
+            onCheckedChange={(v) => void setZenModeShowStatusbar(v)}
+          />
         </SettingRow>
       </div>
 

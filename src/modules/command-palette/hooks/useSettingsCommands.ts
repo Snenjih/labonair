@@ -22,6 +22,8 @@ import {
   setAutocompleteEnabled,
   setAutostart,
   setEditorTheme,
+  setZenModeShowHeader,
+  setZenModeShowStatusbar,
   EDITOR_THEMES,
   EDITOR_THEME_LABELS,
   type ThemePref,
@@ -54,6 +56,8 @@ export function useSettingsCommands(): {
   const editorAutoSave = usePreferencesStore((s) => s.editorAutoSave);
   const autocompleteEnabled = usePreferencesStore((s) => s.autocompleteEnabled);
   const autostart = usePreferencesStore((s) => s.autostart);
+  const zenModeShowHeader = usePreferencesStore((s) => s.zenModeShowHeader);
+  const zenModeShowStatusbar = usePreferencesStore((s) => s.zenModeShowStatusbar);
 
   const [themes, setThemes] = useState<ThemeMeta[]>([]);
   useEffect(() => {
@@ -231,6 +235,34 @@ export function useSettingsCommands(): {
       rightLabel: toggle(autostart),
       icon: createElement(HugeiconsIcon, { icon: CheckListIcon, strokeWidth: 2, className: "size-4" }),
       perform: () => void setAutostart(!autostart),
+    },
+    {
+      id: "settings.zen-mode-header",
+      title: "Toggle: Show Header Bar",
+      section: "Settings",
+      rightLabel: toggle(zenModeShowHeader),
+      icon: createElement(HugeiconsIcon, { icon: EyeIcon, strokeWidth: 2, className: "size-4" }),
+      perform: () => void setZenModeShowHeader(!zenModeShowHeader),
+    },
+    {
+      id: "settings.zen-mode-statusbar",
+      title: "Toggle: Show Status Bar",
+      section: "Settings",
+      rightLabel: toggle(zenModeShowStatusbar),
+      icon: createElement(HugeiconsIcon, { icon: EyeIcon, strokeWidth: 2, className: "size-4" }),
+      perform: () => void setZenModeShowStatusbar(!zenModeShowStatusbar),
+    },
+    {
+      id: "settings.zen-mode",
+      title: "Toggle: Zen Mode",
+      section: "Settings",
+      rightLabel: !zenModeShowHeader && !zenModeShowStatusbar ? "ON" : "OFF",
+      icon: createElement(HugeiconsIcon, { icon: EyeIcon, strokeWidth: 2, className: "size-4" }),
+      perform: () => {
+        const allHidden = !zenModeShowHeader && !zenModeShowStatusbar;
+        void setZenModeShowHeader(allHidden);
+        void setZenModeShowStatusbar(allHidden);
+      },
     },
   ];
 
