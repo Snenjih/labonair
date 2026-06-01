@@ -11,6 +11,17 @@ updates:
     allow:
       - dependency-type: "all"
     versioning-strategy: "auto"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Rust dependencies (Cargo.toml)
   - package-ecosystem: "cargo"
@@ -22,6 +33,17 @@ updates:
     open-pull-requests-limit: 5
     allow:
       - dependency-type: "all"
+    groups:
+      production-dependencies:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
