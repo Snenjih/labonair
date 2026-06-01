@@ -395,11 +395,11 @@ export function AppearanceSection() {
         {backgroundImage !== "" && (
           <div className="flex flex-col gap-4 rounded-lg border border-border/50 bg-card/40 px-4 py-3.5">
             <SliderControl
-              label="UI opacity"
+              label="Wallpaper opacity"
               description="Higher values reveal more of the background"
               value={backgroundOpacity}
               min={0}
-              max={90}
+              max={100}
               step={5}
               suffix="%"
               onChange={(v) => void setBackgroundOpacity(v)}

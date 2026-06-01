@@ -1,13 +1,57 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { setBackgroundImage } from "./store";
 import { usePreferencesStore } from "./preferences";
 
-function clearWallpaperDom() {
-  document.documentElement.removeAttribute("data-wallpaper");
-  document.documentElement.style.removeProperty("--ui-alpha");
+// The wallpaper overlay sits at max z-index ON TOP of everything — including the xterm.js
+// canvas, which renders into a <canvas> element that ignores CSS background variables.
+// Putting the overlay above the canvas (with pointerEvents:none) is the only approach that
+// makes the wallpaper visible through the terminal.
+const OVERLAY_Z = 2147483646;
+const RESIZE_IDLE_MS = 280;
+const FADE_IN_MS = 200;
+// Slider stores 0..100. Rendered opacity is halved so the image never exceeds 50% —
+// keeps UI and terminal readable at any slider position.
+const BG_OPACITY_RENDER_FACTOR = 0.5;
+
+function useWindowResizing(idleMs: number): boolean {
+  const [resizing, setResizing] = useState(false);
+  useEffect(() => {
+    let timer: number | null = null;
+    let active = false;
+    const onResize = () => {
+      if (!active) {
+        active = true;
+        setResizing(true);
+      }
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        active = false;
+        setResizing(false);
+        timer = null;
+      }, idleMs);
+    };
+    window.addEventListener("resize", onResize, { passive: true });
+    return () => {
+      window.removeEventListener("resize", onResize);
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [idleMs]);
+  return resizing;
+}
+
+function useDocumentHidden(): boolean {
+  const [hidden, setHidden] = useState(
+    () => typeof document !== "undefined" && document.hidden,
+  );
+  useEffect(() => {
+    const onChange = () => setHidden(document.hidden);
+    document.addEventListener("visibilitychange", onChange);
+    return () => document.removeEventListener("visibilitychange", onChange);
+  }, []);
+  return hidden;
 }
 
 export function BackgroundImageLayer() {
@@ -16,21 +60,32 @@ export function BackgroundImageLayer() {
   const backgroundBlur = usePreferencesStore((s) => s.backgroundBlur);
   const addNotification = useNotificationStore((s) => s.addNotification);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+  const resizing = useWindowResizing(RESIZE_IDLE_MS);
+  const docHidden = useDocumentHidden();
+  const rafRef = useRef<number | null>(null);
 
-  // Load image as base64 data URL via IPC — no asset protocol scope issues.
   useEffect(() => {
     if (!backgroundImage) {
       setDataUrl(null);
-      clearWallpaperDom();
+      setVisible(false);
       return;
     }
 
+    setVisible(false);
+    let alive = true;
+
     void invoke<string>("background_read_data_url", { filename: backgroundImage })
       .then((url) => {
+        if (!alive) return;
         setDataUrl(url);
-        document.documentElement.setAttribute("data-wallpaper", "");
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = null;
+          if (alive) setVisible(true);
+        });
       })
       .catch((err: unknown) => {
+        if (!alive) return;
         const detail = err instanceof Error ? err.message : String(err);
         addNotification({
           type: "error",
@@ -38,53 +93,50 @@ export function BackgroundImageLayer() {
           message: `"${backgroundImage}" could not be read — falling back to no background. ${detail}`,
           source: "Background",
         });
-        // Clear preference so the app doesn't retry a broken image on every launch
         void setBackgroundImage("");
         setDataUrl(null);
-        clearWallpaperDom();
+        setVisible(false);
       });
-  }, [backgroundImage, addNotification]);
 
-  // Keep --ui-alpha in sync with the opacity slider.
-  // opacity=0   → --ui-alpha=1.0  (fully opaque surfaces, wallpaper hidden)
-  // opacity=90  → --ui-alpha=0.10 (very transparent surfaces, wallpaper fully visible)
-  useEffect(() => {
-    if (!backgroundImage) return;
-    const alpha = Math.max(0.10, 1 - backgroundOpacity / 100);
-    document.documentElement.style.setProperty("--ui-alpha", alpha.toFixed(3));
-  }, [backgroundImage, backgroundOpacity]);
-
-  useEffect(() => {
     return () => {
-      document.documentElement.removeAttribute("data-wallpaper");
-      document.documentElement.style.removeProperty("--ui-alpha");
+      alive = false;
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     };
-  }, []);
+  }, [backgroundImage, addNotification]);
 
   if (!dataUrl) return null;
 
-  // Portal to document.body at z-index:0.
-  // App root div sits at z-index:1 above this layer.
-  // UI surfaces use --background/--card with var(--ui-alpha) for transparency.
+  const blurActive = backgroundBlur > 0 && !resizing;
+  const renderedOpacity =
+    visible && !docHidden && !resizing
+      ? (backgroundOpacity / 100) * BG_OPACITY_RENDER_FACTOR
+      : 0;
+
   return createPortal(
     <div
       aria-hidden
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 0,
+        zIndex: OVERLAY_Z,
         pointerEvents: "none",
         overflow: "hidden",
+        opacity: renderedOpacity,
+        transition: `opacity ${FADE_IN_MS}ms ease-out`,
+        transform: "translateZ(0)",
       }}
     >
       <div
         style={{
           position: "absolute",
-          inset: backgroundBlur > 0 ? "-12px" : 0,
+          inset: blurActive ? "-12px" : 0,
           backgroundImage: `url(${dataUrl})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          filter: backgroundBlur > 0 ? `blur(${backgroundBlur}px)` : undefined,
+          filter: blurActive ? `blur(${backgroundBlur}px)` : undefined,
         }}
       />
     </div>,
