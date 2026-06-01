@@ -1,6 +1,6 @@
 [package]
 name = "nexum"
-version = "1.5.2"
+version = "1.6.0"
 description = "Nexum — an open-source AI-native terminal emulator"
 authors = ["Snenjih"]
 edition = "2021"
