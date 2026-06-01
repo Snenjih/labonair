@@ -14,9 +14,9 @@ import {
   ReasoningContent,
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
-import { Tool } from "@/components/ai-elements/tool";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { SLASH_COMMANDS, NEXUM_CMD_RE } from "../lib/slashCommands";
+import { ToolCallChip } from "./ToolCallChip";
 import { Spinner } from "@/components/ui/spinner";
 import type {
   ChatStatus,
@@ -245,12 +245,12 @@ const RenderedTool = memo(function RenderedTool({
   }
 
   return (
-    <Tool
+    <ToolCallChip
       toolName={toolName}
       state={part.state}
-      input={part.input}
+      input={(part.input ?? {}) as Record<string, unknown>}
       output={"output" in part ? part.output : undefined}
-      errorText={"errorText" in part ? part.errorText : undefined}
+      errorText={"errorText" in part ? (part as { errorText: string }).errorText : undefined}
     />
   );
 });

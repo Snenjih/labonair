@@ -7,6 +7,7 @@ import { buildTerminalTools } from "./terminal";
 import { buildTodoTools } from "./todo";
 
 export { resolvePath, type ToolContext } from "./context";
+export { clearSessionShell } from "./shell";
 
 /**
  * AI tool definitions.

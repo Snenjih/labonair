@@ -111,6 +111,37 @@ export const AiToolApproval = memo(AiToolApprovalImpl, (a, b) => {
   );
 });
 
+function InlineDiff({
+  oldLines,
+  newLines,
+}: {
+  oldLines: string[];
+  newLines: string[];
+}) {
+  return (
+    <div className="overflow-hidden rounded-md border border-border/40 font-mono text-[10.5px]">
+      {oldLines.map((line, i) => (
+        <div
+          key={`r${i}`}
+          className="border-l-2 border-red-500/50 bg-red-500/8 px-2 py-px leading-relaxed text-red-800 dark:text-red-300"
+        >
+          <span className="mr-2 select-none text-red-500/60">−</span>
+          {line}
+        </div>
+      ))}
+      {newLines.map((line, i) => (
+        <div
+          key={`a${i}`}
+          className="border-l-2 border-emerald-500/50 bg-emerald-500/8 px-2 py-px leading-relaxed text-emerald-800 dark:text-emerald-300"
+        >
+          <span className="mr-2 select-none text-emerald-500/60">+</span>
+          {line}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PreviewBlock({
   toolName,
   input,
@@ -156,18 +187,23 @@ function PreviewBlock({
   if (toolName === "edit") {
     const oldStr = typeof input.old_string === "string" ? input.old_string : "";
     const newStr = typeof input.new_string === "string" ? input.new_string : "";
-    const removed = oldStr ? oldStr.split("\n").length : 0;
-    const added = newStr ? newStr.split("\n").length : 0;
+    const oldLines = oldStr ? oldStr.split("\n") : [];
+    const newLines = newStr ? newStr.split("\n") : [];
+    const showInline = Math.max(oldLines.length, newLines.length) <= 15;
     return (
-      <div className="space-y-0.5 font-mono text-[11px]">
+      <div className="space-y-1.5 font-mono text-[11px]">
         <div className="text-muted-foreground">
           {String(input.path ?? "")}
           {input.replace_all ? " · replace all" : ""}
         </div>
-        <div className="text-[10.5px] text-muted-foreground/80">
-          −{removed} / +{added} line{added === 1 && removed === 1 ? "" : "s"} ·
-          review in the diff tab
-        </div>
+        {showInline ? (
+          <InlineDiff oldLines={oldLines} newLines={newLines} />
+        ) : (
+          <div className="text-[10.5px] text-muted-foreground/80">
+            −{oldLines.length} / +{newLines.length} line{oldLines.length === 1 && newLines.length === 1 ? "" : "s"} ·
+            review in the diff tab
+          </div>
+        )}
       </div>
     );
   }
@@ -175,13 +211,31 @@ function PreviewBlock({
     const edits = Array.isArray(input.edits)
       ? (input.edits as Array<{ old_string?: string; new_string?: string }>)
       : [];
+    const totalLines = edits.reduce((sum, e) => {
+      const o = e.old_string?.split("\n").length ?? 0;
+      const n = e.new_string?.split("\n").length ?? 0;
+      return sum + Math.max(o, n);
+    }, 0);
+    const showInline = totalLines <= 15 && edits.length > 0;
     return (
-      <div className="space-y-0.5 font-mono text-[11px]">
+      <div className="space-y-1.5 font-mono text-[11px]">
         <div className="text-muted-foreground">{String(input.path ?? "")}</div>
-        <div className="text-[10.5px] text-muted-foreground/80">
-          {edits.length} edit{edits.length === 1 ? "" : "s"} · review in the
-          diff tab
-        </div>
+        {showInline ? (
+          <div className="space-y-2">
+            {edits.map((e, i) => (
+              <InlineDiff
+                key={i}
+                oldLines={e.old_string?.split("\n") ?? []}
+                newLines={e.new_string?.split("\n") ?? []}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-[10.5px] text-muted-foreground/80">
+            {edits.length} edit{edits.length === 1 ? "" : "s"} · review in the
+            diff tab
+          </div>
+        )}
       </div>
     );
   }

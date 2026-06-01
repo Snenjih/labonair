@@ -29,7 +29,7 @@ import {
   type SessionMeta,
 } from "../lib/sessions";
 import { createContextAwareTransport } from "../lib/transport";
-import type { ToolContext } from "../tools/tools";
+import { clearSessionShell, type ToolContext } from "../tools/tools";
 
 type Live = {
   getCwd: () => string | null;
@@ -402,6 +402,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
     }
     void deleteSessionData(id);
     void useTodosStore.getState().clearSession(id);
+    clearSessionShell(id);
 
     if (remaining.length === 0) {
       const fresh: SessionMeta = {

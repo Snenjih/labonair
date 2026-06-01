@@ -8,19 +8,41 @@ import type { ToolContext } from "./context";
 /**
  * Per-session lazy shell-session id. The agent gets one persistent shell per
  * chat session, so cwd survives across tool calls (cd, mkdir+cd, etc).
+ * Stored as Promise<number> so concurrent first calls share one creation.
  */
 const sessionShells = new Map<string, Promise<number>>();
+
+async function isShellAlive(shellId: number): Promise<boolean> {
+  try {
+    const r = await native.shellSessionRun(shellId, "echo __nx_ok__", 3);
+    return r.exit_code === 0 && r.stdout.includes("__nx_ok__");
+  } catch {
+    return false;
+  }
+}
 
 async function getSessionShell(
   sessionId: string,
   cwd: string | null,
 ): Promise<number> {
-  let p = sessionShells.get(sessionId);
-  if (!p) {
-    p = native.shellSessionOpen(cwd);
-    sessionShells.set(sessionId, p);
+  const existing = sessionShells.get(sessionId);
+  if (existing !== undefined) {
+    try {
+      const shellId = await existing;
+      if (await isShellAlive(shellId)) return shellId;
+    } catch {
+      // Previous creation failed; fall through
+    }
+    sessionShells.delete(sessionId);
   }
+  const p = native.shellSessionOpen(cwd);
+  sessionShells.set(sessionId, p);
   return p;
+}
+
+/** Remove a session's cached shell on session delete (cleanup only; shell exits naturally). */
+export function clearSessionShell(sessionId: string): void {
+  sessionShells.delete(sessionId);
 }
 
 export function buildShellTools(ctx: ToolContext) {
