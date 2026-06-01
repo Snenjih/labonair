@@ -1,7 +1,8 @@
 import type { UIMessage } from "@ai-sdk/react";
 import { DirectChatTransport } from "ai";
-import { TERMINAL_BUFFER_LINES, type ModelId } from "../config";
-import { createNexumAgent } from "./agent";
+import { getModelContextLimit, modelKeepsReasoning, TERMINAL_BUFFER_LINES, type ModelId } from "../config";
+import { createNexumAgent, type AgentUsageDelta } from "./agent";
+import { compact } from "./compact";
 import type { ProviderKeys } from "./keyring";
 import { native } from "./native";
 import type { ToolContext } from "../tools/tools";
@@ -54,12 +55,51 @@ type Deps = {
   getLmstudioChatModelId?: () => string | undefined;
   getOpenaiCompatibleBaseURL?: () => string | undefined;
   getOpenaiCompatibleModelId?: () => string | undefined;
+  getMlxBaseURL?: () => string | undefined;
+  getMlxChatModelId?: () => string | undefined;
+  getOllamaBaseURL?: () => string | undefined;
+  getOllamaChatModelId?: () => string | undefined;
   onStep?: (step: string | null) => void;
+  onUsage?: (delta: AgentUsageDelta) => void;
+  onFinishMeta?: (info: { hitStepCap: boolean; finishReason: string }) => void;
+  onCompaction?: (info: { droppedCount: number }) => void;
   getPlanMode?: () => boolean;
   getMaxAgentSteps?: () => number;
   getTemperature?: () => number;
   getTerminalContextLines?: () => number;
 };
+
+function stripReasoningParts(messages: UIMessage[]): UIMessage[] {
+  return messages.map((m) => {
+    if (!m.parts.some((p) => p.type === "reasoning")) return m;
+    return {
+      ...m,
+      parts: m.parts.filter((p) => p.type !== "reasoning") as UIMessage["parts"],
+    };
+  });
+}
+
+function prepareMessages(
+  messages: UIMessage[],
+  live: LiveSnapshot,
+  bufferLines: number,
+  modelId: ModelId,
+  onCompaction?: (info: { droppedCount: number }) => void,
+): UIMessage[] {
+  // 1. Inject terminal context into last user message.
+  const injected = injectContext(messages, live, bufferLines);
+
+  // 2. Strip reasoning parts for models that don't preserve them.
+  const processed = modelKeepsReasoning(modelId) ? injected : stripReasoningParts(injected);
+
+  // 3. Apply message compaction if context is getting full.
+  const contextLimit = getModelContextLimit(modelId);
+  const compactionResult = compact(processed, contextLimit);
+  if (compactionResult.compacted) {
+    onCompaction?.({ droppedCount: compactionResult.droppedCount });
+  }
+  return compactionResult.messages;
+}
 
 export function createContextAwareTransport(deps: Deps) {
   return {
@@ -68,51 +108,67 @@ export function createContextAwareTransport(deps: Deps) {
       [k: string]: unknown;
     }) {
       const live = deps.getLive();
+      const modelId = deps.getModelId();
       const projectMemory = await readNexumMd(live.workspaceRoot);
       const bufferLines = deps.getTerminalContextLines?.() ?? TERMINAL_BUFFER_LINES;
       const agent = await createNexumAgent({
         keys: deps.getKeys(),
-        modelId: deps.getModelId(),
+        modelId,
         customInstructions: deps.getCustomInstructions(),
         agentPersona: deps.getAgentPersona(),
         toolContext: deps.toolContext,
         onStep: deps.onStep,
+        onUsage: deps.onUsage,
+        onFinishMeta: deps.onFinishMeta,
         lmstudioBaseURL: deps.getLmstudioBaseURL?.(),
         lmstudioChatModelId: deps.getLmstudioChatModelId?.(),
         openaiCompatibleBaseURL: deps.getOpenaiCompatibleBaseURL?.(),
         openaiCompatibleModelId: deps.getOpenaiCompatibleModelId?.(),
+        mlxBaseURL: deps.getMlxBaseURL?.(),
+        mlxChatModelId: deps.getMlxChatModelId?.(),
+        ollamaBaseURL: deps.getOllamaBaseURL?.(),
+        ollamaChatModelId: deps.getOllamaChatModelId?.(),
         planMode: deps.getPlanMode?.(),
         projectMemory,
         maxAgentSteps: deps.getMaxAgentSteps?.(),
         temperature: deps.getTemperature?.(),
       });
       const base = new DirectChatTransport({ agent });
-      const augmented = injectContext(options.messages, live, bufferLines);
+      const finalMessages = prepareMessages(options.messages, live, bufferLines, modelId, deps.onCompaction);
       return base.sendMessages({
         ...options,
-        messages: augmented,
+        messages: finalMessages,
       } as Parameters<typeof base.sendMessages>[0]);
     },
     async reconnectToStream(options: unknown) {
       const live = deps.getLive();
+      const modelId = deps.getModelId();
       const projectMemory = await readNexumMd(live.workspaceRoot);
       const agent = await createNexumAgent({
         keys: deps.getKeys(),
-        modelId: deps.getModelId(),
+        modelId,
         customInstructions: deps.getCustomInstructions(),
         agentPersona: deps.getAgentPersona(),
         toolContext: deps.toolContext,
         onStep: deps.onStep,
+        onUsage: deps.onUsage,
+        onFinishMeta: deps.onFinishMeta,
         lmstudioBaseURL: deps.getLmstudioBaseURL?.(),
         lmstudioChatModelId: deps.getLmstudioChatModelId?.(),
         openaiCompatibleBaseURL: deps.getOpenaiCompatibleBaseURL?.(),
         openaiCompatibleModelId: deps.getOpenaiCompatibleModelId?.(),
+        mlxBaseURL: deps.getMlxBaseURL?.(),
+        mlxChatModelId: deps.getMlxChatModelId?.(),
+        ollamaBaseURL: deps.getOllamaBaseURL?.(),
+        ollamaChatModelId: deps.getOllamaChatModelId?.(),
         planMode: deps.getPlanMode?.(),
         projectMemory,
         maxAgentSteps: deps.getMaxAgentSteps?.(),
         temperature: deps.getTemperature?.(),
       });
       const base = new DirectChatTransport({ agent });
+      // For reconnect we don't have a messages array in options directly,
+      // so pass through as-is — the agent reconstructs from stream state.
       type ReconnectArg = Parameters<typeof base.reconnectToStream>[0];
       return base.reconnectToStream(options as ReconnectArg);
     },

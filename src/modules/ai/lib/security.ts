@@ -21,6 +21,10 @@ const SECRET_BASENAME_PATTERNS: RegExp[] = [
   /^.*\.key$/i, // private keys
   /^.*\.p12$/i,
   /^.*\.pfx$/i,
+  /^.*\.asc$/i, // GPG armored signatures/keys
+  /^.*\.gpg$/i, // GPG encrypted files
+  /^.*\.jks$/i, // Java KeyStore
+  /^.*\.keystore$/i, // Android/Java keystore
   /^id_(rsa|dsa|ecdsa|ed25519)(\.pub)?$/i,
   /^known_hosts$/i,
   /^authorized_keys$/i,
@@ -31,6 +35,7 @@ const SECRET_BASENAME_PATTERNS: RegExp[] = [
   /^\.npmrc$/i,
   /^\.pypirc$/i,
   /^secrets?\.(json|ya?ml|toml)$/i,
+  /^service_account.*\.json$/i, // GCP service accounts
 ];
 
 const SECRET_PATH_SEGMENTS = [
@@ -42,7 +47,11 @@ const SECRET_PATH_SEGMENTS = [
   "/.docker/",
   "/.config/gh/",
   "/.config/git/",
+  "/.config/gcloud/",
   "/.git/", // git internals — refusing avoids tools mutating refs/objects
+  "/var/root/",
+  "/private/var/root/",
+  "/appdata/roaming/", // Windows roaming profile (gcloud, Azure creds, etc.)
 ];
 
 const FORBIDDEN_PREFIXES = [
@@ -52,6 +61,10 @@ const FORBIDDEN_PREFIXES = [
   "/Library/Keychains/",
   "/private/etc/",
   "/private/var/db/",
+  "/proc/",
+  "/sys/",
+  "/var/root/",
+  "/private/var/root/",
 ];
 
 export type SafetyResult = { ok: true } | { ok: false; reason: string };
@@ -62,8 +75,13 @@ function basename(p: string): string {
 }
 
 function normalize(p: string): string {
-  // Lowercase only the comparison surface, not the original path.
-  return p.replace(/\\/g, "/");
+  return p
+    .replace(/\\/g, "/")          // backslash → forward slash
+    .replace(/^\/\?\//, "/")      // strip UNC prefix (//?/)
+    .replace(/^[a-zA-Z]:/, "")    // strip Windows drive letter (C:)
+    .replace(/:[^/]+/g, "")       // strip NTFS alternate data streams (:stream) — applied after drive removal
+    .replace(/[. ]+(?=\/|$)/g, "") // strip trailing dots/spaces per segment (Windows discards them)
+    .toLowerCase();               // case-insensitive matching
 }
 
 export function checkReadable(path: string): SafetyResult {

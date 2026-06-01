@@ -5,6 +5,8 @@ import {
   DEFAULT_AUTOCOMPLETE_MODEL,
   DEFAULT_MODEL_ID,
   LMSTUDIO_DEFAULT_BASE_URL,
+  MLX_DEFAULT_BASE_URL,
+  OLLAMA_DEFAULT_BASE_URL,
   OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
   type AutocompleteProviderId,
   type ModelId,
@@ -53,6 +55,10 @@ export type Preferences = {
   lmstudioChatModelId: string;
   openaiCompatibleBaseURL: string;
   openaiCompatibleModelId: string;
+  mlxBaseURL: string;
+  mlxChatModelId: string;
+  ollamaBaseURL: string;
+  ollamaChatModelId: string;
   vimMode: boolean;
   defaultStartupTab: "terminal" | "host-manager";
   sessionRestore: boolean;
@@ -184,6 +190,10 @@ const KEY_LMSTUDIO_BASE_URL = "lmstudioBaseURL";
 const KEY_LMSTUDIO_CHAT_MODEL_ID = "lmstudioChatModelId";
 const KEY_OPENAI_COMPATIBLE_BASE_URL = "openaiCompatibleBaseURL";
 const KEY_OPENAI_COMPATIBLE_MODEL_ID = "openaiCompatibleModelId";
+const KEY_MLX_BASE_URL = "mlxBaseURL";
+const KEY_MLX_CHAT_MODEL_ID = "mlxChatModelId";
+const KEY_OLLAMA_BASE_URL = "ollamaBaseURL";
+const KEY_OLLAMA_CHAT_MODEL_ID = "ollamaChatModelId";
 const KEY_VIM_MODE = "vimMode";
 const KEY_DEFAULT_STARTUP_TAB = "defaultStartupTab";
 const KEY_SESSION_RESTORE = "sessionRestore";
@@ -289,6 +299,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   lmstudioChatModelId: "",
   openaiCompatibleBaseURL: OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
   openaiCompatibleModelId: "",
+  mlxBaseURL: MLX_DEFAULT_BASE_URL,
+  mlxChatModelId: "",
+  ollamaBaseURL: OLLAMA_DEFAULT_BASE_URL,
+  ollamaChatModelId: "",
   vimMode: false,
   defaultStartupTab: "host-manager",
   sessionRestore: false,
@@ -436,6 +450,15 @@ export async function loadPreferences(): Promise<Preferences> {
     openaiCompatibleModelId:
       get<string>(KEY_OPENAI_COMPATIBLE_MODEL_ID) ??
       DEFAULT_PREFERENCES.openaiCompatibleModelId,
+    mlxBaseURL:
+      get<string>(KEY_MLX_BASE_URL) ?? DEFAULT_PREFERENCES.mlxBaseURL,
+    mlxChatModelId:
+      get<string>(KEY_MLX_CHAT_MODEL_ID) ?? DEFAULT_PREFERENCES.mlxChatModelId,
+    ollamaBaseURL:
+      get<string>(KEY_OLLAMA_BASE_URL) ?? DEFAULT_PREFERENCES.ollamaBaseURL,
+    ollamaChatModelId:
+      get<string>(KEY_OLLAMA_CHAT_MODEL_ID) ??
+      DEFAULT_PREFERENCES.ollamaChatModelId,
     vimMode: get<boolean>(KEY_VIM_MODE) ?? DEFAULT_PREFERENCES.vimMode,
     defaultStartupTab:
       get<"terminal" | "host-manager">(KEY_DEFAULT_STARTUP_TAB) ??
@@ -733,6 +756,26 @@ export async function setOpenaiCompatibleBaseURL(value: string): Promise<void> {
 
 export async function setOpenaiCompatibleModelId(value: string): Promise<void> {
   await (await getStore()).set(KEY_OPENAI_COMPATIBLE_MODEL_ID, value);
+  await (await getStore()).save();
+}
+
+export async function setMlxBaseURL(value: string): Promise<void> {
+  await (await getStore()).set(KEY_MLX_BASE_URL, value);
+  await (await getStore()).save();
+}
+
+export async function setMlxChatModelId(value: string): Promise<void> {
+  await (await getStore()).set(KEY_MLX_CHAT_MODEL_ID, value);
+  await (await getStore()).save();
+}
+
+export async function setOllamaBaseURL(value: string): Promise<void> {
+  await (await getStore()).set(KEY_OLLAMA_BASE_URL, value);
+  await (await getStore()).save();
+}
+
+export async function setOllamaChatModelId(value: string): Promise<void> {
+  await (await getStore()).set(KEY_OLLAMA_CHAT_MODEL_ID, value);
   await (await getStore()).save();
 }
 
@@ -1200,6 +1243,10 @@ export async function onPreferencesChange(
     [KEY_LMSTUDIO_CHAT_MODEL_ID]: "lmstudioChatModelId",
     [KEY_OPENAI_COMPATIBLE_BASE_URL]: "openaiCompatibleBaseURL",
     [KEY_OPENAI_COMPATIBLE_MODEL_ID]: "openaiCompatibleModelId",
+    [KEY_MLX_BASE_URL]: "mlxBaseURL",
+    [KEY_MLX_CHAT_MODEL_ID]: "mlxChatModelId",
+    [KEY_OLLAMA_BASE_URL]: "ollamaBaseURL",
+    [KEY_OLLAMA_CHAT_MODEL_ID]: "ollamaChatModelId",
     [KEY_VIM_MODE]: "vimMode",
     [KEY_DEFAULT_STARTUP_TAB]: "defaultStartupTab",
     [KEY_SESSION_RESTORE]: "sessionRestore",

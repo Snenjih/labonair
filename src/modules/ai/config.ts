@@ -8,7 +8,12 @@ export type ProviderId =
   | "cerebras"
   | "groq"
   | "lmstudio"
-  | "openai-compatible";
+  | "openai-compatible"
+  | "deepseek"
+  | "mistral"
+  | "openrouter"
+  | "mlx"
+  | "ollama";
 
 export type ProviderInfo = {
   id: ProviderId;
@@ -75,6 +80,41 @@ export const PROVIDERS: readonly ProviderInfo[] = [
     keyPrefix: null,
     consoleUrl: "",
   },
+  {
+    id: "deepseek",
+    label: "DeepSeek",
+    keyringAccount: "deepseek-api-key",
+    keyPrefix: "sk-",
+    consoleUrl: "https://platform.deepseek.com/api_keys",
+  },
+  {
+    id: "mistral",
+    label: "Mistral",
+    keyringAccount: "mistral-api-key",
+    keyPrefix: null,
+    consoleUrl: "https://console.mistral.ai/api-keys/",
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    keyringAccount: "openrouter-api-key",
+    keyPrefix: "sk-or-",
+    consoleUrl: "https://openrouter.ai/keys",
+  },
+  {
+    id: "mlx",
+    label: "MLX (local)",
+    keyringAccount: "",
+    keyPrefix: null,
+    consoleUrl: "https://github.com/ml-explore/mlx",
+  },
+  {
+    id: "ollama",
+    label: "Ollama (local)",
+    keyringAccount: "",
+    keyPrefix: null,
+    consoleUrl: "https://ollama.ai",
+  },
 ] as const;
 
 export function getProvider(id: ProviderId): ProviderInfo {
@@ -83,11 +123,22 @@ export function getProvider(id: ProviderId): ProviderInfo {
   return p;
 }
 
+export type ModelTag = "vision" | "reasoning" | "tools" | "coding";
+export type CapabilityScore = 1 | 2 | 3 | 4 | 5;
+export type ModelCapabilities = {
+  intelligence: CapabilityScore;
+  speed: CapabilityScore;
+  cost: CapabilityScore; // 5 = cheapest, 1 = most expensive
+};
+
 export type ModelInfo = {
   id: string;
   provider: ProviderId;
   label: string;
   hint: string;
+  description?: string;
+  capabilities?: ModelCapabilities;
+  tags?: readonly ModelTag[];
 };
 
 export const MODELS = [
@@ -97,18 +148,24 @@ export const MODELS = [
     provider: "openai",
     label: "GPT-5.4 mini",
     hint: "Fast, default",
+    capabilities: { intelligence: 3, speed: 5, cost: 5 },
+    tags: ["tools"] as const,
   },
   {
     id: "gpt-5.5",
     provider: "openai",
     label: "GPT-5.5",
     hint: "Higher quality",
+    capabilities: { intelligence: 5, speed: 3, cost: 2 },
+    tags: ["tools", "coding"] as const,
   },
   {
     id: "gpt-5.3-codex",
     provider: "openai",
     label: "GPT-5.3 Codex",
     hint: "Coding",
+    capabilities: { intelligence: 4, speed: 3, cost: 2 },
+    tags: ["tools", "coding"] as const,
   },
   // Anthropic
   {
@@ -116,18 +173,24 @@ export const MODELS = [
     provider: "anthropic",
     label: "Claude Haiku 4.5",
     hint: "Fast",
+    capabilities: { intelligence: 3, speed: 5, cost: 5 },
+    tags: ["tools"] as const,
   },
   {
     id: "claude-sonnet-4-6",
     provider: "anthropic",
     label: "Claude Sonnet 4.6",
     hint: "Balanced",
+    capabilities: { intelligence: 4, speed: 3, cost: 3 },
+    tags: ["tools", "coding"] as const,
   },
   {
     id: "claude-opus-4-7",
     provider: "anthropic",
     label: "Claude Opus 4.7",
     hint: "Best",
+    capabilities: { intelligence: 5, speed: 2, cost: 1 },
+    tags: ["reasoning", "tools", "coding"] as const,
   },
   // Google
   {
@@ -135,12 +198,16 @@ export const MODELS = [
     provider: "google",
     label: "Gemini 3.1 Pro",
     hint: "Best",
+    capabilities: { intelligence: 4, speed: 3, cost: 2 },
+    tags: ["tools", "vision"] as const,
   },
   {
     id: "gemini-3-flash",
     provider: "google",
     label: "Gemini 3 Flash",
     hint: "Fast",
+    capabilities: { intelligence: 3, speed: 5, cost: 5 },
+    tags: ["tools"] as const,
   },
   // xAI
   {
@@ -148,12 +215,16 @@ export const MODELS = [
     provider: "xai",
     label: "Grok 4.20 Reasoning",
     hint: "Reasoning",
+    capabilities: { intelligence: 5, speed: 2, cost: 2 },
+    tags: ["reasoning", "tools"] as const,
   },
   {
     id: "grok-4.20-non-reasoning",
     provider: "xai",
     label: "Grok 4.20",
     hint: "Fast",
+    capabilities: { intelligence: 4, speed: 4, cost: 3 },
+    tags: ["tools"] as const,
   },
   // Cerebras (autocomplete-tier)
   {
@@ -161,6 +232,8 @@ export const MODELS = [
     provider: "cerebras",
     label: "GPT-OSS 120B",
     hint: "Cerebras · ultra-fast",
+    capabilities: { intelligence: 3, speed: 5, cost: 5 },
+    tags: ["tools"] as const,
   },
   // Groq (autocomplete-tier)
   {
@@ -168,6 +241,8 @@ export const MODELS = [
     provider: "groq",
     label: "GPT-OSS 20B",
     hint: "Groq · ultra-fast",
+    capabilities: { intelligence: 2, speed: 5, cost: 5 },
+    tags: ["tools"] as const,
   },
   // LM Studio (local; model id is user-supplied at runtime)
   {
@@ -182,6 +257,61 @@ export const MODELS = [
     provider: "openai-compatible",
     label: "Custom Endpoint",
     hint: "OpenAI-compatible",
+  },
+  // DeepSeek
+  {
+    id: "deepseek-chat",
+    provider: "deepseek",
+    label: "DeepSeek Chat",
+    hint: "Strong coder",
+    capabilities: { intelligence: 4, speed: 4, cost: 5 },
+    tags: ["coding", "tools"] as const,
+  },
+  {
+    id: "deepseek-reasoner",
+    provider: "deepseek",
+    label: "DeepSeek Reasoner",
+    hint: "Reasoning",
+    capabilities: { intelligence: 5, speed: 2, cost: 4 },
+    tags: ["reasoning"] as const,
+  },
+  // Mistral
+  {
+    id: "mistral-large-latest",
+    provider: "mistral",
+    label: "Mistral Large",
+    hint: "Best",
+    capabilities: { intelligence: 4, speed: 3, cost: 3 },
+    tags: ["tools"] as const,
+  },
+  {
+    id: "mistral-small-latest",
+    provider: "mistral",
+    label: "Mistral Small",
+    hint: "Fast",
+    capabilities: { intelligence: 3, speed: 5, cost: 5 },
+    tags: ["tools"] as const,
+  },
+  // OpenRouter (meta-model gateway; runtime model ID supplied by user)
+  {
+    id: "openrouter-auto",
+    provider: "openrouter",
+    label: "OpenRouter Auto",
+    hint: "Best available",
+  },
+  // MLX (local Apple Silicon; model id is user-supplied at runtime)
+  {
+    id: "mlx-local",
+    provider: "mlx",
+    label: "MLX (local)",
+    hint: "Apple Silicon",
+  },
+  // Ollama (local; model id is user-supplied at runtime)
+  {
+    id: "ollama-local",
+    provider: "ollama",
+    label: "Ollama (local)",
+    hint: "Custom local",
   },
 ] as const satisfies readonly ModelInfo[];
 
@@ -213,6 +343,13 @@ export const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   "openai/gpt-oss-20b": 128_000,
   "lmstudio-local": 32_000,
   "openai-compatible-custom": 128_000,
+  "deepseek-chat": 64_000,
+  "deepseek-reasoner": 64_000,
+  "mistral-large-latest": 128_000,
+  "mistral-small-latest": 128_000,
+  "openrouter-auto": 128_000,
+  "mlx-local": 32_000,
+  "ollama-local": 32_000,
 };
 
 export function getModelContextLimit(modelId: string | undefined): number {
@@ -220,8 +357,56 @@ export function getModelContextLimit(modelId: string | undefined): number {
   return MODEL_CONTEXT_LIMITS[modelId] ?? 128_000;
 }
 
+/** True if the model preserves reasoning / thinking tokens across turns. */
+export function modelKeepsReasoning(modelId: string): boolean {
+  return (MODELS as readonly ModelInfo[]).find((m) => m.id === modelId)?.tags?.includes("reasoning") ?? false;
+}
+
+/** Returns a shorter system prompt for small / fast models. */
+export function selectSystemPrompt(modelId: string): string {
+  const m = (MODELS as readonly ModelInfo[]).find((x) => x.id === modelId);
+  if (m?.capabilities?.speed === 5) return SYSTEM_PROMPT_LITE;
+  return SYSTEM_PROMPT;
+}
+
+/** Pricing per million tokens (USD). Used for cost estimation in the UI. */
+export type ModelPricing = {
+  input: number;
+  output: number;
+  cacheRead?: number;
+};
+
+export const MODEL_PRICING: Record<string, ModelPricing> = {
+  "gpt-5.4-mini": { input: 0.15, output: 0.60 },
+  "gpt-5.5": { input: 2.50, output: 10.00 },
+  "gpt-5.3-codex": { input: 3.00, output: 15.00 },
+  "claude-haiku-4-5": { input: 0.25, output: 1.25, cacheRead: 0.03 },
+  "claude-sonnet-4-6": { input: 3.00, output: 15.00, cacheRead: 0.30 },
+  "claude-opus-4-7": { input: 15.00, output: 75.00, cacheRead: 1.50 },
+  "gemini-3.1-pro": { input: 3.50, output: 10.50 },
+  "gemini-3-flash": { input: 0.075, output: 0.30 },
+  "deepseek-chat": { input: 0.27, output: 1.10 },
+  "deepseek-reasoner": { input: 0.55, output: 2.19 },
+  "mistral-large-latest": { input: 2.00, output: 6.00 },
+  "mistral-small-latest": { input: 0.10, output: 0.30 },
+};
+
+export function estimateCost(
+  modelId: string,
+  usage: { inputTokens: number; outputTokens: number; cacheReadTokens?: number },
+): number | null {
+  const p = MODEL_PRICING[modelId];
+  if (!p) return null;
+  const freshInput = usage.inputTokens - (usage.cacheReadTokens ?? 0);
+  return (
+    (freshInput / 1_000_000) * p.input +
+    ((usage.cacheReadTokens ?? 0) / 1_000_000) * (p.cacheRead ?? p.input) +
+    (usage.outputTokens / 1_000_000) * p.output
+  );
+}
+
 /** Providers that do not require an API key (e.g. local servers). */
-export const KEYLESS_PROVIDERS: readonly ProviderId[] = ["lmstudio"] as const;
+export const KEYLESS_PROVIDERS: readonly ProviderId[] = ["lmstudio", "mlx", "ollama"] as const;
 
 export function providerNeedsKey(id: ProviderId): boolean {
   return !KEYLESS_PROVIDERS.includes(id);
@@ -253,6 +438,8 @@ export const DEFAULT_AUTOCOMPLETE_MODEL: Record<
 
 export const LMSTUDIO_DEFAULT_BASE_URL = "http://localhost:1234/v1";
 export const OPENAI_COMPATIBLE_DEFAULT_BASE_URL = "http://localhost:8080/v1";
+export const MLX_DEFAULT_BASE_URL = "http://localhost:8080/v1";
+export const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434/v1";
 export const MAX_AGENT_STEPS = 10;
 export const TERMINAL_BUFFER_LINES = 300;
 
@@ -296,3 +483,19 @@ APPROVAL:
 
 STYLE:
 - Concise. No filler, no apologies, no restating the question.`;
+
+export const SYSTEM_PROMPT_LITE = `You are Nexum, an AI assistant embedded in a developer terminal emulator.
+
+Every turn includes a <terminal-context> block with workspace_root, active_terminal_cwd, and recent terminal output. Treat it as ground truth.
+
+Tools available:
+- Read (auto): read_file, list_directory, grep, glob
+- Mutate (approval): edit, multi_edit, write_file, create_directory, bash_run, bash_background
+- Other: bash_logs, bash_list, bash_kill, suggest_command, open_preview
+
+Rules:
+- Read before edit. Use grep/glob over brute-force reads.
+- Bare paths resolve against active_terminal_cwd.
+- For a single shell command, use suggest_command. Never hang the terminal (no vim, less, top).
+- State why before calling a mutating tool.
+- Concise — no filler.`;

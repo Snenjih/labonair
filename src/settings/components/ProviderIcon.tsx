@@ -19,6 +19,11 @@ const ICON_BY_PROVIDER = {
   groq: FlashIcon,
   lmstudio: ComputerIcon,
   "openai-compatible": ComputerIcon,
+  deepseek: CpuIcon,
+  mistral: CpuIcon,
+  openrouter: ComputerIcon,
+  mlx: ComputerIcon,
+  ollama: ComputerIcon,
 } as const satisfies Record<ProviderId, typeof ChatGptIcon>;
 
 type Props = {

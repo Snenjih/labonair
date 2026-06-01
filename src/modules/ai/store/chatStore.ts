@@ -49,11 +49,30 @@ export type AgentRunStatus =
   | "awaiting-approval"
   | "error";
 
+export type AgentTokens = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  reasoningTokens: number;
+};
+
 export type AgentMeta = {
   status: AgentRunStatus;
   step: string | null;
   approvalsPending: number;
   error: string | null;
+  tokens: AgentTokens;
+  lastInputTokens: number;
+  lastCachedTokens: number;
+  hitStepCap: boolean;
+  compactionNotice: { droppedCount: number; at: number } | null;
+};
+
+const ZERO_TOKENS: AgentTokens = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  reasoningTokens: 0,
 };
 
 const IDLE_META: AgentMeta = {
@@ -61,6 +80,11 @@ const IDLE_META: AgentMeta = {
   step: null,
   approvalsPending: 0,
   error: null,
+  tokens: ZERO_TOKENS,
+  lastInputTokens: 0,
+  lastCachedTokens: 0,
+  hitStepCap: false,
+  compactionNotice: null,
 };
 
 export type MiniState = {
@@ -147,7 +171,23 @@ const NOOP_LIVE: Live = {
 
 // Per-session Chat instances. Transport reads the keys map lazily, so a key
 // change does not require rebuilding chats.
+const CHATS_LRU_CAP = 8;
 const chats = new Map<string, Chat<UIMessage>>();
+
+function touchChat(id: string, c: Chat<UIMessage>): void {
+  // Move to Map insertion-order tail (= most-recently-used position).
+  chats.delete(id);
+  chats.set(id, c);
+  if (chats.size <= CHATS_LRU_CAP) return;
+  const activeId = useChatStore.getState().activeSessionId;
+  for (const oldest of chats.keys()) {
+    if (oldest === activeId) continue;
+    flushPersistEntry(oldest);
+    void chats.get(oldest)?.stop();
+    chats.delete(oldest);
+    if (chats.size <= CHATS_LRU_CAP) break;
+  }
+}
 // Initial messages for a session, populated at hydration time and consumed
 // when the matching Chat is constructed.
 const seedMessages = new Map<string, UIMessage[]>();
@@ -225,12 +265,49 @@ function makeChat(sessionId: string): Chat<UIMessage> {
       usePreferencesStore.getState().openaiCompatibleBaseURL || undefined,
     getOpenaiCompatibleModelId: () =>
       usePreferencesStore.getState().openaiCompatibleModelId || undefined,
+    getMlxBaseURL: () => usePreferencesStore.getState().mlxBaseURL || undefined,
+    getMlxChatModelId: () =>
+      usePreferencesStore.getState().mlxChatModelId || undefined,
+    getOllamaBaseURL: () =>
+      usePreferencesStore.getState().ollamaBaseURL || undefined,
+    getOllamaChatModelId: () =>
+      usePreferencesStore.getState().ollamaChatModelId || undefined,
     getPlanMode: () => usePlanStore.getState().active,
     getMaxAgentSteps: () => usePreferencesStore.getState().aiMaxAgentSteps,
     getTemperature: () => usePreferencesStore.getState().aiTemperature,
     getTerminalContextLines: () => usePreferencesStore.getState().aiTerminalContextLines,
     onStep: (step) => {
       useChatStore.getState().patchAgentMeta({ step });
+    },
+    onUsage: ({ inputTokens, outputTokens, cacheReadTokens, reasoningTokens, isFinal }) => {
+      const s = useChatStore.getState();
+      if (isFinal) {
+        s.patchAgentMeta({
+          tokens: { inputTokens, outputTokens, cacheReadTokens, reasoningTokens },
+          lastInputTokens: inputTokens,
+          lastCachedTokens: cacheReadTokens,
+        });
+      } else {
+        const prev = s.agentMeta.tokens;
+        s.patchAgentMeta({
+          tokens: {
+            inputTokens: prev.inputTokens + inputTokens,
+            outputTokens: prev.outputTokens + outputTokens,
+            cacheReadTokens: prev.cacheReadTokens + cacheReadTokens,
+            reasoningTokens: prev.reasoningTokens + reasoningTokens,
+          },
+          lastInputTokens: inputTokens,
+          lastCachedTokens: cacheReadTokens,
+        });
+      }
+    },
+    onFinishMeta: ({ hitStepCap }) => {
+      useChatStore.getState().patchAgentMeta({ hitStepCap });
+    },
+    onCompaction: ({ droppedCount }) => {
+      useChatStore.getState().patchAgentMeta({
+        compactionNotice: { droppedCount, at: Date.now() },
+      });
     },
   }) as unknown as ChatTransport<UIMessage>;
 
@@ -381,6 +458,8 @@ export const useChatStore = create<StoreState>((set, get) => ({
       void saveActiveId(id);
     };
     if (chats.has(id) || seedMessages.has(id)) {
+      const existing = chats.get(id);
+      if (existing) touchChat(id, existing);
       flip();
       return;
     }
@@ -481,9 +560,12 @@ export function hasKeyForModel(modelId: ModelId): boolean {
 
 export function getOrCreateChat(sessionId: string): Chat<UIMessage> {
   const existing = chats.get(sessionId);
-  if (existing) return existing;
+  if (existing) {
+    touchChat(sessionId, existing);
+    return existing;
+  }
   const c = makeChat(sessionId);
-  chats.set(sessionId, c);
+  touchChat(sessionId, c);
   return c;
 }
 

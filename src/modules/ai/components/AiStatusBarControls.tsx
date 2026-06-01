@@ -44,6 +44,11 @@ const PROVIDER_ICON = {
   groq: FlashIcon,
   lmstudio: ComputerIcon,
   "openai-compatible": ComputerIcon,
+  deepseek: CpuIcon,
+  mistral: CpuIcon,
+  openrouter: ComputerIcon,
+  mlx: ComputerIcon,
+  ollama: ComputerIcon,
 } as const satisfies Record<ProviderId, typeof ChatGptIcon>;
 
 export function AiOpenButton({ onOpen }: { onOpen: () => void }) {

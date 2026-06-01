@@ -29,7 +29,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { motion } from "motion/react";
 import { useEffect, useMemo } from "react";
-import { getModel, getModelContextLimit } from "../config";
+import { getModelContextLimit } from "../config";
 import type { SessionMeta } from "../lib/sessions";
 import { useAgentsStore } from "../store/agentsStore";
 import { getOrCreateChat, useChatStore } from "../store/chatStore";
@@ -284,15 +284,12 @@ function formatTokens(n: number): string {
 
 function ContextIndicator({ messages }: { messages: UIMessage[] }) {
   const modelId = useChatStore((s) => s.selectedModelId);
-  const used = useMemo(() => estimateTokens(messages), [messages]);
+  const tokens = useChatStore((s) => s.agentMeta.tokens);
+  const compactionNotice = useChatStore((s) => s.agentMeta.compactionNotice);
   const max = getModelContextLimit(modelId);
-  const modelLabel = useMemo(() => {
-    try {
-      return getModel(modelId).label;
-    } catch {
-      return modelId;
-    }
-  }, [modelId]);
+  const charEstimate = useMemo(() => estimateTokens(messages), [messages]);
+  const hasRealTokens = tokens.inputTokens > 0;
+  const used = hasRealTokens ? tokens.inputTokens : charEstimate;
 
   return (
     <Context usedTokens={used} maxTokens={max} modelId={modelId}>
@@ -301,27 +298,43 @@ function ContextIndicator({ messages }: { messages: UIMessage[] }) {
         <ContextContentHeader />
         <ContextContentBody>
           <div className="flex items-center justify-between text-muted-foreground">
-            <span>Model</span>
-            <span className="font-mono text-foreground">{modelLabel}</span>
+            <span>Input tokens</span>
+            <span className="font-mono text-foreground">{formatTokens(used)}</span>
           </div>
-          <div className="mt-1 flex items-center justify-between text-muted-foreground">
-            <span>Estimated used</span>
-            <span className="font-mono text-foreground">
-              {formatTokens(used)}
-            </span>
-          </div>
+          {hasRealTokens && tokens.outputTokens > 0 && (
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Output tokens</span>
+              <span className="font-mono text-foreground">{formatTokens(tokens.outputTokens)}</span>
+            </div>
+          )}
+          {hasRealTokens && tokens.cacheReadTokens > 0 && (
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Cache read</span>
+              <span className="font-mono text-green-500">{formatTokens(tokens.cacheReadTokens)}</span>
+            </div>
+          )}
+          {hasRealTokens && tokens.reasoningTokens > 0 && (
+            <div className="flex items-center justify-between text-muted-foreground">
+              <span>Reasoning</span>
+              <span className="font-mono text-foreground">{formatTokens(tokens.reasoningTokens)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-muted-foreground">
             <span>Window</span>
-            <span className="font-mono text-foreground">
-              {formatTokens(max)}
-            </span>
+            <span className="font-mono text-foreground">{formatTokens(max)}</span>
           </div>
+          {compactionNotice && (
+            <div className="mt-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-500">
+              Context compacted — {compactionNotice.droppedCount} old tool results elided
+            </div>
+          )}
+          {!hasRealTokens && (
+            <p className="mt-1 text-[10px] italic text-muted-foreground">
+              Estimated (chars / 4) — send a message to get real counts.
+            </p>
+          )}
         </ContextContentBody>
-        <ContextContentFooter>
-          <span className="text-[10px] italic text-muted-foreground">
-            Token count is approximate (chars / 4).
-          </span>
-        </ContextContentFooter>
+        <ContextContentFooter />
       </ContextContent>
     </Context>
   );
