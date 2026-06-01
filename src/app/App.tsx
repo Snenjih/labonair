@@ -936,6 +936,14 @@ export default function App() {
     return () => unlisten?.();
   }, []);
 
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<{ path: string; title: string }>("nexum:open-preview", (event) => {
+      useTabsStore.getState().newPreviewTab(event.payload.path, event.payload.title);
+    }).then((fn) => { unlisten = fn; });
+    return () => unlisten?.();
+  }, []);
+
   // ── setLive — tabs/activeId read inside via getState() ────────────────────
   useEffect(() => {
     setLive({

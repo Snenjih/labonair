@@ -29,15 +29,29 @@ import { cn } from "@/lib/utils";
 import {
   Add01Icon,
   Cancel01Icon,
+  CancelCircleIcon,
   ComputerIcon,
+  Delete01Icon,
+  EyeIcon,
+  FolderOpenIcon,
+  Image01Icon,
   Moon02Icon,
   Sun03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { emit } from "@tauri-apps/api/event";
 
 const TITLEBAR_ICONS_DESCRIPTIONS: Record<"auto" | "left" | "right", string> = {
   auto: "Follows platform conventions — right side on macOS (traffic lights occupy the left) and on Windows (before the window controls).",
@@ -262,6 +276,9 @@ export function AppearanceSection() {
                     backgroundSize: "12px 12px",
                   }}
                 />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <HugeiconsIcon icon={CancelCircleIcon} size={22} strokeWidth={1.3} className="text-muted-foreground/50" />
+                </div>
                 {backgroundImage === "" && <SelectedBadge />}
               </button>
             </TileWrapper>
@@ -272,49 +289,78 @@ export function AppearanceSection() {
                 key={bg.filename}
                 label={bg.filename.replace(/\.[^.]+$/, "")}
               >
-                <div
-                  className="relative h-[100px] w-[150px]"
-                  onMouseEnter={() => setHoveredFilename(bg.filename)}
-                  onMouseLeave={() => setHoveredFilename(null)}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(bg.filename)}
-                    className={cn(
-                      "h-full w-full overflow-hidden rounded-lg border transition-all",
-                      backgroundImage === bg.filename
-                        ? "border-foreground/50 ring-2 ring-foreground/20 ring-offset-1 ring-offset-background"
-                        : "border-border/50 hover:border-border",
-                    )}
-                    title={bg.filename}
-                  >
-                    <img
-                      src={thumbUrls[bg.filename]}
-                      alt={bg.filename}
-                      className="h-full w-full object-cover"
-                      draggable={false}
-                    />
-                    {backgroundImage === bg.filename && <SelectedBadge />}
-                  </button>
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <div
+                      className="relative h-[100px] w-[150px]"
+                      onMouseEnter={() => setHoveredFilename(bg.filename)}
+                      onMouseLeave={() => setHoveredFilename(null)}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSelect(bg.filename)}
+                        className={cn(
+                          "h-full w-full overflow-hidden rounded-lg border transition-all",
+                          backgroundImage === bg.filename
+                            ? "border-foreground/50 ring-2 ring-foreground/20 ring-offset-1 ring-offset-background"
+                            : "border-border/50 hover:border-border",
+                        )}
+                        title={bg.filename}
+                      >
+                        <img
+                          src={thumbUrls[bg.filename]}
+                          alt={bg.filename}
+                          className="h-full w-full object-cover"
+                          draggable={false}
+                        />
+                        {backgroundImage === bg.filename && <SelectedBadge />}
+                      </button>
 
-                  {/* Delete button */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDelete(bg.filename);
-                    }}
-                    className={cn(
-                      "absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground shadow-sm transition-all hover:bg-destructive/90 hover:text-white",
-                      hoveredFilename === bg.filename
-                        ? "opacity-100 scale-100"
-                        : "opacity-0 scale-75",
-                    )}
-                    title={`Delete ${bg.filename}`}
-                  >
-                    <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2.5} />
-                  </button>
-                </div>
+                      {/* Quick-delete badge on hover */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleDelete(bg.filename);
+                        }}
+                        className={cn(
+                          "absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground shadow-sm transition-all hover:bg-destructive/90 hover:text-white",
+                          hoveredFilename === bg.filename
+                            ? "opacity-100 scale-100"
+                            : "opacity-0 scale-75",
+                        )}
+                        title={`Delete ${bg.filename}`}
+                      >
+                        <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-48">
+                    <ContextMenuItem
+                      onClick={() => void revealItemInDir(bg.path)}
+                    >
+                      <HugeiconsIcon icon={FolderOpenIcon} size={13} strokeWidth={1.5} className="mr-2 text-muted-foreground" />
+                      Open in Finder
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onClick={() => void emit("nexum:open-preview", {
+                        path: bg.path,
+                        title: bg.filename.replace(/\.[^.]+$/, ""),
+                      })}
+                    >
+                      <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={1.5} className="mr-2 text-muted-foreground" />
+                      Open in Preview
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      variant="destructive"
+                      onClick={() => void handleDelete(bg.filename)}
+                    >
+                      <HugeiconsIcon icon={Delete01Icon} size={13} strokeWidth={1.5} className="mr-2" />
+                      Delete
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               </TileWrapper>
             ))}
 
@@ -333,9 +379,10 @@ export function AppearanceSection() {
           </div>
 
           {backgrounds.length === 0 && !isDragging && (
-            <p className="mt-2 text-center text-[10px] text-muted-foreground/60">
-              No backgrounds yet — drop an image here or click "Add image"
-            </p>
+            <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground/50">
+              <HugeiconsIcon icon={Image01Icon} size={28} strokeWidth={1.3} />
+              <p className="text-[10px]">No backgrounds yet — drop an image here or click "Add image"</p>
+            </div>
           )}
           {isDragging && (
             <p className="mt-2 text-center text-[10.5px] font-medium text-foreground/70">

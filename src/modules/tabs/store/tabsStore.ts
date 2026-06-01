@@ -48,7 +48,7 @@ export type TabsState = {
     isNewFile: boolean;
   }) => number | null;
   setAiDiffStatus: (approvalId: string, status: AiDiffStatus) => void;
-  newPreviewTab: (url: string) => number;
+  newPreviewTab: (url: string, title?: string) => number;
   closeTab: (id: number) => void;
   updateTab: (id: number, patch: TabPatch) => void;
   selectByIndex: (idx: number) => void;
@@ -262,10 +262,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }));
   },
 
-  newPreviewTab: (url) => {
+  newPreviewTab: (url, title) => {
     const id = get()._nextId;
     set((s) => ({
-      tabs: [...s.tabs, { id, kind: "preview" as const, title: titleFromUrl(url), url }],
+      tabs: [...s.tabs, { id, kind: "preview" as const, title: title ?? titleFromUrl(url), url }],
       activeId: id,
       _nextId: s._nextId + 1,
     }));
