@@ -9,7 +9,8 @@ export function buildClaudeTools(ctx: ToolContext) {
     - target "new": opens a new terminal tab
     - target "current": uses the currently active terminal
     - target <number>: uses terminal tab at that 1-based index (1 = first terminal)
-    Lists available terminals automatically. The command defaults to "claude" but can be refined.`,
+    The prompt (task description) is passed as a separate field and will be automatically quoted.
+    Use flags for CLI options like --model.`,
       inputSchema: z.object({
         target: z
           .union([
@@ -20,16 +21,29 @@ export function buildClaudeTools(ctx: ToolContext) {
           .describe(
             'Where to open the session. "new" = new tab, "current" = active terminal, or 1-based index of a specific terminal.',
           ),
-        command: z
+        flags: z
           .string()
-          .default("claude")
+          .optional()
           .describe(
-            'The full command to run. Defaults to "claude". Can include flags like "--model claude-opus-4-7" or a task like "claude \'fix the tests\'"',
+            'Optional CLI flags to pass, e.g. "--model claude-opus-4-7" or "--no-cache". Do NOT include the prompt here.',
+          ),
+        prompt: z
+          .string()
+          .optional()
+          .describe(
+            'Optional task/prompt for Claude, e.g. "fix the failing tests". Will be safely quoted. Omit to just open an interactive session.',
           ),
       }),
       needsApproval: true,
-      execute: async ({ target, command }) => {
-        const cmd = command.endsWith("\n") ? command : `${command}\n`;
+      execute: async ({ target, flags, prompt }) => {
+        // Build the command: claude [flags] ["prompt"]
+        const parts = ["claude"];
+        if (flags?.trim()) parts.push(flags.trim());
+        if (prompt?.trim()) {
+          // Escape any double quotes inside the prompt, then wrap in double quotes.
+          parts.push(`"${prompt.trim().replace(/"/g, '\\"')}"`);
+        }
+        const cmd = parts.join(" ") + "\n";
 
         if (target === "current") {
           if (ctx.getActiveTabKind() !== "workspace") {
@@ -39,12 +53,12 @@ export function buildClaudeTools(ctx: ToolContext) {
             };
           }
           ctx.injectIntoActivePty(cmd);
-          return { success: true, target: "current terminal", command: cmd.trimEnd() };
+          return { success: true, target: "current terminal", command: cmd.trim() };
         }
 
         if (target === "new") {
           ctx.openTerminalWithCommand(cmd);
-          return { success: true, target: "new terminal", command: cmd.trimEnd() };
+          return { success: true, target: "new terminal", command: cmd.trim() };
         }
 
         // Numeric index — find the terminal tab at that 1-based position
@@ -61,7 +75,7 @@ export function buildClaudeTools(ctx: ToolContext) {
         return {
           success: true,
           target: `terminal ${target} (${tab.label})`,
-          command: cmd.trimEnd(),
+          command: cmd.trim(),
         };
       },
     }),
