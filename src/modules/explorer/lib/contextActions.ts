@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/errors";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
 export async function copyToClipboard(text: string): Promise<void> {
@@ -18,6 +19,6 @@ export async function revealInFinder(path: string): Promise<void> {
   try {
     await revealItemInDir(path);
   } catch (e) {
-    console.error("revealItemInDir failed:", e);
+    handleApiError(e, "Could not open in Finder", "Finder");
   }
 }

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { handleApiError } from "@/lib/errors";
 import { useCallback, useEffect, useState } from "react";
 import { useLocalExplorerStore } from "./useLocalExplorerStore";
 
@@ -145,7 +146,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         await invoke(cmd, { path });
         await fetchChildren(pendingCreate.parentPath);
       } catch (e) {
-        console.error(`${cmd} failed:`, e);
+        handleApiError(e, `${cmd === "fs_create_dir" ? "Create folder" : "Create file"} failed`, "File Tree");
       } finally {
         setPendingCreate(null);
       }
@@ -176,7 +177,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         options?.onPathRenamed?.(renaming, to);
         await fetchChildren(parent);
       } catch (e) {
-        console.error("fs_rename failed:", e);
+        handleApiError(e, "Rename failed", "File Tree");
       } finally {
         setRenaming(null);
       }
@@ -191,7 +192,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         options?.onPathDeleted?.(path);
         await fetchChildren(dirname(path));
       } catch (e) {
-        console.error("fs_delete failed:", e);
+        handleApiError(e, "Delete failed", "File Tree");
       }
     },
     [fetchChildren, options],

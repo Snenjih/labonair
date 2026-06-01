@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import type { EditorTab } from "@/modules/tabs";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
@@ -142,7 +143,7 @@ export function EditorStack({
               speed_bps: 0,
             });
           }
-          console.error("Failed to save to remote:", e);
+          handleApiError(e, "Failed to save to remote", "Editor");
         });
       };
       savedCallbacks.current.set(t.id, cb);

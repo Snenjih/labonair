@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -164,7 +165,7 @@ export function GeneralSection() {
       else await disable();
       await setAutostart(next);
     } catch (e) {
-      console.error("autostart toggle failed", e);
+      handleApiError(e, "Could not toggle autostart", "Settings");
     }
   };
 
@@ -174,7 +175,7 @@ export function GeneralSection() {
       await invoke("secrets_set_encryption_enabled", { enabled });
       await setCredentialEncryption(enabled);
     } catch (err) {
-      console.error("Failed to toggle credential encryption:", err);
+      handleApiError(err, "Could not toggle credential encryption", "Settings");
     } finally {
       setPendingEncryption(false);
     }

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { PaneLeaf, PaneNode, PaneSplit } from "@/modules/tabs";
@@ -200,6 +201,12 @@ export async function restoreIfEnabled(actions: TabActions): Promise<RestoreResu
     return await restoreSnapshot(snapshot, actions);
   } catch (e) {
     console.warn("[session] restore failed:", e);
+    useNotificationStore.getState().addNotification({
+      type: "warning",
+      title: "Session not restored",
+      message: "Could not restore previous tabs. Starting with an empty workspace.",
+      source: "Session",
+    });
     return null;
   }
 }

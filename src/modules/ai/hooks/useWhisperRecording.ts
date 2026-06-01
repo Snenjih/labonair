@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/errors";
 import { createOpenAI } from "@ai-sdk/openai";
 import { experimental_transcribe as transcribe } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -82,7 +83,7 @@ export function useWhisperRecording({
           const text = await transcribeBlob(blob, apiKey);
           if (text.trim()) onResult(text.trim());
         } catch (e) {
-          console.error("whisper.transcribe", e);
+          handleApiError(e, "Transcription failed", "Whisper");
         } finally {
           setState("idle");
         }
@@ -91,7 +92,7 @@ export function useWhisperRecording({
       rec.start();
       setState("recording");
     } catch (e) {
-      console.error("whisper.getUserMedia", e);
+      handleApiError(e, "Microphone access denied", "Whisper");
       teardownStream();
       setState("idle");
     }

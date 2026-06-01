@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown01Icon,
@@ -47,7 +48,8 @@ export function PlanDiffReview() {
       const results = await applyAll();
       const failed = results.filter((r) => !r.ok);
       if (failed.length) {
-        console.error("plan apply failures:", failed);
+        const detail = failed.map((f) => f.error ?? "unknown").join("; ");
+        handleApiError(detail, `Plan apply: ${failed.length} edit(s) failed`, "Plan");
       }
     } finally {
       setBusy(false);

@@ -19,6 +19,7 @@ import {
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -113,7 +114,7 @@ export function FileExplorer({
         if (alive) setResults(hits);
       } catch (e) {
         if (alive) {
-          console.error("fs_search failed:", e);
+          handleApiError(e, "File search failed", "File Search");
           setResults([]);
         }
       } finally {

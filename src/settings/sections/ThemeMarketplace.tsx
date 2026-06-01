@@ -1,3 +1,4 @@
+import { handleApiError } from "@/lib/errors";
 import { Input } from "@/components/ui/input";
 import type { ThemeMeta } from "@/lib/useThemeEngine";
 import { useThemeStore } from "@/modules/settings/useThemeStore";
@@ -76,7 +77,7 @@ export function ThemeMarketplace() {
       await invoke("theme_import", { sourcePath: selected });
       void fetchInstalled();
     } catch (e) {
-      console.error("Theme import failed:", e);
+      handleApiError(e, "Theme import failed", "Themes");
     }
   };
 
@@ -101,7 +102,7 @@ export function ThemeMarketplace() {
       setTab("installed");
       await emit("nexum:open-file", { path: filePath });
     } catch (e) {
-      console.error("Theme creation failed:", e);
+      handleApiError(e, "Theme creation failed", "Themes");
     } finally {
       setIsCreating(false);
     }

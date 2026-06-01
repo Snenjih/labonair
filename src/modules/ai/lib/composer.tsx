@@ -1,3 +1,5 @@
+import { handleApiError } from "@/lib/errors";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { invoke } from "@tauri-apps/api/core";
 import {
   createContext,
@@ -177,8 +179,16 @@ export function AiComposerProvider({ children }: ProviderProps) {
         | { kind: "toolarge"; size: number; limit: number };
       const result = await invoke<ReadResult>("fs_read_file", { path });
       if (result.kind !== "text") {
-        // Binary/oversize files: skip (could surface a toast in future).
-        console.warn("attachFileByPath: skipped non-text file", path, result);
+        const msg =
+          result.kind === "toolarge"
+            ? `File too large (limit: ${Math.round((result as { limit: number }).limit / 1024)}KB)`
+            : "Binary files cannot be attached";
+        useNotificationStore.getState().addNotification({
+          type: "warning",
+          title: "Cannot attach file",
+          message: msg,
+          source: "Attachment",
+        });
         return;
       }
       const name = path.split("/").pop() || path;
@@ -198,7 +208,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
       // Open the AI panel & focus the input so the user sees the chip.
       useChatStore.getState().focusInput();
     } catch (e) {
-      console.error("attachFileByPath failed:", e);
+      handleApiError(e, "Failed to attach file", "Attachment");
     }
   };
 
