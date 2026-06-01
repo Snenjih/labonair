@@ -40,6 +40,9 @@ type Live = {
   openPreview: (url: string) => boolean;
   getActiveTabKind: () => string | null;
   getActiveSshTabId: () => string | null;
+  getTerminalTabs: () => { id: string; label: string; index: number }[];
+  openTerminalWithCommand: (command: string) => void;
+  injectIntoTerminal: (tabId: string, command: string) => void;
 };
 
 export type AgentRunStatus =
@@ -167,6 +170,9 @@ const NOOP_LIVE: Live = {
   openPreview: () => false,
   getActiveTabKind: () => null,
   getActiveSshTabId: () => null,
+  getTerminalTabs: () => [],
+  openTerminalWithCommand: () => {},
+  injectIntoTerminal: () => {},
 };
 
 // Per-session Chat instances. Transport reads the keys map lazily, so a key
@@ -235,6 +241,11 @@ function makeChat(sessionId: string): Chat<UIMessage> {
     getSessionId: () => sessionId,
     getActiveTabKind: () => useChatStore.getState().live.getActiveTabKind(),
     getActiveSshTabId: () => useChatStore.getState().live.getActiveSshTabId(),
+    getTerminalTabs: () => useChatStore.getState().live.getTerminalTabs(),
+    openTerminalWithCommand: (command) =>
+      useChatStore.getState().live.openTerminalWithCommand(command),
+    injectIntoTerminal: (tabId, command) =>
+      useChatStore.getState().live.injectIntoTerminal(tabId, command),
   };
 
   const transport = createContextAwareTransport({

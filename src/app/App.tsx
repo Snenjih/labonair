@@ -991,6 +991,38 @@ export default function App() {
         const session = wt.sessions[wt.activePaneId];
         return session?.kind === "ssh" ? wt.activePaneId : null;
       },
+      getTerminalTabs: () => {
+        const { tabs } = useTabsStore.getState();
+        return tabs
+          .filter((t): t is WorkspaceTab => t.kind === "workspace")
+          .map((t, i) => ({
+            id: t.activePaneId,
+            label: t.title ?? "Terminal",
+            index: i + 1,
+          }));
+      },
+      openTerminalWithCommand: (command) => {
+        const { newTab: openNewTab } = useTabsStore.getState();
+        const tabId = openNewTab();
+        setTimeout(() => {
+          const { tabs: updatedTabs } = useTabsStore.getState();
+          const newTabData = updatedTabs.find((t) => t.id === tabId);
+          if (!newTabData || newTabData.kind !== "workspace") return;
+          const paneId = (newTabData as WorkspaceTab).activePaneId;
+          const term = terminalRefs.current.get(paneId);
+          if (term) {
+            term.write(command);
+            term.focus();
+          }
+        }, 100);
+      },
+      injectIntoTerminal: (tabId, command) => {
+        const term = terminalRefs.current.get(tabId);
+        if (term) {
+          term.write(command);
+          term.focus();
+        }
+      },
     });
   }, [setLive, explorerRoot, home, openPreviewTab]);
 

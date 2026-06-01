@@ -30,6 +30,12 @@ export type ToolContext = {
    * an ssh-terminal. Passed to ssh_exec_command for remote routing.
    */
   getActiveSshTabId: () => string | null;
+  /** Returns list of open terminal (workspace) tabs: [{id, label, index}] */
+  getTerminalTabs: () => { id: string; label: string; index: number }[];
+  /** Opens a new terminal tab and runs the given command. */
+  openTerminalWithCommand: (command: string) => void;
+  /** Injects a command into a specific terminal tab by its pane/session id. */
+  injectIntoTerminal: (tabId: string, command: string) => void;
 };
 
 export function resolvePath(rawPath: string, cwd: string | null): string {

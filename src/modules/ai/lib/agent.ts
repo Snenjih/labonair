@@ -88,6 +88,8 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> = 
   todo_write: (i) =>
     `Updating plan (${Array.isArray(i.todos) ? i.todos.length : 0} items)`,
   run_subagent: (i) => `Spawning ${String(i.type ?? "subagent")} subagent`,
+  spawn_claude_session: (i) =>
+    `Spawning Claude in ${i.target === "new" ? "new terminal" : i.target === "current" ? "current terminal" : `terminal ${i.target}`}`,
 };
 
 function shortPath(p: unknown): string {

@@ -1,3 +1,4 @@
+import { buildClaudeTools } from "./claude";
 import { buildEditTools } from "./edit";
 import { buildFsTools } from "./fs";
 import { buildSearchTools } from "./search";
@@ -37,6 +38,7 @@ export function buildTools(ctx: import("./context").ToolContext) {
     ...buildSubagentTools(ctx),
     ...buildTerminalTools(ctx),
     ...buildTodoTools(ctx),
+    ...buildClaudeTools(ctx),
   } as const;
 }
 
