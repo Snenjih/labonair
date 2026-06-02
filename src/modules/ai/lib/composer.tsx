@@ -223,6 +223,8 @@ export function AiComposerProvider({ children }: ProviderProps) {
     )
       return;
 
+    useChatStore.getState().openMini();
+
     // Slash-command interception. `/plan` toggles plan mode; `/init` rewrites
     // the prompt to the NEXUM.md scan template before sending.
     let effectiveText = trimmed;

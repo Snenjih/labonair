@@ -28,7 +28,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { motion } from "motion/react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getModelContextLimit } from "../config";
 import type { SessionMeta } from "../lib/sessions";
 import { useAgentsStore } from "../store/agentsStore";
@@ -60,10 +60,41 @@ const SUGGESTIONS = [
   },
 ];
 
+function useInputBarBottom(): number {
+  const [bottom, setBottom] = useState(48);
+
+  useEffect(() => {
+    const measure = () => {
+      const el = document.querySelector("[data-ai-input-bar]") as HTMLElement | null;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.height > 0) {
+          setBottom(window.innerHeight - rect.top + 8);
+          return;
+        }
+      }
+      setBottom(40);
+    };
+
+    measure();
+    const obs = new ResizeObserver(measure);
+    const el = document.querySelector("[data-ai-input-bar]");
+    if (el) obs.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      obs.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+
+  return bottom;
+}
+
 export function AiMiniWindow() {
   const closeMini = useChatStore((s) => s.closeMini);
   const sessionId = useChatStore((s) => s.activeSessionId);
   const openPanel = useChatStore((s) => s.openPanel);
+  const bottomOffset = useInputBarBottom();
   const expandToPanel = () => {
     closeMini();
     openPanel();
@@ -89,9 +120,9 @@ export function AiMiniWindow() {
       exit={{ opacity: 0, y: 12, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 320, damping: 32 }}
       data-ai-mini-window
-      style={{ willChange: "transform, opacity" }}
+      style={{ willChange: "transform, opacity", bottom: bottomOffset }}
       className={cn(
-        "no-scrollbar-deep fixed right-4 bottom-12 z-40 flex h-[42rem] w-[34rem] flex-col overflow-hidden",
+        "no-scrollbar-deep fixed right-4 z-40 flex h-[42rem] w-[34rem] flex-col overflow-hidden",
         "rounded-2xl border border-border/40 bg-card shadow-2xl ring-1 ring-black/5 dark:ring-white/5",
         "text-[12px]",
       )}
