@@ -124,6 +124,9 @@ type StoreState = {
 
   selectedModelId: ModelId;
   setSelectedModelId: (id: ModelId) => void;
+  favoriteModelIds: string[];
+  recentModelIds: string[];
+  toggleFavoriteModel: (id: string) => void;
 
   mini: MiniState;
   openMini: () => void;
@@ -358,7 +361,19 @@ export const useChatStore = create<StoreState>((set, get) => ({
   },
 
   selectedModelId: DEFAULT_MODEL_ID,
-  setSelectedModelId: (id) => set({ selectedModelId: id }),
+  setSelectedModelId: (id) => {
+    const recents = [id, ...get().recentModelIds.filter((r) => r !== id)].slice(0, 10);
+    set({ selectedModelId: id, recentModelIds: recents });
+    try { localStorage.setItem("nexum-recent-models", JSON.stringify(recents)); } catch { /* ignore */ }
+  },
+  favoriteModelIds: (() => { try { return JSON.parse(localStorage.getItem("nexum-favorite-models") ?? "[]") as string[]; } catch { return []; } })(),
+  recentModelIds: (() => { try { return JSON.parse(localStorage.getItem("nexum-recent-models") ?? "[]") as string[]; } catch { return []; } })(),
+  toggleFavoriteModel: (id) => {
+    const favs = get().favoriteModelIds;
+    const next = favs.includes(id) ? favs.filter((f) => f !== id) : [...favs, id];
+    set({ favoriteModelIds: next });
+    try { localStorage.setItem("nexum-favorite-models", JSON.stringify(next)); } catch { /* ignore */ }
+  },
 
   mini: { open: false },
   openMini: () => set({ mini: { open: true } }),

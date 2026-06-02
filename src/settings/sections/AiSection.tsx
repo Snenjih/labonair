@@ -72,6 +72,7 @@ import {
   setAiMaxAgentSteps,
   setAiTerminalContextLines,
   setAiTemperature,
+  setAiModelPickerOnlyConfigured,
 } from "@/modules/settings/store";
 import {
   Add01Icon,
@@ -283,6 +284,7 @@ function ModelsContent({
   onClearKey: (p: ProviderId) => Promise<void>;
 }) {
   const defaultModel = usePreferencesStore((s) => s.defaultModelId);
+  const onlyConfigured = usePreferencesStore((s) => s.aiModelPickerOnlyConfigured);
 
   const defaultModelInfo = getModel(defaultModel);
   const keyedProviders = PROVIDERS.filter(
@@ -292,6 +294,16 @@ function ModelsContent({
 
   return (
     <div className="flex flex-col gap-7">
+      <SettingRow
+        title="Show only configured providers"
+        description="Hide models from providers without an API key in the model picker. Keeps the list focused on what you can actually use."
+      >
+        <Switch
+          checked={onlyConfigured}
+          onCheckedChange={(v) => void setAiModelPickerOnlyConfigured(v)}
+        />
+      </SettingRow>
+
       <div className="flex flex-col gap-2">
         <Label>Default model</Label>
         <DropdownMenu>

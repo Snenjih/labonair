@@ -1,55 +1,18 @@
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import {
   Add01Icon,
-  ArrowDown01Icon,
-  ChatGptIcon,
-  ClaudeIcon,
-  ComputerIcon,
-  CpuIcon,
-  FlashIcon,
-  GoogleGeminiIcon,
-  Grok02Icon,
   Message01Icon,
   Mic01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { motion } from "motion/react";
 import { useRef } from "react";
-import {
-  getModel,
-  MODELS,
-  PROVIDERS,
-  type ModelId,
-  type ProviderId,
-} from "../config";
 import { ACCEPTED_FILES, useComposer } from "../lib/composer";
 import { useChatStore } from "../store/chatStore";
-
-const PROVIDER_ICON = {
-  openai: ChatGptIcon,
-  anthropic: ClaudeIcon,
-  google: GoogleGeminiIcon,
-  xai: Grok02Icon,
-  cerebras: CpuIcon,
-  groq: FlashIcon,
-  lmstudio: ComputerIcon,
-  "openai-compatible": ComputerIcon,
-  deepseek: CpuIcon,
-  mistral: CpuIcon,
-  openrouter: ComputerIcon,
-  mlx: ComputerIcon,
-  ollama: ComputerIcon,
-} as const satisfies Record<ProviderId, typeof ChatGptIcon>;
+import { ModelPicker } from "./ModelPicker";
 
 export function AiOpenButton({ onOpen }: { onOpen: () => void }) {
   return (
@@ -80,19 +43,6 @@ export function AiStatusBarControls() {
 
   return (
     <div className="flex items-center gap-0.5">
-      {/* <Button
-        onClick={closePanel}
-        title="Close AI panel"
-        size="xs"
-        variant="outline"
-        aria-label="Close AI panel"
-        className="text-[11px] text-foreground/85 pl-1.5"
-      > */}
-      {/* <Kbd className="h-4 gap-px text-[11px]">
-          ⌘<span className="font-mono">I</span>
-        </Kbd> */}
-      {/* Close */}
-      {/* </Button> */}
       <input
         ref={fileInputRef}
         type="file"
@@ -143,7 +93,7 @@ export function AiStatusBarControls() {
         </IconBtn>
       )}
 
-      <ModelDropdown />
+      <ModelPicker />
 
       <span className="mx-1 h-8 w-px bg-border" aria-hidden />
       <Button
@@ -157,7 +107,6 @@ export function AiStatusBarControls() {
         <Kbd className="h-4 gap-px text-[11px]">
           ⌘<span className="font-mono">I</span>
         </Kbd>
-        {/* <HugeiconsIcon icon={Close} size={15} strokeWidth={1.75} /> */}
       </Button>
       <IconBtn
         title={miniOpen ? "Mini-window open" : "Open conversation"}
@@ -166,107 +115,7 @@ export function AiStatusBarControls() {
       >
         <HugeiconsIcon icon={Message01Icon} size={13} strokeWidth={1.75} />
       </IconBtn>
-
     </div>
-  );
-}
-
-function ModelDropdown() {
-  const selected = useChatStore((s) => s.selectedModelId);
-  const apiKeys = useChatStore((s) => s.apiKeys);
-  const setSelected = useChatStore((s) => s.setSelectedModelId);
-  const current = getModel(selected);
-  const currentProviderHasKey = !!apiKeys[current.provider];
-
-  const onPick = (id: ModelId, providerId: ProviderId) => {
-    if (!apiKeys[providerId]) {
-      void openSettingsWindow("models");
-      return;
-    }
-    setSelected(id);
-  };
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-5.5 gap-1 rounded-md px-1.5 my-1 text-xs hover:bg-accent hover:text-foreground",
-            currentProviderHasKey
-              ? "text-muted-foreground"
-              : "text-warning",
-          )}
-          title={
-            currentProviderHasKey
-              ? `Model: ${current.label}`
-              : `${current.label} — no key configured`
-          }
-        >
-          {/* <HugeiconsIcon
-            icon={PROVIDER_ICON[current.provider]}
-            size={12}
-            strokeWidth={1.25}
-          /> */}
-          {current.label}
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            size={11}
-            strokeWidth={2}
-            className="opacity-70"
-          />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[240px]">
-        {PROVIDERS.map((p) => {
-          const models = MODELS.filter((m) => m.provider === p.id);
-          const hasKey = !!apiKeys[p.id];
-          return (
-            <div key={p.id} className="px-1 pt-1.5 first:pt-1">
-              <div className="mb-0.5 flex items-center gap-1.5 px-2 text-[9.5px] font-medium tracking-wide text-muted-foreground uppercase">
-                <HugeiconsIcon
-                  icon={PROVIDER_ICON[p.id]}
-                  size={15}
-                  strokeWidth={1.25}
-                />
-                <span>{p.label}</span>
-                {!hasKey ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void openSettingsWindow("models");
-                    }}
-                    className="ml-auto rounded-sm px-1 text-[9px] normal-case tracking-normal text-warning underline-offset-2 hover:underline"
-                  >
-                    Set key…
-                  </button>
-                ) : null}
-              </div>
-              {models.map((m) => (
-                <DropdownMenuItem
-                  key={m.id}
-                  disabled={!hasKey}
-                  onSelect={() => onPick(m.id as ModelId, p.id)}
-                  className={cn(
-                    "flex flex-col items-start gap-0 text-xs",
-                    m.id === selected && "bg-accent/40",
-                  )}
-                >
-                  <span className="font-medium">{m.label}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {m.hint}
-                  </span>
-                </DropdownMenuItem>
-              ))}
-            </div>
-          );
-        })}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 
