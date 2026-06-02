@@ -1,9 +1,10 @@
 import type { UIMessage } from "@ai-sdk/react";
 import { DirectChatTransport } from "ai";
-import { getModelContextLimit, modelKeepsReasoning, TERMINAL_BUFFER_LINES, type ModelId } from "../config";
+import { getModelContextLimit, modelKeepsReasoning, TERMINAL_BUFFER_LINES, type ModelId, type ProviderInstance } from "../config";
 import { createNexumAgent, type AgentUsageDelta } from "./agent";
 import { compact } from "./compact";
 import type { ProviderKeys } from "./keyring";
+import { parseModelRef } from "./modelRef";
 import { native } from "./native";
 import type { ToolContext } from "../tools/tools";
 
@@ -46,8 +47,10 @@ const MAX_TERMINAL_CHARS = 12_000;
 
 type Deps = {
   getKeys: () => ProviderKeys;
+  getInstances?: () => ProviderInstance[];
+  getInstanceKeys?: () => Record<string, string | null>;
   toolContext: ToolContext;
-  getModelId: () => ModelId;
+  getModelId: () => ModelId | string;
   getCustomInstructions: () => string;
   getAgentPersona: () => { name: string; instructions: string } | null;
   getLive: () => LiveSnapshot;
@@ -113,6 +116,8 @@ export function createContextAwareTransport(deps: Deps) {
       const bufferLines = deps.getTerminalContextLines?.() ?? TERMINAL_BUFFER_LINES;
       const agent = await createNexumAgent({
         keys: deps.getKeys(),
+        instances: deps.getInstances?.(),
+        instanceKeys: deps.getInstanceKeys?.(),
         modelId,
         customInstructions: deps.getCustomInstructions(),
         agentPersona: deps.getAgentPersona(),
@@ -134,7 +139,8 @@ export function createContextAwareTransport(deps: Deps) {
         temperature: deps.getTemperature?.(),
       });
       const base = new DirectChatTransport({ agent });
-      const finalMessages = prepareMessages(options.messages, live, bufferLines, modelId, deps.onCompaction);
+      const { modelDefId } = parseModelRef(modelId);
+      const finalMessages = prepareMessages(options.messages, live, bufferLines, modelDefId as ModelId, deps.onCompaction);
       return base.sendMessages({
         ...options,
         messages: finalMessages,
@@ -146,6 +152,8 @@ export function createContextAwareTransport(deps: Deps) {
       const projectMemory = await readNexumMd(live.workspaceRoot);
       const agent = await createNexumAgent({
         keys: deps.getKeys(),
+        instances: deps.getInstances?.(),
+        instanceKeys: deps.getInstanceKeys?.(),
         modelId,
         customInstructions: deps.getCustomInstructions(),
         agentPersona: deps.getAgentPersona(),

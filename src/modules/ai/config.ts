@@ -438,8 +438,62 @@ export const DEFAULT_AUTOCOMPLETE_MODEL: Record<
 
 export const LMSTUDIO_DEFAULT_BASE_URL = "http://localhost:1234/v1";
 export const OPENAI_COMPATIBLE_DEFAULT_BASE_URL = "http://localhost:8080/v1";
-export const MLX_DEFAULT_BASE_URL = "http://localhost:8080/v1";
+export const MLX_DEFAULT_BASE_URL = "http://127.0.0.1:8080/v1";
 export const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434/v1";
+
+/** Provider IDs that belong to the "cloud" group in the Add Provider dropdown. */
+export const CLOUD_PROVIDER_IDS: readonly ProviderId[] = [
+  "openai", "anthropic", "google", "xai", "cerebras", "groq", "deepseek", "mistral", "openrouter",
+] as const;
+
+/** Provider IDs that belong to the "local & custom" group. */
+export const LOCAL_PROVIDER_IDS: readonly ProviderId[] = [
+  "openai-compatible", "lmstudio", "mlx", "ollama",
+] as const;
+
+export function getProviderDefaultBaseUrl(id: ProviderId): string {
+  switch (id) {
+    case "lmstudio": return LMSTUDIO_DEFAULT_BASE_URL;
+    case "mlx": return MLX_DEFAULT_BASE_URL;
+    case "ollama": return OLLAMA_DEFAULT_BASE_URL;
+    case "openai-compatible": return OPENAI_COMPATIBLE_DEFAULT_BASE_URL;
+    default: return "";
+  }
+}
+
+/** Short descriptions shown on provider cards. */
+export const PROVIDER_DESCRIPTIONS: Partial<Record<ProviderId, string>> = {
+  openrouter: "Any model on OpenRouter — type its full provider/model id.",
+  "openai-compatible": "Any OpenAI-compatible endpoint — vLLM, Z.AI, Fireworks, etc.",
+  lmstudio: "Run GGUF models via LM Studio's HTTP server (Developer tab → enable).",
+  mlx: "Apple-silicon inference via mlx_lm.server (pip install mlx-lm).",
+  ollama: "Local models via Ollama's built-in OpenAI-compatible API.",
+};
+
+/** Documentation URLs shown on local/custom provider cards. */
+export const PROVIDER_DOCS_URLS: Partial<Record<ProviderId, string>> = {
+  openrouter: "https://openrouter.ai/docs",
+  "openai-compatible": "https://platform.openai.com/docs/api-reference",
+  lmstudio: "https://lmstudio.ai/docs/basics/server",
+  mlx: "https://github.com/ml-explore/mlx-lm",
+  ollama: "https://ollama.ai",
+};
+
+/** A configured provider instance — one entry per provider the user has set up. */
+export type ProviderInstance = {
+  id: string;
+  providerId: ProviderId;
+  /** Display name, auto-set to providerId or "openai2" when duplicates exist. */
+  name: string;
+  /** Base URL for local / custom providers. */
+  baseUrl?: string;
+  /** Model ID for local / custom providers (the model running on the server). */
+  localModelId?: string;
+  /** Context window override for openai-compatible. */
+  contextWindowSize?: number;
+  /** Comma-separated model IDs for OpenRouter. */
+  openrouterModelIds?: string;
+};
 export const MAX_AGENT_STEPS = 10;
 export const TERMINAL_BUFFER_LINES = 300;
 

@@ -26,12 +26,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MODELS,
   PROVIDERS,
+  providerNeedsKey,
   type ModelId,
   type ModelInfo,
   type ProviderId,
   getModel,
 } from "../config";
 import { useChatStore } from "../store/chatStore";
+import { useProvidersStore } from "../store/providersStore";
+import { makeModelRef, parseModelRef } from "../lib/modelRef";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 
 const PROVIDER_ICON: Record<ProviderId, typeof ChatGptIcon> = {
@@ -268,6 +271,8 @@ function ModelRow({
 
 type Tab = "all" | "favorites" | "recent";
 
+type ExpandedModel = ModelInfo & { instanceId: string | null; instanceName: string | null };
+
 export function ModelPicker() {
   const selected = useChatStore((s) => s.selectedModelId);
   const apiKeys = useChatStore((s) => s.apiKeys);
@@ -275,6 +280,9 @@ export function ModelPicker() {
   const favorites = useChatStore((s) => s.favoriteModelIds);
   const recents = useChatStore((s) => s.recentModelIds);
   const toggleFavorite = useChatStore((s) => s.toggleFavoriteModel);
+
+  const instances = useProvidersStore((s) => s.instances);
+  const instanceKeys = useProvidersStore((s) => s.instanceKeys);
 
   const onlyConfigured = usePreferencesStore((s) => s.aiModelPickerOnlyConfigured);
 
@@ -285,8 +293,19 @@ export function ModelPicker() {
 
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const current = getModel(selected);
-  const hasKey = !!apiKeys[current.provider];
+  // Determine if a provider has any configured instance with a key
+  const providerHasKeyFn = (providerId: ProviderId): boolean => {
+    if (!providerNeedsKey(providerId)) return true;
+    // Check new instance system first
+    const provInstances = instances.filter((i) => i.providerId === providerId);
+    if (provInstances.length > 0) return provInstances.some((i) => !!instanceKeys[i.id]);
+    // Fallback to old apiKeys
+    return !!apiKeys[providerId];
+  };
+
+  const { modelDefId: selectedModelDefId } = parseModelRef(selected);
+  const current = getModel(selectedModelDefId as ModelId);
+  const hasKey = providerHasKeyFn(current.provider);
 
   useEffect(() => {
     if (open) {
@@ -303,26 +322,41 @@ export function ModelPicker() {
     () => PROVIDERS.filter((p) => {
       const hasModels = MODELS.some((m) => m.provider === p.id);
       if (!hasModels) return false;
-      if (onlyConfigured && !apiKeys[p.id] && p.id !== "lmstudio" && p.id !== "mlx" && p.id !== "ollama") return false;
+      if (onlyConfigured && !providerHasKeyFn(p.id)) return false;
       return true;
     }),
-    [onlyConfigured, apiKeys],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onlyConfigured, apiKeys, instances, instanceKeys],
   );
 
-  const filtered = useMemo<ModelInfo[]>(() => {
-    let list: readonly ModelInfo[] = onlyConfigured
-      ? MODELS.filter((m) => {
-          const p = m.provider as ProviderId;
-          return !!apiKeys[p] || p === "lmstudio" || p === "mlx" || p === "ollama";
-        })
-      : MODELS;
+  // Expand models to include per-instance entries when multiple instances exist.
+  const expandedModels = useMemo<ExpandedModel[]>(() => {
+    const out: ExpandedModel[] = [];
+    for (const m of MODELS as readonly ModelInfo[]) {
+      const provInstances = instances.filter((i) => i.providerId === m.provider);
+      if (provInstances.length > 1) {
+        for (const inst of provInstances) {
+          out.push({ ...m, instanceId: inst.id, instanceName: inst.name });
+        }
+      } else {
+        out.push({ ...m, instanceId: provInstances[0]?.id ?? null, instanceName: null });
+      }
+    }
+    return out;
+  }, [instances]);
+
+  const filtered = useMemo<ExpandedModel[]>(() => {
+    let list = onlyConfigured
+      ? expandedModels.filter((m) => providerHasKeyFn(m.provider as ProviderId))
+      : expandedModels;
 
     if (tab === "favorites") {
       list = list.filter((m) => favorites.includes(m.id));
     } else if (tab === "recent") {
-      const ordered: ModelInfo[] = [];
-      for (const id of recents) {
-        const found = (MODELS as readonly ModelInfo[]).find((m) => m.id === id);
+      const ordered: ExpandedModel[] = [];
+      for (const ref of recents) {
+        const { modelDefId } = parseModelRef(ref);
+        const found = list.find((m) => m.id === modelDefId);
         if (found) ordered.push(found);
       }
       list = ordered;
@@ -339,20 +373,23 @@ export function ModelPicker() {
           m.label.toLowerCase().includes(q) ||
           m.hint.toLowerCase().includes(q) ||
           m.provider.toLowerCase().includes(q) ||
+          (m.instanceName ?? "").toLowerCase().includes(q) ||
           m.tags?.some((t) => t.includes(q)),
       );
     }
 
-    return list as ModelInfo[];
-  }, [tab, activeProvider, search, favorites, recents, onlyConfigured, apiKeys]);
+    return list;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, activeProvider, search, favorites, recents, onlyConfigured, apiKeys, expandedModels, instances, instanceKeys]);
 
-  const onPick = (id: string, provider: ProviderId) => {
-    if (!apiKeys[provider]) {
-      void openSettingsWindow("models");
+  const onPick = (m: ExpandedModel) => {
+    if (!providerHasKeyFn(m.provider as ProviderId)) {
+      void openSettingsWindow("ai");
       setOpen(false);
       return;
     }
-    setSelected(id as ModelId);
+    const ref = makeModelRef(m.id, m.instanceId ?? undefined);
+    setSelected(ref as ModelId);
     setOpen(false);
   };
 
@@ -401,7 +438,7 @@ export function ModelPicker() {
             onKeyDown={(e) => {
               if (e.key === "Escape") setOpen(false);
               if (e.key === "Enter" && filtered.length === 1) {
-                onPick(filtered[0].id, filtered[0].provider as ProviderId);
+                onPick(filtered[0]);
               }
             }}
             placeholder="Search models, providers, capabilities…"
@@ -472,7 +509,7 @@ export function ModelPicker() {
                 onClick={() =>
                   setActiveProvider(activeProvider === p.id ? null : p.id)
                 }
-                hasKey={!!apiKeys[p.id]}
+                hasKey={providerHasKeyFn(p.id)}
               />
             ))}
           </div>
@@ -496,22 +533,34 @@ export function ModelPicker() {
                 )}
               </div>
             ) : (
-              filtered.map((m, i) => (
-                <ModelRow
-                  key={m.id}
-                  model={m}
-                  index={i}
-                  selected={m.id === selected}
-                  hasKey={!!apiKeys[m.provider as ProviderId]}
-                  isFavorite={favorites.includes(m.id)}
-                  providerIcon={PROVIDER_ICON[m.provider as ProviderId] ?? ComputerIcon}
-                  onSelect={() => onPick(m.id, m.provider as ProviderId)}
-                  onToggleFavorite={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(m.id);
-                  }}
-                />
-              ))
+              filtered.map((m, i) => {
+                const ref = makeModelRef(m.id, m.instanceId ?? undefined);
+                const isSelected = selected === ref || (m.instanceName === null && selected === m.id);
+                return (
+                  <div key={`${m.id}-${m.instanceId ?? "single"}`}>
+                    {m.instanceName && (
+                      <div className="px-3 pb-0.5 pt-2 first:pt-1">
+                        <span className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[9.5px] text-muted-foreground">
+                          {m.instanceName}
+                        </span>
+                      </div>
+                    )}
+                    <ModelRow
+                      model={m}
+                      index={i}
+                      selected={isSelected}
+                      hasKey={m.instanceId ? !!instanceKeys[m.instanceId] : providerHasKeyFn(m.provider as ProviderId)}
+                      isFavorite={favorites.includes(m.id)}
+                      providerIcon={PROVIDER_ICON[m.provider as ProviderId] ?? ComputerIcon}
+                      onSelect={() => onPick(m)}
+                      onToggleFavorite={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(m.id);
+                      }}
+                    />
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

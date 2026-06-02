@@ -17,8 +17,10 @@ import {
   selectSystemPrompt,
   type ModelId,
   type ProviderId,
+  type ProviderInstance,
 } from "../config";
 import type { ProviderKeys } from "./keyring";
+import { parseModelRef, resolveInstance } from "./modelRef";
 import { buildTools, type ToolContext } from "../tools/tools";
 
 export type AgentUsageDelta = {
@@ -32,7 +34,12 @@ export type AgentUsageDelta = {
 
 type AgentDeps = {
   keys: ProviderKeys;
-  modelId?: ModelId;
+  /** Provider instances from the new multi-instance system. When provided,
+   *  modelRef is resolved against instances to find the right key/config. */
+  instances?: ProviderInstance[];
+  instanceKeys?: Record<string, string | null>;
+  /** Model reference: "modelDefId" or "modelDefId@instanceId". */
+  modelId?: ModelId | string;
   customInstructions?: string;
   /** Persona / role for this conversation (system prompt addendum). */
   agentPersona?: { name: string; instructions: string } | null;
@@ -238,7 +245,129 @@ type BuildModelExtras = {
   ollamaChatModelId?: string;
 };
 
+/** Build a language model from a ProviderInstance + pre-fetched key. */
+export async function buildLanguageModelFromInstance(
+  instance: ProviderInstance,
+  key: string | null,
+  resolvedModelId: string,
+): Promise<LanguageModel> {
+  const { providerId } = instance;
+  const baseURL = instance.baseUrl;
+  const cacheKey = [providerId, instance.id, key ?? "", resolvedModelId, baseURL ?? ""].join(" ");
+  const hit = modelCache.get(cacheKey);
+  if (hit) return hit;
+
+  let built: LanguageModel;
+  switch (providerId) {
+    case "openai": {
+      const { createOpenAI } = await import("@ai-sdk/openai");
+      built = createOpenAI({ apiKey: key ?? "" })(resolvedModelId);
+      break;
+    }
+    case "anthropic": {
+      const { createAnthropic } = await import("@ai-sdk/anthropic");
+      built = createAnthropic({ apiKey: key ?? "" })(resolvedModelId);
+      break;
+    }
+    case "google": {
+      const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
+      built = createGoogleGenerativeAI({ apiKey: key ?? "" })(resolvedModelId);
+      break;
+    }
+    case "xai": {
+      const { createXai } = await import("@ai-sdk/xai");
+      built = createXai({ apiKey: key ?? "" })(resolvedModelId);
+      break;
+    }
+    case "cerebras": {
+      const { createCerebras } = await import("@ai-sdk/cerebras");
+      built = createCerebras({ apiKey: key ?? "" })(resolvedModelId);
+      break;
+    }
+    case "groq": {
+      const { createGroq } = await import("@ai-sdk/groq");
+      built = createGroq({ apiKey: key ?? "" })(resolvedModelId);
+      break;
+    }
+    case "lmstudio": {
+      const { createOpenAICompatible } = await import("@ai-sdk/openai-compatible");
+      built = createOpenAICompatible({ name: "lmstudio", baseURL: baseURL ?? LMSTUDIO_DEFAULT_BASE_URL })(resolvedModelId);
+      break;
+    }
+    case "openai-compatible": {
+      const { createOpenAICompatible } = await import("@ai-sdk/openai-compatible");
+      built = createOpenAICompatible({
+        name: "openai-compatible",
+        baseURL: baseURL ?? OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
+        ...(key ? { apiKey: key } : {}),
+      })(resolvedModelId);
+      break;
+    }
+    case "deepseek": {
+      const { createDeepSeek } = await import("@ai-sdk/deepseek");
+      built = createDeepSeek({ apiKey: key ?? "" })(resolvedModelId);
+      break;
+    }
+    case "mistral": {
+      const { createMistral } = await import("@ai-sdk/mistral");
+      built = createMistral({ apiKey: key ?? "" })(resolvedModelId);
+      break;
+    }
+    case "openrouter": {
+      const { createOpenRouter } = await import("@openrouter/ai-sdk-provider");
+      built = createOpenRouter({ apiKey: key ?? "" })(resolvedModelId);
+      break;
+    }
+    case "mlx": {
+      const { createOpenAICompatible: createMlx } = await import("@ai-sdk/openai-compatible");
+      built = createMlx({ name: "mlx", baseURL: baseURL ?? MLX_DEFAULT_BASE_URL })(resolvedModelId);
+      break;
+    }
+    case "ollama": {
+      const { createOpenAICompatible: createOllama } = await import("@ai-sdk/openai-compatible");
+      built = createOllama({ name: "ollama", baseURL: baseURL ?? OLLAMA_DEFAULT_BASE_URL })(resolvedModelId);
+      break;
+    }
+    default: {
+      const _exhaustive: never = providerId;
+      throw new Error(`Unsupported provider: ${_exhaustive as ProviderId}`);
+    }
+  }
+  modelCache.set(cacheKey, built);
+  return built;
+}
+
 function buildModel(
+  modelId: ModelId | string,
+  keys: ProviderKeys,
+  extras: BuildModelExtras = {},
+  instances?: ProviderInstance[],
+  instanceKeys?: Record<string, string | null>,
+): Promise<LanguageModel> {
+  // New path: resolve via provider instances
+  if (instances && instanceKeys) {
+    const { modelDefId, instanceId } = parseModelRef(modelId);
+    const baseModelId = modelDefId as ModelId;
+    const m = getModel(baseModelId);
+    const instance = resolveInstance(m.provider, instanceId, instances);
+    if (instance) {
+      const key = providerNeedsKey(m.provider) ? (instanceKeys[instance.id] ?? null) : null;
+      let resolvedModelId: string = m.id;
+      if (m.provider === "lmstudio" || m.provider === "mlx" || m.provider === "ollama" || m.provider === "openai-compatible") {
+        if (!instance.localModelId?.trim()) {
+          throw new Error(`No model ID configured for ${instance.name}. Open Settings → AI → Providers.`);
+        }
+        resolvedModelId = instance.localModelId;
+      }
+      return buildLanguageModelFromInstance(instance, key, resolvedModelId);
+    }
+    // Fall through to legacy path if no instance found
+    return buildModelLegacy(baseModelId, keys, extras);
+  }
+  return buildModelLegacy(modelId as ModelId, keys, extras);
+}
+
+function buildModelLegacy(
   modelId: ModelId,
   keys: ProviderKeys,
   extras: BuildModelExtras = {},
@@ -247,22 +376,22 @@ function buildModel(
   let resolvedModelId = m.id;
   if (m.provider === "lmstudio") {
     if (!extras.lmstudioChatModelId?.trim()) {
-      throw new Error("No LM Studio model ID configured. Open Settings → Models.");
+      throw new Error("No LM Studio model ID configured. Open Settings → AI → Providers.");
     }
     resolvedModelId = extras.lmstudioChatModelId;
   } else if (m.provider === "openai-compatible") {
     if (!extras.openaiCompatibleModelId?.trim()) {
-      throw new Error("No model ID configured for Custom Endpoint. Open Settings → Models.");
+      throw new Error("No model ID configured for Custom Endpoint. Open Settings → AI → Providers.");
     }
     resolvedModelId = extras.openaiCompatibleModelId;
   } else if (m.provider === "mlx") {
     if (!extras.mlxChatModelId?.trim()) {
-      throw new Error("No MLX model ID configured. Open Settings → Models.");
+      throw new Error("No MLX model ID configured. Open Settings → AI → Providers.");
     }
     resolvedModelId = extras.mlxChatModelId;
   } else if (m.provider === "ollama") {
     if (!extras.ollamaChatModelId?.trim()) {
-      throw new Error("No Ollama model ID configured. Open Settings → Models.");
+      throw new Error("No Ollama model ID configured. Open Settings → AI → Providers.");
     }
     resolvedModelId = extras.ollamaChatModelId;
   }
@@ -276,6 +405,8 @@ function buildModel(
 
 export async function createNexumAgent({
   keys,
+  instances,
+  instanceKeys,
   modelId = DEFAULT_MODEL_ID,
   customInstructions,
   agentPersona,
@@ -310,7 +441,8 @@ export async function createNexumAgent({
   const planBlock = planMode
     ? `\n\n## PLAN MODE — ACTIVE\nMutating tools (write_file, edit, multi_edit, create_directory) will queue their changes for the user to review as a single diff. Do NOT execute bash_run or bash_background while plan mode is active — restrict yourself to reads (read_file, grep, glob, list_directory) and the queued mutations. After queueing the full set of edits, stop and return a brief summary; do not continue acting until the user has accepted/rejected.`
     : "";
-  const basePrompt = selectSystemPrompt(modelId);
+  const { modelDefId } = parseModelRef(modelId);
+  const basePrompt = selectSystemPrompt(modelDefId);
   const instructions = `${basePrompt}${memoryBlock}${personaBlock}${customBlock}${planBlock}`;
   const baseModel = await buildModel(modelId, keys, {
     lmstudioBaseURL,
@@ -321,7 +453,7 @@ export async function createNexumAgent({
     mlxChatModelId,
     ollamaBaseURL,
     ollamaChatModelId,
-  });
+  }, instances, instanceKeys);
   const model =
     temperature !== undefined &&
     typeof (baseModel as unknown as { withSettings?: unknown }).withSettings === "function"
@@ -330,7 +462,7 @@ export async function createNexumAgent({
   const steps = maxAgentSteps ?? MAX_AGENT_STEPS;
 
   // Apply Anthropic prompt-caching breakpoint on system message.
-  const m = getModel(modelId);
+  const m = getModel(modelDefId as ModelId);
   const isAnthropic = m.provider === "anthropic";
   const providerOptions = isAnthropic
     ? { anthropic: { cacheControl: { type: "ephemeral" as const } } }

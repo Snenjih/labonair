@@ -11,6 +11,7 @@ import {
   type ModelId,
   type ProviderId,
 } from "../config";
+import { useProvidersStore } from "./providersStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { BUILTIN_AGENTS } from "../lib/agents";
 import { useAgentsStore } from "./agentsStore";
@@ -253,6 +254,8 @@ function makeChat(sessionId: string): Chat<UIMessage> {
 
   const transport = createContextAwareTransport({
     getKeys: () => useChatStore.getState().apiKeys,
+    getInstances: () => useProvidersStore.getState().instances,
+    getInstanceKeys: () => useProvidersStore.getState().instanceKeys,
     toolContext,
     getModelId: () => useChatStore.getState().selectedModelId,
     getCustomInstructions: () =>

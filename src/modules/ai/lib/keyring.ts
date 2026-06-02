@@ -88,3 +88,63 @@ export async function getAllKeys(): Promise<ProviderKeys> {
 export function hasAnyKey(keys: ProviderKeys): boolean {
   return PROVIDERS.some((p) => providerNeedsKey(p.id) && !!keys[p.id]);
 }
+
+// ── Per-instance key functions ─────────────────────────────────────────────────
+// Instance keys are stored with account = "inst-${instanceId}"
+
+export async function getInstanceKey(instanceId: string): Promise<string | null> {
+  try {
+    const v = await invoke<string | null>("secrets_get", {
+      service: KEYRING_SERVICE,
+      account: `inst-${instanceId}`,
+    });
+    return v && v.length > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setInstanceKey(instanceId: string, key: string): Promise<void> {
+  const trimmed = key.trim();
+  if (!trimmed) throw new Error("API key is empty");
+  await invoke("secrets_set", {
+    service: KEYRING_SERVICE,
+    account: `inst-${instanceId}`,
+    password: trimmed,
+  });
+}
+
+export async function clearInstanceKey(instanceId: string): Promise<void> {
+  try {
+    await invoke("secrets_delete", {
+      service: KEYRING_SERVICE,
+      account: `inst-${instanceId}`,
+    });
+  } catch {
+    // already absent — fine
+  }
+}
+
+export async function getAllInstanceKeys(
+  instanceIds: string[],
+): Promise<Record<string, string | null>> {
+  if (instanceIds.length === 0) return {};
+  try {
+    const accounts = instanceIds.map((id) => `inst-${id}`);
+    const results = await invoke<(string | null)[]>("secrets_get_all", {
+      service: KEYRING_SERVICE,
+      accounts,
+    });
+    const out: Record<string, string | null> = {};
+    instanceIds.forEach((id, i) => {
+      const v = results[i];
+      out[id] = v && v.length > 0 ? v : null;
+    });
+    return out;
+  } catch {
+    const entries = await Promise.all(
+      instanceIds.map(async (id) => [id, await getInstanceKey(id)] as const),
+    );
+    return Object.fromEntries(entries);
+  }
+}
