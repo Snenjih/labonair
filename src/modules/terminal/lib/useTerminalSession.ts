@@ -2,6 +2,8 @@ import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
+import { ImageAddon } from "@xterm/addon-image";
+import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -103,7 +105,7 @@ export function useTerminalSession({
           | undefined;
       }
       if (state.terminalRightClickPastes !== prev.terminalRightClickPastes) {
-        term.options.rightClickSelectsWord = !state.terminalRightClickPastes;
+        term.options.rightClickSelectsWord = state.terminalRightClickPastes;
       }
       if (state.terminalWordSeparator !== prev.terminalWordSeparator) {
         term.options.wordSeparator = state.terminalWordSeparator;
@@ -158,7 +160,7 @@ export function useTerminalSession({
           | "900"
           | undefined,
         allowProposedApi: true,
-        rightClickSelectsWord: !prefs.terminalRightClickPastes,
+        rightClickSelectsWord: prefs.terminalRightClickPastes,
         wordSeparator: prefs.terminalWordSeparator,
         scrollSensitivity: prefs.terminalScrollSensitivity,
         // fastScrollModifier is a runtime option in xterm v6 but not in public types
@@ -168,6 +170,12 @@ export function useTerminalSession({
               ? undefined
               : prefs.terminalFastScrollModifier,
         } as Record<string, unknown>),
+        // OSC 8 hyperlinks — open in the system browser, not the Tauri webview
+        linkHandler: {
+          activate: (_e: MouseEvent, uri: string) => {
+            openUrl(uri).catch(console.error);
+          },
+        },
       });
       termRef.current = term;
 
@@ -203,9 +211,12 @@ export function useTerminalSession({
       term.loadAddon(
         new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)),
       );
+      term.loadAddon(new ImageAddon({ storageLimit: 32 }));
 
       term.open(container.current);
       fit.fit();
+      // LigaturesAddon measures font metrics and must be loaded after open()
+      term.loadAddon(new LigaturesAddon());
 
       if (prefs.terminalUseWebGL) {
         try {
@@ -380,13 +391,17 @@ export function useTerminalSession({
     return sel.length > 0 ? sel : null;
   }, []);
 
+  const clear = useCallback(() => {
+    termRef.current?.clear();
+  }, []);
+
   const applyTheme = useCallback(() => {
     const term = termRef.current;
     if (!term) return;
     term.options.theme = buildTerminalTheme();
   }, []);
 
-  return { write, focus, getBuffer, getSelection, applyTheme };
+  return { write, focus, getBuffer, getSelection, clear, applyTheme };
 }
 
 function stripTrailingPunct(url: string): string {

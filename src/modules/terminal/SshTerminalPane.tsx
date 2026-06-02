@@ -7,6 +7,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
+import { ImageAddon } from "@xterm/addon-image";
+import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -22,6 +24,14 @@ import {
   useState,
 } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { useChatStore } from "@/modules/ai/store/chatStore";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { dropPaths } from "./lib/drop-paths";
@@ -70,6 +80,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const [hasError, setHasError] = useState(false);
     const [isDisconnected, setIsDisconnected] = useState(false);
     const [disconnectReason, setDisconnectReason] = useState("");
+    const rightClickPastes = usePreferencesStore((s) => s.terminalRightClickPastes);
+    const [hasSelection, setHasSelection] = useState(false);
     const [sudoPopup, setSudoPopup] = useState<{ x: number; y: number } | null>(null);
     // Real terminal dimensions measured from the actual container element before
     // the SSH connection starts. Avoids the off-by-1-3-column mismatch that the
@@ -163,6 +175,11 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       invoke("ssh_pty_write", { sessionId, data: pw + "\n" }).catch(console.error);
     }, [sessionId]);
 
+    const getSelection = useCallback(
+      () => termRef.current?.getSelection() ?? null,
+      [],
+    );
+
     useImperativeHandle(ref, () => ({
       write: (data: string) => {
         termRef.current?.write(data);
@@ -181,8 +198,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         }
         return lines.join("\n");
       },
-      getSelection: () => termRef.current?.getSelection() ?? null,
-    }), []);
+      getSelection,
+    }), [getSelection]);
 
     // Explorer drag-to-terminal (pointer events, WKWebView-safe)
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -250,7 +267,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             | "500" | "600" | "700" | "800" | "900" | undefined;
         }
         if (state.terminalRightClickPastes !== prev.terminalRightClickPastes) {
-          term.options.rightClickSelectsWord = !state.terminalRightClickPastes;
+          term.options.rightClickSelectsWord = state.terminalRightClickPastes;
         }
         if (state.terminalWordSeparator !== prev.terminalWordSeparator) {
           term.options.wordSeparator = state.terminalWordSeparator;
@@ -353,7 +370,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             | "normal" | "bold" | "100" | "200" | "300" | "400"
             | "500" | "600" | "700" | "800" | "900" | undefined,
           allowProposedApi: true,
-          rightClickSelectsWord: !prefs.terminalRightClickPastes,
+          rightClickSelectsWord: prefs.terminalRightClickPastes,
           wordSeparator: prefs.terminalWordSeparator,
           scrollSensitivity: prefs.terminalScrollSensitivity,
           // fastScrollModifier is a runtime option in xterm v6 but not in public types
@@ -363,6 +380,12 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
                 ? undefined
                 : prefs.terminalFastScrollModifier,
           } as Record<string, unknown>),
+          // OSC 8 hyperlinks — open in the system browser, not the Tauri webview
+          linkHandler: {
+            activate: (_e: MouseEvent, uri: string) => {
+              openUrl(uri).catch((e) => handleApiError(e, "Failed to open URL", "SSH"));
+            },
+          },
         });
         // copyOnSelect: not a built-in option in xterm v6 — implement via selection event
         t.onSelectionChange(() => {
@@ -396,8 +419,11 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         searchRef.current = search;
         t.loadAddon(search);
         t.loadAddon(new WebLinksAddon((_e, uri) => openUrl(uri).catch((e) => handleApiError(e, "Failed to open URL", "SSH"))));
+        t.loadAddon(new ImageAddon({ storageLimit: 32 }));
         t.open(containerRef.current);
         fit.fit();
+        // LigaturesAddon measures font metrics and must be loaded after open()
+        t.loadAddon(new LigaturesAddon());
         // estCols/estRows are rough pixel estimates; send the real dimensions
         // immediately so TUI apps (claude, vim, htop, …) get the correct size.
         invoke("ssh_pty_resize", {
@@ -531,7 +557,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       if (isActive && tabVisible) term?.focus();
     }, [isActive, isConnected, tabVisible, sessionId]);
 
-    return (
+    const paneContent = (
       <div ref={wrapperRef} className="relative h-full w-full">
         {/* Container is always mounted so the ResizeObserver can measure real
             dimensions once the pane slot becomes visible. Hidden behind the
@@ -581,6 +607,51 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           )}
         </AnimatePresence>
       </div>
+    );
+
+    if (rightClickPastes) return paneContent;
+
+    return (
+      <ContextMenu onOpenChange={(open) => { if (open) setHasSelection(!!getSelection()); }}>
+        <ContextMenuTrigger asChild>{paneContent}</ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem
+            disabled={!hasSelection}
+            onSelect={() => {
+              const sel = getSelection() ?? "";
+              void navigator.clipboard.writeText(sel).catch(() => undefined);
+            }}
+          >
+            Copy
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() => {
+              void navigator.clipboard.readText()
+                .then((t) => invoke("ssh_pty_write", { sessionId, data: t }).catch(console.error))
+                .catch(console.error);
+            }}
+          >
+            Paste
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() =>
+              invoke("ssh_pty_write", { sessionId, data: "clear\n" }).catch(console.error)
+            }
+          >
+            Clear
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            disabled={!hasSelection}
+            onSelect={() => {
+              const sel = getSelection() ?? "";
+              useChatStore.getState().attachSelection(sel, "terminal");
+            }}
+          >
+            Ask AI about Selection
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   },
 );

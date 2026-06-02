@@ -1,11 +1,21 @@
 import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useChatStore } from "@/modules/ai/store/chatStore";
 import { useTheme } from "@/modules/theme";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import type { SearchAddon } from "@xterm/addon-search";
 import {
   forwardRef,
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from "react";
 import { dropPaths } from "./lib/drop-paths";
 import { useTerminalSession } from "./lib/useTerminalSession";
@@ -92,7 +102,10 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       [session],
     );
 
-    return (
+    const rightClickPastes = usePreferencesStore((s) => s.terminalRightClickPastes);
+    const [hasSelection, setHasSelection] = useState(false);
+
+    const inner = (
       <div
         ref={containerRef}
         className="h-full w-full"
@@ -101,6 +114,47 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
           pointerEvents: visible ? "auto" : "none",
         }}
       />
+    );
+
+    if (rightClickPastes) return inner;
+
+    return (
+      <ContextMenu onOpenChange={(open) => { if (open) setHasSelection(!!session.getSelection()); }}>
+        <ContextMenuTrigger asChild>{inner}</ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem
+            disabled={!hasSelection}
+            onSelect={() => {
+              const sel = session.getSelection() ?? "";
+              void navigator.clipboard.writeText(sel).catch(() => undefined);
+            }}
+          >
+            Copy
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() => {
+              void navigator.clipboard.readText()
+                .then((t) => session.write(t))
+                .catch(() => undefined);
+            }}
+          >
+            Paste
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => session.clear()}>
+            Clear
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            disabled={!hasSelection}
+            onSelect={() => {
+              const sel = session.getSelection() ?? "";
+              useChatStore.getState().attachSelection(sel, "terminal");
+            }}
+          >
+            Ask AI about Selection
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   },
 );
