@@ -1270,6 +1270,7 @@ export async function onPreferencesChange(
     [KEY_BG_BLUR]: "backgroundBlur",
 
     [KEY_TERMINAL_SHELL]: "terminalShell",
+    [KEY_TERMINAL_DEFAULT_PATH]: "terminalDefaultPath",
     [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
     [KEY_TERMINAL_CURSOR_BLINK_INTERVAL]: "terminalCursorBlinkInterval",
     [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
