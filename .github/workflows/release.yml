@@ -35,8 +35,8 @@ jobs:
           - platform: macos-latest
             rust-target: aarch64-apple-darwin
             args: "--target aarch64-apple-darwin"
-          # Intel — native x86_64 runner
-          - platform: macos-13
+          # Intel — cross-compiled on ARM runner
+          - platform: macos-latest
             rust-target: x86_64-apple-darwin
             args: "--target x86_64-apple-darwin"
           - platform: ubuntu-22.04
