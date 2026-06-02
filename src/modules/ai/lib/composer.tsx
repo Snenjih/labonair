@@ -17,11 +17,13 @@ import { useDirectivesStore } from "../store/directivesStore";
 export type FileAttachment = {
   id: string;
   name: string;
-  kind: "image" | "text" | "selection";
+  kind: "image" | "text" | "selection" | "ref";
   mediaType: string;
   url?: string;
   text?: string;
   size: number;
+  /** Absolute path — only set for kind === "ref". */
+  path?: string;
   /** For kind === "selection": which surface it came from. */
   source?: "terminal" | "editor";
 };
@@ -44,6 +46,8 @@ type ComposerCtx = {
   addFiles: (list: FileList | null) => Promise<void>;
   /** Attach a file by absolute path — used by the file explorer's "Attach to Agent". */
   attachFileByPath: (path: string) => Promise<void>;
+  /** Add a file reference chip (no content read — agent will read_file itself). */
+  addFileRef: (path: string) => void;
   removeFile: (id: string) => void;
   pickedDirectives: Directive[];
   addDirective: (d: Directive) => void;
@@ -212,6 +216,19 @@ export function AiComposerProvider({ children }: ProviderProps) {
     }
   };
 
+  const addFileRef = (path: string) => {
+    const name = path.split("/").pop() || path;
+    const id = `ref-${path}`;
+    setFiles((prev) => {
+      if (prev.some((f) => f.id === id)) return prev;
+      return [
+        ...prev,
+        { id, name, kind: "ref", mediaType: "text/plain", path, size: 0 },
+      ];
+    });
+    useChatStore.getState().focusInput();
+  };
+
   const submit = () => {
     if (isBusy) return;
     const trimmed = value.trim();
@@ -255,6 +272,9 @@ export function AiComposerProvider({ children }: ProviderProps) {
         (f) =>
           `<file name="${f.name}" mediaType="${f.mediaType}">\n${f.text ?? ""}\n</file>`,
       );
+    const refBlocks = files
+      .filter((f) => f.kind === "ref")
+      .map((f) => `<file-ref name="${f.name}" path="${f.path ?? f.name}" />`);
     const selectionBlocks = files
       .filter((f) => f.kind === "selection")
       .map(
@@ -285,6 +305,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
       allDirectiveBlocks.join("\n\n"),
       selectionBlocks.join("\n\n"),
       fileBlocks.join("\n\n"),
+      refBlocks.join("\n"),
       bodyAfterTokens,
     ]
       .filter(Boolean)
@@ -332,6 +353,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
     files,
     addFiles,
     attachFileByPath,
+    addFileRef,
     removeFile,
     pickedDirectives,
     addDirective,

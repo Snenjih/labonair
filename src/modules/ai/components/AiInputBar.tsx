@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { useLocalExplorerStore } from "@/modules/explorer/lib/useLocalExplorerStore";
 import {
   ArrowUpIcon,
   Cancel01Icon,
@@ -12,14 +13,16 @@ import {
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useComposer, type FileAttachment } from "../lib/composer";
 import { SLASH_COMMANDS } from "../lib/slashCommands";
 import type { Directive } from "../lib/directives";
 import { useDirectivesStore } from "../store/directivesStore";
 import { AgentSwitcher } from "./AgentSwitcher";
 import { DirectivePickerContent, type PickerItem } from "./DirectivePicker";
+import { FilePickerContent, type FileSearchHit } from "./FilePicker";
 
 type DirectiveTrigger = {
   start: number;
@@ -46,12 +49,36 @@ function detectDirectiveTrigger(
   return null;
 }
 
+type FileTrigger = { start: number; end: number; query: string };
+
+function detectFileTrigger(value: string, caret: number): FileTrigger | null {
+  for (let i = caret - 1; i >= 0; i--) {
+    const ch = value[i];
+    if (ch === "@") {
+      const prev = i === 0 ? " " : value[i - 1];
+      if (!/\s/.test(prev)) return null;
+      const slice = value.slice(i + 1, caret);
+      if (/\s/.test(slice)) return null;
+      return { start: i, end: caret, query: slice };
+    }
+    if (/\s/.test(ch)) return null;
+  }
+  return null;
+}
+
 export function AiInputBar() {
   const c = useComposer();
   const directives = useDirectivesStore((s) => s.directives);
+  const explorerRoot = useLocalExplorerStore((s) => s.rootPath);
 
   const [trigger, setTrigger] = useState<DirectiveTrigger | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+
+  const [fileTrigger, setFileTrigger] = useState<FileTrigger | null>(null);
+  const [fileHits, setFileHits] = useState<FileSearchHit[]>([]);
+  const [fileLoading, setFileLoading] = useState(false);
+  const [fileActiveIndex, setFileActiveIndex] = useState(0);
+  const fileDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     autoresize(c.textareaRef.current);
@@ -61,10 +88,52 @@ export function AiInputBar() {
     const el = c.textareaRef.current;
     if (!el) {
       setTrigger(null);
+      setFileTrigger(null);
       return;
     }
-    setTrigger(detectDirectiveTrigger(c.value, el.selectionStart ?? 0));
+    const caret = el.selectionStart ?? 0;
+    const newDirective = detectDirectiveTrigger(c.value, caret);
+    const newFile = newDirective ? null : detectFileTrigger(c.value, caret);
+    setTrigger(newDirective);
+    setFileTrigger((prev) => {
+      if (prev?.query !== newFile?.query) setFileActiveIndex(0);
+      return newFile;
+    });
   };
+
+  useEffect(() => {
+    if (fileDebounceRef.current) clearTimeout(fileDebounceRef.current);
+    if (!fileTrigger || !fileTrigger.query) {
+      setFileHits([]);
+      setFileLoading(false);
+      return;
+    }
+    const root = explorerRoot;
+    if (!root) {
+      setFileHits([]);
+      setFileLoading(false);
+      return;
+    }
+    setFileLoading(true);
+    fileDebounceRef.current = setTimeout(async () => {
+      try {
+        const hits = await invoke<FileSearchHit[]>("fs_search", {
+          root,
+          query: fileTrigger.query,
+          limit: 20,
+          showHidden: false,
+        });
+        setFileHits(hits);
+      } catch {
+        setFileHits([]);
+      } finally {
+        setFileLoading(false);
+      }
+    }, 120);
+    return () => {
+      if (fileDebounceRef.current) clearTimeout(fileDebounceRef.current);
+    };
+  }, [fileTrigger?.query, explorerRoot]);
 
   useEffect(updateTrigger, [c.value, c.textareaRef]);
 
@@ -92,7 +161,36 @@ export function AiInputBar() {
     if (activeIndex >= filteredItems.length) setActiveIndex(0);
   }, [filteredItems.length, activeIndex]);
 
-  const pickerOpen = trigger !== null;
+  const pickerOpen = trigger !== null || fileTrigger !== null;
+
+  const onPickFile = (hit: FileSearchHit) => {
+    if (!fileTrigger) return;
+    const before = c.value.slice(0, fileTrigger.start);
+    const after = c.value.slice(fileTrigger.end);
+
+    if (hit.is_dir) {
+      const newQuery = `${hit.rel}/`;
+      c.setValue(`${before}@${newQuery}${after}`);
+      requestAnimationFrame(() => {
+        const el = c.textareaRef.current;
+        if (!el) return;
+        const pos = before.length + 1 + newQuery.length;
+        el.focus();
+        el.setSelectionRange(pos, pos);
+      });
+      return;
+    }
+
+    c.setValue(`${before}${after.replace(/^\s*/, " ").trimEnd() || ""}`);
+    setFileTrigger(null);
+    setFileActiveIndex(0);
+    c.addFileRef(hit.path);
+    requestAnimationFrame(() => {
+      const el = c.textareaRef.current;
+      if (!el) return;
+      el.setSelectionRange(before.length, before.length);
+    });
+  };
 
   const onPickItem = (item: PickerItem) => {
     if (!trigger) return;
@@ -165,7 +263,33 @@ export function AiInputBar() {
                 onClick={updateTrigger}
                 onSelect={updateTrigger}
                 onKeyDown={(e) => {
-                  if (pickerOpen) {
+                  if (fileTrigger !== null) {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setFileActiveIndex((i) =>
+                        Math.min(i + 1, Math.max(0, fileHits.length - 1)),
+                      );
+                      return;
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setFileActiveIndex((i) => Math.max(0, i - 1));
+                      return;
+                    }
+                    if (e.key === "Tab" || e.key === "Enter") {
+                      const hit = fileHits[fileActiveIndex];
+                      if (hit) {
+                        e.preventDefault();
+                        onPickFile(hit);
+                        return;
+                      }
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setFileTrigger(null);
+                      return;
+                    }
+                  } else if (trigger !== null) {
                     if (e.key === "ArrowDown") {
                       e.preventDefault();
                       setActiveIndex((i) =>
@@ -196,7 +320,7 @@ export function AiInputBar() {
                     c.submit();
                   }
                 }}
-                placeholder="Ask Nexum anything   -   # for directives and commands"
+                placeholder="Ask Nexum anything   ·   @ files   ·   # directives"
                 rows={1}
                 disabled={c.isBusy}
                 className={cn(
@@ -230,12 +354,23 @@ export function AiInputBar() {
               )}
             </div>
           </PopoverAnchor>
-          <DirectivePickerContent
-            items={filteredItems}
-            activeIndex={activeIndex}
-            onPick={onPickItem}
-            onHover={setActiveIndex}
-          />
+          {fileTrigger !== null ? (
+            <FilePickerContent
+              hits={fileHits}
+              loading={fileLoading}
+              query={fileTrigger.query}
+              activeIndex={fileActiveIndex}
+              onPick={onPickFile}
+              onHover={setFileActiveIndex}
+            />
+          ) : (
+            <DirectivePickerContent
+              items={filteredItems}
+              activeIndex={activeIndex}
+              onPick={onPickItem}
+              onHover={setActiveIndex}
+            />
+          )}
         </Popover>
 
         <AnimatePresence initial={false}>
@@ -347,6 +482,7 @@ function ChipsRow({
             exit={{ opacity: 0, scale: 0.92 }}
             transition={{ duration: 0.12 }}
             className="group flex items-center gap-1 rounded-md border border-border/60 bg-card px-1.5 py-0.5 text-[11px]"
+            title={f.kind === "ref" ? f.path : undefined}
           >
             {f.kind === "image" && f.url ? (
               <img src={f.url} alt="" className="size-4 rounded object-cover" />
@@ -357,6 +493,8 @@ function ChipsRow({
                 strokeWidth={1.75}
                 className="text-muted-foreground"
               />
+            ) : f.kind === "ref" ? (
+              <span className="font-mono text-[10px] text-muted-foreground">@</span>
             ) : (
               <span className="font-mono text-[10px] text-muted-foreground">
                 {extOf(f.name)}
