@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
 
 type ScrollbackLive = {
@@ -18,7 +19,8 @@ export async function saveAllScrollbacks(sessionIds: string[]): Promise<void> {
     sessionIds.map(async (sessionId) => {
       const handle = refs.get(sessionId);
       if (!handle) return; // terminal not mounted yet
-      const ansi = handle.serialize();
+      const scrollbackLimit = usePreferencesStore.getState().sessionScrollbackLines;
+      const ansi = handle.serialize(scrollbackLimit > 0 ? scrollbackLimit : undefined);
       if (!ansi || ansi.trim().length === 0) return; // empty buffer
       if (ansi.length > 10 * 1024 * 1024) return; // oversized guard
       try {

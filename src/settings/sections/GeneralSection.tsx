@@ -17,6 +17,7 @@ import {
   setHostPingInterval,
   setRestoreWindowState,
   setSessionRestore,
+  setSessionScrollbackLines,
   setVimMode,
   setReduceMotion,
   setNewTabInheritsCwd,
@@ -95,6 +96,7 @@ export function GeneralSection() {
   const autostart = usePreferencesStore((s) => s.autostart);
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
   const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
+  const sessionScrollbackLines = usePreferencesStore((s) => s.sessionScrollbackLines);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
@@ -302,6 +304,29 @@ export function GeneralSection() {
               onCheckedChange={(v) => void setSessionRestore(v)}
             />
           </SettingRow>
+          {sessionRestore && (
+            <SettingRow
+              title="Scrollback history"
+              description="How many lines of terminal output to save and restore per session."
+            >
+              <Select
+                value={String(sessionScrollbackLines)}
+                onValueChange={(v) => void setSessionScrollbackLines(Number(v))}
+              >
+                <SelectTrigger className="h-7 w-36 text-[11.5px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="200">200 lines</SelectItem>
+                  <SelectItem value="500">500 lines</SelectItem>
+                  <SelectItem value="1000">1 000 lines</SelectItem>
+                  <SelectItem value="2000">2 000 lines</SelectItem>
+                  <SelectItem value="5000">5 000 lines</SelectItem>
+                  <SelectItem value="0">Full scrollback</SelectItem>
+                </SelectContent>
+              </Select>
+            </SettingRow>
+          )}
           <SettingRow
             title="Check for updates on launch"
             description="Show an update button in the titlebar when a new version is available."

@@ -62,6 +62,7 @@ export type Preferences = {
   vimMode: boolean;
   defaultStartupTab: "terminal" | "host-manager";
   sessionRestore: boolean;
+  sessionScrollbackLines: number;
 
   // --- App Appearance ---
   appTheme: string;
@@ -198,6 +199,7 @@ const KEY_OLLAMA_CHAT_MODEL_ID = "ollamaChatModelId";
 const KEY_VIM_MODE = "vimMode";
 const KEY_DEFAULT_STARTUP_TAB = "defaultStartupTab";
 const KEY_SESSION_RESTORE = "sessionRestore";
+const KEY_SESSION_SCROLLBACK_LINES = "sessionScrollbackLines";
 
 const KEY_APP_THEME = "appTheme";
 const KEY_APP_FONT_FAMILY = "appFontFamily";
@@ -308,6 +310,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   vimMode: false,
   defaultStartupTab: "host-manager",
   sessionRestore: false,
+  sessionScrollbackLines: 1000,
 
   appTheme: "default",
   appFontFamily: "system-ui",
@@ -468,6 +471,8 @@ export async function loadPreferences(): Promise<Preferences> {
       DEFAULT_PREFERENCES.defaultStartupTab,
     sessionRestore:
       get<boolean>(KEY_SESSION_RESTORE) ?? DEFAULT_PREFERENCES.sessionRestore,
+    sessionScrollbackLines:
+      get<number>(KEY_SESSION_SCROLLBACK_LINES) ?? DEFAULT_PREFERENCES.sessionScrollbackLines,
 
     appTheme: get<string>(KEY_APP_THEME) ?? DEFAULT_PREFERENCES.appTheme,
     appFontFamily:
@@ -798,6 +803,11 @@ export async function setDefaultStartupTab(
 
 export async function setSessionRestore(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_SESSION_RESTORE, value);
+  await (await getStore()).save();
+}
+
+export async function setSessionScrollbackLines(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SESSION_SCROLLBACK_LINES, value);
   await (await getStore()).save();
 }
 
@@ -1260,6 +1270,7 @@ export async function onPreferencesChange(
     [KEY_VIM_MODE]: "vimMode",
     [KEY_DEFAULT_STARTUP_TAB]: "defaultStartupTab",
     [KEY_SESSION_RESTORE]: "sessionRestore",
+    [KEY_SESSION_SCROLLBACK_LINES]: "sessionScrollbackLines",
 
     [KEY_APP_THEME]: "appTheme",
     [KEY_APP_FONT_FAMILY]: "appFontFamily",

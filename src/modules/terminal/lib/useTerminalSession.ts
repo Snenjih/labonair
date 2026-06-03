@@ -424,8 +424,10 @@ export function useTerminalSession({
     term.options.theme = buildTerminalTheme();
   }, []);
 
-  const serialize = useCallback((): string | null => {
-    return serializeRef.current?.serialize() ?? null;
+  const serialize = useCallback((scrollback?: number): string | null => {
+    const addon = serializeRef.current;
+    if (!addon) return null;
+    return scrollback && scrollback > 0 ? addon.serialize({ scrollback }) : addon.serialize();
   }, []);
 
   return { write, focus, getBuffer, getSelection, clear, applyTheme, serialize };

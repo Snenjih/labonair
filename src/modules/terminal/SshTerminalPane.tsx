@@ -201,7 +201,11 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         return lines.join("\n");
       },
       getSelection,
-      serialize: () => serializeRef.current?.serialize() ?? null,
+      serialize: (scrollback?: number) => {
+        const addon = serializeRef.current;
+        if (!addon) return null;
+        return scrollback && scrollback > 0 ? addon.serialize({ scrollback }) : addon.serialize();
+      },
     }), [getSelection]);
 
     // Explorer drag-to-terminal (pointer events, WKWebView-safe)
