@@ -63,6 +63,7 @@ function Bridge({
     chat,
   });
   const patch = useChatStore((s) => s.patchAgentMeta);
+  const runStatusRef = useRef<AgentRunStatus>("idle");
   const openMini = useChatStore((s) => s.openMini);
   const persistMessages = useChatStore((s) => s.persistMessages);
   const setApprovalResponder = useChatStore((s) => s.setApprovalResponder);
@@ -117,7 +118,26 @@ function Bridge({
         : {}),
       ...(runStatus === "idle" ? { error: null } : {}),
     });
-  }, [status, approvalsPending, patch]);
+
+    // Drain the message queue when the agent goes idle from a busy state.
+    // Error state intentionally does not drain — keeps messages queued for user.
+    const prevRunStatus = runStatusRef.current;
+    runStatusRef.current = runStatus;
+    const wasBusy =
+      prevRunStatus === "thinking" ||
+      prevRunStatus === "streaming" ||
+      prevRunStatus === "awaiting-approval";
+    if (runStatus === "idle" && wasBusy) {
+      const queued = useChatStore.getState().dequeueMessage(sessionId);
+      if (queued) {
+        const c = getOrCreateChat(sessionId);
+        void c.sendMessage({
+          role: "user",
+          parts: [{ type: "text", text: queued.text }],
+        } as Parameters<typeof c.sendMessage>[0]);
+      }
+    }
+  }, [status, approvalsPending, patch, sessionId]);
 
   useEffect(() => {
     if (approvalsPending > 0) openMini();

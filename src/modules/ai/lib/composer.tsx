@@ -58,6 +58,8 @@ type ComposerCtx = {
   isBusy: boolean;
   submit: () => void;
   stop: () => void;
+  enqueue: () => void;
+  queuedCount: number;
   voice: Voice;
   canSend: boolean;
 };
@@ -339,6 +341,22 @@ export function AiComposerProvider({ children }: ProviderProps) {
     void getOrCreateChat(sessionId).stop();
   };
 
+  const queues = useChatStore((s) => s.queues);
+  const queuedCount = sessionId ? (queues[sessionId]?.length ?? 0) : 0;
+
+  const enqueue = () => {
+    if (!sessionId) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const result = useChatStore.getState().enqueueMessage(sessionId, trimmed);
+    if (result) {
+      setValue("");
+      setFiles([]);
+      setPickedDirectives([]);
+      setPickedCommands([]);
+    }
+  };
+
   const canSend =
     !isBusy &&
     (value.trim().length > 0 ||
@@ -364,6 +382,8 @@ export function AiComposerProvider({ children }: ProviderProps) {
     isBusy,
     submit,
     stop,
+    enqueue,
+    queuedCount,
     voice,
     canSend,
   };

@@ -38,6 +38,7 @@ import { AgentSwitcher } from "./AgentSwitcher";
 import { AiChatView } from "./AiChat";
 import { PlanDiffReview } from "./PlanDiffReview";
 import { TodoStrip } from "./TodoStrip";
+import { QueueStrip } from "./QueueStrip";
 
 const SUGGESTIONS = [
   {
@@ -191,6 +192,7 @@ function Body({
         )}
       </div>
 
+      <QueueStrip sessionId={sessionId} />
       <TodoStrip sessionId={sessionId} />
     </>
   );

@@ -53,6 +53,8 @@ export type AgentRunStatus =
   | "awaiting-approval"
   | "error";
 
+export type QueuedMessage = { id: string; text: string; createdAt: number };
+
 export type AgentTokens = {
   inputTokens: number;
   outputTokens: number;
@@ -163,6 +165,13 @@ type StoreState = {
   renameSession: (id: string, title: string) => void;
   /** Persist messages of a session and bump its updatedAt + auto-title. */
   persistMessages: (id: string, messages: UIMessage[]) => void;
+
+  // Per-session message queue — messages typed while AI is busy, auto-sent on idle
+  queues: Record<string, QueuedMessage[]>;
+  enqueueMessage: (sessionId: string, text: string) => QueuedMessage | null;
+  dequeueMessage: (sessionId: string) => QueuedMessage | null;
+  cancelQueuedMessage: (sessionId: string, id: string) => void;
+  clearQueue: (sessionId: string) => void;
 };
 
 const NOOP_LIVE: Live = {
@@ -462,6 +471,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
   },
 
   newSession: () => {
+    get().clearQueue(get().activeSessionId ?? "");
     const id = newSessionId();
     const meta: SessionMeta = {
       id,
@@ -479,6 +489,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
   switchSession: (id) => {
     if (get().activeSessionId === id) return;
     if (!get().sessions.some((s) => s.id === id)) return;
+    get().clearQueue(get().activeSessionId ?? "");
 
     // Lazily seed the chat with persisted messages the first time we open
     // this session. Subsequent switches reuse the cached Chat instance.
@@ -511,6 +522,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
     void deleteSessionData(id);
     void useTodosStore.getState().clearSession(id);
     clearSessionShell(id);
+    get().clearQueue(id);
 
     if (remaining.length === 0) {
       const fresh: SessionMeta = {
@@ -538,6 +550,44 @@ export const useChatStore = create<StoreState>((set, get) => ({
     );
     set({ sessions: next });
     void saveSessionsList(next);
+  },
+
+  queues: {},
+  enqueueMessage: (sessionId, text) => {
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+    const msg: QueuedMessage = {
+      id: `q-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      text: trimmed,
+      createdAt: Date.now(),
+    };
+    set((s) => ({
+      queues: { ...s.queues, [sessionId]: [...(s.queues[sessionId] ?? []), msg] },
+    }));
+    return msg;
+  },
+  dequeueMessage: (sessionId) => {
+    const queue = get().queues[sessionId];
+    if (!queue?.length) return null;
+    const [first, ...rest] = queue;
+    set((s) => ({ queues: { ...s.queues, [sessionId]: rest } }));
+    return first;
+  },
+  cancelQueuedMessage: (sessionId, id) => {
+    set((s) => ({
+      queues: {
+        ...s.queues,
+        [sessionId]: (s.queues[sessionId] ?? []).filter((m) => m.id !== id),
+      },
+    }));
+  },
+  clearQueue: (sessionId) => {
+    if (!sessionId) return;
+    set((s) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { [sessionId]: _dropped, ...rest } = s.queues;
+      return { queues: rest };
+    });
   },
 
   persistMessages: (id, messages) => {

@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { IS_MAC } from "@/lib/platform";
 import { useLocalExplorerStore } from "@/modules/explorer/lib/useLocalExplorerStore";
 import {
   ArrowUpIcon,
@@ -315,14 +316,21 @@ export function AiInputBar() {
                       return;
                     }
                   }
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    c.submit();
+                  if (e.key === "Enter") {
+                    const isModEnter = e.metaKey || e.ctrlKey;
+                    if (c.isBusy) {
+                      e.preventDefault();
+                      if (isModEnter && !pickerOpen) c.enqueue();
+                      return;
+                    }
+                    if (!e.shiftKey) {
+                      e.preventDefault();
+                      c.submit();
+                    }
                   }
                 }}
                 placeholder="Ask Nexum anything   ·   @ files   ·   # directives"
                 rows={1}
-                disabled={c.isBusy}
                 className={cn(
                   "max-h-40 flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none",
                   "placeholder:text-muted-foreground/60",
@@ -389,6 +397,23 @@ export function AiInputBar() {
                 <Spinner className="size-3" />
               )}
               <span className="truncate">{voiceLabel}</span>
+            </motion.div>
+          )}
+          {c.isBusy && (
+            <motion.div
+              key="queue-hint"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.08 }}
+              className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground/60"
+            >
+              <span>{IS_MAC ? "⌘↵" : "Ctrl+↵"} to queue a follow-up</span>
+              {c.queuedCount > 0 && (
+                <span className="rounded bg-muted px-1 font-mono text-[10px]">
+                  {c.queuedCount} queued
+                </span>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
