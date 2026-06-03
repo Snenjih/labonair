@@ -295,6 +295,7 @@ export default function App() {
   useEffect(() => {
     if (!prefsHydrated) return;
     if (!sessionRestore) {
+      openDefaultTab();
       setSessionRestored(true);
       return;
     }
