@@ -12,3 +12,4 @@ pub mod snippets;
 pub mod ssh;
 pub mod themes;
 pub mod backgrounds;
+pub mod scrollback;

@@ -565,6 +565,9 @@ pub fn run() {
             background_import,
             background_delete,
             background_read_data_url,
+            modules::scrollback::scrollback_save,
+            modules::scrollback::scrollback_load,
+            modules::scrollback::scrollback_cleanup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

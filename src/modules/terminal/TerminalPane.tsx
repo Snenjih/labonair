@@ -25,6 +25,7 @@ export type TerminalPaneHandle = {
   focus: () => void;
   getBuffer: (maxLines?: number) => string | null;
   getSelection: () => string | null;
+  serialize: () => string | null;
 };
 
 type Props = {
@@ -57,6 +58,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const session = useTerminalSession({
       container: containerRef,
       visible,
+      sessionId: tabId,
       initialCwd,
       initialCommand,
       onSearchReady: (a) => onSearchReady?.(tabId, a),
@@ -98,6 +100,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
         focus: () => session.focus(),
         getBuffer: (max?: number) => session.getBuffer(max),
         getSelection: () => session.getSelection(),
+        serialize: () => session.serialize(),
       }),
       [session],
     );

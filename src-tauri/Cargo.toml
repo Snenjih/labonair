@@ -48,6 +48,7 @@ md5 = "0.7"
 aes-gcm = "0.10"
 rand = { version = "0.8", features = ["getrandom"] }
 thiserror = "1"
+flate2 = "1"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"

@@ -86,7 +86,7 @@ import { UpdaterDialog, useUpdater } from "@/modules/updater";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { useTerminalCursorBlinkInterval } from "@/lib/useTerminalCursorBlinkInterval";
 import { handleApiError } from "@/lib/errors";
-import { captureAndSave, clearSnapshot, restoreIfEnabled } from "@/modules/session";
+import { captureAndSave, clearSnapshot, restoreIfEnabled, setScrollbackLive, saveAllScrollbacks, cleanupScrollbacks } from "@/modules/session";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { listen } from "@tauri-apps/api/event";
@@ -105,6 +105,18 @@ function sameOrigin(a: string, b: string): boolean {
   } catch {
     return a === b;
   }
+}
+
+function collectAllSessionIds(): string[] {
+  const { tabs } = useTabsStore.getState();
+  const ids: string[] = [];
+  for (const tab of tabs) {
+    if (tab.kind !== "workspace") continue;
+    for (const s of Object.values((tab as WorkspaceTab).sessions)) {
+      if (s.id) ids.push(s.id);
+    }
+  }
+  return ids;
 }
 
 export default function App() {
@@ -316,6 +328,11 @@ export default function App() {
       if (!alive) return;
       if (!result || result.restoredCount === 0) openDefaultTab();
       setSessionRestored(true);
+      if (sessionRestore) {
+        setTimeout(() => {
+          void cleanupScrollbacks(collectAllSessionIds());
+        }, 5000);
+      }
     });
     return () => { alive = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -329,7 +346,10 @@ export default function App() {
   useEffect(() => {
     if (!sessionRestore || !prefsHydrated) return;
     let debounce: ReturnType<typeof setTimeout>;
-    const periodic = setInterval(() => void captureAndSave(), 30_000);
+    const periodic = setInterval(async () => {
+      await captureAndSave();
+      if (sessionRestore) void saveAllScrollbacks(collectAllSessionIds());
+    }, 30_000);
     const unsub = useTabsStore.subscribe(() => {
       clearTimeout(debounce);
       debounce = setTimeout(() => void captureAndSave(), 3_000);
@@ -370,7 +390,10 @@ export default function App() {
         }
       }
       try {
-        if (sessionRestore) await captureAndSave();
+        if (sessionRestore) {
+          await captureAndSave();
+          await saveAllScrollbacks(collectAllSessionIds());
+        }
       } finally {
         await invoke("quit_app");
       }
@@ -1034,6 +1057,10 @@ export default function App() {
       },
     });
   }, [setLive, explorerRoot, home, openPreviewTab]);
+
+  useEffect(() => {
+    setScrollbackLive({ getAllTerminalRefs: () => terminalRefs.current });
+  }, []);
 
   const registerEditorHandle = useCallback((id: number, h: EditorPaneHandle | null) => {
     if (h) editorRefs.current.set(id, h);

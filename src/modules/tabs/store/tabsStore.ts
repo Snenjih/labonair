@@ -34,9 +34,9 @@ export type TabsState = {
 
   // Actions
   setActiveId: (id: number) => void;
-  newTab: (cwd?: string, initialCommand?: string) => number;
-  newSshTab: (hostId: string, title: string, cwd?: string, initialCommand?: string) => number;
-  newQuickSshTab: (username: string, hostAddress: string, port: number) => number;
+  newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newSshTab: (hostId: string, title: string, cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
   openDefaultTab: () => void;
   openHomeTab: () => void;
   openFileTab: (path: string) => number | null;
@@ -84,9 +84,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   setActiveId: (id) => set({ activeId: id }),
 
-  newTab: (cwd, initialCommand) => {
+  newTab: (cwd, initialCommand, sessionId) => {
     const tabId = get()._nextId;
-    const sessionId = newSessionId();
+    sessionId = sessionId ?? newSessionId();
     const tab: WorkspaceTab = {
       id: tabId,
       kind: "workspace",
@@ -101,9 +101,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return tabId;
   },
 
-  newSshTab: (hostId, title, cwd, initialCommand) => {
+  newSshTab: (hostId, title, cwd, initialCommand, sessionId) => {
     const tabId = get()._nextId;
-    const sessionId = newSessionId();
+    sessionId = sessionId ?? newSessionId();
 
     const host = useHostsStore.getState().hosts.find((h) => h.id === hostId);
     let startupSnippet: { command: string; mode: "execute" | "inject" } | null = null;
@@ -141,9 +141,9 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return tabId;
   },
 
-  newQuickSshTab: (username, hostAddress, port) => {
+  newQuickSshTab: (username, hostAddress, port, sessionId) => {
     const tabId = get()._nextId;
-    const sessionId = newSessionId();
+    sessionId = sessionId ?? newSessionId();
     const title = `${username}@${hostAddress}`;
     const tab: WorkspaceTab = {
       id: tabId,

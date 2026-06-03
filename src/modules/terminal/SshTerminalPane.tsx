@@ -10,6 +10,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { ImageAddon } from "@xterm/addon-image";
 import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { SearchAddon } from "@xterm/addon-search";
+import { SerializeAddon } from "@xterm/addon-serialize";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
@@ -93,6 +94,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const containerRef = useRef<HTMLDivElement>(null);
     const termRef = useRef<Terminal | null>(null);
     const fitRef = useRef<FitAddon | null>(null);
+    const serializeRef = useRef<SerializeAddon | null>(null);
     const searchRef = useRef<SearchAddon | null>(null);
     const onSearchReadyRef = useRef(onSearchReady);
     onSearchReadyRef.current = onSearchReady;
@@ -199,6 +201,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         return lines.join("\n");
       },
       getSelection,
+      serialize: () => serializeRef.current?.serialize() ?? null,
     }), [getSelection]);
 
     // Explorer drag-to-terminal (pointer events, WKWebView-safe)
@@ -424,6 +427,24 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         fit.fit();
         // LigaturesAddon measures font metrics and must be loaded after open()
         t.loadAddon(new LigaturesAddon());
+
+        // SerializeAddon must be loaded after open()
+        const serializeAddon = new SerializeAddon();
+        serializeRef.current = serializeAddon;
+        t.loadAddon(serializeAddon);
+
+        // Restore scrollback BEFORE flushing earlyBuffer so old content appears first
+        if (!disposed) {
+          try {
+            const ansi = await invoke<string | null>("scrollback_load", { sessionId });
+            if (ansi && !disposed) {
+              t.write(ansi);
+              const sepLen = Math.max(20, t.cols - 20);
+              t.write(`\r\n\x1b[2m\x1b[90m${"─".repeat(sepLen)} session restored \x1b[0m\r\n\r\n`);
+            }
+          } catch { /* graceful degradation */ }
+        }
+
         // estCols/estRows are rough pixel estimates; send the real dimensions
         // immediately so TUI apps (claude, vim, htop, …) get the correct size.
         invoke("ssh_pty_resize", {
@@ -532,6 +553,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         termRef.current?.dispose();
         termRef.current = null;
         fitRef.current = null;
+        serializeRef.current = null;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isConnected]);

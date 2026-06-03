@@ -1,10 +1,12 @@
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
 import { ImageAddon } from "@xterm/addon-image";
 import { LigaturesAddon } from "@xterm/addon-ligatures";
 import { SearchAddon } from "@xterm/addon-search";
+import { SerializeAddon } from "@xterm/addon-serialize";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
@@ -15,6 +17,7 @@ import { openPty, type PtySession } from "./pty-bridge";
 type Options = {
   container: React.RefObject<HTMLDivElement | null>;
   visible: boolean;
+  sessionId?: string;
   initialCwd?: string;
   initialCommand?: string;
   onSearchReady?: (addon: SearchAddon) => void;
@@ -37,6 +40,7 @@ const FONT_WEIGHT_MAP: Record<string, string | number> = {
 export function useTerminalSession({
   container,
   visible,
+  sessionId,
   initialCwd,
   initialCommand,
   onSearchReady,
@@ -57,6 +61,7 @@ export function useTerminalSession({
   }, [onDetectedLocalUrl, onCwd, onExit, onSearchReady]);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const serializeRef = useRef<SerializeAddon | null>(null);
   const ptyRef = useRef<PtySession | null>(null);
 
   // Apply terminal preference changes to the live xterm instance.
@@ -218,6 +223,23 @@ export function useTerminalSession({
       // LigaturesAddon measures font metrics and must be loaded after open()
       term.loadAddon(new LigaturesAddon());
 
+      // SerializeAddon must also be loaded after open()
+      const serializeAddon = new SerializeAddon();
+      serializeRef.current = serializeAddon;
+      term.loadAddon(serializeAddon);
+
+      // Restore scrollback before opening PTY so history appears first
+      if (sessionId && !disposed) {
+        try {
+          const ansi = await invoke<string | null>("scrollback_load", { sessionId });
+          if (ansi && !disposed) {
+            term.write(ansi);
+            const sepLen = Math.max(20, term.cols - 20);
+            term.write(`\r\n\x1b[2m\x1b[90m${"─".repeat(sepLen)} session restored \x1b[0m\r\n\r\n`);
+          }
+        } catch { /* graceful degradation — terminal starts normally */ }
+      }
+
       if (prefs.terminalUseWebGL) {
         try {
           const webgl = new WebglAddon();
@@ -344,6 +366,7 @@ export function useTerminalSession({
       termRef.current?.dispose();
       termRef.current = null;
       fitRef.current = null;
+      serializeRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -401,7 +424,11 @@ export function useTerminalSession({
     term.options.theme = buildTerminalTheme();
   }, []);
 
-  return { write, focus, getBuffer, getSelection, clear, applyTheme };
+  const serialize = useCallback((): string | null => {
+    return serializeRef.current?.serialize() ?? null;
+  }, []);
+
+  return { write, focus, getBuffer, getSelection, clear, applyTheme, serialize };
 }
 
 function stripTrailingPunct(url: string): string {
