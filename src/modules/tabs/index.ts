@@ -18,6 +18,8 @@ export {
   type HomeTab,
 } from "./types";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
+export { useTabManagement } from "./lib/useTabManagement";
+export type { TabManagementReturn, UseTabManagementOptions } from "./lib/useTabManagement";
 export {
   useTabsStore,
   selectActiveTab,
