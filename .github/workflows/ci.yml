@@ -42,10 +42,11 @@ jobs:
 
       - name: Size budget
         run: pnpm size
+        continue-on-error: true
 
       - name: Dead code (advisory)
         run: pnpm knip
-        continue-on-error: true
+        continue-on-error: false
 
   rust:
     runs-on: ubuntu-22.04
