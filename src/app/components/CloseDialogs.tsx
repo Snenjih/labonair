@@ -36,7 +36,9 @@ export function CloseDialogs({
     <>
       <AlertDialog
         open={pendingSaveTab !== null}
-        onOpenChange={(open) => { if (!open) setPendingSaveTab(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingSaveTab(null);
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -46,14 +48,23 @@ export function CloseDialogs({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { disposeTab(pendingSaveTab!.id); setPendingSaveTab(null); }}>
+            <AlertDialogCancel
+              onClick={() => {
+                const tab = pendingSaveTab;
+                if (!tab) return;
+                disposeTab(tab.id);
+                setPendingSaveTab(null);
+              }}
+            >
               Don't Save
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
-                const h = editorRefs.current.get(pendingSaveTab!.id);
+                const tab = pendingSaveTab;
+                if (!tab) return;
+                const h = editorRefs.current.get(tab.id);
                 if (h) await h.save();
-                disposeTab(pendingSaveTab!.id);
+                disposeTab(tab.id);
                 setPendingSaveTab(null);
               }}
             >
@@ -65,7 +76,9 @@ export function CloseDialogs({
 
       <AlertDialog
         open={pendingDirtyTab !== null}
-        onOpenChange={(open) => { if (!open) setPendingDirtyTab(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingDirtyTab(null);
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -78,7 +91,12 @@ export function CloseDialogs({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { disposeTab(pendingDirtyTab!.id); setPendingDirtyTab(null); }}
+              onClick={() => {
+                const tab = pendingDirtyTab;
+                if (!tab) return;
+                disposeTab(tab.id);
+                setPendingDirtyTab(null);
+              }}
             >
               Close Anyway
             </AlertDialogAction>
@@ -88,7 +106,9 @@ export function CloseDialogs({
 
       <AlertDialog
         open={pendingCloseTabId !== null}
-        onOpenChange={(open) => { if (!open) setPendingCloseTabId(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingCloseTabId(null);
+        }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
