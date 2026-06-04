@@ -359,12 +359,12 @@ function PaletteItem({ action, onExecute }: PaletteItemProps) {
       onSelect={() => onExecute(action)}
       className={cn(
         "group relative flex h-10 cursor-default select-none items-center gap-3 rounded-lg px-3 mx-0.5 my-0.5",
-        "text-foreground/80 outline-none transition-colors",
-        "data-[selected=true]:bg-accent/50 data-[selected=true]:text-foreground",
+        "border-l-2 border-transparent text-foreground/80 outline-none transition-colors",
+        "data-[selected=true]:border-primary data-[selected=true]:bg-accent/60 data-[selected=true]:pl-[10px] data-[selected=true]:text-foreground",
       )}
     >
       {action.icon && (
-        <span className="shrink-0 text-muted-foreground transition-colors group-data-[selected=true]:text-foreground">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/30 text-muted-foreground transition-colors group-data-[selected=true]:bg-accent/50 group-data-[selected=true]:text-foreground">
           {action.icon}
         </span>
       )}
