@@ -41,7 +41,7 @@ export function buildClaudeTools(ctx: ToolContext) {
         if (flags?.trim()) parts.push(flags.trim());
         if (prompt?.trim()) {
           // Escape any double quotes inside the prompt, then wrap in double quotes.
-          parts.push(`"${prompt.trim().replace(/"/g, '\\"')}"`);
+          parts.push(`"${prompt.trim().replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`);
         }
         const cmd = parts.join(" ") + "\n";
 
