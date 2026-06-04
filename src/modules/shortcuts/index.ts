@@ -12,3 +12,5 @@ export {
 } from "./lib/useGlobalShortcuts";
 export { useKeybindsStore } from "./lib/useKeybindsStore";
 export type { KeyBinding, KeyBindingMap, KeyBindingOrDisabled } from "./types";
+export { useShortcutHandlers } from "./lib/useShortcutHandlers";
+export type { UseShortcutHandlersOptions } from "./lib/useShortcutHandlers";
