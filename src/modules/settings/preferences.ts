@@ -12,6 +12,10 @@ type State = Preferences & {
   init: () => Promise<void>;
 };
 
+// Start loading immediately at module import time — before React renders.
+// Falls back to null on error so init() can apply DEFAULT_PREFERENCES instead.
+const _earlyPrefsP: Promise<Preferences | null> = loadPreferences().catch(() => null);
+
 let initialized = false;
 
 export const usePreferencesStore = create<State>((set) => ({
@@ -20,8 +24,8 @@ export const usePreferencesStore = create<State>((set) => ({
   init: async () => {
     if (initialized) return;
     initialized = true;
-    const prefs = await loadPreferences();
-    set({ ...prefs, hydrated: true });
+    const prefs = await _earlyPrefsP;
+    set({ ...(prefs ?? DEFAULT_PREFERENCES), hydrated: true });
     void onPreferencesChange((key, value) => {
       set({ [key]: value } as Partial<State>);
     });

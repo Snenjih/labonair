@@ -349,7 +349,11 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(
             tauri_plugin_log::Builder::new()
-                .level(tauri_plugin_log::log::LevelFilter::Debug)
+                .level(if cfg!(debug_assertions) {
+                    tauri_plugin_log::log::LevelFilter::Debug
+                } else {
+                    tauri_plugin_log::log::LevelFilter::Warn
+                })
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init())
@@ -394,7 +398,7 @@ pub fn run() {
             // (restore disabled). A short sleep lets the plugin finish its async work.
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                 if let Some(window) = app_handle.get_webview_window("main") {
                     if restore_window {
                         clamp_window_to_monitor(&window);

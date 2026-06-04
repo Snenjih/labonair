@@ -71,9 +71,9 @@ export default function App() {
   useUpdater({ autoCheck: checkForUpdates });
 
   useEffect(() => {
-    if (!prefsHydrated || !keysLoaded || !sessionRestored) return;
+    if (!prefsHydrated || !sessionRestored) return;
     void invoke("show_main_window");
-  }, [prefsHydrated, keysLoaded, sessionRestored]);
+  }, [prefsHydrated, sessionRestored]);
 
   // Wire terminal refs into the scrollback live context
   useEffect(() => {

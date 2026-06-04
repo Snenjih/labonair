@@ -74,13 +74,25 @@ export function useAppBootstrap(): AppBootstrapReturn {
     setSelectedModelId(prefDefaultModel);
   }, [prefsHydrated, prefDefaultModel, setSelectedModelId]);
 
-  // Hydrate sessions, agents, directives, snippets
+  // Hydrate sessions immediately
   useEffect(() => {
     void hydrateSessions();
-    void useAgentsStore.getState().hydrate();
-    void useDirectivesStore.getState().hydrate();
-    void useCommandSnippetsStore.getState().hydrate();
   }, [hydrateSessions]);
+
+  // Defer non-critical hydrations until the browser is idle
+  useEffect(() => {
+    const cb = () => {
+      void useAgentsStore.getState().hydrate();
+      void useDirectivesStore.getState().hydrate();
+      void useCommandSnippetsStore.getState().hydrate();
+    };
+    if (typeof requestIdleCallback !== "undefined") {
+      const id = requestIdleCallback(cb, { timeout: 2000 });
+      return () => cancelIdleCallback(id);
+    }
+    const id = setTimeout(cb, 1000);
+    return () => clearTimeout(id);
+  }, []);
 
   // Bootstrap SFTP transfer listeners
   useEffect(() => { void bootstrapTransferListeners(); }, []);
