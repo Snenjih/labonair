@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTabsStore, type WorkspaceTab } from "@/modules/tabs";
 import { captureAndSave, clearSnapshot, restoreIfEnabled } from "@/modules/session";
+import { saveAllScrollbacks, cleanupScrollbacks } from "./scrollback";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -9,6 +10,18 @@ import { ask } from "@tauri-apps/plugin-dialog";
 export interface SessionLifecycleReturn {
   sessionRestored: boolean;
   prefsHydrated: boolean;
+}
+
+function collectAllSessionIds(): string[] {
+  const { tabs } = useTabsStore.getState();
+  const ids: string[] = [];
+  for (const tab of tabs) {
+    if (tab.kind !== "workspace") continue;
+    for (const s of Object.values((tab as WorkspaceTab).sessions)) {
+      if (s.id) ids.push(s.id);
+    }
+  }
+  return ids;
 }
 
 export function useSessionLifecycle(): SessionLifecycleReturn {
@@ -42,6 +55,11 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
       if (!alive) return;
       if (!result || result.restoredCount === 0) actions.openDefaultTab();
       setSessionRestored(true);
+      if (sessionRestore) {
+        setTimeout(() => {
+          void cleanupScrollbacks(collectAllSessionIds());
+        }, 5000);
+      }
     });
     return () => { alive = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,7 +74,10 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
   useEffect(() => {
     if (!sessionRestore || !prefsHydrated) return;
     let debounce: ReturnType<typeof setTimeout>;
-    const periodic = setInterval(() => void captureAndSave(), 30_000);
+    const periodic = setInterval(async () => {
+      await captureAndSave();
+      if (sessionRestore) void saveAllScrollbacks(collectAllSessionIds());
+    }, 30_000);
     const unsub = useTabsStore.subscribe(() => {
       clearTimeout(debounce);
       debounce = setTimeout(() => void captureAndSave(), 3_000);
@@ -79,7 +100,7 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
   const confirmQuitRef = useRef(confirmQuitWithSsh);
   useEffect(() => { confirmQuitRef.current = confirmQuitWithSsh; }, [confirmQuitWithSsh]);
 
-  // Window close handler with SSH check and session save
+  // Window close handler with SSH check + session save + scrollback save
   useEffect(() => {
     if (!sessionRestore && !confirmQuitWithSsh) return;
     let cleanup: (() => void) | undefined;
@@ -99,7 +120,10 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
         }
       }
       try {
-        if (sessionRestore) await captureAndSave();
+        if (sessionRestore) {
+          await captureAndSave();
+          await saveAllScrollbacks(collectAllSessionIds());
+        }
       } finally {
         await invoke("quit_app");
       }
