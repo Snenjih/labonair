@@ -22,3 +22,5 @@ export {
   type AgentMeta,
   type AgentRunStatus,
 } from "./store/chatStore";
+export { useAiLiveBridge } from "./lib/useAiLiveBridge";
+export type { AiLiveBridgeReturn, UseAiLiveBridgeOptions } from "./lib/useAiLiveBridge";
