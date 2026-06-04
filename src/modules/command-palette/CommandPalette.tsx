@@ -358,7 +358,7 @@ function PaletteItem({ action, onExecute }: PaletteItemProps) {
       value={value}
       onSelect={() => onExecute(action)}
       className={cn(
-        "group relative flex h-10 cursor-default select-none items-center gap-3 rounded-lg px-3 mx-0.5 my-0.5",
+        "group relative flex min-h-10 cursor-default select-none items-center gap-3 rounded-lg px-3 py-2 mx-0.5 my-0.5",
         "border-l-2 border-transparent text-foreground/80 outline-none transition-colors",
         "data-[selected=true]:border-primary data-[selected=true]:bg-accent/60 data-[selected=true]:pl-[10px] data-[selected=true]:text-foreground",
       )}
@@ -368,14 +368,16 @@ function PaletteItem({ action, onExecute }: PaletteItemProps) {
           {action.icon}
         </span>
       )}
-      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
-        {action.title}
-      </span>
-      {action.subtitle && (
-        <span className="ml-2 shrink-0 text-[11px] text-muted-foreground">
-          {action.subtitle}
+      <div className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium leading-tight">
+          {action.title}
         </span>
-      )}
+        {action.subtitle && (
+          <span className="block truncate text-[11px] leading-tight text-muted-foreground mt-0.5">
+            {action.subtitle}
+          </span>
+        )}
+      </div>
       <div className="ml-auto flex shrink-0 items-center gap-2">
         {action.rightLabel && (
           <span
