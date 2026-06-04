@@ -16,6 +16,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { useCommandStore } from "./useCommandStore";
 import { useCommandRegistry } from "./useCommandRegistry";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setCommandPaletteSearchMode } from "@/modules/settings/store";
 import type { CommandAction, CommandContext, CommandPage, RegistryCallbacks } from "./types";
 
 type Props = {
@@ -189,6 +190,31 @@ export function CommandPalette({
       .filter((a): a is CommandAction => !!a);
   }, [search, activePage, registry, recentIds]);
 
+  const visibleCount = useMemo(() => {
+    const actions = currentPage?.actions ?? [];
+    if (!search) return actions.length;
+    return actions.filter((action) => {
+      const value = `${action.title} ${action.subtitle ?? ""} ${action.section}`.toLowerCase();
+      const s = search.toLowerCase();
+      if (searchMode === "startsWith") return value.startsWith(s);
+      if (searchMode === "fuzzy") {
+        let i = 0;
+        for (const ch of value) {
+          if (ch === s[i]) i++;
+          if (i === s.length) return true;
+        }
+        return false;
+      }
+      return value.includes(s);
+    }).length;
+  }, [search, currentPage, searchMode]);
+
+  const cycleSearchMode = useCallback(() => {
+    const modes = ["contains", "startsWith", "fuzzy"] as const;
+    const idx = modes.indexOf(searchMode as typeof modes[number]);
+    void setCommandPaletteSearchMode(modes[(idx + 1) % modes.length]);
+  }, [searchMode]);
+
   const animDuration =
     animation === "none" ? "0ms" :
     animation === "fast" ? "70ms" :
@@ -347,22 +373,35 @@ export function CommandPalette({
               </motion.div>
             </AnimatePresence>
 
-            {/* Footer hints */}
-            <div className="flex items-center justify-end gap-3 border-t border-border/30 px-4 py-2">
-              <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
-                <Kbd>↑↓</Kbd> navigate
+            {/* Footer */}
+            <div className="flex items-center gap-3 border-t border-border/30 px-4 py-2">
+              <button
+                onClick={cycleSearchMode}
+                title="Click to cycle search mode"
+                className="rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/50 ring-1 ring-border/40 transition-colors hover:text-muted-foreground hover:ring-border/70"
+              >
+                {searchMode}
+              </button>
+              <span className="text-[10px] text-muted-foreground/30">·</span>
+              <span className="text-[11px] text-muted-foreground/50">
+                {visibleCount} {visibleCount === 1 ? "result" : "results"}
               </span>
-              <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
-                <Kbd>↵</Kbd> select
-              </span>
-              {pages.length > 1 && (
+              <div className="ml-auto flex items-center gap-3">
                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
-                  <Kbd>⌫</Kbd> back
+                  <Kbd>↑↓</Kbd> navigate
                 </span>
-              )}
-              <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
-                <Kbd>Esc</Kbd> close
-              </span>
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
+                  <Kbd>↵</Kbd> select
+                </span>
+                {pages.length > 1 && (
+                  <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
+                    <Kbd>⌫</Kbd> back
+                  </span>
+                )}
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/50">
+                  <Kbd>Esc</Kbd> close
+                </span>
+              </div>
             </div>
           </CommandPrimitive>
         </DialogPrimitive.Content>
