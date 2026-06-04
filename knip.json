@@ -1,0 +1,6 @@
+{
+  "entry": ["src/main.tsx", "src/settings/**/*.tsx"],
+  "project": ["src/**/*.{ts,tsx}"],
+  "ignore": ["src/**/*.d.ts"],
+  "ignoreDependencies": ["tailwindcss", "tw-animate-css"]
+}

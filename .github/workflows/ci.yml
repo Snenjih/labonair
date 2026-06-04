@@ -34,6 +34,9 @@ jobs:
       - name: Type-check
         run: pnpm exec tsc --noEmit
 
+      - name: Lint
+        run: pnpm exec biome lint --reporter=github src
+
       - name: Build frontend
         run: pnpm build
 
