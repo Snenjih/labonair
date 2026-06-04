@@ -46,7 +46,7 @@ jobs:
 
       - name: Dead code (advisory)
         run: pnpm knip
-        continue-on-error: false
+        continue-on-error: true
 
   rust:
     runs-on: ubuntu-22.04
