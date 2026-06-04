@@ -6,6 +6,8 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   create-release:
     permissions:
@@ -95,6 +97,8 @@ jobs:
   update-homebrew:
     needs: publish-tauri
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Get version from tag
         id: version
