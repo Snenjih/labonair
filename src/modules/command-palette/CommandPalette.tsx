@@ -168,20 +168,6 @@ export function CommandPalette({
     [currentPage],
   );
 
-  const actionByValue = useMemo(() => {
-    const map = new Map<string, CommandAction>();
-    for (const action of currentPage?.actions ?? []) {
-      map.set(`${action.title} ${action.subtitle ?? ""} ${action.section}`.trim(), action);
-    }
-    return map;
-  }, [currentPage]);
-
-  const handleValueChange = useCallback((value: string) => {
-    setHighlightedValue(value);
-    const action = actionByValue.get(value);
-    action?.onPreview?.();
-  }, [actionByValue]);
-
   const recentActions = useMemo(() => {
     if (search || activePage !== "root") return [];
     const allRootActions = registry["root"]?.actions ?? [];
@@ -189,6 +175,27 @@ export function CommandPalette({
       .map((id) => allRootActions.find((a) => a.id === id))
       .filter((a): a is CommandAction => !!a);
   }, [search, activePage, registry, recentIds]);
+
+  const actionByValue = useMemo(() => {
+    const map = new Map<string, CommandAction>();
+    for (const action of currentPage?.actions ?? []) {
+      const base = `${action.title} ${action.subtitle ?? ""} ${action.section}`.trim();
+      map.set(base, action);
+    }
+    // Recent items are rendered with a "__recent__:" prefix so cmdk treats them
+    // as distinct items — register those prefixed keys too for onPreview lookups.
+    for (const action of recentActions) {
+      const base = `${action.title} ${action.subtitle ?? ""} ${action.section}`.trim();
+      map.set(`__recent__:${base}`, action);
+    }
+    return map;
+  }, [currentPage, recentActions]);
+
+  const handleValueChange = useCallback((value: string) => {
+    setHighlightedValue(value);
+    const action = actionByValue.get(value);
+    action?.onPreview?.();
+  }, [actionByValue]);
 
   const visibleCount = useMemo(() => {
     const actions = currentPage?.actions ?? [];
@@ -265,7 +272,8 @@ export function CommandPalette({
             onValueChange={handleValueChange}
             filter={(value: string, search: string) => {
               if (!search) return 1;
-              const v = value.toLowerCase();
+              // Strip the __recent__: prefix added to deduplicate recently-used items
+              const v = value.replace(/^__recent__:/, "").toLowerCase();
               const s = search.toLowerCase();
               if (searchMode === "startsWith") return v.startsWith(s) ? 1 : 0;
               if (searchMode === "fuzzy") {
@@ -349,6 +357,7 @@ export function CommandPalette({
                           key={`recent-${action.id}`}
                           action={action}
                           onExecute={executeAction}
+                          isRecent
                         />
                       ))}
                     </CommandPrimitive.Group>
@@ -413,10 +422,12 @@ export function CommandPalette({
 type PaletteItemProps = {
   action: CommandAction;
   onExecute: (action: CommandAction) => void;
+  isRecent?: boolean;
 };
 
-function PaletteItem({ action, onExecute }: PaletteItemProps) {
-  const value = `${action.title} ${action.subtitle ?? ""} ${action.section}`.trim();
+function PaletteItem({ action, onExecute, isRecent }: PaletteItemProps) {
+  const base = `${action.title} ${action.subtitle ?? ""} ${action.section}`.trim();
+  const value = isRecent ? `__recent__:${base}` : base;
 
   return (
     <CommandPrimitive.Item
