@@ -2,6 +2,7 @@ import { Command as CommandPrimitive } from "cmdk";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -12,11 +13,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { Search01Icon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import { Kbd } from "@/components/ui/kbd";
-import { Badge } from "@/components/ui/badge";
 import { useCommandStore } from "./useCommandStore";
 import { useCommandRegistry } from "./useCommandRegistry";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import type { CommandAction, CommandContext, RegistryCallbacks } from "./types";
+import type { CommandAction, CommandContext, CommandPage, RegistryCallbacks } from "./types";
 
 type Props = {
   callbacks: RegistryCallbacks;
@@ -34,6 +34,17 @@ function groupBySection(actions: CommandAction[]): [string, CommandAction[]][] {
     map.set(action.section, group);
   }
   return [...map.entries()];
+}
+
+function pageLabel(pageId: string, registry: Record<string, CommandPage>): string {
+  if (pageId === "root") return "Commands";
+  const page = registry[pageId];
+  if (!page) return pageId.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return page.searchPlaceholder
+    .replace(/^search\s+/i, "")
+    .replace(/\.\.\.$/i, "")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function CommandPalette({
@@ -83,6 +94,14 @@ export function CommandPalette({
     setSearch("");
     setHighlightedValue("");
   }, [pages.length, currentPage]);
+
+  const goBackToIndex = useCallback((index: number) => {
+    currentPage?.onLeave?.();
+    setSlideDir("back");
+    setPages((prev) => prev.slice(0, index + 1));
+    setSearch("");
+    setHighlightedValue("");
+  }, [currentPage]);
 
   const handleClose = useCallback(() => {
     currentPage?.onLeave?.();
@@ -142,11 +161,6 @@ export function CommandPalette({
     },
     [navigateTo, handleClose, pushRecent],
   );
-
-  const breadcrumbLabel = useMemo(() => {
-    if (pages.length <= 1) return null;
-    return activePage.charAt(0).toUpperCase() + activePage.slice(1);
-  }, [pages.length, activePage]);
 
   const groupedActions = useMemo(
     () => groupBySection(currentPage?.actions ?? []),
@@ -242,20 +256,32 @@ export function CommandPalette({
           >
             {/* Header with search input */}
             <div className="flex h-14 items-center gap-3 border-b border-border/40 px-4">
-              {breadcrumbLabel ? (
-                <button
-                  onClick={goBack}
-                  className="flex shrink-0 items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <HugeiconsIcon
-                    icon={ArrowLeft01Icon}
-                    strokeWidth={2}
-                    className="size-3.5"
-                  />
-                  <Badge variant="secondary" className="text-[11px]">
-                    {breadcrumbLabel}
-                  </Badge>
-                </button>
+              {pages.length > 1 ? (
+                <div className="flex shrink-0 items-center gap-1 overflow-hidden">
+                  {pages.map((pageId, index) => {
+                    const label = pageLabel(pageId, registry);
+                    const isCurrent = index === pages.length - 1;
+                    return (
+                      <Fragment key={pageId}>
+                        {index > 0 && (
+                          <span className="shrink-0 text-[10px] text-muted-foreground/40">›</span>
+                        )}
+                        {isCurrent ? (
+                          <span className="max-w-[120px] truncate rounded-md bg-accent px-2 py-0.5 text-[11px] font-medium text-foreground">
+                            {label}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => goBackToIndex(index)}
+                            className="max-w-[120px] truncate rounded-md px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+                          >
+                            {label}
+                          </button>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </div>
               ) : (
                 <HugeiconsIcon
                   icon={Search01Icon}
