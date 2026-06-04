@@ -1,0 +1,82 @@
+name: Dependabot Security Audit
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit
+        id: pnpm_audit
+        run: pnpm audit --audit-level=moderate 2>&1 | tee pnpm-audit.txt || echo "AUDIT_FAILED=true" >> "$GITHUB_ENV"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: cargo audit
+        id: cargo_audit
+        working-directory: src-tauri
+        run: cargo audit 2>&1 | tee ../cargo-audit.txt || echo "CARGO_AUDIT_FAILED=true" >> "$GITHUB_ENV"
+
+      - name: Post audit summary as PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const pnpmOut = fs.existsSync('pnpm-audit.txt') ? fs.readFileSync('pnpm-audit.txt', 'utf8') : 'not run';
+            const cargoOut = fs.existsSync('cargo-audit.txt') ? fs.readFileSync('cargo-audit.txt', 'utf8') : 'not run';
+            const pnpmFailed = process.env.AUDIT_FAILED === 'true';
+            const cargoFailed = process.env.CARGO_AUDIT_FAILED === 'true';
+            const status = (pnpmFailed || cargoFailed) ? '⚠️ Issues found' : '✅ No known vulnerabilities';
+            const body = [
+              `## Security Audit — ${status}`,
+              '',
+              '### pnpm audit',
+              '```',
+              pnpmOut.slice(0, 3000),
+              '```',
+              '',
+              '### cargo audit',
+              '```',
+              cargoOut.slice(0, 3000),
+              '```',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Fail if vulnerabilities found
+        if: env.AUDIT_FAILED == 'true' || env.CARGO_AUDIT_FAILED == 'true'
+        run: |
+          echo "Security vulnerabilities detected. Review the PR comment for details."
+          exit 1
