@@ -130,7 +130,7 @@
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vite-plugin-inspect": "^11.4.1",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.0"
   },
   "pnpm": {
     "overrides": {
