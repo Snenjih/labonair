@@ -176,26 +176,20 @@ export function CommandPalette({
       .filter((a): a is CommandAction => !!a);
   }, [search, activePage, registry, recentIds]);
 
-  const actionByValue = useMemo(() => {
+  const actionById = useMemo(() => {
     const map = new Map<string, CommandAction>();
-    for (const action of currentPage?.actions ?? []) {
-      const base = `${action.title} ${action.subtitle ?? ""} ${action.section}`.trim();
-      map.set(base, action);
-    }
-    // Recent items are rendered with a "__recent__:" prefix so cmdk treats them
-    // as distinct items — register those prefixed keys too for onPreview lookups.
-    for (const action of recentActions) {
-      const base = `${action.title} ${action.subtitle ?? ""} ${action.section}`.trim();
-      map.set(`__recent__:${base}`, action);
+    for (const action of [...(currentPage?.actions ?? []), ...recentActions]) {
+      map.set(action.id, action);
     }
     return map;
   }, [currentPage, recentActions]);
 
   const handleValueChange = useCallback((value: string) => {
     setHighlightedValue(value);
-    const action = actionByValue.get(value);
-    action?.onPreview?.();
-  }, [actionByValue]);
+    // Values are formatted as "<searchable text> §<action.id>" — extract the id.
+    const match = /§(\S+)$/.exec(value);
+    if (match) actionById.get(match[1])?.onPreview?.();
+  }, [actionById]);
 
   const visibleCount = useMemo(() => {
     const actions = currentPage?.actions ?? [];
@@ -272,8 +266,8 @@ export function CommandPalette({
             onValueChange={handleValueChange}
             filter={(value: string, search: string) => {
               if (!search) return 1;
-              // Strip the __recent__: prefix added to deduplicate recently-used items
-              const v = value.replace(/^__recent__:/, "").toLowerCase();
+              // Strip decorators before matching: "__recent__:" prefix and " §<id>" suffix
+              const v = value.replace(/^__recent__:/, "").replace(/\s*§\S+$/, "").toLowerCase();
               const s = search.toLowerCase();
               if (searchMode === "startsWith") return v.startsWith(s) ? 1 : 0;
               if (searchMode === "fuzzy") {
@@ -426,7 +420,7 @@ type PaletteItemProps = {
 };
 
 function PaletteItem({ action, onExecute, isRecent }: PaletteItemProps) {
-  const base = `${action.title} ${action.subtitle ?? ""} ${action.section}`.trim();
+  const base = `${action.title} ${action.subtitle ?? ""} ${action.section} §${action.id}`.trim();
   const value = isRecent ? `__recent__:${base}` : base;
 
   return (
