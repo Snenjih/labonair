@@ -8,8 +8,6 @@ updates:
       day: "monday"
       time: "03:00"
     open-pull-requests-limit: 5
-    reviewers:
-      - "Snenjih"
     allow:
       - dependency-type: "all"
     versioning-strategy: "auto"
@@ -33,8 +31,6 @@ updates:
       day: "monday"
       time: "03:00"
     open-pull-requests-limit: 5
-    reviewers:
-      - "Snenjih"
     allow:
       - dependency-type: "all"
     groups:
@@ -57,5 +53,3 @@ updates:
       day: "monday"
       time: "03:00"
     open-pull-requests-limit: 5
-    reviewers:
-      - "Snenjih"
