@@ -31,14 +31,21 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Type-check
-        run: pnpm exec tsc --noEmit
-
       - name: Lint
-        run: pnpm exec biome lint --reporter=github src
+        run: pnpm lint
+
+      - name: Type-check
+        run: pnpm check-types
 
       - name: Build frontend
         run: pnpm build
+
+      - name: Size budget
+        run: pnpm size
+
+      - name: Dead code (advisory)
+        run: pnpm knip
+        continue-on-error: true
 
   rust:
     runs-on: ubuntu-22.04
@@ -71,3 +78,12 @@ jobs:
       - name: cargo clippy
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-machete
+
+      - name: Unused crates (advisory)
+        working-directory: src-tauri
+        run: cargo machete
+        continue-on-error: true

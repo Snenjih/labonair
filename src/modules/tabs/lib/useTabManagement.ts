@@ -16,7 +16,7 @@ import type { EditorPaneHandle } from "@/modules/editor";
 import type { PreviewPaneHandle } from "@/modules/preview";
 import type { WorkspacePaneHandle, TerminalPaneHandle } from "@/modules/terminal";
 import type { WorkspaceTab, AiDiffTab } from "../types";
-import React from "react";
+import type React from "react";
 
 export interface UseTabManagementOptions {
   home: string | null;

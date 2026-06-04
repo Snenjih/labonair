@@ -20,7 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   DndContext,
-  DragEndEvent,
+  type DragEndEvent,
   PointerSensor,
   closestCenter,
   useSensor,

@@ -1,6 +1,34 @@
 {
-  "entry": ["src/main.tsx", "src/settings/**/*.tsx"],
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/settings/**/*.tsx",
+    "src/styles/globals.css"
+  ],
   "project": ["src/**/*.{ts,tsx}"],
-  "ignore": ["src/**/*.d.ts"],
-  "ignoreDependencies": ["tailwindcss", "tw-animate-css"]
+  "ignore": [
+    "src/**/*.d.ts",
+    "src/components/ui/**",
+    "src/components/ai-elements/**"
+  ],
+  "ignoreDependencies": [
+    "@size-limit/file",
+    "@tauri-apps/plugin-autostart",
+    "@tauri-apps/plugin-dialog",
+    "@tauri-apps/plugin-log",
+    "@tauri-apps/plugin-notification",
+    "@tauri-apps/plugin-opener",
+    "@tauri-apps/plugin-os",
+    "@tauri-apps/plugin-process",
+    "@tauri-apps/plugin-store",
+    "@tauri-apps/plugin-updater",
+    "@tauri-apps/plugin-window-state",
+    "tailwindcss",
+    "tw-animate-css",
+    "shadcn",
+    "@fontsource-variable/inter",
+    "@fontsource/jetbrains-mono",
+    "@codemirror/autocomplete",
+    "@uiw/codemirror-themes"
+  ]
 }

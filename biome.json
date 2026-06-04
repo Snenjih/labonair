@@ -1,25 +1,71 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.x/schema.json",
-  "organizeImports": { "enabled": true },
+  "$schema": "https://biomejs.dev/schemas/2.x/schema.json",
+  "files": {
+    "includes": [
+      "src/**/*.ts",
+      "src/**/*.tsx",
+      "!src/components/ui/**",
+      "!src/components/ai-elements/**",
+      "!dist/**",
+      "!src-tauri/target/**",
+      "!node_modules/**",
+      "!**/*.d.ts"
+    ]
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 110
   },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double"
+    }
+  },
   "linter": {
     "enabled": true,
     "rules": {
       "recommended": true,
+      "a11y": {
+        "useSemanticElements": "warn",
+        "useKeyWithClickEvents": "warn",
+        "useFocusableInteractive": "warn",
+        "noStaticElementInteractions": "warn",
+        "useAriaPropsSupportedByRole": "warn",
+        "noSvgWithoutTitle": "warn",
+        "noNoninteractiveTabindex": "warn",
+        "noLabelWithoutControl": "warn",
+        "useButtonType": "warn",
+        "noAutofocus": "warn"
+      },
       "suspicious": {
-        "noConsoleLog": "off"
+        "noControlCharactersInRegex": "off",
+        "noArrayIndexKey": "warn",
+        "noAssignInExpressions": "warn",
+        "useIterableCallbackReturn": "warn",
+        "noTsIgnore": "error"
+      },
+      "complexity": {
+        "useOptionalChain": "warn",
+        "useIndexOf": "warn",
+        "noBannedTypes": "warn"
       },
       "style": {
-        "useImportType": "warn"
+        "useImportType": "error",
+        "useExportType": "error",
+        "noNonNullAssertion": "warn",
+        "useTemplate": "warn"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "warn",
+        "useHookAtTopLevel": "warn",
+        "useParseIntRadix": "warn",
+        "noUnusedVariables": "warn"
+      },
+      "performance": {
+        "noAccumulatingSpread": "warn"
       }
     }
-  },
-  "files": {
-    "ignore": ["dist", "src-tauri/target", "node_modules", "*.d.ts"]
   }
 }
