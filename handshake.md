@@ -1,6 +1,50 @@
 # Handshake — Session State
 
-## Last Session: 2026-05-27 (Tab State → Zustand Migration)
+## Last Session: 2026-06-04 (App.tsx Decomposition + Tooling)
+
+### What Was Done
+Decomposed `src/app/App.tsx` from 1370 → 181 lines into focused per-module hooks and components. Added Biome linting + knip dead-code detection. PR #73 open on branch `refactor/decompose-app-tsx-add-tooling`.
+
+**New files created:**
+- `src/lib/urls.ts` — `sameOrigin()` utility
+- `src/app/CLAUDE.md` — architecture context for this directory
+- `src/app/hooks/useAppBootstrap.ts` — all startup effects
+- `src/app/hooks/useMenuBridge.ts` — Tauri menu:* event bridge
+- `src/app/components/AppShell.tsx` — full layout tree
+- `src/app/components/WorkspaceArea.tsx` — stacked tab stacks (React.memo)
+- `src/app/components/SidebarContent.tsx` — sidebar panel
+- `src/app/components/AiOverlays.tsx` — AI floating elements
+- `src/app/components/CloseDialogs.tsx` — 3 confirmation dialogs
+- `src/modules/session/useSessionLifecycle.ts` — restore/save/quit
+- `src/modules/tabs/lib/useTabManagement.ts` — all tab/pane ops + refs
+- `src/modules/statusbar/lib/useSidebar.ts` — sidebar panel state
+- `src/modules/terminal/lib/usePreviewDetection.ts` — URL detection
+- `src/modules/ai/lib/useAiLiveBridge.ts` — AI context + selection popup
+- `src/modules/command-palette/hooks/usePaletteCallbacks.ts` — palette callbacks
+- `src/modules/shortcuts/lib/useShortcutHandlers.ts` — global shortcuts
+- `biome.json` — Biome linter config
+- `knip.json` — dead-code config
+
+**Tooling added:** `pnpm lint`, `pnpm format`, `pnpm check`, `pnpm knip`
+
+**`tsc --noEmit` ✅ throughout all commits**
+
+### Current State
+- PR #73 open — awaiting review/merge
+- Branch: `refactor/decompose-app-tsx-add-tooling`
+- No Rust changes this session
+
+### What's Next
+- Merge PR #73 after review
+- `nexum-themes` GitHub repo still needs to be created (community themes)
+- Consider running `pnpm knip` to find further dead code to clean up
+
+### Blockers
+- None
+
+---
+
+## Previous Session: 2026-05-27 (Tab State → Zustand Migration)
 
 ### What Was Done
 Completed the full `useTabs` → `useTabsStore` performance migration (plan: `~/.claude/plans/clever-juggling-zebra.md`). `tsc --noEmit` ✅

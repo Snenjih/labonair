@@ -7,7 +7,16 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "check-types": "tsc --noEmit",
+    "lint": "biome lint src",
+    "lint:fix": "biome lint --write src",
+    "format": "biome format --write src",
+    "format:check": "biome format src",
+    "check": "biome check --write src",
+    "knip": "knip",
+    "analyze:bundle": "ANALYZE=true vite build",
+    "size": "size-limit"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",
@@ -104,14 +113,24 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
+    "@size-limit/file": "^12.1.0",
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.6.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "knip": "^6.15.0",
+    "react-compiler-healthcheck": "^1.0.0",
+    "react-scan": "^0.5.7",
+    "rollup-plugin-visualizer": "^7.0.1",
     "shadcn": "^4.3.1",
+    "size-limit": "^12.1.0",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vite-plugin-inspect": "^11.4.1",
+    "vitest": "^2.1.9"
   },
   "pnpm": {
     "overrides": {
