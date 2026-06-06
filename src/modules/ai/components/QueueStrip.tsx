@@ -6,12 +6,14 @@ import { useChatStore } from "../store/chatStore";
 type Props = { sessionId: string | null };
 
 export function QueueStrip({ sessionId }: Props) {
+  // Must not use `?? []` here — a new array reference on every selector call
+  // causes useSyncExternalStore's post-render consistency check to loop infinitely.
   const queue = useChatStore((s) =>
-    sessionId ? (s.queues[sessionId] ?? []) : [],
+    sessionId ? (s.queues[sessionId] ?? null) : null,
   );
   const cancelQueuedMessage = useChatStore((s) => s.cancelQueuedMessage);
 
-  if (!sessionId || queue.length === 0) return null;
+  if (!sessionId || !queue?.length) return null;
 
   return (
     <div className="shrink-0 border-t border-border/80 bg-muted/20 px-3 py-1.5">
@@ -29,7 +31,7 @@ export function QueueStrip({ sessionId }: Props) {
       </div>
       <ul className="flex flex-col gap-0.5">
         <AnimatePresence initial={false}>
-          {queue.map((item, index) => (
+          {queue!.map((item, index) => (
             <motion.li
               key={item.id}
               layout
