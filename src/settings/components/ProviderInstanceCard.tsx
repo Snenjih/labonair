@@ -46,7 +46,7 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
   const isLocal = !needsKey && instance.providerId !== "openrouter";
   const docsUrl = PROVIDER_DOCS_URLS[instance.providerId] ?? providerInfo?.consoleUrl ?? "";
   const description = PROVIDER_DESCRIPTIONS[instance.providerId];
-  const showNameField = sameProviderCount > 1;
+  const showNameField = sameProviderCount > 1 || instance.providerId === "openai-compatible";
 
   const [currentKey, setCurrentKey] = useState<string | null>(null);
   const [keyDraft, setKeyDraft] = useState("");
@@ -166,7 +166,13 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2">
           <ProviderIcon provider={instance.providerId} size={15} />
-          <span className="text-[13px] font-semibold">{providerInfo?.label ?? instance.providerId}</span>
+          <span className="text-[13px] font-semibold">
+            {instance.providerId === "openai-compatible" &&
+             instance.name !== instance.providerId &&
+             !/^[a-z-]+\d+$/.test(instance.name)
+              ? instance.name
+              : (providerInfo?.label ?? instance.providerId)}
+          </span>
         </span>
         <span className="flex items-center gap-2">
           {docsUrl && (
@@ -204,7 +210,7 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
             onChange={(e) => setName(e.target.value)}
             onBlur={() => void handleSaveName()}
             className="h-8 text-[12px]"
-            placeholder="e.g. openai1"
+            placeholder={instance.providerId === "openai-compatible" ? "e.g. My Company API" : "e.g. openai1"}
           />
         </div>
       )}

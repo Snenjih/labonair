@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getAllKeys, useChatStore, type ProviderKeys } from "@/modules/ai";
 import { useAgentsStore } from "@/modules/ai/store/agentsStore";
 import { useDirectivesStore } from "@/modules/ai/store/directivesStore";
+import { useProvidersStore } from "@/modules/ai/store/providersStore";
 import { useCommandSnippetsStore } from "@/modules/snippets";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { onKeysChanged } from "@/modules/settings/store";
@@ -78,6 +79,17 @@ export function useAppBootstrap(): AppBootstrapReturn {
   useEffect(() => {
     void hydrateSessions();
   }, [hydrateSessions]);
+
+  // Providers store: init once, then reload whenever the settings window changes providers
+  useEffect(() => {
+    const store = useProvidersStore.getState();
+    void store.init();
+    let unlisten: (() => void) | null = null;
+    void store.onProvidersChanged(() => {
+      void useProvidersStore.getState().reload();
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
+  }, []);
 
   // Defer non-critical hydrations until the browser is idle
   useEffect(() => {

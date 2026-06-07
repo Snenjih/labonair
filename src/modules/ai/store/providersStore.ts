@@ -115,6 +115,8 @@ type ProvidersState = {
   instanceKeys: Record<string, string | null>;
   hydrated: boolean;
   init: (legacyPrefs?: LegacyPrefs) => Promise<void>;
+  /** Re-read instances from disk without migration. Safe to call from any window after a cross-window update. */
+  reload: () => Promise<void>;
   add: (providerId: ProviderId) => Promise<ProviderInstance>;
   update: (id: string, patch: Partial<ProviderInstance>) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -147,6 +149,13 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
 
     const keys = await loadInstanceKeys(instances);
     set({ instances, instanceKeys: keys, hydrated: true });
+  },
+
+  reload: async () => {
+    const store = await getStore();
+    const instances = (await store.get<ProviderInstance[]>(PROVIDERS_KEY)) ?? [];
+    const keys = await loadInstanceKeys(instances);
+    set({ instances, instanceKeys: keys });
   },
 
   add: async (providerId) => {

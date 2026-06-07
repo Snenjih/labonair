@@ -272,6 +272,12 @@ function ModelRow({
   );
 }
 
+function resolveInstanceLabel(m: ModelInfo, inst: { name: string; providerId: string }): string {
+  if (m.provider !== "openai-compatible") return m.label;
+  const isDefault = inst.name === inst.providerId || /^[a-z-]+\d+$/.test(inst.name);
+  return isDefault ? m.label : inst.name;
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 type Tab = "all" | "favorites" | "recent";
@@ -308,9 +314,19 @@ export function ModelPicker() {
     return !!apiKeys[providerId];
   };
 
-  const { modelDefId: selectedModelDefId } = parseModelRef(selected);
+  const { modelDefId: selectedModelDefId, instanceId: selectedInstanceId } = parseModelRef(selected);
   const current = getModel(selectedModelDefId as ModelId);
   const hasKey = providerHasKeyFn(current.provider);
+
+  const triggerLabel = useMemo(() => {
+    if (current.provider !== "openai-compatible") return current.label;
+    const inst =
+      instances.find((i) => i.id === selectedInstanceId) ??
+      instances.find((i) => i.providerId === "openai-compatible");
+    if (!inst) return current.label;
+    const isDefault = inst.name === inst.providerId || /^[a-z-]+\d+$/.test(inst.name);
+    return isDefault ? current.label : inst.name;
+  }, [current, selectedInstanceId, instances]);
 
   useEffect(() => {
     if (open) {
@@ -341,10 +357,13 @@ export function ModelPicker() {
       const provInstances = instances.filter((i) => i.providerId === m.provider);
       if (provInstances.length > 1) {
         for (const inst of provInstances) {
-          out.push({ ...m, instanceId: inst.id, instanceName: inst.name });
+          const label = resolveInstanceLabel(m, inst);
+          out.push({ ...m, label, instanceId: inst.id, instanceName: inst.name });
         }
       } else {
-        out.push({ ...m, instanceId: provInstances[0]?.id ?? null, instanceName: null });
+        const inst = provInstances[0];
+        const label = inst ? resolveInstanceLabel(m, inst) : m.label;
+        out.push({ ...m, label, instanceId: inst?.id ?? null, instanceName: null });
       }
     }
     return out;
@@ -409,9 +428,9 @@ export function ModelPicker() {
             "h-5.5 gap-1 rounded-md px-1.5 my-1 text-xs hover:bg-accent hover:text-foreground",
             hasKey ? "text-muted-foreground" : "text-warning",
           )}
-          title={hasKey ? `Model: ${current.label}` : `${current.label} — no key configured`}
+          title={hasKey ? `Model: ${triggerLabel}` : `${triggerLabel} — no key configured`}
         >
-          {current.label}
+          {triggerLabel}
           <HugeiconsIcon
             icon={ArrowDown01Icon}
             size={11}
