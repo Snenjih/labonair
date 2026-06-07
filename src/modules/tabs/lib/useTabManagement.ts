@@ -53,6 +53,7 @@ export interface TabManagementReturn {
   handleDuplicateTab: (id: number) => void;
   cycleTab: (delta: 1 | -1) => void;
   openNewTab: () => void;
+  openNewBlockTerminalTab: () => void;
   openPreviewTab: (url: string) => number;
   cdInNewTab: (path: string) => void;
   sendCd: (path: string) => void;
@@ -79,6 +80,7 @@ export function useTabManagement({
   // ── Stable store actions (never change — safe to destructure once) ─────────
   const {
     newTab,
+    newBlockTerminalTab,
     openHomeTab,
     openFileTab,
     newPreviewTab,
@@ -226,6 +228,14 @@ export function useTabManagement({
     newTab(cwd);
   }, [inheritedCwdForNewTab, newTab]);
 
+  const openNewBlockTerminalTab = useCallback(() => {
+    const { newTabInheritsCwd, terminalDefaultPath } = usePreferencesStore.getState();
+    const cwd = newTabInheritsCwd
+      ? inheritedCwdForNewTab()
+      : (terminalDefaultPath.trim() || undefined);
+    newBlockTerminalTab(cwd);
+  }, [inheritedCwdForNewTab, newBlockTerminalTab]);
+
   const onOpenHostManager = useCallback(() => { openHomeTab(); }, [openHomeTab]);
 
   const sendCd = useCallback((path: string) => {
@@ -367,6 +377,7 @@ export function useTabManagement({
     handleDuplicateTab,
     cycleTab,
     openNewTab,
+    openNewBlockTerminalTab,
     openPreviewTab,
     cdInNewTab,
     sendCd,

@@ -26,6 +26,7 @@ export type TerminalSessionData = {
   quickConnect?: QuickConnectParams;
   initialCommand?: string;
   startupSnippet?: { command: string; mode: "execute" | "inject" } | null;
+  terminalMode?: "standard" | "block";
 };
 
 // ─── Tab types ────────────────────────────────────────────────────────────────

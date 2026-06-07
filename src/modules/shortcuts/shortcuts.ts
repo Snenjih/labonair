@@ -9,6 +9,7 @@
 
 export type ShortcutId =
   | "tab.new"
+  | "tab.newBlockTerminal"
   | "tab.newPreview"
   | "tab.newEditor"
   | "tab.close"
@@ -65,7 +66,14 @@ export const SHORTCUTS: Shortcut[] = [
     label: "New tab",
     keys: ["⌘", "T"],
     group: "Tabs",
-    match: (e) => isMod(e) && e.key.toLowerCase() === "t",
+    match: (e) => isMod(e) && !e.shiftKey && e.key.toLowerCase() === "t",
+  },
+  {
+    id: "tab.newBlockTerminal",
+    label: "New block terminal tab",
+    keys: ["⌘", "⇧", "T"],
+    group: "Tabs",
+    match: (e) => isMod(e) && e.shiftKey && e.key.toLowerCase() === "t",
   },
   {
     id: "tab.newPreview",

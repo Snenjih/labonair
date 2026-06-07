@@ -1,6 +1,71 @@
 # Handshake — Session State
 
-## Last Session: 2026-06-04 (App.tsx Decomposition + Tooling)
+## Last Session: 2026-06-07 (Block Terminal Feature — Full Implementation)
+
+### What Was Done
+Implemented a full Warp-style "block terminal" mode across local and SSH terminals. Each command + output is grouped into a visual block with header chrome (command, cwd, duration, exit code badge, toolbar). Implemented via 6 sequential subagents.
+
+**New files created:**
+- `src/modules/terminal/block/lib/types.ts` — BlockMeta, BlockMode, PositionedBlock, VisibleBlocks, BlockChromeSettings
+- `src/modules/terminal/block/lib/blockDecorations.ts` — BlockDecorations class (OSC 133 parsing via xterm parser API, xterm IMarker management, viewport calculation)
+- `src/modules/terminal/block/lib/modeMachine.ts` — ModeMachine class (alt-screen detection via CSI ?1049h/?1049l)
+- `src/modules/terminal/block/lib/blockPersistence.ts` — saveBlockMeta/loadBlockMeta (Tauri invoke)
+- `src/modules/terminal/block/lib/sshInjectionScript.ts` — buildOsc133InjectionScript (bash/zsh/auto detection), waitForFirstOsc133
+- `src/modules/terminal/block/BlockOverlay.tsx` — main overlay (RAF loop, subscribe pattern)
+- `src/modules/terminal/block/BlockChrome.tsx` — per-block header/divider/toolbar (Copy, Search, AI attach)
+- `src/modules/terminal/block/StickyHeader.tsx` — sticky running-block header with motion animations
+- `src/modules/terminal/block/BlockSearchBar.tsx` — in-block search via SearchAddon
+- `src/modules/terminal/block/index.ts` — barrel export
+- `src-tauri/src/modules/pty/block_meta.rs` — block_meta_save, block_meta_load, block_meta_cleanup Tauri commands
+
+**Files modified:**
+- `src/modules/tabs/types.ts` — `terminalMode?: "standard" | "block"` on TerminalSessionData
+- `src/modules/tabs/store/tabsStore.ts` — newBlockTerminalTab(), newSshTab() reads terminal_mode from host
+- `src/modules/tabs/lib/tabUtils.tsx` — "Block Terminal" menu item (⌘⇧T)
+- `src/modules/tabs/lib/useTabManagement.ts` — openNewBlockTerminalTab()
+- `src/modules/tabs/TabBar.tsx` + `SidebarTabList.tsx` — onNewBlockTerminal prop
+- `src/modules/header/Header.tsx` + `src/app/components/AppShell.tsx` + `SidebarContent.tsx` — prop threading
+- `src/modules/shortcuts/shortcuts.ts` — "tab.newBlockTerminal" ⌘⇧T shortcut
+- `src/modules/shortcuts/lib/useShortcutHandlers.ts` — shortcut handler wired
+- `src/app/App.tsx` — openNewBlockTerminalTab passed to handlers
+- `src/modules/terminal/lib/useTerminalSession.ts` — block mode init (BlockDecorations, ModeMachine, persistence)
+- `src/modules/terminal/TerminalPane.tsx` + `WorkspacePane.tsx` — BlockOverlay render
+- `src/modules/terminal/SshTerminalPane.tsx` — OSC 133 injection after session_established + BlockOverlay
+- `src/modules/hosts/types.ts` — terminal_mode on Host, CreateHostPayload
+- `src/modules/hosts/components/HostFormPanel.tsx` — Terminal Mode toggle in SSH tab
+- `src/modules/settings/store.ts` — 9 new blockTerminal* preferences + setters
+- `src/settings/sections/TerminalSection.tsx` — "Block Terminal" settings subsection
+- `src-tauri/src/modules/hosts/mod.rs` — terminal_mode field on Host struct
+- `src-tauri/src/modules/hosts/db.rs` — migration + SELECT/INSERT/UPDATE query updates
+- `src-tauri/src/modules/pty/mod.rs` — pub mod block_meta
+- `src-tauri/src/lib.rs` — register block_meta commands, startup cleanup spawn
+
+**Key architectural decisions:**
+- Overlay approach: xterm.js untouched, block chrome is a `position: absolute` React layer
+- OSC 133 already emitted by local shell init scripts (zshrc.zsh, bashrc.bash) — no changes needed there
+- SSH: inject PROMPT_COMMAND/precmd setup script via ssh_pty_write after session_established (600ms delay, 3s timeout)
+- Alt-screen: ModeMachine detects CSI ?1049h/?1049l, hides overlay when mode === "alt"
+- Block metadata: optionally persisted as per-session JSON in app_local_data_dir/block_meta/
+- Known limitation: hydrateFromMeta() calls notify() but doesn't re-render previous blocks visually (positional rendering not implemented) — this is a future iteration item
+
+**Verification:** `pnpm exec tsc --noEmit` ✅ `cargo check` ✅ `cargo clippy` ✅
+
+### Current State
+- Branch: `main` (changes uncommitted — ready to commit)
+- Block terminal fully implemented and type-safe
+- All 6 agents completed successfully
+
+### What's Next
+- Commit the block terminal feature
+- Test manually: local block terminal (⌘⇧T), SSH block terminal (set in host settings), settings panel
+- Future: implement full hydrateFromMeta() positional rendering for scrollback block history
+
+### Blockers
+- None
+
+---
+
+## Previous Session: 2026-06-04 (App.tsx Decomposition + Tooling)
 
 ### What Was Done
 Decomposed `src/app/App.tsx` from 1370 → 181 lines into focused per-module hooks and components. Added Biome linting + knip dead-code detection. PR #73 open on branch `refactor/decompose-app-tsx-add-tooling`.

@@ -29,6 +29,15 @@ import {
   setTerminalFastScrollModifier,
   setTerminalShell,
   setTerminalDefaultPath,
+  setBlockTerminalScrollbackPersistence,
+  setBlockTerminalShowHeader,
+  setBlockTerminalShowExitCode,
+  setBlockTerminalShowExecutionTime,
+  setBlockTerminalShowCwd,
+  setBlockTerminalCompactHeaders,
+  setBlockTerminalHighlightFailed,
+  setBlockTerminalAutoCollapseOnAltScreen,
+  setBlockTerminalSshInjectionTimeoutMs,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -54,6 +63,15 @@ export function TerminalSection() {
   const terminalFastScrollModifier = usePreferencesStore((s) => s.terminalFastScrollModifier);
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
   const terminalDefaultPath = usePreferencesStore((s) => s.terminalDefaultPath);
+  const blockTerminalScrollbackPersistence = usePreferencesStore((s) => s.blockTerminalScrollbackPersistence);
+  const blockTerminalShowHeader = usePreferencesStore((s) => s.blockTerminalShowHeader);
+  const blockTerminalShowExitCode = usePreferencesStore((s) => s.blockTerminalShowExitCode);
+  const blockTerminalShowExecutionTime = usePreferencesStore((s) => s.blockTerminalShowExecutionTime);
+  const blockTerminalShowCwd = usePreferencesStore((s) => s.blockTerminalShowCwd);
+  const blockTerminalCompactHeaders = usePreferencesStore((s) => s.blockTerminalCompactHeaders);
+  const blockTerminalHighlightFailed = usePreferencesStore((s) => s.blockTerminalHighlightFailed);
+  const blockTerminalAutoCollapseOnAltScreen = usePreferencesStore((s) => s.blockTerminalAutoCollapseOnAltScreen);
+  const blockTerminalSshInjectionTimeoutMs = usePreferencesStore((s) => s.blockTerminalSshInjectionTimeoutMs);
 
   return (
     <div className="flex flex-col gap-6">
@@ -347,6 +365,120 @@ export function TerminalSection() {
               <SelectItem value="shift" className="text-[11.5px]">Shift</SelectItem>
             </SelectContent>
           </Select>
+        </SettingRow>
+      </div>
+
+      <SectionHeader
+        title="Block Terminal"
+        description="Settings for block-mode terminal sessions, where each command is grouped into a collapsible block."
+      />
+
+      <div className="flex flex-col gap-2">
+        <Label>Persistence</Label>
+        <SettingRow
+          title="Scrollback persistence"
+          description="Whether block metadata is preserved when reloading a session."
+        >
+          <Select
+            value={blockTerminalScrollbackPersistence}
+            onValueChange={(v) =>
+              void setBlockTerminalScrollbackPersistence(v as "metadata" | "fresh")
+            }
+          >
+            <SelectTrigger className="h-7 w-48 text-[11.5px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fresh" className="text-[11.5px]">Fresh start on reload</SelectItem>
+              <SelectItem value="metadata" className="text-[11.5px]">Save block metadata</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Block Headers</Label>
+        <SettingRow
+          title="Show block header"
+          description="Display a header row above each command block."
+        >
+          <Switch
+            checked={blockTerminalShowHeader}
+            onCheckedChange={(v) => void setBlockTerminalShowHeader(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Show exit code"
+          description="Show the exit code in the block header."
+        >
+          <Switch
+            checked={blockTerminalShowExitCode}
+            onCheckedChange={(v) => void setBlockTerminalShowExitCode(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Show execution time"
+          description="Show how long the command took to run in the block header."
+        >
+          <Switch
+            checked={blockTerminalShowExecutionTime}
+            onCheckedChange={(v) => void setBlockTerminalShowExecutionTime(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Show working directory"
+          description="Show the working directory in the block header."
+        >
+          <Switch
+            checked={blockTerminalShowCwd}
+            onCheckedChange={(v) => void setBlockTerminalShowCwd(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Compact headers"
+          description="Use a smaller, more compact block header style."
+        >
+          <Switch
+            checked={blockTerminalCompactHeaders}
+            onCheckedChange={(v) => void setBlockTerminalCompactHeaders(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Highlight failed blocks"
+          description="Visually highlight blocks where the command exited with a non-zero code."
+        >
+          <Switch
+            checked={blockTerminalHighlightFailed}
+            onCheckedChange={(v) => void setBlockTerminalHighlightFailed(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Auto-pause on TUI apps (vim/htop)"
+          description="Automatically collapse block mode when a full-screen TUI application is detected."
+        >
+          <Switch
+            checked={blockTerminalAutoCollapseOnAltScreen}
+            onCheckedChange={(v) => void setBlockTerminalAutoCollapseOnAltScreen(v)}
+          />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>SSH</Label>
+        <SettingRow
+          title="SSH injection timeout"
+          description="Time in milliseconds to wait for shell integration injection on SSH connections."
+        >
+          <div className="flex items-center gap-1.5">
+            <NumInput
+              value={blockTerminalSshInjectionTimeoutMs}
+              min={500}
+              max={30000}
+              step={500}
+              onChange={(v) => void setBlockTerminalSshInjectionTimeoutMs(v)}
+            />
+            <span className="text-[11.5px] text-muted-foreground">ms</span>
+          </div>
         </SettingRow>
       </div>
     </div>

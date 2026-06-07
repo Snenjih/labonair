@@ -22,6 +22,7 @@ import { TabIconFor, labelFor, NewTabDropdownItems } from "./lib/tabUtils";
 type Props = {
   onSelect: (id: number) => void;
   onNew: () => void;
+  onNewBlockTerminal: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
   onNewSsh: (hostId: string, title: string) => void;
@@ -37,6 +38,7 @@ type Props = {
 export function TabBar({
   onSelect,
   onNew,
+  onNewBlockTerminal,
   onNewPreview,
   onNewEditor,
   onNewSsh,
@@ -187,6 +189,7 @@ export function TabBar({
           <DropdownMenuContent align="start" className="min-w-44">
             <NewTabDropdownItems
               onNew={onNew}
+              onNewBlockTerminal={onNewBlockTerminal}
               onNewPreview={onNewPreview}
               onNewEditor={onNewEditor}
               onNewSsh={onNewSsh}

@@ -3,6 +3,16 @@ import { handleApiError } from "@/lib/errors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import type { TerminalSessionData } from "@/modules/tabs";
+import {
+  BlockDecorations,
+  BlockOverlay,
+  ModeMachine,
+  buildOsc133InjectionScript,
+  loadBlockMeta,
+  saveBlockMeta,
+  waitForFirstOsc133,
+} from "@/modules/terminal/block";
+import type { BlockMode } from "@/modules/terminal/block";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -82,6 +92,15 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const [isDisconnected, setIsDisconnected] = useState(false);
     const [disconnectReason, setDisconnectReason] = useState("");
     const rightClickPastes = usePreferencesStore((s) => s.terminalRightClickPastes);
+    const blockSettings = usePreferencesStore((s) => ({
+      showHeader: s.blockTerminalShowHeader,
+      showExitCode: s.blockTerminalShowExitCode,
+      showExecutionTime: s.blockTerminalShowExecutionTime,
+      showCwd: s.blockTerminalShowCwd,
+      compactHeaders: s.blockTerminalCompactHeaders,
+      highlightFailed: s.blockTerminalHighlightFailed,
+      autoCollapseOnAltScreen: s.blockTerminalAutoCollapseOnAltScreen,
+    }));
     const [hasSelection, setHasSelection] = useState(false);
     const [sudoPopup, setSudoPopup] = useState<{ x: number; y: number } | null>(null);
     // Real terminal dimensions measured from the actual container element before
@@ -102,6 +121,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const sudoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const outputTailRef = useRef<string>("");
     const sudoPopupRef = useRef<{ x: number; y: number } | null>(null);
+    const blockDecorationsRef = useRef<BlockDecorations | null>(null);
+    const [blockMode, setBlockMode] = useState<BlockMode>("prompt");
 
     // Measure the real container dimensions once the pane is actually visible.
     // We use a ResizeObserver instead of a one-shot useLayoutEffect because
@@ -437,6 +458,42 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         serializeRef.current = serializeAddon;
         t.loadAddon(serializeAddon);
 
+        // Block mode setup
+        if (session.terminalMode === "block") {
+          const decorations = new BlockDecorations(t, () => "");
+          decorations.init();
+          blockDecorationsRef.current = decorations;
+
+          const mm = new ModeMachine(t);
+          const unsubMode = mm.subscribe((mode) => {
+            if (!disposed) setBlockMode(mode);
+          });
+
+          if (prefs.blockTerminalScrollbackPersistence === "metadata") {
+            void loadBlockMeta(session.id).then((blocks) => {
+              if (blocks) decorations.hydrateFromMeta(blocks);
+            });
+
+            let saveTimer: ReturnType<typeof setTimeout> | null = null;
+            const unsubSave = decorations.subscribe(() => {
+              if (saveTimer) clearTimeout(saveTimer);
+              saveTimer = setTimeout(() => {
+                saveTimer = null;
+                void saveBlockMeta(session.id, decorations.allBlocks());
+              }, 1000);
+            });
+            cleanups.push(() => {
+              if (saveTimer) clearTimeout(saveTimer);
+              unsubSave();
+            });
+          }
+
+          cleanups.push(
+            () => { unsubMode(); mm.dispose(); },
+            () => { decorations.dispose(); blockDecorationsRef.current = null; },
+          );
+        }
+
         // Restore scrollback BEFORE flushing earlyBuffer so old content appears first
         if (!disposed) {
           try {
@@ -488,6 +545,34 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           setTimeout(() => {
             if (!disposed) invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
           }, 300);
+        }
+
+        // OSC 133 injection for block mode
+        if (session.terminalMode === "block") {
+          setTimeout(async () => {
+            if (disposed) return;
+            try {
+              const script = buildOsc133InjectionScript("auto");
+              await invoke<void>("ssh_pty_write", { sessionId, data: script + "\n" });
+
+              const decorations = blockDecorationsRef.current;
+              if (decorations) {
+                const injectionTimeout = usePreferencesStore.getState().blockTerminalSshInjectionTimeoutMs ?? 3000;
+                const success = await waitForFirstOsc133(decorations, injectionTimeout);
+                if (!success) {
+                  console.warn("Block terminal: OSC 133 injection timed out — shell integration unavailable");
+                  useNotificationStore.getState().addNotification({
+                    type: "error",
+                    title: "Block Terminal",
+                    message: "Shell integration injection timed out. Block mode may not work correctly.",
+                    source: session.title || "SSH",
+                  });
+                }
+              }
+            } catch (e) {
+              console.error("Block terminal: OSC 133 injection failed", e);
+            }
+          }, 600);
         }
 
         t.onData((data) => {
@@ -589,6 +674,17 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             dimensions once the pane slot becomes visible. Hidden behind the
             overlay during the loading phase. */}
         <div ref={containerRef} className="h-full w-full" />
+        {session.terminalMode === "block" && (
+          <BlockOverlay
+            term={termRef.current}
+            containerRef={containerRef}
+            decorations={blockDecorationsRef.current}
+            mode={blockMode}
+            sessionId={session.id}
+            settings={blockSettings}
+            searchAddon={searchRef.current}
+          />
+        )}
         {(!isConnected && !hasError) && (initialDims ? (
           <div className="absolute inset-0 z-10">
             <SshLoadingScreen

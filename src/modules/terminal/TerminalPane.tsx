@@ -2,6 +2,7 @@ import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useChatStore } from "@/modules/ai/store/chatStore";
 import { useTheme } from "@/modules/theme";
+import { BlockOverlay } from "@/modules/terminal/block";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -33,6 +34,7 @@ type Props = {
   visible: boolean;
   initialCwd?: string;
   initialCommand?: string;
+  terminalMode?: "standard" | "block";
   onSearchReady?: (tabId: string, addon: SearchAddon) => void;
   onExit?: (tabId: string, code: number) => void;
   onCwd?: (tabId: string, cwd: string) => void;
@@ -46,6 +48,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       visible,
       initialCwd,
       initialCommand,
+      terminalMode,
       onSearchReady,
       onExit,
       onCwd,
@@ -54,6 +57,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
+    const searchAddonRef = useRef<SearchAddon | null>(null);
     const { resolvedTheme } = useTheme();
     const session = useTerminalSession({
       container: containerRef,
@@ -61,11 +65,25 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       sessionId: tabId,
       initialCwd,
       initialCommand,
-      onSearchReady: (a) => onSearchReady?.(tabId, a),
+      terminalMode,
+      onSearchReady: (a) => {
+        searchAddonRef.current = a;
+        onSearchReady?.(tabId, a);
+      },
       onExit: (c) => onExit?.(tabId, c),
       onCwd: (c) => onCwd?.(tabId, c),
       onDetectedLocalUrl: (u) => onDetectedLocalUrl?.(tabId, u),
     });
+
+    const blockPrefs = usePreferencesStore((s) => ({
+      showHeader: s.blockTerminalShowHeader,
+      showExitCode: s.blockTerminalShowExitCode,
+      showExecutionTime: s.blockTerminalShowExecutionTime,
+      showCwd: s.blockTerminalShowCwd,
+      compactHeaders: s.blockTerminalCompactHeaders,
+      highlightFailed: s.blockTerminalHighlightFailed,
+      autoCollapseOnAltScreen: s.blockTerminalAutoCollapseOnAltScreen,
+    }));
 
     useEffect(() => {
       // Defer one frame so CSS-variable token resolution sees the new class.
@@ -108,7 +126,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const rightClickPastes = usePreferencesStore((s) => s.terminalRightClickPastes);
     const [hasSelection, setHasSelection] = useState(false);
 
-    const inner = (
+    const terminalContainer = (
       <div
         ref={containerRef}
         className="h-full w-full"
@@ -117,6 +135,25 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
           pointerEvents: visible ? "auto" : "none",
         }}
       />
+    );
+
+    const blockOverlay = terminalMode === "block" ? (
+      <BlockOverlay
+        term={null}
+        containerRef={containerRef}
+        decorations={session.blockDecorations}
+        mode={session.blockMode}
+        sessionId={tabId}
+        settings={blockPrefs}
+        searchAddon={searchAddonRef.current}
+      />
+    ) : null;
+
+    const inner = (
+      <div className="relative h-full w-full">
+        {terminalContainer}
+        {blockOverlay}
+      </div>
     );
 
     if (rightClickPastes) return inner;

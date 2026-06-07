@@ -17,6 +17,7 @@ import {
   GitCompareIcon,
   Globe02Icon,
   Home03Icon,
+  LayoutGridIcon,
   PencilEdit02Icon,
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
@@ -101,6 +102,7 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
 
 interface NewTabDropdownItemsProps {
   onNew: () => void;
+  onNewBlockTerminal: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
   onNewSsh: (hostId: string, title: string) => void;
@@ -110,6 +112,7 @@ interface NewTabDropdownItemsProps {
 
 export function NewTabDropdownItems({
   onNew,
+  onNewBlockTerminal,
   onNewPreview,
   onNewEditor,
   onNewSsh,
@@ -123,6 +126,11 @@ export function NewTabDropdownItems({
         <HugeiconsIcon icon={TerminalIcon} size={14} strokeWidth={1.75} />
         <span className="flex-1">Terminal</span>
         <span className="text-xs text-muted-foreground">⌘T</span>
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => onNewBlockTerminal()}>
+        <HugeiconsIcon icon={LayoutGridIcon} size={14} strokeWidth={1.75} />
+        <span className="flex-1">Block Terminal</span>
+        <span className="text-xs text-muted-foreground">⌘⇧T</span>
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => onNewEditor()}>
         <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.75} />

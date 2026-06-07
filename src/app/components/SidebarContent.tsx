@@ -18,6 +18,7 @@ export interface SidebarContentProps {
   // Tab list callbacks
   onSelect: (id: number) => void;
   onNew: () => void;
+  onNewBlockTerminal: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
   onNewSsh: (hostId: string, title: string) => void;
@@ -46,6 +47,7 @@ export function SidebarContent({
   explorerRoot,
   onSelect,
   onNew,
+  onNewBlockTerminal,
   onNewPreview,
   onNewEditor,
   onNewSsh,
@@ -84,6 +86,7 @@ export function SidebarContent({
           <SidebarTabList
             onSelect={onSelect}
             onNew={onNew}
+            onNewBlockTerminal={onNewBlockTerminal}
             onNewPreview={onNewPreview}
             onNewEditor={onNewEditor}
             onNewSsh={onNewSsh}

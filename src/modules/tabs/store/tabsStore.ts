@@ -35,6 +35,7 @@ export type TabsState = {
   // Actions
   setActiveId: (id: number) => void;
   newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newBlockTerminalTab: (cwd?: string) => number;
   newSshTab: (hostId: string, title: string, cwd?: string, initialCommand?: string, sessionId?: string) => number;
   newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
   openDefaultTab: () => void;
@@ -101,6 +102,23 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return tabId;
   },
 
+  newBlockTerminalTab: (cwd) => {
+    const tabId = get()._nextId;
+    const sessionId = newSessionId();
+    const tab: WorkspaceTab = {
+      id: tabId,
+      kind: "workspace",
+      title: "shell",
+      activePaneId: sessionId,
+      layout: makeLeaf(sessionId),
+      sessions: {
+        [sessionId]: { id: sessionId, kind: "local", title: "shell", cwd, terminalMode: "block" },
+      },
+    };
+    set((s) => ({ tabs: [...s.tabs, tab], activeId: tabId, _nextId: s._nextId + 1 }));
+    return tabId;
+  },
+
   newSshTab: (hostId, title, cwd, initialCommand, sessionId) => {
     const tabId = get()._nextId;
     sessionId = sessionId ?? newSessionId();
@@ -134,6 +152,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           cwd,
           initialCommand,
           startupSnippet,
+          terminalMode: host?.terminal_mode as "standard" | "block" | undefined,
         },
       },
     };

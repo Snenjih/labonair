@@ -138,6 +138,7 @@ export default function App() {
 
   useShortcutHandlers({
     openNewTab: tabs.openNewTab,
+    openNewBlockTerminalTab: tabs.openNewBlockTerminalTab,
     handleClose: tabs.handleClose,
     cycleTab: tabs.cycleTab,
     togglePanelAndFocus: ai.togglePanelAndFocus,

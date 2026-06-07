@@ -52,6 +52,8 @@ interface FormState {
   // Startup snippet
   startup_snippet_id: string;
   startup_snippet_mode: "execute" | "inject";
+  // Terminal mode
+  terminal_mode: "standard" | "block";
 }
 
 function hostToForm(host: Host): FormState {
@@ -72,6 +74,7 @@ function hostToForm(host: Host): FormState {
     default_path_sftp: host.default_path_sftp ?? "",
     startup_snippet_id: host.startup_snippet_id ?? "",
     startup_snippet_mode: (host.startup_snippet_mode as "execute" | "inject") ?? "execute",
+    terminal_mode: (host.terminal_mode as "standard" | "block") ?? "standard",
   };
 }
 
@@ -92,6 +95,7 @@ const DEFAULT_FORM: FormState = {
   default_path_sftp: "",
   startup_snippet_id: "",
   startup_snippet_mode: "execute",
+  terminal_mode: "standard",
 };
 
 function parseTunnels(raw?: string): TunnelConfig[] {
@@ -168,6 +172,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
         payload.credential_id = form.auth_method === "credential" ? form.credential_id : "";
         payload.startup_snippet_id = form.startup_snippet_id || "";
         payload.startup_snippet_mode = form.startup_snippet_mode;
+        payload.terminal_mode = form.terminal_mode;
         await updateHost(payload as unknown as import("../types").UpdateHostPayload);
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
@@ -203,6 +208,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
         payload.startup_snippet_id = form.startup_snippet_id;
         payload.startup_snippet_mode = form.startup_snippet_mode;
       }
+      payload.terminal_mode = form.terminal_mode;
 
       const newHost = await createHost(payload as unknown as CreateHostPayload);
       setSelectedHost(newHost.id);
@@ -489,6 +495,28 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
               />
               <p className="text-[11px] text-muted-foreground/70">
                 Runs <span className="font-mono">cd &lt;path&gt;</span> automatically after connecting
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Terminal Mode</Label>
+              <div className="flex gap-1.5">
+                {(["standard", "block"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => { setForm((d) => ({ ...d, terminal_mode: mode })); setTimeout(handleBlur, 0); }}
+                    className={`flex-1 rounded-md border py-1.5 text-xs font-medium transition-all ${
+                      form.terminal_mode === mode
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    {mode === "standard" ? "Standard" : "Block Terminal"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground/70">
+                Block mode groups each command and its output into a visual block with inline metadata.
               </p>
             </div>
             <div className="flex gap-2">

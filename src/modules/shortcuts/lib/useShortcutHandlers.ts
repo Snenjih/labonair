@@ -18,6 +18,7 @@ import type { EditorPaneHandle } from "@/modules/editor";
 
 export interface UseShortcutHandlersOptions {
   openNewTab: () => void;
+  openNewBlockTerminalTab: () => void;
   handleClose: (id: number) => void;
   cycleTab: (delta: 1 | -1) => void;
   togglePanelAndFocus: () => void;
@@ -33,6 +34,7 @@ export interface UseShortcutHandlersOptions {
 export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
   const {
     openNewTab,
+    openNewBlockTerminalTab,
     handleClose,
     cycleTab,
     togglePanelAndFocus,
@@ -56,6 +58,7 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
   const shortcutHandlers = useMemo(() => ({
     "command.palette": () => toggleCommandPalette(),
     "tab.new": openNewTab,
+    "tab.newBlockTerminal": openNewBlockTerminalTab,
     "tab.newPreview": () => openPreviewTab(""),
     "tab.newEditor": () => void openUntitledTab(),
     "tab.close": () => handleClose(useTabsStore.getState().activeId),
@@ -114,6 +117,7 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
     cycleTab,
     handleClose,
     openNewTab,
+    openNewBlockTerminalTab,
     openPreviewTab,
     workspacePaneRefs,
     togglePanelAndFocus,
