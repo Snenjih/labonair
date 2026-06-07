@@ -2,7 +2,6 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { defineConfig, type PluginOption } from "vite";
-import Inspect from "vite-plugin-inspect";
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -12,15 +11,8 @@ const analyze = process.env.ANALYZE === "true";
 // https://vite.dev/config/
 export default defineConfig(async ({ mode }) => ({
   plugins: [
-    react({
-      babel: {
-        plugins: [["babel-plugin-react-compiler", { target: "19" }]],
-      },
-    }),
+    react(),
     tailwindcss(),
-    // Dev-only module-graph inspector at /__inspect (who-imports-what,
-    // per-plugin transforms). Never included in a production build.
-    ...(mode === "development" ? [Inspect() as PluginOption] : []),
     ...(analyze
       ? [
           (await import("rollup-plugin-visualizer")).visualizer({

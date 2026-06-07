@@ -75,6 +75,13 @@ export default function App() {
     void invoke("show_main_window");
   }, [prefsHydrated, sessionRestored]);
 
+  // Safety net: show the window after 8 s even if a bootstrap condition never
+  // resolves. show_main_window is idempotent so calling it twice is harmless.
+  useEffect(() => {
+    const t = setTimeout(() => void invoke("show_main_window"), 8_000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Wire terminal refs into the scrollback live context
   useEffect(() => {
     setScrollbackLive({ getAllTerminalRefs: () => tabs.refs.terminalRefs.current });

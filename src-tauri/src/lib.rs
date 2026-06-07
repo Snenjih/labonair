@@ -396,9 +396,11 @@ pub fn run() {
             // After the window-state plugin has restored geometry, either clamp to
             // monitor bounds (restore enabled) or reset to the default 800×600 centered
             // (restore disabled). A short sleep lets the plugin finish its async work.
+            // The CAMetalLayer async-rendering tweak is also deferred here so it never
+            // races with the WKWebView WebContent process starting up.
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
                 if let Some(window) = app_handle.get_webview_window("main") {
                     if restore_window {
                         clamp_window_to_monitor(&window);
@@ -409,22 +411,10 @@ pub fn run() {
                         }));
                         let _ = window.center();
                     }
-                }
-            });
 
-            // Build and set the native macOS (and cross-platform) menu bar.
-            let menu = build_menu(app)?;
-            app.set_menu(menu)?;
-
-            #[cfg(target_os = "macos")]
-            modules::dock_menu::setup(&app.app_handle());
-
-            // macOS: enable asynchronous CAMetalLayer rendering to reduce latency
-            // on ProMotion / high-refresh-rate displays. Done after the window is
-            // realized so the WKWebView layer hierarchy is already set up.
-            #[cfg(target_os = "macos")]
-            {
-                if let Some(window) = app.get_webview_window("main") {
+                    // macOS: enable async CAMetalLayer rendering. Deferred so the
+                    // WebContent process is stable before we touch the layer tree.
+                    #[cfg(target_os = "macos")]
                     let _ = window.with_webview(|webview| {
                         use objc2::msg_send;
                         use objc2::runtime::AnyObject;
@@ -437,7 +427,25 @@ pub fn run() {
                         }
                     });
                 }
-            }
+            });
+
+            // Safety net: if the frontend never calls show_main_window (e.g. because
+            // the WebContent process crashed before React could mount), force-show the
+            // window after 12 s so the app is never stuck invisible forever.
+            let app_handle_guard = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(12)).await;
+                if let Some(win) = app_handle_guard.get_webview_window("main") {
+                    let _ = win.show();
+                }
+            });
+
+            // Build and set the native macOS (and cross-platform) menu bar.
+            let menu = build_menu(app)?;
+            app.set_menu(menu)?;
+
+            #[cfg(target_os = "macos")]
+            modules::dock_menu::setup(&app.app_handle());
 
             app.on_menu_event(|app, event| {
                 match event.id().as_ref() {
