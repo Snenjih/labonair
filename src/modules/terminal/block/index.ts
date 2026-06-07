@@ -13,6 +13,7 @@ export type {
   BlockChromeSettings,
 } from "./lib/types";
 export { BlockChrome } from "./BlockChrome";
+export { BlockInputBar } from "./BlockInputBar";
 export { StickyHeader } from "./StickyHeader";
 export { BlockSearchBar } from "./BlockSearchBar";
 export { BlockOverlay } from "./BlockOverlay";

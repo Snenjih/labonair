@@ -69,9 +69,9 @@ export function BlockChrome({
         <div
           className={cn(
             "pointer-events-auto absolute left-0 right-0 flex h-6 items-center gap-2 px-2",
-            "bg-background/60 backdrop-blur-sm border-b border-border/50",
+            "bg-background border-b border-border",
             "transition-opacity duration-150",
-            isHovered ? "opacity-100" : "opacity-70",
+            isHovered ? "opacity-100" : "opacity-80",
           )}
           style={{ top: block.headerTop }}
           onMouseEnter={() => onHover(block.id)}

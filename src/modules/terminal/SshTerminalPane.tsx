@@ -6,6 +6,7 @@ import { useTheme } from "@/modules/theme";
 import type { TerminalSessionData } from "@/modules/tabs";
 import {
   BlockDecorations,
+  BlockInputBar,
   BlockOverlay,
   ModeMachine,
   buildOsc133InjectionScript,
@@ -669,23 +670,21 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       if (isActive && tabVisible) term?.focus();
     }, [isActive, isConnected, tabVisible, sessionId]);
 
-    const paneContent = (
-      <div ref={wrapperRef} className="relative h-full w-full">
-        {/* Container is always mounted so the ResizeObserver can measure real
-            dimensions once the pane slot becomes visible. Hidden behind the
-            overlay during the loading phase. */}
-        <div ref={containerRef} className="h-full w-full" />
-        {session.terminalMode === "block" && (
-          <BlockOverlay
-            term={termRef.current}
-            containerRef={containerRef}
-            decorations={blockDecorationsRef.current}
-            mode={blockMode}
-            sessionId={session.id}
-            settings={blockSettings}
-            searchAddon={searchRef.current}
-          />
-        )}
+    const blockOverlay = session.terminalMode === "block" ? (
+      <BlockOverlay
+        term={termRef.current}
+        containerRef={containerRef}
+        decorations={blockDecorationsRef.current}
+        mode={blockMode}
+        sessionId={session.id}
+        settings={blockSettings}
+        searchAddon={searchRef.current}
+      />
+    ) : null;
+
+    // Overlays (loading, error, disconnect, sudo) shared by both layout branches
+    const sharedOverlays = (
+      <>
         {(!isConnected && !hasError) && (initialDims ? (
           <div className="absolute inset-0 z-10">
             <SshLoadingScreen
@@ -729,6 +728,25 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             />
           )}
         </AnimatePresence>
+      </>
+    );
+
+    const paneContent = session.terminalMode === "block" ? (
+      <div ref={wrapperRef} className="flex h-full w-full flex-col">
+        <div className="relative min-h-0 flex-1">
+          {/* Container is always mounted so the ResizeObserver can measure real
+              dimensions once the pane slot becomes visible. Hidden behind the
+              overlay during the loading phase. */}
+          <div ref={containerRef} className="h-full w-full" />
+          {blockOverlay}
+          {sharedOverlays}
+        </div>
+        <BlockInputBar />
+      </div>
+    ) : (
+      <div ref={wrapperRef} className="relative h-full w-full">
+        <div ref={containerRef} className="h-full w-full" />
+        {sharedOverlays}
       </div>
     );
 
