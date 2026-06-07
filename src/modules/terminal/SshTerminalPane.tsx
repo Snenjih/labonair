@@ -1,6 +1,7 @@
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { handleApiError } from "@/lib/errors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useShallow } from "zustand/react/shallow";
 import { useTheme } from "@/modules/theme";
 import type { TerminalSessionData } from "@/modules/tabs";
 import {
@@ -92,7 +93,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const [isDisconnected, setIsDisconnected] = useState(false);
     const [disconnectReason, setDisconnectReason] = useState("");
     const rightClickPastes = usePreferencesStore((s) => s.terminalRightClickPastes);
-    const blockSettings = usePreferencesStore((s) => ({
+    const blockSettings = usePreferencesStore(useShallow((s) => ({
       showHeader: s.blockTerminalShowHeader,
       showExitCode: s.blockTerminalShowExitCode,
       showExecutionTime: s.blockTerminalShowExecutionTime,
@@ -100,7 +101,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       compactHeaders: s.blockTerminalCompactHeaders,
       highlightFailed: s.blockTerminalHighlightFailed,
       autoCollapseOnAltScreen: s.blockTerminalAutoCollapseOnAltScreen,
-    }));
+    })));
     const [hasSelection, setHasSelection] = useState(false);
     const [sudoPopup, setSudoPopup] = useState<{ x: number; y: number } | null>(null);
     // Real terminal dimensions measured from the actual container element before

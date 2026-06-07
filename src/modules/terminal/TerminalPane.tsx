@@ -1,6 +1,7 @@
 import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useChatStore } from "@/modules/ai/store/chatStore";
+import { useShallow } from "zustand/react/shallow";
 import { useTheme } from "@/modules/theme";
 import { BlockOverlay } from "@/modules/terminal/block";
 import {
@@ -75,7 +76,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       onDetectedLocalUrl: (u) => onDetectedLocalUrl?.(tabId, u),
     });
 
-    const blockPrefs = usePreferencesStore((s) => ({
+    const blockPrefs = usePreferencesStore(useShallow((s) => ({
       showHeader: s.blockTerminalShowHeader,
       showExitCode: s.blockTerminalShowExitCode,
       showExecutionTime: s.blockTerminalShowExecutionTime,
@@ -83,7 +84,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       compactHeaders: s.blockTerminalCompactHeaders,
       highlightFailed: s.blockTerminalHighlightFailed,
       autoCollapseOnAltScreen: s.blockTerminalAutoCollapseOnAltScreen,
-    }));
+    })));
 
     useEffect(() => {
       // Defer one frame so CSS-variable token resolution sees the new class.
