@@ -35,7 +35,7 @@ tauri-plugin-os = "2"
 tauri-plugin-store = "2"
 tauri-plugin-process = "2"
 tauri-plugin-dialog = "2"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
 ssh2 = "0.9"
 openssl = { version = "0.10", features = ["vendored"] }
