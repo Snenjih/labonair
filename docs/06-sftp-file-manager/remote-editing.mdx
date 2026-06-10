@@ -1,0 +1,47 @@
+---
+title: "Remote Editing"
+description: "Edit remote files directly in Nexum's CodeMirror editor — changes are automatically synced back to the server on save."
+---
+
+# Remote Editing
+
+Nexum lets you edit remote files directly without leaving the app. Right-clicking a file in the remote pane and choosing "Edit" downloads it to a temporary location and opens it in the built-in CodeMirror 6 editor. When you save, the file is automatically uploaded back to the server.
+
+## How to Open a Remote File for Editing
+
+1. Navigate to the file in the remote pane of the SFTP File Manager
+2. Right-click the file
+3. Select **Edit** from the context menu
+
+Nexum triggers the `prepare_remote_edit` IPC command, which downloads the file to a temporary path at `/tmp/nexum_edits/<uuid>_<filename>`. A new editor tab opens (`kind: "editor"`) with that temp file loaded.
+
+## Saving Changes Back to the Server
+
+Edit the file as you would any local file in Nexum. When you are ready to push changes back:
+
+- Press `Cmd+S`
+
+Nexum saves the temp file to disk and immediately invokes `save_remote_edit`, which uploads the updated file back to its original path on the remote server over SFTP. A brief **"Syncing..."** indicator appears in the editor tab while the upload is in progress. Once complete, the indicator disappears and the remote file reflects your changes.
+
+No manual download/upload cycle is required — the round-trip is handled transparently.
+
+## Cleanup
+
+When you close the editor tab, Nexum deletes the temporary file from `/tmp/nexum_edits/`. No temp files accumulate over time.
+
+## Limitations
+
+The remote editing workflow is designed for configuration files, scripts, and text assets. Two hard limits apply:
+
+- **Binary files are refused** — attempting to open a binary file (detected by content inspection) shows a clear error message and does not open an editor tab
+- **Files over 5 MB are refused** — a size check runs before the download; if the file exceeds 5 MB, an error is shown and no download is attempted
+
+These limits exist to keep the editor responsive and to avoid accidentally loading large binary assets (disk images, compiled artifacts, media files) into a text editor.
+
+:::tip
+Remote editing is ideal for quick config changes — editing `/etc/nginx/nginx.conf`, tweaking a `.env` file, or modifying a deployment script. For larger refactoring work, consider downloading the file to a local directory and editing it there so you have the full power of local tooling available.
+:::
+
+:::warning
+If the SSH connection drops while a save is in progress, the upload may fail silently. Check the remote file after any save on an unstable connection to confirm the changes reached the server.
+:::

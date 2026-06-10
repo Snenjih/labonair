@@ -1,0 +1,69 @@
+---
+title: "Architecture Overview"
+description: "A technical overview of Nexum's two-process Tauri v2 architecture."
+---
+
+# Architecture Overview
+
+Nexum is built on **Tauri v2** using a strict two-process model. Understanding this separation is essential before contributing code.
+
+## Two-Process Model
+
+### Rust Backend (`src-tauri/`)
+
+The Rust process owns all operating system access. The frontend is never allowed to directly touch the filesystem, spawn processes, open network connections, or access the Keychain. Every OS operation goes through a Tauri `invoke()` IPC call to a Rust command.
+
+Rust responsibilities:
+- Local terminal PTY sessions via `portable-pty`
+- SSH connections and SSH terminal PTY via the `ssh2` crate
+- SFTP file manager and background transfer queue via `ssh2`
+- SQLite host and group storage via `rusqlite` (bundled, no system SQLite dependency)
+- macOS Keychain access for passwords and API keys via `keyring`
+- JSON theme file management
+- One-shot subshell execution for AI tool calls
+
+### React Frontend (`src/`)
+
+The frontend is a single-window React 19 + TypeScript app rendered in a WKWebView. It communicates with the Rust backend exclusively through:
+- `invoke("command_name", { args })` — request/response IPC
+- `listen("event_name", handler)` — Rust-to-frontend event stream
+
+## Key Rust Modules
+
+| Module | Responsibility |
+|---|---|
+| `modules/pty/` | Local terminal PTY sessions, shell init scripts |
+| `modules/ssh/` | SSH connection lifecycle, SSH PTY, auth |
+| `modules/sftp/` | SFTP directory operations, transfer queue worker |
+| `modules/hosts/` | SQLite CRUD for hosts and groups |
+| `modules/themes/` | JSON theme file import, export, delete |
+| `modules/secrets/` | Keychain read/write via `keyring` |
+
+## Critical Constraints
+
+These constraints are enforced by code review and must not be violated:
+
+1. **No Node.js imports in frontend** — everything is `invoke()` only
+2. **No `unwrap()` on predictable errors** — use `Result<T, String>`
+3. **No blocking code in Tauri commands** — use `async fn` or `tokio::spawn`
+4. **No hardcoded colors** — use Tailwind CSS semantic variables
+5. **Passwords never in SQLite** — always use the Keychain via `keyring`
+
+## Frontend Stack
+
+| Layer | Technology |
+|---|---|
+| UI framework | React 19 + TypeScript |
+| Build tool | Vite |
+| Styling | Tailwind CSS v4 (config in `globals.css`) |
+| Component library | shadcn/ui (Radix primitives) |
+| Global state | Zustand |
+| Terminal emulator | xterm.js + WebGL addon |
+| File editor | CodeMirror 6 |
+| Virtual lists | @tanstack/react-virtual |
+| Animations | Motion (Framer Motion successor) |
+| Layout | react-resizable-panels |
+
+:::tip
+When in doubt about whether something belongs in Rust or React, ask: does it require OS access? If yes, it belongs in Rust.
+:::

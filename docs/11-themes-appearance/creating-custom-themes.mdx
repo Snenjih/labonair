@@ -1,0 +1,69 @@
+---
+title: "Creating Custom Themes"
+description: "Step-by-step guide to building a custom Nexum theme from scratch using the JSON format."
+---
+
+# Creating Custom Themes
+
+Building a custom Nexum theme requires nothing more than a text editor and a color picker. Themes are plain JSON files — no build step, no toolchain, no CSS knowledge required.
+
+## Step-by-Step
+
+### 1. Export the Default Theme
+
+Open the Theme Picker (**Settings → Appearance → Theme**), hover over **Nexum Dark**, and click the Export icon. Save the file somewhere convenient — this gives you a complete, valid JSON starting point with every required key already present.
+
+### 2. Open in a Text Editor
+
+Open the exported `.json` file in any text editor. VS Code, Zed, Sublime Text, or even a plain editor works fine.
+
+### 3. Set Name and Author
+
+```json
+{
+  "name": "My Custom Theme",
+  "author": "Your Name",
+  "type": "dark",
+  ...
+}
+```
+
+Change `name` to your theme's display name and add your name to `author`. Set `type` to `"dark"` or `"light"` depending on your background color.
+
+### 4. Edit the Colors
+
+Work through the `colors` map and replace HEX values with your chosen palette. A free online color picker like [coolors.co](https://coolors.co) or [oklch.com](https://oklch.com) makes it easy to explore palettes and copy HEX codes.
+
+**Start with these high-impact keys:**
+
+- `background` — the main app background
+- `foreground` — primary text color
+- `primary` — your accent color (buttons, active tabs, selection highlights)
+- `border` — dividers and outlines
+- `muted_foreground` — placeholder text and secondary labels
+
+Then work through the `terminal_*` ANSI colors. These significantly affect day-to-day terminal use — choose colors with clear visual distinction between each slot.
+
+### 5. Save as `.json`
+
+Save the file with a `.json` extension. The filename can be anything — it does not need to match the `name` field.
+
+### 6. Import into Nexum
+
+In the Theme Picker, click **Import**, select your file, and confirm. If the file is valid, it appears in the list immediately and can be activated.
+
+### 7. Iterate
+
+Activate your theme, look for contrast issues or jarring color combinations, tweak the JSON in your editor, and re-import. Because the import flow overwrites themes with the same filename, rapid iteration is straightforward.
+
+### 8. Share
+
+If you want to share your theme with the community, submit a pull request to the `nexum-themes` GitHub repository. Include your `.json` file and a short description.
+
+:::tip
+Keep sufficient contrast between `background` and `foreground` for comfortable reading. A contrast ratio of at least 4.5:1 is recommended (WCAG AA standard). Use a tool like [contrast ratio checker](https://webaim.org/resources/contrastchecker/) to verify your choices.
+:::
+
+:::tip
+For light themes, set `type` to `"light"` so macOS renders the native window chrome in light mode. A mismatched `type` value results in a dark titlebar on a light-background UI, or vice versa.
+:::

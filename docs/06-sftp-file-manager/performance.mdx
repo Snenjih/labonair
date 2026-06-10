@@ -1,0 +1,48 @@
+---
+title: "Performance & Large Directories"
+description: "How Nexum's SFTP File Manager stays fast with 10,000+ files through list virtualization, async fetching, and in-memory operations."
+---
+
+# Performance & Large Directories
+
+The SFTP File Manager is built to handle real-world server directories — not just the handful of files in a typical demo. Production servers often have directories with tens of thousands of files: log archives, asset pipelines, package caches. Nexum is designed to handle these without any degradation in UI responsiveness.
+
+## List Virtualization
+
+The file list renders with `@tanstack/react-virtual`. At any point, only the rows currently visible in the pane's viewport are mounted in the DOM. Rows outside the visible area are unmounted and their memory is reclaimed.
+
+The result: a directory with 50,000 files has the same DOM footprint as a directory with 50 files. Scrolling stays at 60 FPS regardless of directory size.
+
+## Asynchronous Directory Fetching
+
+Directory listings are fetched via the `sftp_read_dir` IPC command, which is a fully async Rust function backed by Tokio. The SFTP network I/O happens on a Tokio worker thread — it never blocks the main thread or the UI event loop. A loading spinner appears in the pane toolbar during the fetch; the rest of the app remains fully interactive.
+
+## In-Memory Sorting and Filtering
+
+Once a directory listing is loaded, all sorting and filtering operations happen entirely in memory in the frontend:
+
+- **Sorting** by name, date, size, or type — instantaneous, no network request
+- **Filtering** by substring in the filter bar — instantaneous, no network request
+
+Changing sort order or typing in the filter bar never triggers an additional SFTP roundtrip. This makes the SFTP File Manager behave like a local file manager even when browsing remote filesystems.
+
+## File Icons
+
+File icons are resolved by the `iconResolver.ts` module, which maps file extensions to the Material Icon Theme icon set (`material-icon-theme`). Icon resolution is a pure in-memory lookup — it adds no I/O overhead to rendering the list, even for large directories.
+
+## Practical Tips for Large Directories
+
+| Scenario | Recommendation |
+|---|---|
+| Directory with 10,000+ files | Use the filter bar to narrow results before browsing |
+| Slow / high-latency connection | Navigate to subdirectories rather than loading a flat massive listing |
+| Finding a specific file | Type the filename (or a fragment) in the filter bar — results appear instantly |
+| Repeated access to a large directory | Keep the SFTP tab open; re-fetching is only triggered by explicit refresh |
+
+:::tip
+For very large directories (10,000+ files), use the filter bar to narrow down results before browsing. The filter is instant — no network requests are made.
+:::
+
+:::warning
+The `sftp_read_dir` command fetches the entire directory listing in a single SFTP operation. On extremely large directories (100,000+ entries) over slow connections, the initial load may take several seconds. Once loaded, all subsequent interactions (sort, filter, scroll) are instantaneous.
+:::

@@ -1,0 +1,40 @@
+---
+title: "Explorer & Terminal Sync"
+description: "How the Local File Explorer stays in sync with the active terminal's current working directory."
+---
+
+# Explorer & Terminal Sync
+
+One of Nexum's core usability decisions is that the file explorer is not a static view rooted at your home directory. It follows your terminal as you work, always showing the filesystem context that is relevant to what you are doing.
+
+## How the sync works
+
+The sync pipeline has three layers:
+
+1. **Shell integration** — Nexum injects a small init script into each terminal session (zsh or bash). This script hooks into the shell's `precmd` or `chpwd` mechanism and emits an **OSC escape sequence** whenever the CWD changes. This happens automatically after every `cd` command or any command that changes the working directory.
+
+2. **OSC handler** — The `osc-handlers.ts` module in the frontend parses incoming PTY output for these OSC sequences. When a CWD update sequence is detected, it updates the corresponding tab's CWD field in the Zustand tabs store.
+
+3. **`useWorkspaceCwd` hook** — The explorer reads the CWD of the currently active tab from the Zustand store via this hook. When the active tab changes or the active tab's CWD updates, the explorer root re-renders to the new path.
+
+The result: every `cd` in your terminal is immediately reflected in the explorer sidebar, with no polling and no manual refresh.
+
+## Switching between tabs
+
+When you switch terminal tabs, the explorer root switches to that tab's last known CWD. This means you can maintain multiple terminal contexts — one `cd`'d into a backend service, another in a frontend app — and the explorer updates instantly as you switch.
+
+## Non-terminal tabs
+
+When the active tab is an editor, SFTP, or SSH tab, the explorer does not have a live CWD source. In this case it shows the **last known CWD** from the most recently active terminal tab. The display does not clear or reset — it simply stops updating until you switch back to a terminal tab.
+
+## Status bar breadcrumb
+
+The status bar at the bottom of the window also reflects the current CWD using the same `useWorkspaceCwd` hook. The breadcrumb updates in lock-step with the explorer root, so both surfaces always show the same path.
+
+:::tip
+If the explorer root looks stale after switching tabs, click back to a terminal tab and run any command (even `pwd`). This triggers a fresh CWD emission from the shell integration script and re-syncs the explorer.
+:::
+
+:::warning
+Shell integration scripts are injected automatically for zsh and bash. If you are using a non-standard shell (fish, nushell, etc.), CWD sync may not work and the explorer root will remain at its last known position.
+:::

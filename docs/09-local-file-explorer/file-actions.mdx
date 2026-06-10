@@ -1,0 +1,49 @@
+---
+title: "File Actions"
+description: "Context menu actions available for files and folders in the Nexum Local File Explorer."
+---
+
+# File Actions
+
+The Local File Explorer provides a small set of focused actions available through the right-click context menu. The design is intentional: destructive filesystem operations (delete, move) belong in the terminal where you have full control and history.
+
+## Opening files
+
+Click any file to open it in a new editor tab. If the file is already open in a tab, that tab is brought to the front instead of creating a duplicate.
+
+## Inline Rename
+
+Right-click any file or folder and choose **Rename**. The item label becomes an editable text input directly inside the tree — no modal dialog. 
+
+- Press `Enter` to confirm the new name and apply the rename.
+- Press `Escape` to cancel without making any changes.
+
+The rename is applied immediately to the filesystem via a Tauri `fs` command. If a file with the new name already exists in the same directory, a warning is shown.
+
+:::warning
+Renaming a file that is currently open in an editor tab does not automatically update that tab. Close and reopen the file after renaming to ensure you are editing the correctly named file.
+:::
+
+## Context menu reference
+
+Right-click any item in the explorer tree to access:
+
+| Action | Available on | Description |
+|---|---|---|
+| **Open** | Files | Opens the file in a new editor tab |
+| **Rename** | Files and folders | Triggers inline rename input |
+| **Copy Path** | Files and folders | Copies the absolute filesystem path to the clipboard |
+| **Reveal in Finder** | Files and folders | Opens macOS Finder with the item highlighted |
+| **Open Terminal Here** | Folders | Opens a new local terminal tab `cd`'d into that folder |
+
+## Reveal in Finder
+
+Uses the Tauri opener plugin to instruct macOS Finder to show the selected file or folder. This is useful when you need to drag a file to another app, check file metadata in the Info panel, or hand off a path to a colleague.
+
+## Open Terminal Here
+
+Right-clicking a folder and selecting **Open Terminal Here** creates a new local terminal tab with the shell starting in that directory. This is equivalent to opening a terminal and running `cd /path/to/folder`, but in one click.
+
+:::tip
+**Copy Path** is handy when you need to reference a file in a terminal command. Copy the path, switch to a terminal tab, and paste it directly into your command.
+:::

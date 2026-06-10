@@ -1,0 +1,65 @@
+---
+title: "SFTP Transfer Errors"
+description: "Diagnose and resolve common SFTP transfer failures in Nexum."
+---
+
+# SFTP Transfer Errors
+
+SFTP transfers in Nexum are managed by a background queue worker in the Rust backend. Errors are surfaced in the Transfer Queue dropdown with a descriptive message. This page explains the most common errors and how to fix them.
+
+## "Permission Denied"
+
+Your SSH user does not have read or write permission on the target file or directory.
+
+**Resolution:** Open an SSH terminal to the server and adjust permissions:
+```bash
+# Give your user write access to a directory
+chmod u+w /path/to/directory
+
+# Change ownership to your user
+chown youruser:yourgroup /path/to/file
+```
+
+If you need to operate on system files (e.g., under `/etc/`), your user may need `sudo` privileges. Consider using `sudo -i` in the SSH terminal to perform the file operations directly.
+
+## "No Space Left on Device"
+
+The remote filesystem is full. Nexum cannot write the transferred file even if the transfer starts successfully.
+
+**Resolution:** In an SSH terminal, check disk usage:
+```bash
+df -h
+```
+Free up space by removing logs, old backups, or unused packages before retrying the transfer.
+
+## "Transfer Timed Out"
+
+The transfer stalled — this is most common with large files over slow or unstable connections.
+
+**Resolution:** Consider splitting the transfer into smaller files, or compressing the file on the server first:
+```bash
+tar -czf archive.tar.gz /large/directory
+```
+Then transfer the compressed archive as a single file.
+
+## "File Already Exists"
+
+This is not an error condition — it triggers the Conflict Resolution dialog. Nexum will ask whether to overwrite, skip, or rename the conflicting file. See the Transfer Queue documentation for details on conflict resolution options.
+
+## Transfer Stuck at 0%
+
+The SFTP subsystem is not available or not enabled on the SSH server.
+
+**Resolution:** Verify SFTP works independently:
+```bash
+ssh -s user@host sftp
+```
+If this fails, the server's `sshd_config` may not have `Subsystem sftp` configured. Contact your server administrator to enable it.
+
+## Finding Error Details
+
+All transfer errors are visible in the Transfer Queue panel (click the transfers icon in the status bar). Each failed transfer shows the specific error message returned by the server. Copy the error text when filing a bug report.
+
+:::tip
+If a transfer fails partway through, the partial file remains on the server. Clean it up manually via the SFTP file manager or an SSH terminal before retrying to avoid confusion.
+:::

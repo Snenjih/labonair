@@ -1,0 +1,58 @@
+---
+title: "Models & Agents Settings"
+description: "Reference for Nexum's AI configuration: API keys, model selection, custom providers, and agent behavior."
+---
+
+# Models & Agents Settings
+
+Models & Agents settings configure Nexum's built-in AI workspace — API credentials, the active language model, custom provider endpoints, and how the AI agent executes tool calls. Open them via **Settings (`Cmd+,`) → Models** and **Settings → Agents**.
+
+## OpenAI API Key
+
+Paste your OpenAI API key here to enable the AI workspace. The key is stored in the **macOS Keychain** using the `nexum-ai` service entry — it is never written to disk, the settings store, or any log file.
+
+To obtain a key, visit [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+
+:::warning
+Never share your API key. Nexum stores it securely in the macOS Keychain, but be careful when screen-sharing or taking screenshots of the Settings window — the field displays the key as a masked input.
+:::
+
+## Default Model
+
+The language model used for new AI sessions. Nexum supports all models available on your API key:
+
+| Model | Best for |
+|---|---|
+| `gpt-4o` | Complex reasoning, long context, tool use (default) |
+| `gpt-4o-mini` | Fast responses, lower cost, simple queries |
+
+Switch the default model here; individual sessions can also be changed on a per-session basis from the AI session header.
+
+## Custom Base URL
+
+Override the API endpoint to use an **OpenAI-compatible provider** instead of OpenAI's servers. Common use cases:
+
+- **Ollama** (local models): `http://localhost:11434/v1`
+- **Groq**: `https://api.groq.com/openai/v1`
+- **LM Studio**: `http://localhost:1234/v1`
+- **Azure OpenAI**: your Azure endpoint URL
+
+Leave blank to use the default OpenAI endpoint.
+
+## Custom Provider Name
+
+A display name shown in the Nexum UI when a custom base URL is active. For example, enter `Ollama` or `Groq` so the model picker and session header show a recognizable label instead of the raw endpoint URL.
+
+## Max Agent Steps
+
+The maximum number of sequential tool-call steps the AI agent is allowed to take before stopping automatically. Default: **20**.
+
+Increase this for complex multi-step tasks (e.g., exploring a large codebase or running many shell commands in sequence). Decrease it to prevent runaway agent loops that consume API tokens unexpectedly.
+
+## Auto-Execute Tools
+
+When enabled, the `read_file` and `list_directory` tools run automatically without requiring your confirmation in the UI. Write operations (`write_file`, `create_directory`, `run_command`) always require approval regardless of this setting.
+
+:::tip
+Enable Auto-Execute Tools for read operations when you want faster AI responses. Nexum's security layer still blocks reads from sensitive paths (`.env*`, `.ssh/`, credential files) even when auto-execute is on.
+:::

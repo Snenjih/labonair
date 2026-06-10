@@ -1,0 +1,51 @@
+---
+title: "Terminal Settings"
+description: "Complete reference for all terminal appearance and behavior settings in Nexum."
+---
+
+# Terminal Settings
+
+Open **Settings** with `Cmd+,`, then select the **Terminal** section to access all terminal configuration options. Changes apply immediately to all open terminal tabs — you do not need to restart the app or reopen terminals.
+
+## Font
+
+| Setting | Description | Default |
+|---|---|---|
+| **Font Family** | Monospace font used in the terminal. Any font installed on your Mac is available. | System monospace |
+| **Font Size** | Point size for terminal text. | 13 |
+| **Font Weight** | Weight applied to regular terminal text: Normal, Medium, or Bold. | Normal |
+| **Line Height** | Vertical spacing multiplier. `1.0` is tight; `1.4`+ is open. | 1.2 |
+| **Letter Spacing** | Extra horizontal pixels between characters. Useful for certain monospace fonts that feel too compressed. | 0 |
+
+:::tip
+Popular choices for terminal fonts include **JetBrains Mono**, **Fira Code**, **Cascadia Code**, and **SF Mono**. Any font with ligature support will render ligatures in the terminal.
+:::
+
+## Cursor
+
+| Setting | Description | Default |
+|---|---|---|
+| **Cursor Style** | Shape of the text cursor: Block, Underline, or Bar (vertical line). | Block |
+| **Cursor Blink** | Whether the cursor blinks when the terminal is idle. | On |
+
+## Scrollback
+
+| Setting | Description | Default |
+|---|---|---|
+| **Scrollback Lines** | Number of lines retained in the scrollback buffer after they scroll off screen. Range: 1,000 – 100,000. | 10,000 |
+
+A larger scrollback buffer lets you scroll further back into command history, but uses more memory. For most workflows, the default of 10,000 lines is sufficient. If you frequently run commands with very long output (like verbose build logs), consider increasing to 50,000.
+
+:::warning
+Very large scrollback buffers (100,000 lines) in combination with many open tabs can significantly increase memory usage. Use high values only when needed.
+:::
+
+## Shell Integration
+
+| Setting | Description | Default |
+|---|---|---|
+| **Shell Integration** | Inject Nexum's init script for CWD tracking and command markers. Disable only if you experience shell startup conflicts. | Enabled |
+
+## Applying changes
+
+All settings take effect immediately. Font changes cause the terminal to re-render with the new metrics; there is no flicker or session restart. The scrollback setting takes effect for newly opened terminals; existing terminals retain their current buffer size until the tab is closed and reopened.

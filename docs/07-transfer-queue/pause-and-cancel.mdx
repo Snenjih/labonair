@@ -1,0 +1,47 @@
+---
+title: "Pause & Cancel"
+description: "How to cancel an active transfer and what happens to partially transferred files."
+---
+
+# Pause & Cancel
+
+## Cancelling a Transfer
+
+Every active transfer in the Transfer Queue panel has a Cancel button (×) on its right side. Clicking it stops the transfer immediately.
+
+What happens when you cancel:
+
+1. A cancellation signal is sent from the React UI to the Rust transfer worker
+2. The worker stops reading and writing data at the next chunk boundary
+3. The transfer row in the panel disappears
+4. The SSH/SFTP connection itself remains open and unaffected — other transfers in the queue continue normally
+
+Cancellation is near-instant. There is no confirmation prompt — the transfer stops as soon as the current in-flight chunk completes (typically within a fraction of a second on a normal connection).
+
+## What Happens to Partial Files
+
+When a transfer is cancelled mid-way, the partially written file is **left in place** at the destination. Nexum does not automatically clean up incomplete files.
+
+Behavior by scenario:
+
+| Scenario | What remains |
+|---|---|
+| Upload cancelled | A partial file exists on the remote server at the destination path |
+| Download cancelled | A partial file exists in the local destination directory |
+| Folder transfer cancelled | Files transferred before cancellation remain; the folder structure may be partially created |
+
+You will need to manually delete any partial files if they are not wanted. Nexum does not track which files were written during a cancelled transfer.
+
+:::warning
+If you cancel an upload that was overwriting an existing remote file, the destination file may be in an inconsistent state (truncated or partially overwritten). Always verify critical files after a cancelled overwrite transfer.
+:::
+
+## Pause Functionality
+
+Pause is not yet implemented. The Cancel button is the only way to stop an in-progress transfer. Pause/Resume is planned for a future release.
+
+If you need to temporarily free up bandwidth, cancel the transfer and re-initiate it later. Nexum does not support resuming partial transfers — the transfer restarts from the beginning.
+
+## Cancelling Multiple Transfers
+
+Each transfer must be cancelled individually using its own × button. There is no "Cancel All" button in the current release. If you have many active transfers to stop, click the × for each one in the panel.

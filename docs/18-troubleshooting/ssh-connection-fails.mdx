@@ -1,0 +1,64 @@
+---
+title: "SSH Connection Fails"
+description: "Diagnose and fix common SSH connection failures in Nexum."
+---
+
+# SSH Connection Fails
+
+This page covers the most common reasons an SSH connection attempt fails and how to resolve each one.
+
+## "Connection Refused"
+
+The SSH server is not running on the target host, or the port is wrong.
+
+**Resolution:** Verify from your local macOS terminal:
+```bash
+ssh user@host -p <port>
+```
+If this also fails, the server-side SSH daemon (`sshd`) may be stopped. Connect via your cloud provider's console and run `sudo systemctl start sshd` (or equivalent for your OS).
+
+## "Host Unreachable" / "No Route to Host"
+
+The host is offline, the network path is blocked, or a firewall is dropping packets on port 22.
+
+**Resolution:** Check:
+- Is the server online? Try `ping host` from Terminal.
+- Is your VPN connected if the server requires it?
+- Is port 22 (or your custom SSH port) open in the server's firewall/security group?
+
+## "Authentication Failed"
+
+Wrong password, incorrect private key, or the user account does not exist on the server.
+
+**Resolution:**
+- Verify the username matches exactly (case-sensitive)
+- If using a password, confirm it is correct by trying in your local terminal
+- If using a key, verify `~/.ssh/authorized_keys` on the server contains your public key
+- Check that the private key file path in Nexum's host settings points to the correct key
+
+## "known_hosts Mismatch"
+
+The server's SSH fingerprint does not match the stored entry in `~/.ssh/known_hosts`. See [known_hosts Warning](./known-hosts-warning) for a full explanation of when to accept or reject this warning.
+
+## Loading Screen Stuck
+
+The connection attempt is timing out. This can indicate a slow network, overloaded server, or a firewall that accepts the TCP connection but never responds.
+
+**Resolution:** Close the tab and try again. If it persists, test with a direct `ssh` command in Terminal to confirm the server is reachable.
+
+## 2FA / TOTP Not Working
+
+TOTP codes are time-based and expire every 30 seconds. Entering the code too slowly after reading it can cause it to be rejected.
+
+**Resolution:**
+- Enter the code immediately after it appears in your authenticator app
+- Ensure your Mac's system clock is accurate (check System Settings → Date & Time → "Set automatically")
+- If using a hardware token, resync the token's time if supported
+
+:::warning
+Never accept an unexpected known_hosts mismatch without investigating. It may indicate that someone is intercepting your connection (MITM attack).
+:::
+
+:::tip
+Enable verbose SSH logging on the server (`sudo journalctl -u sshd -f`) to see exactly why connections are being rejected while you debug.
+:::

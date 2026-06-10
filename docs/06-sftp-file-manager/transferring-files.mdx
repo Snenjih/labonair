@@ -1,0 +1,61 @@
+---
+title: "Transferring Files"
+description: "Upload and download files and folders between your local machine and a remote server using drag-and-drop or toolbar buttons."
+---
+
+# Transferring Files
+
+File transfers in Nexum are handled by a background Rust worker built on Tokio. Once you start a transfer, it runs independently of the UI. You can close the SFTP tab or switch to another workspace — the transfer continues and progress is always visible in the titlebar Transfer Queue indicator.
+
+## Drag and Drop
+
+The fastest way to transfer files is drag and drop:
+
+1. Select one or more files or folders in either pane
+2. Drag them across to the opposite pane
+3. Drop anywhere in the destination pane's file list
+
+**Local → Remote** initiates an upload. **Remote → Local** initiates a download. The destination path is the directory currently open in the target pane.
+
+## Toolbar Buttons
+
+Each pane's toolbar contains Upload and Download icons:
+
+- **Upload** (in the remote pane toolbar) — transfers the currently selected local files to the remote directory
+- **Download** (in the local pane toolbar) — transfers the currently selected remote files to the local directory
+
+Select your files first, then click the appropriate toolbar button.
+
+## How Transfers Work
+
+Every transfer is added to the global Transfer Queue via the `enqueue_transfer` IPC command. The Rust backend processes the queue sequentially and streams progress back to the UI via `transfer_progress` Tauri events.
+
+Key behaviors:
+
+- **Folders are transferred recursively** — the entire directory tree is walked and all contents are transferred
+- **Multiple files are queued** — selecting 10 files and triggering a transfer adds 10 items to the queue, processed one by one
+- **Transfers survive tab closure** — closing the SFTP tab does not interrupt an active transfer
+- **Progress is always visible** — the titlebar indicator shows a progress ring and aggregate stats while transfers are active
+
+## Monitoring Progress
+
+Click the transfer indicator in the titlebar to open the Transfer Queue panel. Each active transfer shows:
+
+- Filename and transfer direction (upload ↑ / download ↓)
+- Progress bar and percentage
+- Current transfer speed (KB/s or MB/s)
+- Bytes transferred vs. total file size
+
+See [Transfer Queue UI](/docs/07-transfer-queue/transfer-queue-ui) for full details.
+
+## Conflict Handling
+
+If a file with the same name already exists at the destination, the transfer pauses and a conflict resolution dialog appears. You can choose to overwrite, skip, or rename the incoming file. See [Conflict Resolution](/docs/06-sftp-file-manager/conflict-resolution) for details.
+
+:::tip
+To transfer a large folder, drag it from the source pane and drop it on the destination pane. Nexum walks the entire directory tree recursively — no need to manually select nested contents.
+:::
+
+:::warning
+Transfers are not paused automatically when you lose network connectivity. If the SSH connection drops mid-transfer, the transfer will fail and display an error in the Transfer Queue panel. Re-establish the connection and restart the transfer.
+:::

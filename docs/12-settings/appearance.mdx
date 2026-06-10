@@ -1,0 +1,46 @@
+---
+title: "Appearance Settings"
+description: "Reference for Nexum's Appearance settings: theme, fonts, and background image."
+---
+
+# Appearance Settings
+
+Appearance settings control how the Nexum application shell looks — its color theme, UI typography, and optional background image. Open them via **Settings (`Cmd+,`) → Appearance**.
+
+## Theme
+
+Clicking the **Theme** button opens the full Theme Picker overlay. From here you can:
+
+- Browse all installed themes (built-in + user-imported)
+- Hover over a theme to live-preview it without committing
+- Click a theme to activate it permanently
+- Import a new theme from a `.json` file
+- Export any theme to share or edit
+
+See [Switching Themes](../11-themes-appearance/switching-themes), [Importing Themes](../11-themes-appearance/importing-themes), and [Exporting Themes](../11-themes-appearance/exporting-themes) for full details.
+
+## App Font
+
+The font family applied to all UI text outside the terminal and editor — sidebar labels, panel headers, buttons, tooltips, and form fields.
+
+Enter any font name installed on your system. Nexum does not bundle UI fonts; it uses whatever is available on the machine. If the font is not found, the system UI font is used as a fallback.
+
+## App Font Size
+
+The base font size for the UI shell, in pixels. Scales all UI text proportionally. Default: **14**.
+
+## App Line Height
+
+A line height multiplier applied to UI text. Default: **1.4**. Higher values increase spacing between lines in lists and descriptions.
+
+## Background Image
+
+Click **Choose Image** to set a custom background image behind the entire Nexum UI. An opacity slider controls how strongly the image shows through. Set opacity to 0 or click **Clear** to remove it.
+
+Supported formats: PNG, JPEG, WebP.
+
+See [Background Images](../11-themes-appearance/background-images) for full details.
+
+:::tip
+The Appearance section controls only the **app shell** — fonts and background. Terminal-specific settings (terminal font, cursor, ANSI colors) live in the **Terminal** settings category. Editor-specific settings live in **Editor**.
+:::

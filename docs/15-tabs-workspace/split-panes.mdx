@@ -1,0 +1,60 @@
+---
+title: "Split Panes"
+description: "How to split the workspace into multiple panes and work on two sessions side by side."
+---
+
+# Split Panes
+
+Nexum supports splitting the workspace into multiple independent panes so you can view and interact with two (or more) sessions simultaneously — for example, a terminal alongside an editor, or two SSH sessions to different servers.
+
+## Splitting the Current Pane
+
+You can split any pane from the keyboard or the Command Palette:
+
+| Action | Shortcut |
+|---|---|
+| Split vertically (side by side) | `Cmd+\` |
+| Split horizontally (top and bottom) | `Cmd+Shift+\` |
+
+Alternatively, open the Command Palette (`Cmd+K`) and search for **"Split Pane Vertically"** or **"Split Pane Horizontally"**.
+
+When you split a pane, the new pane opens with a fresh **Home tab** by default. You can then open any tab type in that pane — connect to an SSH host, open a file in the editor, or start a local terminal session.
+
+## Navigating Between Panes
+
+Move focus between panes without touching the mouse:
+
+- `Cmd+Option+Left` — focus the pane to the left
+- `Cmd+Option+Right` — focus the pane to the right
+- `Cmd+Option+Up` — focus the pane above
+- `Cmd+Option+Down` — focus the pane below
+
+The active pane has a subtle highlight on its border so you always know which one has keyboard focus.
+
+## Resizing Panes
+
+Click and drag the **divider** between any two panes to resize them. The resize is live — both panes reflow and the terminals reissue a `pty_resize` signal so their content rewraps correctly.
+
+:::tip
+After resizing a split pane that contains an SSH or local terminal, the terminal automatically sends the updated column/row dimensions to the PTY. You do not need to manually resize inside the shell.
+:::
+
+## Closing a Pane
+
+Press `Cmd+W` while a pane is focused. If the workspace contains more than one pane, only that pane is closed — the other panes remain open and their sessions continue. If only one pane is left, `Cmd+W` closes the entire tab instead.
+
+You can also close a pane by clicking the **×** button that appears in the pane's top-right corner when hovered.
+
+## Independent Sessions per Pane
+
+Each pane in a workspace tab runs its own fully independent session. Two panes in the same workspace can hold:
+
+- Two different SSH connections (to different servers)
+- A local terminal and a remote SSH terminal simultaneously
+- An editor and a terminal (common development workflow)
+
+There is no shared state between panes — they are separate tab slots that happen to be visible at the same time.
+
+:::warning
+Closing a pane that contains an active SSH session or a local terminal **terminates that session**. There is no way to recover a terminated PTY session. If you want to keep the session alive while using the workspace differently, consider opening the session in a standalone tab and switching to it rather than using a split.
+:::

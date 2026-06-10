@@ -1,0 +1,56 @@
+---
+title: "Multiple Panes & Split View"
+description: "How to split a workspace tab into multiple terminal panes and navigate between them."
+---
+
+# Multiple Panes & Split View
+
+A single Nexum workspace tab can contain multiple terminal panes arranged in a split layout. Each pane runs its own independent PTY session — you can have different directories, different commands, or even different shells running side by side in the same tab.
+
+## Splitting panes
+
+| Action | Shortcut |
+|---|---|
+| Split vertically (left / right) | `Cmd+\` |
+| Split horizontally (top / bottom) | `Cmd+Shift+\` |
+
+Splits are applied to the currently focused pane. You can split any pane further — there is no hard limit on the number of panes in a single tab, though usability degrades past four or five panes on a typical screen.
+
+## Navigating between panes
+
+| Action | Shortcut |
+|---|---|
+| Focus pane to the left | `Cmd+Option+Left` |
+| Focus pane to the right | `Cmd+Option+Right` |
+| Focus pane above | `Cmd+Option+Up` |
+| Focus pane below | `Cmd+Option+Down` |
+
+The focused pane has a subtle highlight on its border. Keyboard input, shortcuts, and copy/paste actions apply to the focused pane only.
+
+## Resizing panes
+
+Drag the **divider** between two panes to resize them. The divider appears as a thin line between pane edges; hover over it to reveal the drag handle.
+
+Panes have a minimum size to ensure the terminal remains usable — you cannot collapse a pane to zero.
+
+## Closing panes
+
+Press `Cmd+W` to close the currently focused pane. If only one pane remains in the tab, `Cmd+W` closes the entire tab.
+
+You can also right-click the pane area and choose **Close Pane** from the context menu.
+
+## CWD inheritance
+
+When you open a new pane by splitting, the new pane's shell starts in the **same working directory** as the currently focused pane. If CWD tracking is enabled and the active pane is sitting in `/Users/alice/project`, the new pane will also open there.
+
+:::tip
+Use split panes to keep a log tail (`tail -f /var/log/app.log`) running in one pane while you work in another — both are visible simultaneously without switching tabs.
+:::
+
+## Common layouts
+
+- **Two-pane vertical split** — code runner on the left, test output on the right
+- **Three-pane layout** — server process top-left, client process top-right, general shell bottom
+- **Monitoring layout** — `htop` in one pane, application logs in another
+
+Each pane is entirely independent. Closing one pane does not affect the others.

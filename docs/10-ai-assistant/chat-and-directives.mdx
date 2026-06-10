@@ -1,0 +1,55 @@
+---
+title: "Chat & Directives"
+description: "Sending messages, using directives to steer the AI's behavior, and attaching files or terminal selections."
+---
+
+# Chat & Directives
+
+The AI panel's input bar at the bottom of the panel is the primary interface for communicating with the assistant. It supports plain conversation, structured directives, file attachments, and terminal selections.
+
+## Sending a Message
+
+Type your message in the input bar and press **Enter** or **`Cmd+Enter`** to send. The AI streams its response token by token. A **Stop** button appears during streaming — click it to interrupt the response at any point.
+
+## Directives
+
+Directives let you signal your intent before sending, which helps the AI respond in the right mode instead of guessing. Click the **directive picker icon** (to the left of the input field) to choose one:
+
+| Directive | Effect |
+|---|---|
+| `chat` | Regular open-ended conversation — the default |
+| `edit` | Instructs the AI to focus on modifying a specific file |
+| `plan` | Asks the AI to produce a structured plan before taking any action |
+| `explain` | Requests a detailed step-by-step explanation of something |
+
+The selected directive is prepended to your message context. You can still type freely — directives steer tone and behavior, they do not replace your message.
+
+## Attachments
+
+Click the **paperclip icon** in the input bar to attach context:
+
+- **Image** — attach a screenshot or diagram for the AI to analyze
+- **Text file** — attach a local file; its contents are included inline in the message
+- **Terminal selection** — attach text selected in an active terminal or editor tab (see [Selection → Ask AI](./selection-ask-ai))
+
+Attachments appear as chips/tags in the composer area above the text field. Remove any attachment by clicking the × on its chip before sending.
+
+## Multi-line Input
+
+Press **`Shift+Enter`** to insert a newline in the input field without sending. Useful for structuring longer prompts or pasting multi-line snippets.
+
+## Keyboard Reference
+
+| Action | Shortcut |
+|---|---|
+| Send message | `Enter` or `Cmd+Enter` |
+| New line | `Shift+Enter` |
+| Stop streaming | Click Stop button |
+
+:::tip
+Use the `plan` directive when you are about to ask the AI to make several changes across multiple files. The AI will outline the steps first, giving you a chance to course-correct before any files are touched.
+:::
+
+:::tip
+You can paste large blocks of text directly into the input bar, but attaching a file via the paperclip is cleaner for anything over a few dozen lines — it keeps the input bar readable and the AI treats file attachments as a distinct, labeled context block.
+:::

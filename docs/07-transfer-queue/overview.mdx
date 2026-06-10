@@ -1,0 +1,44 @@
+---
+title: "Transfer Queue Overview"
+description: "How Nexum's background Rust transfer worker manages SFTP uploads and downloads independently of the UI."
+---
+
+# Transfer Queue Overview
+
+The Transfer Queue is Nexum's background file transfer engine. It manages all active and pending SFTP uploads and downloads, runs entirely in Rust, and operates independently of any UI component or tab lifecycle.
+
+## Architecture
+
+Transfers are powered by a `tokio` background task running inside the Tauri process. When you initiate a transfer — via drag-and-drop, toolbar button, or any other mechanism — the frontend calls the `enqueue_transfer` IPC command. This adds the transfer to a Tokio `mpsc` channel. A dedicated Rust worker consumes items from this channel, executes the SFTP transfer, and streams progress updates back to the frontend via `transfer_progress` Tauri events.
+
+This design separates transfer execution completely from the React component tree. No React component holds transfer state — the Rust worker does.
+
+## Key Behaviors
+
+- **Transfers continue when the SFTP tab is closed** — the worker is not tied to any tab or component lifecycle
+- **Transfers continue when you switch workspaces** — navigating to a terminal tab, the editor, or the home screen has no effect
+- **Transfers stop only when**: explicitly cancelled, the SSH connection drops, or the app is quit
+- **The queue is not persisted** — if Nexum is quit with active transfers, the queue starts empty on the next launch
+
+## Accessing the Queue
+
+When transfers are active, a progress ring indicator appears in the Nexum titlebar. Click it to open the Transfer Queue dropdown panel, which shows live progress for all active and recently completed transfers.
+
+The indicator is only visible when at least one transfer is active or has completed since the app launched. There is no persistent transfer history across app restarts.
+
+## Transfer Progress Events
+
+The Rust backend emits `transfer_progress` events with the following information for each transfer:
+
+- Transfer ID (internal)
+- Filename and direction (upload/download)
+- Bytes transferred so far
+- Total file size
+- Current transfer speed
+- Status: `in_progress`, `completed`, or `failed` (with error message)
+
+The React frontend subscribes to these events globally and updates the Transfer Queue UI in real time.
+
+:::tip
+You can safely close the SFTP tab as soon as a large transfer has started. The transfer runs in the background and you will see live progress in the titlebar indicator at all times.
+:::

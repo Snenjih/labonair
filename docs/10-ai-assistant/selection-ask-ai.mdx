@@ -1,0 +1,60 @@
+---
+title: "Selection → Ask AI"
+description: "Select text in any terminal or editor tab and instantly send it as context to the AI assistant."
+---
+
+# Selection → Ask AI
+
+The fastest way to get the AI's opinion on a specific piece of output or code is to select it directly in the source and use the **Ask AI** popup. No copy-pasting, no switching tabs and manually pasting.
+
+## How It Works
+
+1. Select any text in a **terminal tab** or **editor tab**
+2. A small **"Ask AI"** popup appears near the selection
+3. Click the popup — the selection is attached as a context chip in the AI input bar
+4. Type your question (or leave the field empty to ask for a general explanation)
+5. Press Enter to send
+
+The selection travels as a structured attachment, not as raw text pasted into the input field. This keeps your prompt clean and lets the AI know exactly where the content came from.
+
+## How Selections Are Sent
+
+When submitted, the selection is wrapped in a source-tagged block:
+
+```xml
+<selection source="terminal">
+Last login: Tue Jun 10 14:32:01 on ttys001
+permission denied (publickey,gssapi-keyex,gssapi-with-mic)
+</selection>
+```
+
+or for editor content:
+
+```xml
+<selection source="editor">
+fn connect(host: &str, port: u16) -> Result<Session, SshError> {
+    ...
+}
+</selection>
+```
+
+The `source` attribute tells the AI whether the content is terminal output or source code, which influences how it interprets and responds.
+
+## Multiple Selections
+
+You can attach selections from more than one source before sending a single message. Each appears as its own chip in the composer. All chips are included in the outgoing message as separate tagged blocks. This is useful when you want to compare output from two different servers or cross-reference terminal output with a config file.
+
+## Removing a Selection
+
+Click the **×** on the selection chip before sending to remove it from the message. Removal does not affect the original terminal or editor content.
+
+## Use Cases
+
+- **Diagnose an error**: select a stack trace from the terminal → Ask AI → "what is causing this?"
+- **Explain a config**: select a block of nginx or systemd config in the editor → Ask AI → "explain what this does"
+- **Review a command's output**: select `df -h` output → Ask AI → "which filesystem is running low?"
+- **Debug unfamiliar code**: select a function in the editor → Ask AI → "are there any edge cases I'm missing?"
+
+:::tip
+You do not need to type a question after attaching a selection. Sending with an empty input bar (just a selection chip) prompts the AI to give a general explanation of the selected content — useful for quickly understanding unfamiliar output.
+:::

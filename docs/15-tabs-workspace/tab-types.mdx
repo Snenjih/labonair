@@ -1,0 +1,50 @@
+---
+title: "Tab Types"
+description: "A reference for all seven tab kinds in Nexum and when each one is used."
+---
+
+# Tab Types
+
+Nexum models every open surface as a **tab** — a typed, discriminated value with a `kind` field. There are currently seven tab types. Each renders a distinct UI in the workspace and has its own lifecycle rules around connection, persistence, and restoration.
+
+## `home` — Host Manager
+
+The default landing tab. Shows the Host Manager dashboard: a searchable list of all configured SSH/SFTP hosts organized into groups, with action buttons for connecting, editing, and deleting hosts. Every new window starts with a Home tab. Opening Nexum fresh also lands here.
+
+## `terminal` — Local Terminal
+
+A local PTY shell session. Under the hood, the Rust backend creates a `portable-pty` process (typically `zsh` or `bash`) and streams its output to an xterm.js WebGL terminal in the frontend. Shell integration is injected via a startup script, enabling cwd tracking and tab title updates. Use this for local development, scripts, and general shell work.
+
+## `ssh-terminal` — Remote SSH Terminal
+
+An interactive SSH session to a remote host. Functionally identical to the local terminal in terms of rendering (same xterm.js WebGL stack), but the PTY runs on the remote server via the `ssh2` Rust library. Supports true color, Unicode, mouse reporting, and all standard terminal escape sequences.
+
+## `sftp` — SFTP File Manager
+
+A split-pane file manager. The left pane shows your local filesystem; the right pane shows the remote filesystem over SFTP. Supports:
+
+- Double-click to navigate directories
+- Drag-and-drop file transfers between panes
+- Background transfer queue with progress tracking
+- Conflict resolution dialog on name collisions
+- Inline remote file editing (opens a temp file in an editor tab, saves back on close)
+
+## `editor` — Code Editor
+
+A CodeMirror 6 file editor. Opens local files for editing or remote files via a temp-file workflow (fetched over SFTP, edited locally, pushed back on save). Language mode is auto-detected from file extension. Supports syntax highlighting for dozens of languages, line numbers, bracket matching, and find/replace.
+
+## `preview` — In-App Preview
+
+An embedded browser preview. Used to render local HTML files or remote URLs within the workspace without leaving the app. Useful for previewing static site builds or internal web UIs on remote servers.
+
+## `ai-diff` — AI Diff Review
+
+A special-purpose tab that appears when the AI assistant proposes changes to a file. Shows a standard two-column diff (before / after) using Nexum's diff renderer. You can accept the full change, reject it, or edit the proposed content before applying. Closing this tab without confirming discards the proposed change.
+
+:::tip
+You can have multiple tabs of the same kind open simultaneously. For example, two SSH terminal tabs connected to different servers, or two editor tabs with different files — they are all fully independent.
+:::
+
+:::warning
+The `ai-diff` tab is ephemeral. If you close it without accepting or rejecting the change, the AI's proposed edit is permanently discarded. The AI will not re-generate it automatically.
+:::

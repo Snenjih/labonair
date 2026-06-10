@@ -1,0 +1,54 @@
+---
+title: "Editor Settings"
+description: "Reference for Nexum's built-in file editor settings: auto-save, formatting, and display options."
+---
+
+# Editor Settings
+
+Editor settings control how the built-in CodeMirror 6 file editor behaves when editing local or remote files. Open them via **Settings (`Cmd+,`) → Editor**.
+
+## Auto-Save
+
+Controls when unsaved changes are automatically written to disk:
+
+| Option | Behavior |
+|---|---|
+| Off | Changes are only saved when you explicitly press `Cmd+S` |
+| After Delay | Changes are saved automatically after a short idle period (default: 1 second after you stop typing) |
+| On Focus Change | Changes are saved when you switch to a different tab or window |
+
+:::tip
+For editing configuration files on remote servers via SFTP, **After Delay** is the most convenient option — you see the result of your changes immediately after saving, without needing to manually press `Cmd+S` each time.
+:::
+
+## Line Numbers
+
+Toggle the line number gutter on the left side of the editor. Enabled by default.
+
+Useful to disable when editing short configuration snippets where line context is less important, freeing a few pixels of horizontal space.
+
+## Word Wrap
+
+When enabled, lines longer than the editor width wrap to the next visual line instead of scrolling horizontally. Disabled by default.
+
+:::warning
+Word wrap can make some file formats (minified JSON, long log lines) harder to navigate. Consider toggling it per-session from the Command Palette → "Toggle Word Wrap" rather than changing the global default.
+:::
+
+## Tab Size
+
+The number of spaces used to represent a tab character and the indentation unit when pressing the Tab key:
+
+| Option | Common use case |
+|---|---|
+| 2 spaces | JavaScript, TypeScript, JSON, YAML |
+| 4 spaces | Python, Rust, Go |
+| 8 spaces | Legacy C code, Makefiles |
+
+## Bracket Matching
+
+When enabled, the editor highlights the matching opening or closing bracket when your cursor is adjacent to a bracket character (`(`, `)`, `[`, `]`, `{`, `}`). Enabled by default.
+
+## Quick Access via Command Palette
+
+All editor settings can be toggled directly from the Command Palette (`Cmd+K`) without opening Settings. Search for the setting name — for example, "Word Wrap" or "Line Numbers" — to toggle it instantly from anywhere in the app.

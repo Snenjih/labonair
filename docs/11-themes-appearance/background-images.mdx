@@ -1,0 +1,56 @@
+---
+title: "Background Images"
+description: "How to set and configure a custom background image in Nexum."
+---
+
+# Background Images
+
+Nexum supports a custom background image layer that sits behind the entire application UI. This lets you personalize your workspace with a wallpaper, gradient image, or any visual texture — without compromising legibility.
+
+## Setting a Background Image
+
+1. Open **Settings** (`Cmd+,`) and navigate to **Appearance**.
+2. In the **Background Image** section, click **Choose Image**.
+3. An OS file dialog opens. Select an image file and confirm.
+4. Use the **Opacity** slider that appears to control how strongly the image shows through.
+
+## Supported Formats
+
+- PNG
+- JPEG / JPG
+- WebP
+
+Large files are supported but higher-resolution images consume more memory. A 1x or 2x resolution image matching your display size is sufficient.
+
+## Opacity Control
+
+The opacity slider ranges from **0%** to **100%**:
+
+- **0%** — the image is invisible; effectively the same as no background image.
+- **20–40%** — a subtle texture or tint behind the UI, which most users find comfortable for extended use.
+- **100%** — the image is fully opaque. Combined with the automatic overlay (see below), the UI remains usable, but low contrast between the image and UI elements is possible at high opacity.
+
+## Legibility Overlay
+
+Nexum automatically applies a semi-transparent overlay between the background image and the UI components. This overlay uses the current theme's `background` color at a fixed opacity, softening the image and ensuring that text, icons, and interactive elements remain readable regardless of what image you choose.
+
+You do not need to pre-process your image to darken it — the overlay handles this automatically.
+
+## Removing the Background Image
+
+To remove the background image, either:
+
+- Drag the opacity slider to **0%** — the image is hidden but the path is retained.
+- Click the **Clear** button next to the image path — this removes the image path from settings entirely.
+
+## Technical Details
+
+The background image is rendered by the `BackgroundImageLayer` React component, which sits at the bottom of the component tree, behind all panels and overlays. The image path is stored in Nexum's settings store (not the theme JSON) and is local to the machine — it is not part of the theme file and is not exported when you export a theme.
+
+:::warning
+Background image paths are stored as absolute file paths in your local settings. If you move or delete the image file, Nexum will silently fall back to no background image on next launch.
+:::
+
+:::tip
+Blurred or heavily bokeh'd photos work best as background images — they add visual personality without distracting from terminal output or file manager content.
+:::

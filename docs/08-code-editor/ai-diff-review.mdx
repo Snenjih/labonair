@@ -1,0 +1,44 @@
+---
+title: "AI Diff Review"
+description: "How to review, accept, or reject file changes proposed by the Nexum AI assistant."
+---
+
+# AI Diff Review
+
+When the Nexum AI assistant proposes a change to a file — via the `write_file` tool — it does not write directly to disk. Instead, Nexum opens a dedicated **AI Diff** tab and pauses the agent, waiting for your explicit decision before anything is modified.
+
+## The AI Diff tab
+
+The diff tab (tab type: `ai-diff`) presents the proposed change in a clear visual format:
+
+- **Green lines** — content the AI wants to add.
+- **Red lines** — content the AI wants to remove.
+- **Gray lines** — unchanged context surrounding the edit, so you understand where in the file the change lands.
+
+The tab header shows the filename and a label indicating it is an AI-proposed diff, so it is easy to distinguish from a normal editor tab.
+
+## Your three options
+
+| Button | Effect |
+|---|---|
+| **Accept** | Writes the proposed content to disk immediately. The diff tab closes and a normal editor tab opens showing the updated file. |
+| **Reject** | Discards the proposal. The file is untouched. The AI agent is notified that the change was rejected and may try an alternative approach. |
+| **Edit** | Opens the proposed content in a standard editor tab before accepting. Make any manual adjustments, then save with `Cmd+S` to finalize. |
+
+:::tip
+Use **Edit** when the AI's proposal is mostly right but needs a small tweak — it is faster than rejecting and re-prompting.
+:::
+
+## Agent pausing behavior
+
+The AI agent is fully paused while the diff tab is open. It will not proceed to subsequent steps (running commands, reading other files, etc.) until you respond. This ensures the agent never acts on stale assumptions about file content.
+
+Once you click **Accept** or **Reject**, Nexum sends the approval response back to the agent and it resumes automatically.
+
+## Accepted diffs are saved immediately
+
+Clicking **Accept** writes the file to disk at that moment. You do not need to press `Cmd+S` afterward. For remote files, the upload to the SFTP host also fires immediately — a brief "Syncing…" indicator appears in the status bar.
+
+:::warning
+If you close the AI Diff tab without clicking Accept, Reject, or Edit, the proposal is silently discarded and the agent may stall waiting for a response. If the agent appears stuck, check whether a diff tab was closed without a decision and re-prompt the AI.
+:::

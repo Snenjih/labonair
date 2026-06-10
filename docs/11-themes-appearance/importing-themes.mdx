@@ -1,0 +1,48 @@
+---
+title: "Importing Themes"
+description: "How to install a .json theme file into Nexum using the Theme Picker import flow."
+---
+
+# Importing Themes
+
+Any `.json` theme file — whether downloaded from the community, received from a colleague, or hand-crafted in a text editor — can be imported directly into Nexum through the Theme Picker.
+
+## Import Steps
+
+1. Open the Theme Picker via **Settings → Appearance → Theme** or `Cmd+K` → "Switch Theme".
+2. Click the **Import** button in the top-right corner of the Theme Picker.
+3. An OS-native file dialog opens. Navigate to your `.json` theme file and click **Open**.
+4. Nexum validates the file and, if it passes, copies it to your local themes directory and immediately adds it to the list.
+
+## Validation
+
+Nexum validates the imported file before accepting it. The following conditions must be met:
+
+- The file must be valid JSON.
+- A `name` field (string) must be present.
+- A `type` field with the value `"dark"` or `"light"` must be present.
+- A `colors` object must be present and contain at least the required UI color keys.
+
+If validation fails, an error toast is shown with a description of what is missing. The file is not copied to the themes directory in this case.
+
+## Where Themes Are Stored
+
+Successfully imported themes are copied to:
+
+```
+~/.local/share/com.nexum.app/themes/
+```
+
+You can also drop `.json` files directly into this directory — they will be picked up the next time Nexum launches or the Theme Picker is opened.
+
+## Technical Details
+
+The import flow uses the `theme_import` Tauri IPC command on the Rust backend, which invokes the Tauri `dialog` plugin to open the native file picker and then validates and copies the file using Rust's `std::fs`. The frontend never touches the filesystem directly.
+
+:::tip
+If you manage themes for a team, you can distribute `.json` files via a shared folder or internal wiki. Each team member imports the file once — subsequent updates need to be re-imported.
+:::
+
+:::warning
+Theme files are copied into the Nexum data directory. If you later edit the original file on disk, the change is not automatically reflected in Nexum. Re-import the updated file to apply changes.
+:::

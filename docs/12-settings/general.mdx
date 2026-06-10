@@ -1,0 +1,46 @@
+---
+title: "General Settings"
+description: "Reference for Nexum's General settings: app font, startup behavior, and language."
+---
+
+# General Settings
+
+General settings control application-wide behavior that is not specific to any single feature area. Open them via **Settings (`Cmd+,`) → General**.
+
+## App Font Family
+
+The font used for all non-terminal, non-editor UI text — labels, sidebar items, buttons, tooltips, and panel headers. This does not affect the terminal or the code editor, which have their own font settings under Terminal and Editor respectively.
+
+Set this to any font installed on your Mac. If the specified font is not available, Nexum falls back to the system UI font.
+
+## App Font Size
+
+The base font size for the UI shell, in points. Default is **14px**. Adjust this if you find the default too small or too large for your display density.
+
+This value scales proportionally — headings, labels, and secondary text all scale relative to this base size.
+
+## App Line Height
+
+A multiplier applied to the base line height of UI text. Default is **1.4**. Increasing this adds more breathing room between text lines in lists, descriptions, and multi-line UI elements.
+
+## Startup Behavior
+
+Controls what Nexum does when you launch the application:
+
+| Option | Behavior |
+|---|---|
+| Open Home Tab | Launches to the host manager home screen (default) |
+| Restore Previous Session | Re-opens the tabs and layout from the last session |
+| Open New Terminal | Immediately opens a fresh local terminal tab |
+
+:::tip
+"Restore Previous Session" is convenient for developers who work in the same set of local terminals every day. SSH session tabs are not automatically reconnected — they restore as disconnected stubs that you can reconnect manually.
+:::
+
+## Language
+
+Sets the display language for the Nexum UI. Currently **English only** — additional languages will be added in future releases.
+
+## Applying Changes
+
+All changes in General settings apply immediately. Font changes affect all currently open UI surfaces without a restart.

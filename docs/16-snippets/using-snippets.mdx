@@ -1,0 +1,51 @@
+---
+title: "Using Snippets"
+description: "How to insert snippets into terminal sessions using the Command Palette or Snippets panel."
+---
+
+# Using Snippets
+
+Once you have saved snippets, inserting them into a terminal is a fast two-step: find the snippet, select it. The content lands in the terminal as typed text — ready to review and run.
+
+## Inserting via the Command Palette
+
+The Command Palette is the fastest insertion path when you already know the snippet name:
+
+1. Make sure a terminal tab is active.
+2. Press `Cmd+K` to open the Command Palette.
+3. Start typing the snippet name (or any word from its name/description).
+4. Select the matching snippet from the results list.
+5. The snippet content is inserted at the current terminal cursor position.
+
+The Command Palette uses fuzzy search, so partial matches work well. If you named your snippet `docker: run postgres 15 dev`, searching `postgres dev` or `docker pg` will surface it.
+
+## Inserting via the Snippets panel
+
+The Snippets panel is better for browsing when you do not remember the exact name:
+
+1. Open the Snippets panel from the sidebar.
+2. Scroll or search to find the snippet.
+3. Click the **Insert** button (or double-click the snippet row).
+4. The content is sent to the active terminal tab at the cursor position.
+
+## How insertion works
+
+Snippets are injected directly into the active terminal PTY — the same mechanism as pasting text from the clipboard. The terminal receives the text character by character at the current cursor position.
+
+**Key behavior to understand:**
+
+- Snippets do **not** auto-execute. No newline is appended. You see the snippet content appear in the terminal prompt and must press `Enter` to run it.
+- You can edit the inserted content on the terminal command line before running — add flags, change paths, or substitute values inline.
+- Multi-line snippets are sent in full, with newlines preserved. Each line will appear in the terminal as if you typed it. Since most shells treat a newline as "run this command", multi-line snippets may execute immediately as they are inserted — review multi-line snippets carefully before inserting.
+
+:::warning
+Multi-line snippets are sent line by line. If your snippet contains multiple commands separated by newlines, the shell may execute each line as it arrives. Test multi-line snippets in a safe environment before using them on production hosts.
+:::
+
+## Inserting into SSH terminal tabs
+
+Snippets work in SSH terminal tabs the same way as local terminal tabs. The snippet content is written to the PTY that is connected to the remote shell session. The remote shell receives and executes it exactly as if you had typed it manually.
+
+:::tip
+For long multi-line scripts that you want to review before any line executes, wrap the snippet content in a shell function definition — define the function, then call it. This lets you insert the whole block first, inspect it, and run the function call as a single command on a separate line.
+:::

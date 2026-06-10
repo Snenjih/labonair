@@ -1,0 +1,52 @@
+---
+title: "Todo Strip"
+description: "A real-time task progress strip that appears above the input bar when the AI is working through a multi-step plan."
+---
+
+# Todo Strip
+
+When the AI agent is working through a complex, multi-step task, it can create a structured task list using the `todo` tool. This list is rendered as the **Todo Strip** — a persistent, live-updating progress tracker that sits above the AI input bar for the duration of the agent run.
+
+## What It Looks Like
+
+The Todo Strip appears as a compact horizontal (or vertically stacked) list of task items, each with a status indicator:
+
+| Status | Indicator |
+|---|---|
+| Pending | Empty checkbox |
+| In Progress | Spinner / filled checkbox |
+| Completed | Checked checkbox |
+
+At a glance you can see how far along the agent is, which step it is currently executing, and how many steps remain.
+
+## When It Appears
+
+The Todo Strip is shown whenever the AI calls the `todo` tool to register a task list. This typically happens when you give the AI a broad instruction — for example, "set up a new Node.js project with ESLint and Prettier" or "update all config files to use the new API endpoint." The AI plans the steps first, then works through them one by one.
+
+For simple single-step responses (answering a question, reading a file), no Todo Strip is shown.
+
+## Real-Time Updates
+
+As the AI executes each step — calling `read_file`, running commands, writing files — it updates the corresponding task item's status. Transitions happen in real time as the agent loop progresses. You do not need to refresh or interact with the strip for it to update.
+
+## Expanding a Task Item
+
+Click any task item in the Todo Strip to expand it. The expanded view shows:
+
+- The tool calls made during that step
+- The results returned by those tools
+- Any intermediate reasoning the AI produced
+
+This gives you full auditability of what the AI actually did at each step, not just a summary.
+
+## After the Run
+
+Once the agent run finishes (either successfully or by hitting the step limit), the Todo Strip remains visible in a completed state. You can still click items to review what happened. The strip is cleared when the next agent run begins or when you start a new session.
+
+:::tip
+The Todo Strip is particularly useful for infrastructure provisioning tasks. If the agent stalls or encounters an error mid-run, the strip shows exactly which step failed — you can then intervene manually (fix the issue in the terminal) and ask the AI to continue from where it left off.
+:::
+
+:::tip
+If you want the AI to always plan before acting, use the `plan` directive in the input bar. This causes the AI to produce a Todo Strip with all planned steps before executing any of them, giving you a preview you can comment on before work begins.
+:::

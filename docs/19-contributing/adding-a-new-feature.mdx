@@ -1,0 +1,96 @@
+---
+title: "Adding a New Feature"
+description: "Step-by-step instructions for adding frontend features, Tauri commands, and new tab types to Nexum."
+---
+
+# Adding a New Feature
+
+This page walks through the most common contribution patterns: adding a frontend-only feature, adding a new Tauri command (Rust + frontend), and adding a new tab type.
+
+## Frontend Feature
+
+When the feature does not require OS access and is entirely UI-side:
+
+1. Create a module directory: `src/modules/<feature>/`
+2. Add components in `<feature>/components/`, hooks in `<feature>/lib/`, and a Zustand store in `<feature>/store/` if needed
+3. Export the public surface from `<feature>/index.ts`
+4. Import from other modules using `@/modules/<name>`, never relative cross-module paths
+5. Wire the new module into `App.tsx` or the relevant parent component as a coordinator — `App.tsx` should remain a thin coordinator, not a feature host
+
+## New Tauri Command (Rust + Frontend)
+
+When the feature requires OS access, file I/O, a network call, or any system resource:
+
+**Rust side:**
+
+1. Define the command in the relevant `src-tauri/src/modules/<area>/` file:
+   ```rust
+   #[tauri::command]
+   pub async fn your_command(arg: String) -> Result<String, String> {
+       // Implementation
+       Ok(result)
+   }
+   ```
+2. Register it in `src-tauri/src/lib.rs`:
+   ```rust
+   .invoke_handler(tauri::generate_handler![
+       // ... existing commands ...
+       your_command,
+   ])
+   ```
+
+**Frontend side:**
+
+3. Call the command from React:
+   ```ts
+   import { invoke } from "@tauri-apps/api/core"
+   
+   const result = await invoke<string>("your_command", { arg: "value" })
+   ```
+
+No capability entry is needed for custom commands — only for Tauri plugins.
+
+**Rules for Tauri commands:**
+- Always use `async fn` — never block the Tauri command thread
+- Return `Result<T, String>` with descriptive error messages
+- Never use `unwrap()` on predictable error paths
+
+## New Tab Type
+
+1. Add the new kind to the `Tab` union in `src/modules/tabs/types.ts`:
+   ```ts
+   export type Tab =
+     | { kind: "terminal"; ... }
+     | { kind: "your-new-tab"; yourData: string; ... }
+     // ... existing kinds
+   ```
+2. Add a render case in the relevant Stack component (e.g., `src/modules/tabs/components/TabStack.tsx`)
+3. Follow the **never-unmount** rule for tabs that should preserve state: hide inactive tabs with `invisible pointer-events-none` rather than conditionally rendering them
+
+## Listening to Rust Events
+
+To subscribe to a Tauri event emitted by the Rust backend:
+
+```ts
+import { listen } from "@tauri-apps/api/event"
+
+useEffect(() => {
+  const unlisten = listen("event_name", (event) => {
+    // event.payload contains the data
+  })
+  return () => { unlisten.then(f => f()) }
+}, [])
+```
+
+## Running Checks Before Committing
+
+After implementing any change, both of these must pass before submitting a PR:
+
+```bash
+cd src-tauri && cargo check
+pnpm exec tsc --noEmit
+```
+
+:::warning
+Do not submit a PR if either check fails. CI will reject it, and reviewers will not merge broken builds.
+:::

@@ -1,0 +1,65 @@
+---
+title: "Agent Tools"
+description: "The AI agent's built-in tools — what they do, which run automatically, and which require your approval."
+---
+
+# Agent Tools
+
+The AI assistant operates as an **agent**: rather than just generating text, it can call tools to interact with your filesystem and terminal. Tools are divided into two categories based on whether they require your explicit approval.
+
+## Auto-Execute Tools
+
+These tools run silently without interrupting the conversation. The AI uses them to gather context before responding.
+
+### `read_file`
+Reads the contents of a local file and makes them available to the AI for analysis or reference. The AI will often call this automatically when you mention a file path, ask it to review code, or reference a config.
+
+- Input: absolute file path
+- Output: file contents (shown inline in the conversation as an expandable card)
+- Blocked paths: see [AI Security](./security) for the deny-list
+
+### `list_directory`
+Lists the files and directories at a given path. Used by the AI to understand project structure before diving into a task.
+
+- Input: directory path
+- Output: directory listing with file names and types
+
+## Approval-Required Tools
+
+These tools pause the agent and show an **Approval Card** in the chat. You must click Allow or Deny before the AI continues. See [Tool Approval](./tool-approval) for details on the approval flow.
+
+### `write_file`
+Creates a new file or overwrites an existing one. When approved, an **AI Diff tab** opens so you can review the exact changes before they are committed to disk.
+
+- Input: file path + new file contents
+- Requires: explicit Allow per call
+
+### `create_directory`
+Creates a new directory (and any necessary parent directories) at the specified path.
+
+- Input: directory path
+- Requires: explicit Allow per call
+
+### `run_command`
+Executes a shell command in the active terminal session. The exact command is shown in the Approval Card before execution.
+
+- Input: shell command string
+- Requires: explicit Allow per call
+- Runs in: the currently active terminal tab
+
+## Sub-Agent Tool
+
+### `subagent`
+Spawns a secondary AI instance to handle a specific subtask independently. See [Sub-Agents](./sub-agents) for details.
+
+## Tool Results
+
+All tool outputs — whether auto-executed or approval-gated — appear inline in the conversation as collapsible result cards. You can expand them to see the full output at any time during or after the agent run.
+
+:::tip
+If you want to see what the AI is doing in real time, watch the tool cards that appear between messages. Each card shows the tool name, its inputs, and the result — giving you full visibility into the agent's reasoning process.
+:::
+
+:::warning
+The `run_command` tool runs commands in your active local terminal with your user privileges. Always read the proposed command carefully before approving. If a command looks unexpected or overly broad, click Deny — the AI will attempt an alternative approach.
+:::

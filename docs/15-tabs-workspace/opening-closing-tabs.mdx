@@ -1,0 +1,68 @@
+---
+title: "Opening & Closing Tabs"
+description: "How to open, close, and manage tabs in Nexum using keyboard shortcuts, the dashboard, and the Command Palette."
+---
+
+# Opening & Closing Tabs
+
+Tabs are the primary navigation unit in Nexum. Every active session, file, and view lives in a tab. You can open tabs from several entry points — keyboard shortcuts, the Home Dashboard, or the Command Palette — and close them just as easily.
+
+## Opening a New Tab
+
+### Blank Home Tab
+
+Press `Cmd+T` to open a new **Home tab**. This lands you on the Host Manager dashboard where you can choose what to do next: connect to a host, open a file, or start a local terminal session.
+
+### From the Home Dashboard
+
+In a Home tab, find your host in the list and click it. Two action buttons appear:
+
+- **Connect SSH** — opens a new `ssh-terminal` tab for that host.
+- **Open SFTP** — opens a new `sftp` tab for that host.
+
+If the host has never been connected before, Nexum will show the known-hosts fingerprint verification dialog before establishing the session.
+
+### From the Command Palette
+
+Press `Cmd+K` to open the Command Palette. Type any part of a host's display name or hostname. The palette surfaces matching hosts with connection type options — select one to open the appropriate tab immediately.
+
+The Command Palette also exposes actions like:
+- **New Terminal Tab** — opens a `terminal` (local PTY) tab.
+- **Open File…** — opens a file picker and launches an `editor` tab.
+- **New SFTP Tab** — prompts you to choose a host and opens an `sftp` tab.
+
+### From the Sidebar File Explorer
+
+In the Sidebar file explorer, double-click any file to open it in a new `editor` tab.
+
+## Closing a Tab
+
+- **Keyboard:** `Cmd+W` closes the active tab.
+- **Mouse:** Click the **×** button on the tab itself.
+- **Context Menu:** Right-click the tab in the Tab Bar to reveal options including **Close Tab**, **Close Other Tabs**, and **Close Tabs to the Right**.
+
+:::warning
+Closing an SSH terminal, SFTP, or local terminal tab **permanently ends** that session. Any running processes in the terminal will be terminated. If you need the session to keep running in the background, switch away from the tab instead of closing it.
+:::
+
+## Switching Between Tabs
+
+- Click any tab in the Tab Bar.
+- `Cmd+1` through `Cmd+9` switch to the tab at that position.
+- `Cmd+Shift+[` and `Cmd+Shift+]` cycle to the previous and next tab.
+- The Command Palette also accepts tab names — type the session label to jump to an open tab.
+
+## Tab Context Menu
+
+Right-clicking a tab in the Tab Bar reveals additional management options:
+
+| Action | Description |
+|---|---|
+| Close Tab | Closes this tab and ends its session |
+| Close Other Tabs | Closes all tabs except this one |
+| Close Tabs to the Right | Closes all tabs to the right of this one |
+| Rename Tab | Sets a custom label for this tab |
+
+:::tip
+Use **Rename Tab** to give descriptive names to SSH sessions when you have many open at once — for example "prod-web-01" and "staging-db" instead of generic hostnames.
+:::

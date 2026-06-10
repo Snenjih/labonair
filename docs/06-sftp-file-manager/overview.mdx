@@ -1,0 +1,45 @@
+---
+title: "SFTP File Manager Overview"
+description: "A high-performance split-pane file browser for transferring files between your local machine and a remote server."
+---
+
+# SFTP File Manager Overview
+
+The SFTP File Manager is Nexum's flagship feature — a dual-pane file browser that lets you navigate, transfer, and manage files between your local machine and any remote server over SFTP. It opens in its own dedicated tab type (`sftp`) and is designed to feel as responsive as a native app, even when connected to slow or high-latency servers.
+
+## Layout
+
+The interface is a resizable split pane:
+
+- **Left pane** — your local filesystem, starting at your home directory (`~`)
+- **Right pane** — the remote SFTP filesystem, starting at the SSH user's home directory
+
+You can drag the divider between the two panes to redistribute horizontal space. Each pane is fully independent: sorting, filtering, and navigation in one pane have no effect on the other.
+
+## Opening the SFTP File Manager
+
+There are two ways to launch an SFTP session:
+
+1. **Home Dashboard** — right-click any host and select "Open SFTP"
+2. **Command Palette** (`Cmd+K`) — type the host name and choose "Open SFTP" from the results
+
+Both methods open a new `sftp` tab and establish a connection to the remote host using the stored credentials.
+
+## Performance
+
+The file list is built on `@tanstack/react-virtual`, a row-virtualization library that mounts only the visible rows in the DOM at any time. Directories with 10,000 or even 50,000 files render at 60 FPS — scrolling stays smooth regardless of directory size.
+
+Transfers are handled entirely by a background Rust worker powered by `tokio`. Once a transfer is enqueued, it runs independently of the UI. You can close the SFTP tab, switch to a terminal, or open a different connection — the transfer continues uninterrupted and progress is always visible in the titlebar Transfer Queue indicator.
+
+## What You Can Do
+
+- Browse and navigate both local and remote filesystems simultaneously
+- Transfer files and folders via drag-and-drop or toolbar buttons
+- Rename, delete, create folders, and change permissions on remote files
+- Edit remote files directly in Nexum's built-in CodeMirror editor
+- Filter and sort large directory listings in-memory without additional network requests
+- Resolve file conflicts with fine-grained options (overwrite, skip, rename)
+
+:::tip
+The SFTP File Manager requires an SSH connection with SFTP subsystem support. Most modern OpenSSH servers enable this by default. If you see a connection error, verify that `Subsystem sftp /usr/lib/openssh/sftp-server` (or equivalent) is present in the server's `sshd_config`.
+:::

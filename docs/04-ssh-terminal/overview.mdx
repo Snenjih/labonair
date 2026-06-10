@@ -1,0 +1,42 @@
+---
+title: "SSH Terminal Overview"
+description: "A guide to Nexum's full-featured SSH terminal, powered by xterm.js and the ssh2 Rust crate."
+---
+
+# SSH Terminal Overview
+
+Nexum ships a first-class SSH terminal that feels identical to a local shell — because under the hood it uses the exact same rendering stack. Every SSH session is rendered through **xterm.js** with the WebGL addon enabled, giving you GPU-accelerated text output at any window size without tearing or lag.
+
+## How it fits into the workspace
+
+SSH terminals live in their own tab type (`ssh-terminal`) alongside local workspace tabs, SFTP tabs, editor tabs, and preview tabs. You can have as many SSH sessions open simultaneously as you need — to different hosts, or multiple sessions to the same host — and switch between them instantly without dropping any connection.
+
+## Protocol and authentication
+
+The SSH protocol layer is handled entirely in Rust via the **ssh2** crate. Nexum supports:
+
+- **SSH protocol 2** only (protocol 1 is obsolete and intentionally not supported)
+- **Password authentication** — credentials stored securely in the macOS Keychain, never on disk
+- **Public-key authentication** — key pairs from `~/.ssh/` are offered automatically
+- **Keyboard-interactive / 2FA** — multi-step challenges (TOTP codes, one-time passwords) surface as an inline prompt inside the tab
+
+## Session management
+
+PTY sessions are managed on the Rust side. The frontend never touches the SSH channel directly — all input and output flows through Tauri IPC:
+
+- User keystrokes → `ssh_pty_write` command → Rust → SSH server
+- Server output → `ssh_pty_output {tab_id, data}` Tauri event → xterm.js renderer
+
+This clean separation means the SSH session survives tab switches, window resizes, and background focus loss without any data loss.
+
+## Non-destructive tab switching
+
+Switching away from an SSH Terminal tab does **not** pause or disconnect the session. The tab is hidden via CSS while the PTY keeps streaming in the background. Terminal output continues to accumulate in the scrollback buffer. Switching back is instant — full terminal state is preserved.
+
+:::tip
+You can run a long-running command, switch to an SFTP tab to manage files, then switch back to see the output — the session never pauses.
+:::
+
+## Relationship to the local terminal
+
+The SSH terminal shares the same xterm.js instance configuration, font settings, color scheme, and key bindings as the local terminal. If you change the font size in Settings → Terminal, it updates both local and SSH terminals immediately.

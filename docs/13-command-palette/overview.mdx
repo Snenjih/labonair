@@ -1,0 +1,48 @@
+---
+title: "Command Palette Overview"
+description: "The Command Palette is Nexum's central hub for keyboard-driven navigation and action execution."
+---
+
+# Command Palette Overview
+
+The Command Palette is the fastest way to navigate Nexum without lifting your hands from the keyboard. It surfaces every available action, host connection, theme, and setting in a single searchable interface — no mouse required.
+
+## Opening the Palette
+
+Press `Cmd+K` or `Cmd+Shift+P` from anywhere in the app. The palette opens as a modal overlay on top of your current workspace without interrupting running processes or terminal sessions.
+
+## Searching Commands
+
+Start typing immediately after opening. The palette performs fuzzy search across the command title, subtitle, and section label simultaneously. You do not need to match the exact wording — partial matches and abbreviations work. For example, typing `sftp ref` will surface "Refresh Directory" in the SFTP section.
+
+## Multi-Level Navigation
+
+Some commands open a sub-menu rather than executing immediately. These are called sub-pages. Examples include:
+
+- **Hosts** — lists all saved hosts with SSH and SFTP connect actions
+- **Themes** — lists all installed themes with live preview on hover
+- **Modes** — toggles between light, dark, and system appearance
+
+When you enter a sub-page, the palette header updates to show the current page name. The search field resets so you can filter within that sub-page independently.
+
+## Technical Foundation
+
+The Command Palette is built with the `cmdk` library rendered inside a Radix UI Dialog. This ensures correct focus trapping, screen reader accessibility, and consistent keyboard behavior. The palette component lives in `src/modules/command-palette/`.
+
+## Escape Behavior
+
+The `Escape` key follows a deliberate three-step hierarchy:
+
+1. **First press** — clears the current search text (if any)
+2. **Second press** — navigates back one page (if in a sub-page)
+3. **Third press** — closes the palette entirely
+
+This behavior is intentional. It mirrors the mental model of drilling into a menu and being able to back out gracefully without losing context. Nexum intercepts `Escape` before Radix's default dialog-close behavior to implement this custom hierarchy.
+
+:::tip
+Use `Cmd+K` as your default way to open the palette. `Cmd+Shift+P` is provided as a familiar shortcut for users coming from VS Code.
+:::
+
+## Context Awareness
+
+Not all commands are always visible. Commands tagged with a specific context (editor, terminal, sftp) only appear when that tab type is currently active. This keeps the list focused and relevant. See [Context-Aware Commands](./context-aware-commands) for details.

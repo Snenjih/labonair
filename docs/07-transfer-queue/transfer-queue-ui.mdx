@@ -1,0 +1,57 @@
+---
+title: "Transfer Queue UI"
+description: "How to read the Transfer Queue panel in the titlebar — progress bars, transfer speeds, and status indicators explained."
+---
+
+# Transfer Queue UI
+
+The Transfer Queue panel is accessible from the Nexum titlebar and gives you a live view of all active, completed, and failed transfers during the current session.
+
+## The Titlebar Indicator
+
+When one or more transfers are active, a circular progress ring appears in the Nexum titlebar. The ring animates to reflect aggregate transfer progress. Once all transfers complete, the ring is replaced by a static checkmark icon that remains visible until you start another transfer.
+
+If no transfers have occurred in the current session, the indicator is hidden entirely.
+
+## Opening the Panel
+
+Click the titlebar indicator to toggle the Transfer Queue dropdown panel open or closed. The panel floats below the titlebar and does not block interaction with the rest of the app.
+
+## Panel Layout
+
+Each transfer is listed as a row in the panel. Rows are ordered from newest to oldest. The panel shows:
+
+### Active Transfers
+
+- **Filename** — the name of the file being transferred
+- **Direction** — an arrow icon indicating upload (↑) or download (↓)
+- **Progress bar** — a horizontal bar showing percentage completion
+- **Speed** — current transfer throughput displayed as KB/s or MB/s, updated in real time
+- **Size** — bytes transferred so far vs. total file size (e.g., `12.4 MB / 80 MB`)
+- **Cancel button** — a × icon on the right; click to cancel this transfer
+
+### Completed Transfers
+
+Completed transfers remain in the panel for the duration of the session. They display:
+
+- Filename and direction
+- A green checkmark icon
+- Total size transferred
+
+### Failed Transfers
+
+Failed transfers display:
+
+- Filename and direction
+- A red × icon
+- The error message from the Rust backend (e.g., "Permission denied", "Connection lost")
+
+## Real-Time Updates
+
+The panel subscribes to `transfer_progress` Tauri events emitted by the Rust backend. Updates arrive continuously as each transfer chunk completes. Transfer speed is calculated over a rolling window and smoothed to avoid erratic flickering.
+
+There is no manual refresh — the panel always reflects the current state of the Rust worker.
+
+:::tip
+If a transfer shows an unexpectedly low speed, it is usually a sign of network latency or server-side I/O limits rather than a Nexum issue. Check your connection to the remote host with a `ping` in a terminal tab to get a baseline.
+:::

@@ -1,0 +1,64 @@
+---
+title: "Terminal Settings"
+description: "Reference for all terminal appearance and behavior settings in Nexum."
+---
+
+# Terminal Settings
+
+Terminal settings control the appearance and behavior of every terminal session in Nexum — both local PTY sessions and SSH terminal tabs. Open them via **Settings (`Cmd+,`) → Terminal**.
+
+## Typography
+
+### Font Family
+
+The monospace font used to render terminal output. Nexum defaults to the system monospace font. You can specify any monospace font installed on your Mac — popular choices include `JetBrains Mono`, `Fira Code`, `Cascadia Code`, and `Menlo`.
+
+:::tip
+Ligature-enabled fonts like JetBrains Mono and Fira Code render programming symbols (`=>`, `!==`, `->`) as single glyphs. Enable this in the font's own settings if supported.
+:::
+
+### Font Size
+
+The terminal font size in points. Default: **13**. Adjust for your display and preferences.
+
+### Font Weight
+
+Controls the rendered weight of terminal text:
+
+| Option | Effect |
+|---|---|
+| Normal | Standard weight (400) |
+| Medium | Slightly heavier (500) |
+| Bold | Heavy weight (700) |
+
+### Line Height
+
+A multiplier applied to the terminal's line spacing. Default: **1.2**. Increase for more breathing room between output lines; decrease to pack more lines on screen.
+
+### Letter Spacing
+
+Extra horizontal space added between terminal characters, in pixels. Default: **0**. Fractional values (e.g. `0.5`) are supported.
+
+## Cursor
+
+### Cursor Style
+
+| Style | Appearance |
+|---|---|
+| Block | Solid rectangle (default) |
+| Underline | Thin horizontal bar below the character |
+| Bar | Thin vertical bar (I-beam) |
+
+### Cursor Blink
+
+Enable or disable cursor blinking. When enabled, the cursor blinks at the system default rate. Disable for a static cursor that does not distract from output.
+
+## Scrollback
+
+The number of lines retained in the terminal's scroll history. Range: **100 – 100,000**. Default: **10,000**.
+
+Higher values consume more memory per terminal session. For log-heavy workflows (e.g., streaming server output), increasing this to 50,000 or more prevents older output from being lost.
+
+## Applying Changes
+
+Terminal typography and cursor settings apply to newly opened terminal sessions immediately. Existing sessions update where xterm.js supports live reconfiguration — font size and cursor changes take effect immediately in open tabs.

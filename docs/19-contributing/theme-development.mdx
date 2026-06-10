@@ -1,0 +1,77 @@
+---
+title: "Theme Development"
+description: "How to create, test, and contribute themes for Nexum."
+---
+
+# Theme Development
+
+Nexum themes are JSON files that define a complete color palette. The Rust backend manages them as files; the React frontend injects them as CSS variables at runtime. This page explains the full lifecycle.
+
+## Theme JSON Format
+
+Each theme is a `.json` file with the following shape (see [Theme JSON Format](/11-themes-appearance/theme-json-format) for the complete field reference):
+
+```json
+{
+  "id": "my-theme",
+  "name": "My Theme",
+  "author": "yourhandle",
+  "version": "1.0.0",
+  "colors": {
+    "background": "#1a1a2e",
+    "foreground": "#e0e0ff",
+    "accent": "#7c3aed",
+    ...
+  }
+}
+```
+
+All color values are HEX strings. The Rust backend validates the JSON schema on import and rejects files with missing required fields.
+
+## CSS Injection
+
+When Nexum loads a theme, the React frontend:
+
+1. Calls `themes_get_all` on boot to fetch all theme metadata
+2. Reads the active theme ID from the preferences store
+3. Fetches the active theme's color data
+4. Iterates over the `colors` object and injects each value as a CSS custom property on `document.documentElement.style`
+
+For example, `"background": "#1a1a2e"` becomes `--background: <oklch equivalent>` on the `<html>` element. Tailwind CSS v4's semantic utilities (e.g., `bg-background`) resolve to these injected variables, so every UI element recolors instantly.
+
+## Rust Theme Commands
+
+| Command | Description |
+|---|---|
+| `themes_get_all` | Returns metadata for all installed themes |
+| `theme_import` | Validates and copies a theme JSON into the themes directory |
+| `theme_export` | Writes a theme JSON to a user-chosen path |
+| `theme_delete` | Removes a theme file and clears it if it was active |
+
+## Theme Storage
+
+Installed themes are stored at:
+
+```
+~/.local/share/com.nexum.app/themes/
+```
+
+Each `.json` file in this directory is a theme. You can place theme files here manually without using the import UI — Nexum reads this directory on each launch.
+
+## Testing a Theme
+
+1. Create your theme JSON file
+2. Open Settings → Appearance → Theme Picker → **Import**
+3. Select your JSON file
+4. The theme appears in the Theme Picker immediately
+5. Select it to preview; use the Command Palette theme switcher for live preview while editing
+
+## Contributing Community Themes
+
+Submit a pull request to the [nexum-themes repository](https://github.com/Snenjih/nexum-themes). Include:
+- Your theme `.json` file
+- A screenshot showing the theme in a terminal, editor, and SFTP tab
+
+:::tip
+Use the live theme preview in the Command Palette (see [Theme Switcher via Palette](/13-command-palette/theme-switcher)) to rapidly iterate on your theme colors without closing and reopening dialogs.
+:::

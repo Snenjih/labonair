@@ -1,0 +1,49 @@
+---
+title: "Host Groups"
+description: "Organize your saved hosts into collapsible groups for easier navigation in the Home Dashboard."
+---
+
+# Host Groups
+
+Groups let you partition your hosts into logical collections — for example, separating production servers from staging environments, or grouping hosts by client. Groups appear as collapsible sections in the Home Dashboard, keeping the view clean even with dozens of saved hosts.
+
+## Creating a Group
+
+There are two ways to create a group:
+
+- Click **New Group** in the sidebar or at the bottom of the Home Dashboard.
+- Type a new group name in the **Group** field while creating or editing a host — the group is created automatically when the host is saved.
+
+## Renaming a Group
+
+Double-click the group name label directly in the dashboard to enter inline rename mode. Type the new name and press `Enter` to confirm, or `Escape` to cancel.
+
+## Deleting a Group
+
+Right-click the group header and choose **Delete Group** from the context menu. A confirmation dialog appears before the group is removed.
+
+:::warning
+Deleting a group does **not** delete the hosts inside it. Hosts become **ungrouped** and move to the default ungrouped section at the top of the dashboard. No connection data or credentials are lost.
+:::
+
+## Reordering Groups and Hosts
+
+Nexum supports full drag-and-drop reordering:
+
+- **Reorder groups** — drag a group header to a new position.
+- **Reorder hosts within a group** — drag a host card up or down within its group.
+- **Move a host to a different group** — drag the host card onto a different group's header or into its host list area.
+
+The new order is persisted to SQLite immediately.
+
+## Collapsing and Expanding Groups
+
+Click the chevron icon next to a group name to collapse or expand it. Collapsed groups still show a count of the hosts they contain. Nexum remembers the collapsed/expanded state of each group between sessions.
+
+## Ungrouped Hosts
+
+Hosts without a group assignment appear in an **Ungrouped** section at the top of the dashboard. You can assign them to a group at any time by editing the host and selecting a group, or by dragging the card into a group section.
+
+:::tip
+Use color labels alongside groups for a two-level organization system — for example, all production hosts in one group but colored red, and staging hosts colored yellow.
+:::

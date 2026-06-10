@@ -1,0 +1,57 @@
+---
+title: "known_hosts Warning"
+description: "What to do when Nexum shows a server fingerprint mismatch warning."
+---
+
+# known_hosts Warning
+
+When you connect to an SSH server, Nexum verifies the server's cryptographic fingerprint against the entries in `~/.ssh/known_hosts`. If the fingerprint does not match the stored value, Nexum shows a known_hosts warning dialog before allowing the connection to proceed.
+
+## Why This Warning Appears
+
+There are two categories of cause: expected and dangerous.
+
+**Expected causes:**
+- The server was rebuilt or reprovisioned, generating new SSH host keys
+- The server administrator regenerated the SSH host keys deliberately
+- You are connecting to a different server that now occupies the same IP address (e.g., after a cloud VM replacement)
+- The host entry in `~/.ssh/known_hosts` was written with an old key before a planned migration
+
+**Dangerous cause:**
+- A Man-in-the-Middle (MITM) attack — a third party is intercepting your connection and presenting their own server key instead of the legitimate server's key
+
+## How to Respond
+
+**If you expected the change** (you were told the server was rebuilt, or you performed the key rotation yourself):
+
+1. Verify the new fingerprint with your server administrator or cloud provider console
+2. Click **"Accept New Key"** in the warning dialog
+3. Nexum updates the `~/.ssh/known_hosts` entry and proceeds with the connection
+
+**If the change is unexpected:**
+
+1. Click **"Cancel"** — do not connect
+2. Do not accept the new key
+3. Contact your server administrator to confirm whether the key changed intentionally
+4. Check with your network team whether anything changed on the network path between you and the server
+
+:::warning
+Never accept an unexpected fingerprint change. This is a potential security incident. An accepted MITM key means every password, command, and file transfer over that session is visible to the attacker. Investigate before connecting.
+:::
+
+## Viewing known_hosts
+
+The known_hosts file is a plain text file located at:
+
+```
+~/.ssh/known_hosts
+```
+
+Each line represents one stored host fingerprint. You can open it in Nexum's editor or any text editor to inspect, edit, or remove specific entries manually.
+
+To remove a stale entry for a specific host from the command line:
+```bash
+ssh-keygen -R hostname_or_ip
+```
+
+This is equivalent to what Nexum does internally when you click "Accept New Key."

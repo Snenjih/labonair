@@ -1,0 +1,53 @@
+---
+title: "Choosing a Model"
+description: "Select from OpenAI's model lineup or connect any OpenAI-compatible provider with a custom base URL."
+---
+
+# Choosing a Model
+
+Nexum supports OpenAI's full model lineup and any provider that exposes an OpenAI-compatible API. Model selection is available both in Settings and directly from the AI panel header.
+
+## Changing the Model
+
+**From Settings:**
+1. Open Settings (`Cmd+,`) → **Models & Agents**
+2. Select a model from the dropdown or type a custom model ID
+
+**From the AI Panel:**
+Click the model name displayed in the AI panel header to open the Model Picker. The change takes effect immediately for new messages; the current session retains the selected model.
+
+## Supported OpenAI Models
+
+| Model | Best For |
+|---|---|
+| `gpt-4o` | Default — best balance of speed and capability |
+| `gpt-4o-mini` | Faster and cheaper for lighter tasks |
+| `gpt-4-turbo` | Large context tasks, document analysis |
+| `o1-preview` | Deep reasoning, complex multi-step problems |
+| `o1-mini` | Fast reasoning for coding tasks |
+
+The default model is `gpt-4o`. This can be changed in Settings or (for advanced users) via `src/modules/ai/config.ts`.
+
+## OpenAI-Compatible Providers
+
+Nexum supports any provider that implements the OpenAI Chat Completions API. To connect one:
+
+1. Open Settings → **Models & Agents**
+2. Enable **Custom Endpoint**
+3. Enter the provider's base URL (e.g., `http://localhost:11434/v1` for Ollama)
+4. Enter the model ID as expected by the provider (e.g., `llama3`, `mixtral`)
+5. Optionally set a **custom display name** that replaces the model ID in the UI
+
+Providers known to work include **Ollama** (local), **Groq**, **Together AI**, **Fireworks AI**, and **LM Studio**.
+
+:::tip
+When using Ollama locally, you can leave the API key field empty or enter any placeholder string — Ollama does not require authentication. Set the base URL to `http://localhost:11434/v1` and enter your model name (e.g., `llama3.1:8b`).
+:::
+
+## Model Persistence
+
+The selected model is saved with each session. Switching sessions may restore the model that was active when that session was last used. You can always override it from the Model Picker before sending a message.
+
+:::warning
+`o1-preview` and `o1-mini` use a different token structure and do not support streaming in the same way. Response times are longer — this is expected behavior from OpenAI, not a Nexum issue.
+:::

@@ -1,0 +1,40 @@
+---
+title: "Local Terminal Overview"
+description: "A guide to Nexum's built-in local terminal emulator, powered by xterm.js and portable-pty."
+---
+
+# Local Terminal Overview
+
+Nexum includes a high-performance local terminal emulator that runs your system shell in a native pseudo-terminal (PTY). It is not a wrapper around Terminal.app or iTerm2 — it is a fully self-contained terminal engine built into Nexum.
+
+## Technology stack
+
+The terminal is built on two components:
+
+- **xterm.js with the WebGL addon** — handles rendering. The WebGL renderer draws text directly to a GPU canvas, giving you smooth, flicker-free output even at large terminal sizes and high scroll speeds.
+- **portable-pty (Rust)** — opens and manages PTY sessions at the OS level. It spawns your system shell inside a proper PTY, which means applications like `vim`, `tmux`, `htop`, and interactive `fzf` work exactly as they would in a native terminal.
+
+## Workspace tabs
+
+Local terminals are displayed as **Workspace tabs** in the Nexum tab bar. Internally, the tab type is `terminal`. Each workspace tab can contain one or more terminal panes in a split layout, all sharing the same tab.
+
+You can have as many workspace tabs open simultaneously as you need. Each tab runs its own independent shell session.
+
+## Shell support
+
+Nexum launches whatever shell your macOS user account is configured to use — typically **zsh** (the macOS default since Catalina), but **bash** and **fish** are also supported. Shell integration scripts are injected automatically for zsh and bash to enable CWD tracking and other features.
+
+## Appearance
+
+The local terminal shares all visual settings with SSH terminal tabs:
+
+- Font family, size, weight, line height, and letter spacing
+- Cursor style (block, underline, bar) and blink
+- Scrollback buffer size
+- Color scheme (driven by Nexum's theme engine)
+
+Changes to any of these settings in **Settings → Terminal** apply immediately to all open terminal tabs — local and SSH alike.
+
+:::tip
+Open multiple workspace tabs to keep separate shell contexts organized — for example, one tab for a running dev server, one for git operations, and one for general commands.
+:::

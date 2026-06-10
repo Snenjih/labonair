@@ -1,0 +1,76 @@
+---
+title: "Module Structure"
+description: "A map of every frontend module in Nexum and what each one owns."
+---
+
+# Module Structure
+
+The Nexum frontend is organized into self-contained modules under `src/modules/`. Each module owns its own components, hooks, stores, and types. Modules communicate through Zustand stores and Tauri IPC — never through direct imports of internal implementation files from other modules.
+
+## Module Directory Map
+
+```
+src/modules/
+├── ai/                — AI assistant, agent runner, sessions, tool definitions
+├── command-palette/   — Cmd+K palette, command registry
+├── editor/            — CodeMirror 6 editor stack
+├── explorer/          — Local file tree sidebar
+├── header/            — Top bar, inline search
+├── hosts/             — Home Dashboard, Host Manager UI
+├── notifications/     — Toast and notification system
+├── preview/           — URL preview tab
+├── session/           — Session save and restore
+├── settings/          — Settings window and preferences store
+├── sftp/              — SFTP file manager UI
+├── shortcuts/         — Keybinding registry and global shortcut hooks
+├── snippets/          — Snippet manager
+├── statusbar/         — Bottom bar, cwd breadcrumb
+├── tabs/              — Tab system, Zustand tab store
+├── terminal/          — xterm.js terminal panes, shell integration
+├── theme/             — next-themes provider
+└── updater/           — Auto-update dialog
+```
+
+## Module Conventions
+
+### Barrel Export
+
+Each module exposes a thin public surface via `index.ts`. Consumers import from `@/modules/<name>`, not from internal paths:
+
+```ts
+// Correct
+import { useTabs } from "@/modules/tabs"
+
+// Wrong — never import internals directly
+import { useTabs } from "@/modules/tabs/lib/useTabs"
+```
+
+### Hooks
+
+Module-specific hooks live in `<module>/lib/`. They are not exported unless other modules need them.
+
+### Stores
+
+Zustand stores that are only used within one module live inside that module's directory. Stores shared across modules (e.g., the tabs store, the hosts store) live in `<module>/store/` and are exported from the module barrel.
+
+### Types
+
+Type definitions used only within a module stay in `<module>/types.ts`. Shared types that cross module boundaries should be placed in `src/types/`.
+
+## Key Modules in Detail
+
+### `tabs/`
+
+The source of truth for the tab list and active tab ID. The `Tab` type is a tagged union with `kind` values: `"terminal"`, `"ssh-terminal"`, `"sftp"`, `"editor"`, `"preview"`, `"ai-diff"`, `"home"`. Adding a new tab type requires updating this union.
+
+### `terminal/`
+
+Manages xterm.js instances. Terminal tabs are never unmounted — inactive tabs are hidden via `invisible pointer-events-none` so their PTY sessions keep streaming in the background.
+
+### `ai/`
+
+Agent, sessions, tool definitions, and AI chat UI. The AI subsystem is BYOK (OpenAI API key). Tool calls that require approval (write_file, run_command) pause for an in-UI confirmation card before executing.
+
+:::tip
+When adding a new feature, create a new module directory rather than adding files to an existing unrelated module. Modules should have a single, clear responsibility.
+:::

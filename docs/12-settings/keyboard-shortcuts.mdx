@@ -1,0 +1,51 @@
+---
+title: "Keyboard Shortcuts Settings"
+description: "How to view and customize keyboard shortcuts in Nexum."
+---
+
+# Keyboard Shortcuts Settings
+
+Nexum's Keyboard Shortcuts settings let you view the full shortcut reference and remap any shortcut to a key combination of your choice. Open via **Settings (`Cmd+,`) → Keyboard Shortcuts**.
+
+## Viewing All Shortcuts
+
+Click **View All Shortcuts** to open the Shortcuts reference dialog. You can also open it directly from anywhere in the app with `Cmd+?`.
+
+The dialog lists every shortcut organized by category:
+
+| Category | Examples |
+|---|---|
+| Global | `Cmd+,` open settings, `Cmd+K` command palette, `Cmd+T` new terminal tab |
+| Terminal | `Cmd+C` copy, `Cmd+V` paste, `Cmd+F` find in terminal |
+| Editor | `Cmd+S` save, `Cmd+Z` undo, `Cmd+/` toggle comment |
+| SFTP | Upload, download, rename, delete file shortcuts |
+| AI | Toggle AI panel, submit message, approve tool call |
+| Navigation | Switch tabs, close tab, cycle through panels |
+
+See the [Keyboard Shortcuts reference](/14-keyboard-shortcuts/global-shortcuts) for a complete listing with descriptions.
+
+## Remapping a Shortcut
+
+1. In the Shortcuts dialog, locate the shortcut you want to change.
+2. Click the shortcut row — it enters an "awaiting input" state.
+3. Press the new key combination you want to assign.
+4. The new binding is shown immediately. Click elsewhere or press `Escape` to confirm.
+
+Changes are saved persistently in the keybinds store and survive app restarts.
+
+## Resetting Shortcuts
+
+- **Reset individual shortcut**: click the reset icon on any row to restore the factory default for that specific shortcut.
+- **Reset all shortcuts**: click **Reset All** at the top of the dialog to restore every shortcut to its default. You will be asked to confirm before the reset is applied.
+
+:::warning
+Reset All cannot be undone. Any custom bindings you have set will be lost. Consider noting down your customizations before resetting.
+:::
+
+## Conflict Detection
+
+If you assign a key combination that is already used by another shortcut, Nexum highlights the conflict and shows which shortcut currently owns that binding. You can proceed (which reassigns the combination to the new shortcut and clears the old one) or choose a different key.
+
+:::tip
+macOS system shortcuts (like `Cmd+Space` for Spotlight or `Cmd+Tab` for app switching) cannot be captured by Nexum. If you press one of these, macOS intercepts it before Nexum can register it.
+:::

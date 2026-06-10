@@ -1,0 +1,64 @@
+---
+title: "Terminal Features"
+description: "Color support, copy/paste, search, scrollback, URL detection, and the right-click context menu in Nexum's SSH terminal."
+---
+
+# Terminal Features
+
+The SSH terminal in Nexum is a full-featured xterm.js terminal with the WebGL renderer enabled. This section covers the day-to-day features you will use in every session.
+
+## Color support
+
+Nexum's terminal supports the full spectrum of terminal color modes:
+
+- **16 ANSI colors** — standard foreground/background color codes
+- **256-color mode** — extended xterm palette used by tools like `tmux`, `vim`, and `bat`
+- **True color (24-bit)** — full RGB color for modern terminal applications and color schemes
+
+No configuration is required. The terminal advertises true-color capability to the remote shell automatically.
+
+## Copy and paste
+
+| Action | Shortcut |
+|---|---|
+| Copy selection | `Cmd+C` |
+| Paste | `Cmd+V` |
+| Auto-copy on mouse release | Enabled by default |
+
+When you release the mouse after a text selection, the selected text is copied to the clipboard automatically. You do not need to press `Cmd+C` separately.
+
+:::tip
+Hold `Option` while clicking to enter rectangular (block) selection mode, which is useful for selecting columns of output.
+:::
+
+## Scrollback buffer
+
+The scrollback buffer retains terminal output after it scrolls off screen. The default is **10,000 lines**; you can increase this up to 100,000 lines in Settings → Terminal → Scrollback.
+
+Scroll through history with the mouse wheel, two-finger trackpad swipe, or `Shift+PageUp` / `Shift+PageDown`.
+
+## In-terminal search
+
+Press `Cmd+F` to open the **inline search bar** at the top of the terminal. Type your query and press `Enter` or the arrow buttons to jump between matches. Matches are highlighted in the scrollback buffer. Press `Escape` to dismiss.
+
+Search is powered by the xterm.js search addon and works across the entire scrollback history, not just visible lines.
+
+## URL detection
+
+Nexum scans terminal output for HTTP and HTTPS URLs. Detected URLs appear as **underlined, clickable links**. Click a URL to open it in a new Preview tab inside Nexum (in-app WebView). This is especially handy for local dev servers.
+
+To open in your system browser instead, use the right-click context menu → **Open in Browser**.
+
+## Right-click context menu
+
+Right-click anywhere in the terminal to open a context menu with the following actions:
+
+- **Copy** — copy the current selection
+- **Paste** — paste clipboard contents
+- **Select All** — select the entire scrollback buffer
+- **Clear** — clear the terminal screen (equivalent to running `clear`)
+- **Open in Browser** — if a URL is under the cursor, open it in the default system browser
+
+## Font and appearance
+
+Font family, size, weight, line height, letter spacing, cursor style, and cursor blink are all shared between local and SSH terminals. Change them once in Settings → Terminal and they apply everywhere.

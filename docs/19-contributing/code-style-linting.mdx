@@ -1,0 +1,85 @@
+---
+title: "Code Style & Linting"
+description: "Code style rules, linting tools, and formatting conventions for contributing to Nexum."
+---
+
+# Code Style & Linting
+
+Nexum enforces consistent code style through automated tools. All checks must pass before a PR can be merged.
+
+## TypeScript / React
+
+### Linting and Formatting
+
+Nexum uses **Biome** (`biome.json`) as the unified linter and formatter for all TypeScript and React code.
+
+```bash
+# Lint (report issues, no fix)
+pnpm lint
+
+# Format (fix formatting issues)
+pnpm format
+
+# Combined check + auto-fix
+pnpm check
+```
+
+Biome replaces ESLint and Prettier. Do not add ESLint or Prettier configurations — they conflict with Biome.
+
+### Dead Code Detection
+
+**knip** (`knip.json`) detects unused exports, dead code, and unreferenced files:
+
+```bash
+pnpm knip
+```
+
+Address knip findings before submitting a PR. Unused exports are a maintenance burden.
+
+### Import Rules
+
+- Always use `@/...` path aliases, never relative paths that cross module boundaries
+- Example: `import { useTabs } from "@/modules/tabs"` not `../../tabs/lib/useTabs`
+- Within the same module, relative imports are acceptable: `import { helper } from "./lib/helper"`
+
+### Color Rules
+
+- Never hardcode HEX values in component code
+- Always use Tailwind semantic variables: `bg-background`, `text-foreground`, `border-border`, `bg-accent`, etc.
+- All theme colors are injected as CSS variables by the theme engine — semantic classes resolve correctly across all themes
+
+### No Node.js in Frontend
+
+Never import Node.js built-in modules (`fs`, `path`, `child_process`, etc.) in frontend code. The frontend runs in a WKWebView and does not have Node.js. All system calls go through `invoke()`.
+
+## Rust
+
+### Required Checks
+
+```bash
+cd src-tauri
+
+# Compilation check — must pass with zero errors
+cargo check
+
+# Linting — address all warnings before submitting
+cargo clippy
+```
+
+### Error Handling
+
+- **No `unwrap()` on predictable errors** — use `Result<T, String>` and return descriptive error messages. Reserve `unwrap()` for truly impossible states.
+- Return errors as `Err("Descriptive message: {detail}".to_string())` — the frontend surfaces these messages directly to the user.
+
+### Async Rules
+
+- All Tauri command functions must be `async fn` — never use synchronous blocking I/O on the Tauri command thread
+- For heavy work, use `tokio::spawn` to move execution off the command thread
+
+### Comments
+
+Write comments only when the **why** is non-obvious. Do not write comments that restate what the code already clearly expresses. Avoid docstrings on simple getters or straightforward functions.
+
+:::tip
+Run `pnpm check` and `cargo clippy` before committing. CI runs both checks on every PR and will block merging if either fails.
+:::

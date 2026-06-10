@@ -1,0 +1,49 @@
+---
+title: "SFTP Shortcuts"
+description: "Keyboard shortcuts for the SFTP file manager in Nexum."
+---
+
+# SFTP Shortcuts
+
+These shortcuts are active when an `sftp` tab is focused. They operate on the remote file listing and directory navigation.
+
+## Full Reference
+
+| Action | Shortcut |
+|---|---|
+| Refresh Directory | `Cmd+R` |
+| New Folder | `Cmd+Shift+N` |
+| Select All | `Cmd+A` |
+| Deselect | `Escape` |
+| Delete Selected | `Backspace` or `Delete` |
+| Rename | `Enter` (on selected item) |
+| Navigate to Path | `Cmd+L` (focuses path input) |
+| Toggle Hidden Files | `Cmd+Shift+.` |
+
+## Selection
+
+`Cmd+A` selects all items in the current directory. Click a single item to select it; hold `Cmd` and click to add to the selection; hold `Shift` and click to range-select. `Escape` clears the current selection without closing any panel or dialog.
+
+## Deleting Files
+
+With one or more items selected, press `Backspace` or `Delete` to delete them. A confirmation dialog appears before any deletion is performed. Deleted remote files are not moved to a trash — they are permanently removed from the server.
+
+## Renaming
+
+Select a single item and press `Enter` to enter inline rename mode. Type the new name and press `Enter` to confirm, or `Escape` to cancel.
+
+## Path Navigation
+
+`Cmd+L` focuses the path bar at the top of the SFTP panel, allowing you to type a full remote path directly. Press `Enter` to navigate to that path. This is the fastest way to jump to a deeply nested directory without clicking through folders.
+
+## Refreshing
+
+`Cmd+R` re-fetches the current directory listing from the server. Use this after making changes via an SSH terminal that would not automatically update the SFTP view.
+
+## Hidden Files
+
+`Cmd+Shift+.` mirrors the macOS Finder shortcut for showing hidden files. Dot-prefixed files and directories (`.bashrc`, `.ssh/`, etc.) are hidden by default and revealed by toggling this setting.
+
+:::tip
+Use `Cmd+L` to navigate to paths like `/etc/nginx/` or `/var/log/` directly rather than clicking through the directory tree one level at a time.
+:::

@@ -1,0 +1,54 @@
+---
+title: "macOS Keychain Integration"
+description: "How Nexum stores and manages credentials using the macOS Keychain Services API via the keyring crate."
+---
+
+# macOS Keychain Integration
+
+Nexum delegates all credential storage to the macOS Keychain via the `keyring` Rust crate, which wraps the native macOS Keychain Services API. This means your passwords and passphrases benefit from the same protection used by Safari, Mail, and other system apps.
+
+## How Credentials Are Stored
+
+Each saved credential is a Keychain entry with the following identifiers:
+
+- **Service**: `com.nexum.app`
+- **Account**: the host's UUID (a randomly generated identifier assigned when the host is created)
+
+Using a UUID as the account key — rather than the hostname or username — means the Keychain entry does not leak any information about the server it belongs to, even if someone browses Keychain Access directly.
+
+## Inspecting Keychain Entries Manually
+
+To view or manage Nexum's Keychain entries:
+
+1. Open **Keychain Access.app** (in `/Applications/Utilities/` or via Spotlight).
+2. In the search box, type `com.nexum.app`.
+3. All Nexum credential entries will appear, each identified by a UUID.
+
+You can delete individual entries from Keychain Access if needed, though Nexum handles automatic cleanup when hosts are deleted through the UI.
+
+## Automatic Cleanup
+
+Keychain entries are automatically removed in the following scenarios:
+
+- **Host deleted** via the Home Dashboard — the Keychain entry for that host's UUID is removed alongside the SQLite row.
+- **Auth method changed** — the old credential type is removed from Keychain and replaced with the new one.
+
+No orphaned entries are left behind during normal Nexum operation.
+
+## macOS Authorization Prompt
+
+The first time Nexum writes a credential, macOS may display a system dialog:
+
+> "nexum" wants to use the "login" keychain.
+
+Click **Always Allow** to grant Nexum persistent access. If you click **Deny**, credential reads and writes will fail silently and you will be prompted for passwords on every connection. To fix this after a denial, open Keychain Access, find the `com.nexum.app` entry, open its **Access Control** tab, and add Nexum to the allowed applications list.
+
+## iCloud Keychain
+
+:::warning
+Nexum's Keychain entries are **not** synced to iCloud Keychain. They are stored in the local login keychain and remain on the Mac where Nexum is installed. If you set up a new Mac, you will need to re-enter credentials for all saved hosts.
+:::
+
+## Security Scope
+
+The Keychain is unlocked when your macOS user session is active (login password or Touch ID). Nexum cannot read credentials if the Keychain is locked (e.g., immediately after a cold boot before first login). This is intentional system behavior and provides an additional layer of protection for unattended machines.

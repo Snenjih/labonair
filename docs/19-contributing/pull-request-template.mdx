@@ -1,0 +1,96 @@
+---
+title: "Pull Request Workflow"
+description: "Branch naming, commit conventions, pre-PR checklist, and how to open a PR for Nexum."
+---
+
+# Pull Request Workflow
+
+All contributions to Nexum go through a pull request. This page covers the complete workflow from branch creation to PR submission.
+
+## Branch Naming
+
+| Type | Pattern | Example |
+|---|---|---|
+| Feature | `feat/<short-description>` | `feat/sftp-bulk-delete` |
+| Bug fix | `fix/<short-description>` | `fix/ssh-reconnect-loop` |
+| Refactor | `refactor/<short-description>` | `refactor/tabs-store-cleanup` |
+| Documentation | `docs/<short-description>` | `docs/ipc-reference` |
+| Chore | `chore/<short-description>` | `chore/bump-tauri-2.5` |
+
+Branch names should be lowercase with hyphens. Avoid including issue numbers in branch names.
+
+## Commit Message Convention
+
+Nexum uses **Conventional Commits**. Every commit message must follow this format:
+
+```
+type(scope): short description
+
+Optional longer body explaining the why.
+```
+
+**Types:** `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `perf`
+
+**Scope:** the module or area affected (e.g., `sftp`, `ssh`, `ai`, `tabs`, `terminal`, `settings`)
+
+**Examples:**
+```
+feat(sftp): add bulk delete with multi-select
+fix(ssh): prevent reconnect loop on auth failure
+refactor(tabs): simplify Tab union discriminant handling
+docs(ipc): add transfer queue event payloads
+```
+
+## Pre-PR Checklist
+
+Before opening a PR, run all of the following and confirm they pass:
+
+```bash
+# 1. Rust compilation
+cd src-tauri && cargo check
+
+# 2. TypeScript type check
+pnpm exec tsc --noEmit
+
+# 3. Linting
+pnpm lint
+
+# 4. Formatting
+pnpm format
+```
+
+Also verify the feature works end-to-end in the running app (`pnpm tauri dev`), not just in type-checked code.
+
+## Opening a PR
+
+The PR creation workflow for Nexum is:
+
+```bash
+# 1. Create a feature branch
+git checkout -b feat/my-feature
+
+# 2. Stage and commit changes
+git add src/modules/my-feature/ src-tauri/src/modules/my-area/
+git commit -m "feat(my-feature): implement X"
+
+# 3. Push the branch
+git push -u origin feat/my-feature
+
+# 4. Open a PR targeting main
+gh pr create --title "feat: implement X" --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)"
+```
+
+Fill out the PR template sections: Summary, Changes, Test Plan, and Screenshots (if UI changes). The template is in `.github/PULL_REQUEST_TEMPLATE.md`.
+
+## PR Review Standards
+
+PRs are reviewed for:
+- Both `cargo check` and `tsc --noEmit` passing
+- No hardcoded colors or Node.js imports in frontend code
+- No `unwrap()` on predictable error paths in Rust
+- Feature tested end-to-end, not just type-checked
+- Conventional commit messages
+
+:::tip
+Small, focused PRs are merged faster than large ones. If your change touches both the frontend and Rust backend, that is fine — but avoid bundling unrelated fixes into the same PR.
+:::

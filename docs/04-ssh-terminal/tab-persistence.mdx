@@ -1,0 +1,50 @@
+---
+title: "Tab Persistence"
+description: "How Nexum keeps SSH sessions alive and terminal state intact when you switch between tabs."
+---
+
+# Tab Persistence
+
+A common frustration with GUI SSH clients is sessions that disconnect or lose state when you switch away from them. Nexum is designed around the principle that switching tabs should be **non-destructive** — your SSH sessions keep running exactly as if the tab were still visible.
+
+## What happens when you switch tabs
+
+When you switch away from an SSH Terminal tab, Nexum hides the tab's terminal container using CSS (`invisible pointer-events-none`). The xterm.js instance is not unmounted, the PTY is not paused, and the SSH channel remains fully open.
+
+This means:
+
+- **Long-running commands keep running** — a background job, log tail, or database dump continues uninterrupted.
+- **Output keeps buffering** — all server output that arrives while the tab is hidden is written to the xterm.js scrollback buffer in the background.
+- **Switching back is instant** — there is no reconnect delay. The terminal renders immediately with all accumulated output already in place.
+
+## State that is preserved
+
+| State | Preserved |
+|---|---|
+| SSH connection | Yes — session stays open |
+| Scrollback buffer | Yes — all lines buffered in background |
+| Cursor position | Yes |
+| Terminal title (set via OSC) | Yes |
+| Running foreground process | Yes — unaffected by tab switch |
+| Background jobs | Yes |
+
+## What ends the session
+
+Only two events end an SSH session:
+
+1. **Closing the tab** — pressing the close button (`Cmd+W`) or closing the tab sends a teardown signal; Rust closes the SSH channel cleanly.
+2. **Quitting the app** — all active sessions are closed when Nexum exits.
+
+Locking your Mac, putting it to sleep, or switching to another app does not close SSH sessions (subject to your network and server `ClientAliveInterval` settings).
+
+:::tip
+You can leave SSH sessions open indefinitely while you work in other tabs. Switch back any time to check on long-running operations — all output is waiting for you in the scrollback buffer.
+:::
+
+## Comparison with the local terminal
+
+This behavior is identical to local workspace terminal tabs. Both SSH and local terminals use the same hidden-via-CSS approach, ensuring consistent behavior across all terminal types in Nexum.
+
+:::warning
+If your server has an aggressive `ClientAliveInterval` / `ClientAliveCountMax` configuration, the SSH daemon may close idle connections even while Nexum's tab is hidden. In that case, the tab will show a "Disconnected" banner when you switch back.
+:::
