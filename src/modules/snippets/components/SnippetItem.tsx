@@ -93,7 +93,7 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
                   onRun(snippet);
                 }}
               >
-                <HugeiconsIcon icon={PlayIcon} size={9} strokeWidth={2.5} />
+                <HugeiconsIcon icon={PlayIcon} size={10} strokeWidth={2.5} />
                 RUN
               </Button>
 
