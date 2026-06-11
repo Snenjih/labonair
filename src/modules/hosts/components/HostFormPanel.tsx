@@ -52,6 +52,9 @@ interface FormState {
   // Startup snippet
   startup_snippet_id: string;
   startup_snippet_mode: "execute" | "inject";
+  // Jump host & notes
+  jump_host_id: string;
+  notes: string;
 }
 
 function hostToForm(host: Host): FormState {
@@ -72,6 +75,8 @@ function hostToForm(host: Host): FormState {
     default_path_sftp: host.default_path_sftp ?? "",
     startup_snippet_id: host.startup_snippet_id ?? "",
     startup_snippet_mode: (host.startup_snippet_mode as "execute" | "inject") ?? "execute",
+    jump_host_id: host.jump_host_id ?? "",
+    notes: host.notes ?? "",
   };
 }
 
@@ -92,6 +97,8 @@ const DEFAULT_FORM: FormState = {
   default_path_sftp: "",
   startup_snippet_id: "",
   startup_snippet_mode: "execute",
+  jump_host_id: "",
+  notes: "",
 };
 
 function parseTunnels(raw?: string): TunnelConfig[] {
@@ -113,6 +120,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
   const isNew = hostId === "__new__" || hostId === null;
 
   const host = useHostsStore((s) => (isNew ? null : s.hosts.find((h) => h.id === hostId) ?? null));
+  const hosts = useHostsStore((s) => s.hosts);
   const groups = useHostsStore((s) => s.groups);
   const snippets = useCommandSnippetsStore((s) => s.snippets);
   const createHost = useHostsStore((s) => s.createHost);
@@ -168,6 +176,8 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
         payload.credential_id = form.auth_method === "credential" ? form.credential_id : "";
         payload.startup_snippet_id = form.startup_snippet_id || "";
         payload.startup_snippet_mode = form.startup_snippet_mode;
+        payload.jump_host_id = form.jump_host_id || null;
+        payload.notes = form.notes || null;
         await updateHost(payload as unknown as import("../types").UpdateHostPayload);
         setSaved(true);
         setTimeout(() => setSaved(false), 1500);
@@ -203,6 +213,8 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
         payload.startup_snippet_id = form.startup_snippet_id;
         payload.startup_snippet_mode = form.startup_snippet_mode;
       }
+      if (form.jump_host_id) payload.jump_host_id = form.jump_host_id;
+      if (form.notes) payload.notes = form.notes;
 
       const newHost = await createHost(payload as unknown as CreateHostPayload);
       setSelectedHost(newHost.id);
@@ -427,6 +439,49 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 <p className="text-[11px] text-muted-foreground/70">Stored securely in local encrypted store</p>
               </div>
             )}
+          </section>
+
+          {/* Jump Host */}
+          <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Jump Host (ProxyJump)</p>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Via Jump Host</Label>
+              <select
+                value={form.jump_host_id}
+                onChange={(e) => {
+                  setForm((d) => ({ ...d, jump_host_id: e.target.value }));
+                  setTimeout(handleBlur, 0);
+                }}
+                className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">None (direct connection)</option>
+                {hosts
+                  .filter((h) => h.id !== hostId)
+                  .map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.name} ({h.host_address}:{h.port})
+                    </option>
+                  ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground/70">
+                Connect to this host through another host as a bastion/jump server.
+              </p>
+            </div>
+          </section>
+
+          {/* Notes */}
+          <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes / Runbook</p>
+            <div className="space-y-1.5">
+              <textarea
+                placeholder="Configuration notes, credentials hints, runbook steps…"
+                value={form.notes}
+                onChange={(e) => setForm((d) => ({ ...d, notes: e.target.value }))}
+                onBlur={handleBlur}
+                rows={4}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[80px] max-h-[300px]"
+              />
+            </div>
           </section>
 
           {/* Add button (new mode) or Delete button (edit mode) */}

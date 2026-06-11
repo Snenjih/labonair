@@ -532,6 +532,8 @@ pub fn run() {
             ssh_trust_host,
             ssh_remove_known_host,
             ssh_disconnect,
+            crate::modules::ssh::config_parser::parse_ssh_config_cmd,
+            crate::modules::ssh::config_parser::import_ssh_config_entries,
             ssh_start_tunnels,
             ssh_stop_tunnels,
             ssh_exec_command,

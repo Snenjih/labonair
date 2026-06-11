@@ -43,6 +43,7 @@ import { HostFormPanel } from "./HostFormPanel";
 import { CredentialFormPanel } from "./CredentialFormPanel";
 import { CredentialListItem } from "./CredentialListItem";
 import { CredentialCard } from "./CredentialCard";
+import { SshConfigImportDialog } from "./SshConfigImportDialog";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -221,6 +222,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
   const [viewMode, setViewMode] = useState<"hosts" | "credentials">("hosts");
   const [search, setSearch] = useState("");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
   const [addingGroup, setAddingGroup] = useState(false);
   const [groupName, setGroupName] = useState("");
@@ -423,6 +425,13 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                   }}
                 >
                   New Group
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={viewMode === "credentials"}
+                  onClick={() => setShowImportDialog(true)}
+                >
+                  Import SSH Config
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -784,6 +793,16 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* SSH Config Import dialog */}
+      <SshConfigImportDialog
+        open={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onImported={() => {
+          void useHostsStore.getState().fetchData();
+          setShowImportDialog(false);
+        }}
+      />
 
       {/* Delete group confirmation */}
       <AlertDialog open={!!groupToDelete} onOpenChange={(open) => { if (!open) setGroupToDelete(null); }}>

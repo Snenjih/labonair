@@ -272,6 +272,27 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "Terminal",
     controlType: "NumberInput",
   },
+  {
+    id: "sshAutoReconnect",
+    label: "Auto-reconnect SSH sessions",
+    description: "Automatically retry when an SSH connection is lost unexpectedly.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "sshAutoReconnectDelay",
+    label: "Reconnect delay (s)",
+    description: "Seconds to wait before the first reconnect attempt (1–30).",
+    category: "Terminal",
+    controlType: "NumberInput",
+  },
+  {
+    id: "sshAutoReconnectMaxAttempts",
+    label: "Max reconnect attempts",
+    description: "Give up after this many failed attempts (1–10).",
+    category: "Terminal",
+    controlType: "NumberInput",
+  },
 
   // --- Editor ---
   {
