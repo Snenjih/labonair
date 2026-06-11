@@ -2,3 +2,6 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: false
   msw: true
+
+overrides:
+  shiki: "^4.0.2"

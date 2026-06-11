@@ -166,7 +166,7 @@ pub async fn import_ssh_config_entries(
             // Extract just the host part from "user@host:port" format
             let pj_host = pj_alias
                 .split('@')
-                .last()
+                .next_back()
                 .unwrap_or(pj_alias)
                 .split(':')
                 .next()
