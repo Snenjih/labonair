@@ -325,14 +325,14 @@ export function ToolCallChip({ toolName, state, input, output, errorText }: Prop
         )}
       >
         {isPending && (
-          <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-blue-400/70" />
+          <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-info/70" />
         )}
         {isSuccess && (
           <HugeiconsIcon
             icon={Tick02Icon}
             size={11}
             strokeWidth={2.5}
-            className="shrink-0 text-emerald-500"
+            className="shrink-0 text-success"
           />
         )}
         {(isError || isDenied) && (
