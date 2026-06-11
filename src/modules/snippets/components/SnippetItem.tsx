@@ -99,7 +99,7 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
 
               <div className="flex-1" />
 
-              <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-100 group-hover:opacity-100">
+              <div className="flex items-center gap-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100">
                 <button
                   type="button"
                   title="Copy command"
