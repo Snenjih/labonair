@@ -58,6 +58,8 @@ export function BackgroundImageLayer() {
   const backgroundImage = usePreferencesStore((s) => s.backgroundImage);
   const backgroundOpacity = usePreferencesStore((s) => s.backgroundOpacity);
   const backgroundBlur = usePreferencesStore((s) => s.backgroundBlur);
+  const backgroundTintColor = usePreferencesStore((s) => s.backgroundTintColor);
+  const backgroundTintOpacity = usePreferencesStore((s) => s.backgroundTintOpacity);
   const addNotification = useNotificationStore((s) => s.addNotification);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
@@ -139,6 +141,16 @@ export function BackgroundImageLayer() {
           filter: blurActive ? `blur(${backgroundBlur}px)` : undefined,
         }}
       />
+      {backgroundTintOpacity > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: backgroundTintColor,
+            opacity: backgroundTintOpacity / 100,
+          }}
+        />
+      )}
     </div>,
     document.body,
   );

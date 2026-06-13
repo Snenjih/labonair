@@ -69,6 +69,19 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+    /* Density tokens — default values (matches current hardcoded Tailwind classes) */
+    --ui-row-py: 0.625rem;   /* 10px = py-2.5 */
+    --ui-section-gap: 1.5rem; /* 24px = gap-6 */
+}
+
+.density-compact {
+    --ui-row-py: 0.375rem;    /* 6px — tighter rows */
+    --ui-section-gap: 1rem;   /* 16px — tighter sections */
+}
+
+.density-relaxed {
+    --ui-row-py: 0.875rem;    /* 14px — more breathing room */
+    --ui-section-gap: 2rem;   /* 32px — more section spacing */
 }
 
 :root {
