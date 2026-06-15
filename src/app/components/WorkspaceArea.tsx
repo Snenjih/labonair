@@ -10,6 +10,7 @@ import { PreviewStack } from "@/modules/preview";
 import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { SftpStack } from "@/modules/sftp/SftpStack";
+import { AgentFleetStack } from "@/modules/agent-fleet/AgentFleetStack";
 import { useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import { WorkspaceStack } from "@/modules/terminal/WorkspaceStack";
 import type { WorkspacePaneHandle, TerminalPaneHandle } from "@/modules/terminal";
@@ -131,6 +132,7 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           onOpenRemoteEditor={onOpenRemoteEditor}
           onPathsChange={onSftpPathsChange}
         />
+        <AgentFleetStack />
       </div>
 
       {keysLoaded ? (

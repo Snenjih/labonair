@@ -112,9 +112,9 @@ export function CloseDialogs({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Close terminal tab?</AlertDialogTitle>
+            <AlertDialogTitle>Close tab?</AlertDialogTitle>
             <AlertDialogDescription>
-              The running shell process will be terminated.
+              The running process(es) will be terminated.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

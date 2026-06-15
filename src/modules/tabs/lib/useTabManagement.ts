@@ -16,6 +16,7 @@ import type { EditorPaneHandle } from "@/modules/editor";
 import type { PreviewPaneHandle } from "@/modules/preview";
 import type { WorkspacePaneHandle, TerminalPaneHandle } from "@/modules/terminal";
 import type { WorkspaceTab, AiDiffTab } from "../types";
+import { useAgentFleetStore } from "@/modules/agent-fleet/store/agentFleetStore";
 import type React from "react";
 
 export interface UseTabManagementOptions {
@@ -171,6 +172,20 @@ export function useTabManagement({
         setPendingCloseTabId(id);
         return;
       }
+      disposeTab(id);
+      return;
+    }
+    if (t?.kind === "agent-fleet") {
+      const { sessions, cleanupTab } = useAgentFleetStore.getState();
+      const tabSessions = sessions[id] ?? {};
+      const hasRunning = Object.values(tabSessions).some(
+        (s) => s.status !== "exited",
+      );
+      if (hasRunning) {
+        setPendingCloseTabId(id);
+        return;
+      }
+      cleanupTab(id);
       disposeTab(id);
       return;
     }

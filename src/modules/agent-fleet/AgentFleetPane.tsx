@@ -5,6 +5,7 @@ import { useTabsStore } from "@/modules/tabs";
 import { useAgentFleetStore } from "./store/agentFleetStore";
 import { AgentCard } from "./AgentCard";
 import { AgentLaunchDialog } from "./AgentLaunchDialog";
+import { BroadcastBar } from "./BroadcastBar";
 import type { TerminalPaneHandle } from "@/modules/terminal";
 
 type Props = {
@@ -285,6 +286,16 @@ export function AgentFleetPane({ tab, visible }: Props) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Broadcast Bar */}
+      {tab.agents.length > 0 && (
+        <BroadcastBar
+          configs={tab.agents}
+          sessions={sessions}
+          terminalRefs={terminalRefs.current}
+          inputRef={broadcastBarRef}
+        />
       )}
 
       {/* Launch Dialog */}
