@@ -24,6 +24,7 @@ type Options = {
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
   onDetectedLocalUrl?: (url: string) => void;
+  onActivity?: () => void;
 };
 
 // Matches dev-server-style local URLs (vite, next dev, webpack, …). Anchors
@@ -47,18 +48,21 @@ export function useTerminalSession({
   onExit,
   onCwd,
   onDetectedLocalUrl,
+  onActivity,
 }: Options) {
   const detectedRef = useRef<string | null>(null);
   const onDetectedRef = useRef(onDetectedLocalUrl);
   const onCwdRef = useRef(onCwd);
   const onExitRef = useRef(onExit);
   const onSearchReadyRef = useRef(onSearchReady);
+  const onActivityRef = useRef(onActivity);
   useEffect(() => {
     onDetectedRef.current = onDetectedLocalUrl;
     onCwdRef.current = onCwd;
     onExitRef.current = onExit;
     onSearchReadyRef.current = onSearchReady;
-  }, [onDetectedLocalUrl, onCwd, onExit, onSearchReady]);
+    onActivityRef.current = onActivity;
+  }, [onDetectedLocalUrl, onCwd, onExit, onSearchReady, onActivity]);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const serializeRef = useRef<SerializeAddon | null>(null);
@@ -268,6 +272,7 @@ export function useTerminalSession({
         {
           onData: (bytes) => {
             term.write(bytes);
+            onActivityRef.current?.();
             // Sniff for dev-server URLs in raw output. Byte-level prefilter
             // (':' '/' '/') skips decode+regex on the overwhelming majority
             // of chunks (ordinary terminal output, log tails, test runs).
