@@ -33,3 +33,5 @@ export interface BlockChromeSettings {
   highlightFailed: boolean;
   autoCollapseOnAltScreen: boolean;
 }
+
+export const HEADER_HEIGHT_PX = 24;

@@ -3,6 +3,11 @@ import type { BlockMeta, PositionedBlock, VisibleBlocks } from "./types";
 
 const MAX_BLOCKS = 1000;
 
+function getCssVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
 type MarkerLike = { line: number; isDisposed: boolean };
 type LineRange = { start: number; end: number };
 
@@ -204,6 +209,36 @@ export class BlockDecorations {
     return lines.join("\n");
   }
 
+  getViewportY(): number {
+    return this.term.buffer.active.viewportY;
+  }
+
+  getAdjacentBlock(
+    direction: "prev" | "next",
+    viewportY: number,
+  ): BlockMeta | null {
+    const blocks = this.allBlocks();
+    if (blocks.length === 0) return null;
+
+    if (direction === "prev") {
+      let found: BlockMeta | null = null;
+      for (const b of blocks) {
+        if (b.startLine < viewportY) found = b;
+        else break;
+      }
+      return found ?? blocks[0];
+    } else {
+      for (const b of blocks) {
+        if (b.startLine > viewportY) return b;
+      }
+      return blocks[blocks.length - 1];
+    }
+  }
+
+  scrollToBlock(startLine: number): void {
+    this.term.scrollToLine(startLine);
+  }
+
   allBlocks(): BlockMeta[] {
     const out: BlockMeta[] = [];
     for (const e of this.entries) {
@@ -224,18 +259,32 @@ export class BlockDecorations {
   }
 
   hydrateFromMeta(blocks: BlockMeta[]): void {
-    // Positional-only hydration: no xterm markers, used for display when the
-    // real xterm buffer hasn't been restored yet.
-    // Entries already present take priority; only add missing ids.
+    const buf = this.term.buffer.active;
+    const baseY = buf.baseY;
     const existingIds = new Set(this.entries.map((e) => e.id));
+
     for (const b of blocks) {
       if (existingIds.has(b.id)) continue;
-      // Create stub markers that are immediately disposed so computeRange
-      // returns null — the block falls back to stored startLine/endLine.
-      // This is intentionally a no-op: the caller (block UI) uses BlockMeta
-      // directly for hydrated blocks, not xterm markers.
+
+      const startOffset = Math.max(0, b.startLine - baseY);
+      const endOffset = Math.max(startOffset, b.endLine - baseY);
+
+      const startMarker = this.term.registerMarker(startOffset);
+      const endMarker = this.term.registerMarker(endOffset);
+      if (!startMarker || !endMarker) continue;
+
+      this.entries.push({
+        id: b.id,
+        command: b.command,
+        cwd: b.cwd,
+        exitCode: b.exitCode,
+        startedAt: b.startedAt,
+        finishedAt: b.finishedAt ?? Date.now(),
+        startMarker,
+        endMarker,
+        deco: null,
+      });
     }
-    // After hydration, notify subscribers so the UI can re-render.
     this.notify();
   }
 
@@ -279,12 +328,14 @@ export class BlockDecorations {
       return;
     }
     const ok = exit === 0 || exit === null;
+    const okColor = getCssVar("--color-primary", "#5fb3b3");
+    const errColor = getCssVar("--color-destructive", "#e5706b");
     const deco =
       this.term.registerDecoration({
         marker: endMarker,
         width: 1,
         overviewRulerOptions: {
-          color: ok ? "#5fb3b3" : "#e5706b",
+          color: ok ? okColor : errColor,
         },
       }) ?? null;
     this.entries.push({

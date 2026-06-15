@@ -6,7 +6,6 @@ import { useTheme } from "@/modules/theme";
 import type { TerminalSessionData } from "@/modules/tabs";
 import {
   BlockDecorations,
-  BlockInputBar,
   BlockOverlay,
   ModeMachine,
   buildOsc133InjectionScript,
@@ -49,6 +48,7 @@ import { useNotificationStore } from "@/modules/notifications/store/useNotificat
 import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { dropPaths } from "./lib/drop-paths";
 import { SshLoadingScreen } from "./SshLoadingScreen";
+import { registerBlockDecorations } from "@/modules/tabs";
 import { SudoFillPopup } from "./SudoFillPopup";
 import type { TerminalPaneHandle } from "./TerminalPane";
 
@@ -466,6 +466,9 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           decorations.init();
           blockDecorationsRef.current = decorations;
 
+          const unregisterDeco = registerBlockDecorations(session.id, decorations);
+          cleanups.push(unregisterDeco);
+
           const mm = new ModeMachine(t);
           const unsubMode = mm.subscribe((mode) => {
             if (!disposed) setBlockMode(mode);
@@ -732,16 +735,13 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     );
 
     const paneContent = session.terminalMode === "block" ? (
-      <div ref={wrapperRef} className="flex h-full w-full flex-col">
-        <div className="relative min-h-0 flex-1">
-          {/* Container is always mounted so the ResizeObserver can measure real
-              dimensions once the pane slot becomes visible. Hidden behind the
-              overlay during the loading phase. */}
-          <div ref={containerRef} className="h-full w-full" />
-          {blockOverlay}
-          {sharedOverlays}
-        </div>
-        <BlockInputBar />
+      <div ref={wrapperRef} className="relative h-full w-full">
+        {/* Container is always mounted so the ResizeObserver can measure real
+            dimensions once the pane slot becomes visible. Hidden behind the
+            overlay during the loading phase. */}
+        <div ref={containerRef} className="h-full w-full" />
+        {blockOverlay}
+        {sharedOverlays}
       </div>
     ) : (
       <div ref={wrapperRef} className="relative h-full w-full">

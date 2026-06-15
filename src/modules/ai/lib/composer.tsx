@@ -232,6 +232,19 @@ export function AiComposerProvider({ children }: ProviderProps) {
   };
 
   const submit = () => {
+    // --- TERMINAL MODE: route to active PTY instead of AI ---
+    const target = useChatStore.getState().sendTarget;
+    if (target === "terminal") {
+      const command = value.trim();
+      if (!command) return;
+      useChatStore.getState().injectCommand(command);
+      setValue("");
+      setFiles([]);
+      setPickedDirectives([]);
+      setPickedCommands([]);
+      return;
+    }
+
     if (isBusy) return;
     const trimmed = value.trim();
     if (

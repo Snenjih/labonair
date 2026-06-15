@@ -20,6 +20,7 @@ import { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { registerCwdHandler, registerPromptTracker } from "./osc-handlers";
 import { openPty, type PtySession } from "./pty-bridge";
+import { registerBlockDecorations } from "@/modules/tabs";
 
 type Options = {
   container: React.RefObject<HTMLDivElement | null>;
@@ -280,6 +281,11 @@ export function useTerminalSession({
         blockDecorationsRef.current = decorations;
         setBlockDecorations(decorations);
 
+        if (sessionId) {
+          const unregister = registerBlockDecorations(sessionId, decorations);
+          cleanups.push(unregister);
+        }
+
         const modeMachine = new ModeMachine(term);
         const unsubMode = modeMachine.subscribe((mode) => setBlockMode(mode));
 
@@ -491,6 +497,7 @@ export function useTerminalSession({
     serialize,
     blockDecorations,
     blockMode,
+    termRef,
   };
 }
 

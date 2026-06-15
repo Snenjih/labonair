@@ -4,12 +4,15 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { IS_MAC } from "@/lib/platform";
 import { useLocalExplorerStore } from "@/modules/explorer/lib/useLocalExplorerStore";
+import { useChatStore } from "@/modules/ai/store/chatStore";
+import { selectIsActiveBlockTerminal, useTabsStore } from "@/modules/tabs";
 import {
   ArrowUpIcon,
   Cancel01Icon,
   CodeIcon,
   HashtagIcon,
   Key01Icon,
+  SparklesIcon,
   StopCircleIcon,
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
@@ -71,6 +74,9 @@ export function AiInputBar() {
   const c = useComposer();
   const directives = useDirectivesStore((s) => s.directives);
   const explorerRoot = useLocalExplorerStore((s) => s.rootPath);
+  const isBlockTerminal = useTabsStore(selectIsActiveBlockTerminal);
+  const sendTarget = useChatStore((s) => s.sendTarget);
+  const setSendTarget = useChatStore((s) => s.setSendTarget);
 
   const [trigger, setTrigger] = useState<DirectiveTrigger | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -256,6 +262,27 @@ export function AiInputBar() {
         <Popover open={pickerOpen}>
           <PopoverAnchor asChild>
             <div className="flex items-start gap-2">
+              {isBlockTerminal && (
+                <button
+                  type="button"
+                  title={sendTarget === "terminal" ? "Switch to AI chat" : "Switch to Terminal input"}
+                  onClick={() => setSendTarget(sendTarget === "ai" ? "terminal" : "ai")}
+                  className={cn(
+                    "flex h-7 shrink-0 items-center gap-1.5 self-end rounded-md px-2 text-[11px] font-medium",
+                    "border transition-colors duration-100",
+                    sendTarget === "terminal"
+                      ? "border-primary/30 bg-primary/10 text-primary"
+                      : "border-border bg-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <HugeiconsIcon
+                    icon={sendTarget === "terminal" ? TerminalIcon : SparklesIcon}
+                    size={11}
+                    strokeWidth={1.75}
+                  />
+                  <span>{sendTarget === "terminal" ? "Terminal" : "AI"}</span>
+                </button>
+              )}
               <textarea
                 ref={c.textareaRef}
                 value={c.value}
@@ -329,15 +356,26 @@ export function AiInputBar() {
                     }
                   }
                 }}
-                placeholder="Ask Nexum anything   ·   @ files   ·   # directives"
+                placeholder={sendTarget === "terminal" ? "Type a command and press Enter…" : "Ask Nexum anything   ·   @ files   ·   # directives"}
                 rows={1}
                 className={cn(
                   "max-h-40 flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none",
                   "placeholder:text-muted-foreground/60",
                 )}
               />
-              <AgentSwitcher />
-              {c.isBusy ? (
+              {sendTarget !== "terminal" && <AgentSwitcher />}
+              {sendTarget === "terminal" ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  onClick={c.submit}
+                  disabled={!c.value.trim()}
+                  className="size-7 shrink-0 rounded-md"
+                  title="Run command (Enter)"
+                >
+                  <HugeiconsIcon icon={ArrowUpIcon} size={13} strokeWidth={1.75} />
+                </Button>
+              ) : c.isBusy ? (
                 <Button
                   type="button"
                   size="icon"

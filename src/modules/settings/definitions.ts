@@ -4,6 +4,7 @@ export type SettingCategory =
   | "General"
   | "Appearance"
   | "Terminal"
+  | "Block Terminal"
   | "Editor"
   | "Command Palette"
   | "File Manager"
@@ -273,6 +274,75 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "NumberInput",
   },
 
+  // --- Block Terminal ---
+  {
+    id: "blockTerminalShowHeader",
+    label: "Show block headers",
+    description: "Display the command header bar above each terminal block.",
+    category: "Block Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "blockTerminalShowExitCode",
+    label: "Show exit code",
+    description: "Display the exit code badge in block headers.",
+    category: "Block Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "blockTerminalShowExecutionTime",
+    label: "Show execution time",
+    description: "Display the elapsed execution time in block headers.",
+    category: "Block Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "blockTerminalShowCwd",
+    label: "Show working directory",
+    description: "Display the current working directory in block headers.",
+    category: "Block Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "blockTerminalCompactHeaders",
+    label: "Compact headers",
+    description: "Use a reduced-height header style for terminal blocks.",
+    category: "Block Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "blockTerminalHighlightFailed",
+    label: "Highlight failed commands",
+    description: "Apply a visual indicator to blocks whose command exited with a non-zero code.",
+    category: "Block Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "blockTerminalAutoCollapseOnAltScreen",
+    label: "Auto-collapse on alternate screen",
+    description: "Hide block overlays automatically when an alternate screen app (e.g. vim) is active.",
+    category: "Block Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "blockTerminalScrollbackPersistence",
+    label: "Scrollback persistence",
+    description: "What to restore when reopening a block terminal session.",
+    category: "Block Terminal",
+    controlType: "Select",
+    options: [
+      { value: "metadata", label: "Metadata (commands & exit codes)" },
+      { value: "fresh", label: "Fresh (no restoration)" },
+    ],
+  },
+  {
+    id: "blockTerminalSshInjectionTimeoutMs",
+    label: "SSH injection timeout (ms)",
+    description: "Maximum time in milliseconds to wait for shell integration to be injected on SSH sessions.",
+    category: "Block Terminal",
+    controlType: "NumberInput",
+  },
+
   // --- Editor ---
   {
     id: "editorFontFamily",
@@ -456,6 +526,7 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "General",
   "Appearance",
   "Terminal",
+  "Block Terminal",
   "Editor",
   "Command Palette",
   "File Manager",

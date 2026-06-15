@@ -29,6 +29,8 @@ export interface UseShortcutHandlersOptions {
   activeEditorHandle: EditorPaneHandle | null;
   openShortcuts: () => void;
   openFind: () => void;
+  navigatePrevBlock?: () => void;
+  navigateNextBlock?: () => void;
 }
 
 export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
@@ -44,6 +46,8 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
     workspacePaneRefs,
     activeEditorHandle,
     openShortcuts,
+    navigatePrevBlock,
+    navigateNextBlock,
   } = opts;
 
   const toggleCommandPalette = useCommandStore((s) => s.toggle);
@@ -112,6 +116,8 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
       else if (kind === "editor") void setEditorFontSize(DEFAULT_PREFERENCES.editorFontSize);
       else if (kind === "sftp") void setSftpFontSize(DEFAULT_PREFERENCES.sftpFontSize);
     },
+    "block.prev": () => navigatePrevBlock?.(),
+    "block.next": () => navigateNextBlock?.(),
   }), [
     activeEditorHandle,
     cycleTab,
@@ -129,6 +135,8 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
     selectByIndex,
     splitPane,
     closePane,
+    navigatePrevBlock,
+    navigateNextBlock,
   ]);
 
   useGlobalShortcuts(shortcutHandlers);

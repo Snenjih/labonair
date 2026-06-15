@@ -10,6 +10,8 @@ import {
   useTabManagement,
   useTabsStore,
   selectActiveTabKind,
+  selectIsActiveBlockTerminal,
+  getActiveBlockDecorations,
 } from "@/modules/tabs";
 import { usePaletteCallbacks } from "@/modules/command-palette";
 import { useMenuBridge } from "@/app/hooks/useMenuBridge";
@@ -87,6 +89,12 @@ export default function App() {
     setScrollbackLive({ getAllTerminalRefs: () => tabs.refs.terminalRefs.current });
   }, [tabs.refs.terminalRefs]);
 
+  // Auto-switch sendTarget when the active pane changes between block terminal and other modes
+  const isActiveBlockTerminal = useTabsStore(selectIsActiveBlockTerminal);
+  useEffect(() => {
+    useChatStore.getState().setSendTarget(isActiveBlockTerminal ? "terminal" : "ai");
+  }, [isActiveBlockTerminal]);
+
   const ai = useAiLiveBridge({
     terminalRefs: tabs.refs.terminalRefs,
     editorRefs: tabs.refs.editorRefs,
@@ -149,6 +157,18 @@ export default function App() {
     activeEditorHandle: tabs.activeEditorHandle,
     openShortcuts: () => setShortcutsOpen(true),
     openFind,
+    navigatePrevBlock: () => {
+      const decs = getActiveBlockDecorations(useTabsStore.getState());
+      if (!decs) return;
+      const block = decs.getAdjacentBlock("prev", decs.getViewportY());
+      if (block) decs.scrollToBlock(block.startLine);
+    },
+    navigateNextBlock: () => {
+      const decs = getActiveBlockDecorations(useTabsStore.getState());
+      if (!decs) return;
+      const block = decs.getAdjacentBlock("next", decs.getViewportY());
+      if (block) decs.scrollToBlock(block.startLine);
+    },
   });
 
   return (

@@ -28,7 +28,9 @@ export type ShortcutId =
   | "view.zenMode"
   | "view.zoomIn"
   | "view.zoomOut"
-  | "view.zoomReset";
+  | "view.zoomReset"
+  | "block.prev"
+  | "block.next";
 
 export type ShortcutGroup = "General" | "Tabs" | "Search" | "AI" | "View";
 
@@ -194,6 +196,20 @@ export const SHORTCUTS: Shortcut[] = [
     keys: ["⌘", "0"],
     group: "View",
     match: (e) => isMod(e) && e.key === "0",
+  },
+  {
+    id: "block.prev",
+    label: "Previous block",
+    keys: ["⌃", "↑"],
+    group: "Tabs",
+    match: (e) => e.ctrlKey && !e.metaKey && !e.altKey && e.key === "ArrowUp",
+  },
+  {
+    id: "block.next",
+    label: "Next block",
+    keys: ["⌃", "↓"],
+    group: "Tabs",
+    match: (e) => e.ctrlKey && !e.metaKey && !e.altKey && e.key === "ArrowDown",
   },
 ];
 

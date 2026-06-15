@@ -1,6 +1,59 @@
 # Handshake — Session State
 
-## Last Session: 2026-06-07 (Block Terminal Feature — Full Implementation)
+## Last Session: 2026-06-15 (Block Terminal — Warp-Style Feature Completion)
+
+### What Was Done
+Completed all remaining Warp-style block terminal features via parallel subagents. 21 files changed, 535 insertions, 109 deletions.
+
+**Phase 1 — Unified Input (AiInputBar as terminal input):**
+- `chatStore.ts` — added `sendTarget: "ai" | "terminal"`, `setSendTarget()`, `injectCommand()`
+- `tabsStore.ts` — added `selectIsActiveBlockTerminal` selector, `blockDecorationRegistry`, `registerBlockDecorations()`, `getActiveBlockDecorations()`
+- `tabs/index.ts` — exported new selector and registry functions
+- `App.tsx` — auto-switch `sendTarget` effect + keyboard nav handlers wired
+- `WorkspaceArea.tsx` — `shouldShowInput = panelOpen || isBlockTerminal` (always visible in block mode)
+- `AiInputBar.tsx` — toggle button (AI/Terminal) + dynamic placeholder + terminal send path
+- `composer.tsx` — terminal branch at start of `submit()` (routes to `injectCommand`)
+- `BlockInputBar.tsx` — deleted (stub removed)
+- `TerminalPane.tsx` / `SshTerminalPane.tsx` — simplified to `div.relative.h-full` (no BlockInputBar)
+
+**Phase 2 — Block UI:**
+- `BlockChrome.tsx` — fully rewritten: collapse/expand chevron, pulsing running indicator, live duration ticker, re-run button, selection state, hover toolbar
+- `BlockOverlay.tsx` — `selectedId`, `collapsedIds` state; `handleRerun` via `injectCommand`; `BlockSearchBar` gets `block` + `decorations` + `term`
+- `types.ts` — exported `HEADER_HEIGHT_PX = 24`
+
+**Phase 3 — Keyboard Navigation:**
+- `blockDecorations.ts` — `getAdjacentBlock()`, `getViewportY()`, `scrollToBlock()` methods
+- `shortcuts.ts` — `"block.prev"` (Ctrl+Up), `"block.next"` (Ctrl+Down)
+- `useShortcutHandlers.ts` — `navigatePrevBlock` / `navigateNextBlock` options wired
+- `useTerminalSession.ts` — `registerBlockDecorations()` call on init
+- `SshTerminalPane.tsx` — `registerBlockDecorations()` call on block mode init
+
+**Phase 5 — Block-Scoped Search:**
+- `BlockSearchBar.tsx` — custom `findMatches()` on `decorations.readBlock()`, match counter `"x/n"`, `term.scrollToLine()` navigation, no-match red border
+
+**Phase 6 — Quality:**
+- `blockDecorations.ts` — `getCssVar()` replaces hardcoded HEX colors; `hydrateFromMeta()` now creates real xterm markers
+- `store.ts` — `blockTerminalScrollbackPersistence` default → `"metadata"`
+- `definitions.ts` — new "Block Terminal" settings section (9 settings)
+
+**Verification:** `pnpm exec tsc --noEmit` ✅ (no errors)
+
+### Current State
+- Branch: `feat/block-terminals`
+- All block terminal features implemented and type-safe
+- Changes committed (see commit below)
+
+### What's Next
+- Manual testing: local block terminal (⌘⇧T), SSH block terminal, settings panel
+- Optional: keyboard shortcut `Ctrl+\`` to toggle send target (planned in Phase 1.5 but not implemented)
+- Future: full positional hydrateFromMeta rendering for scrollback block history
+
+### Blockers
+- None
+
+---
+
+## Previous Session: 2026-06-07 (Block Terminal Feature — Full Implementation)
 
 ### What Was Done
 Implemented a full Warp-style "block terminal" mode across local and SSH terminals. Each command + output is grouped into a visual block with header chrome (command, cwd, duration, exit code badge, toolbar). Implemented via 6 sequential subagents.

@@ -427,7 +427,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   zenModeShowHeader: true,
   zenModeShowStatusbar: true,
 
-  blockTerminalScrollbackPersistence: "fresh",
+  blockTerminalScrollbackPersistence: "metadata",
   blockTerminalShowHeader: true,
   blockTerminalShowExitCode: true,
   blockTerminalShowExecutionTime: true,

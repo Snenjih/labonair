@@ -34,19 +34,20 @@ function visibleSignature(v: VisibleBlocks): string {
 }
 
 export function BlockOverlay({
+  term,
   containerRef,
   decorations,
   mode,
   settings,
   searchAddon,
 }: BlockOverlayProps) {
-  // Hide in alt-screen mode (e.g. vim, less) if configured
   if (mode === "alt" && settings.autoCollapseOnAltScreen) {
     return <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" />;
   }
 
   return (
     <BlockOverlayInner
+      term={term}
       containerRef={containerRef}
       decorations={decorations}
       settings={settings}
@@ -55,13 +56,14 @@ export function BlockOverlay({
   );
 }
 
-// Separate inner component so the early-return above doesn't violate hooks rules
 function BlockOverlayInner({
+  term,
   containerRef,
   decorations,
   settings,
   searchAddon,
 }: {
+  term: Terminal | null;
   containerRef: React.RefObject<HTMLDivElement | null>;
   decorations: BlockDecorations | null;
   settings: BlockChromeSettings;
@@ -69,12 +71,13 @@ function BlockOverlayInner({
 }) {
   const [visibleBlocks, setVisibleBlocks] = useState<VisibleBlocks>(EMPTY_VISIBLE);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [searchTarget, setSearchTarget] = useState<BlockMeta | null>(null);
 
   const lastSig = useRef("");
   const rafRef = useRef<number | null>(null);
 
-  // Subscribe to decoration changes and drive a RAF loop for viewport sync
   useEffect(() => {
     if (!decorations) return;
 
@@ -97,9 +100,7 @@ function BlockOverlayInner({
       });
     };
 
-    // Initial read
     update();
-
     const unsubscribe = decorations.subscribe(scheduleRaf);
 
     return () => {
@@ -130,32 +131,48 @@ function BlockOverlayInner({
     useChatStore.getState().attachSelection(text, "terminal");
   };
 
+  const handleRerun = (block: BlockMeta) => {
+    if (!block.command) return;
+    useChatStore.getState().injectCommand(block.command);
+  };
+
+  const handleToggleCollapse = (id: string) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
-      {/* Per-block chrome */}
       {visibleBlocks.blocks.map((block) => (
         <BlockChrome
           key={block.id}
           block={block}
           isHovered={hoveredId === block.id}
+          isSelected={selectedId === block.id}
+          isCollapsed={collapsedIds.has(block.id)}
           onHover={setHoveredId}
+          onSelect={setSelectedId}
+          onToggleCollapse={handleToggleCollapse}
           onCopyCommand={() => handleCopyCommand(block.command)}
           onCopyOutput={() => handleCopyOutput(block)}
           onSearch={() => setSearchTarget(block)}
           onAttachToAi={() => handleAttachToAi(block)}
+          onRerun={() => handleRerun(block)}
           settings={settings}
         />
       ))}
 
-      {/* Sticky header for the block scrolled out of view */}
       <StickyHeader block={visibleBlocks.sticky} />
 
-      {/* In-block search bar */}
       {searchTarget !== null && (
         <BlockSearchBar
+          block={searchTarget}
+          decorations={decorations}
+          term={term}
           searchAddon={searchAddon}
-          startLine={searchTarget.startLine}
-          endLine={searchTarget.endLine}
           onClose={() => setSearchTarget(null)}
         />
       )}

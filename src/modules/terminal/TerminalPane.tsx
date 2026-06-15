@@ -3,7 +3,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useChatStore } from "@/modules/ai/store/chatStore";
 import { useShallow } from "zustand/react/shallow";
 import { useTheme } from "@/modules/theme";
-import { BlockInputBar, BlockOverlay } from "@/modules/terminal/block";
+import { BlockOverlay } from "@/modules/terminal/block";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -140,7 +140,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     const blockOverlay = terminalMode === "block" ? (
       <BlockOverlay
-        term={null}
+        term={session.termRef.current}
         containerRef={containerRef}
         decorations={session.blockDecorations}
         mode={session.blockMode}
@@ -151,12 +151,9 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     ) : null;
 
     const inner = terminalMode === "block" ? (
-      <div className="flex h-full w-full flex-col">
-        <div className="relative min-h-0 flex-1">
-          {terminalContainer}
-          {blockOverlay}
-        </div>
-        <BlockInputBar />
+      <div className="relative h-full w-full">
+        {terminalContainer}
+        {blockOverlay}
       </div>
     ) : (
       <div className="relative h-full w-full">

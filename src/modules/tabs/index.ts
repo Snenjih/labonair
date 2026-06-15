@@ -25,4 +25,7 @@ export {
   selectActiveTab,
   selectActiveTabKind,
   selectActivePaneId,
+  selectIsActiveBlockTerminal,
+  registerBlockDecorations,
+  getActiveBlockDecorations,
 } from "./store/tabsStore";
