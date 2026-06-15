@@ -16,6 +16,9 @@ export type {
   QuickConnectParams,
   SftpTab,
   HomeTab,
+  AgentTool,
+  FleetAgentConfig,
+  AgentFleetTab,
 } from "./types";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
 export { useTabManagement } from "./lib/useTabManagement";

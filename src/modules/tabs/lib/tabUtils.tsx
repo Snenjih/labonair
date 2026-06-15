@@ -40,6 +40,7 @@ export function labelFor(t: Tab): string {
   if (t.kind === "ai-diff") return t.title;
   if (t.kind === "home") return t.title;
   if (t.kind === "sftp") return t.title;
+  if (t.kind === "agent-fleet") return t.title;
   const wt = t as WorkspaceTab;
   const activeSession = wt.sessions[wt.activePaneId];
   if (activeSession?.kind === "local" && activeSession.cwd) {
@@ -74,6 +75,11 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
   if (tab.kind === "sftp") {
     return (
       <HugeiconsIcon icon={CloudServerIcon} size={14} strokeWidth={1.75} className="shrink-0" />
+    );
+  }
+  if (tab.kind === "agent-fleet") {
+    return (
+      <HugeiconsIcon icon={ComputerTerminal02Icon} size={14} strokeWidth={1.75} className="shrink-0" />
     );
   }
   if (tab.kind === "workspace") {
