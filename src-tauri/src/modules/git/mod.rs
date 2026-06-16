@@ -53,6 +53,14 @@ pub struct CommitResult {
     pub subject: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StashEntry {
+    pub index: u32,
+    pub message: String,
+    pub branch: String,
+    pub hash: String,
+}
+
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
 /// Synchronous helper: validate cwd, run git with the given args, return trimmed stdout.
@@ -381,14 +389,19 @@ pub async fn git_get_branches(path: String) -> Result<Vec<Branch>, String> {
 
 /// Returns the diff for a specific file, either staged or unstaged.
 #[tauri::command]
-pub async fn git_get_diff(path: String, file: String, staged: bool) -> Result<String, String> {
+pub async fn git_get_diff(path: String, file: String, staged: bool, ignore_whitespace: Option<bool>) -> Result<String, String> {
     const MAX_DIFF_BYTES: usize = 200 * 1024; // 200 KB
 
-    let args: Vec<&str> = if staged {
-        vec!["diff", "--cached", "--", &file]
+    let mut args: Vec<String> = if staged {
+        vec!["diff".to_string(), "--cached".to_string()]
     } else {
-        vec!["diff", "--", &file]
+        vec!["diff".to_string()]
     };
+    if ignore_whitespace.unwrap_or(false) {
+        args.push("-w".to_string());
+    }
+    args.push("--".to_string());
+    args.push(file);
 
     // We build the args with owned strings to allow the file path through.
     let cwd_path = PathBuf::from(&path);
@@ -613,4 +626,232 @@ pub async fn git_get_log(
 #[tauri::command]
 pub async fn git_get_commit_detail(path: String, hash: String) -> Result<String, String> {
     run_git(&["show", "--stat", "--format=%B", &hash], &path)
+}
+
+// ─── Branch Management ────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn git_checkout_branch(path: String, branch: String) -> Result<(), String> {
+    run_git(&["checkout", &branch], &path).map(|_| ())
+}
+
+#[tauri::command]
+pub async fn git_create_branch(
+    path: String,
+    name: String,
+    from_ref: Option<String>,
+    checkout: bool,
+) -> Result<(), String> {
+    let mut args: Vec<String> = if checkout {
+        vec!["checkout".to_string(), "-b".to_string(), name.clone()]
+    } else {
+        vec!["branch".to_string(), name.clone()]
+    };
+    if let Some(ref r) = from_ref {
+        args.push(r.clone());
+    }
+    let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    run_git(&args_refs, &path).map(|_| ())
+}
+
+#[tauri::command]
+pub async fn git_delete_branch(path: String, name: String, force: bool) -> Result<(), String> {
+    let flag = if force { "-D" } else { "-d" };
+    run_git(&["branch", flag, &name], &path).map(|_| ())
+}
+
+#[tauri::command]
+pub async fn git_rename_branch(
+    path: String,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
+    run_git(&["branch", "-m", &old_name, &new_name], &path).map(|_| ())
+}
+
+// ─── Stash Commands ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn git_stash_push(path: String, message: Option<String>) -> Result<(), String> {
+    if let Some(ref msg) = message {
+        run_git(&["stash", "push", "-m", msg.as_str()], &path).map(|_| ())
+    } else {
+        run_git(&["stash", "push"], &path).map(|_| ())
+    }
+}
+
+#[tauri::command]
+pub async fn git_stash_list(path: String) -> Result<Vec<StashEntry>, String> {
+    let output = run_git(&["stash", "list", "--format=%gd|%gs|%H"], &path)?;
+    let mut entries: Vec<StashEntry> = Vec::new();
+    for line in output.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = line.splitn(3, '|').collect();
+        if parts.len() < 3 {
+            continue;
+        }
+        // parts[0] = "stash@{0}", parts[1] = "On main: message", parts[2] = hash
+        let ref_part = parts[0]; // "stash@{N}"
+        let index: u32 = ref_part
+            .trim_start_matches("stash@{")
+            .trim_end_matches('}')
+            .parse()
+            .unwrap_or(0);
+        let gs = parts[1]; // "On <branch>: <message>" or "WIP on <branch>: <message>"
+        let (branch, message) = if let Some(rest) = gs.strip_prefix("On ") {
+            if let Some(colon_pos) = rest.find(": ") {
+                (rest[..colon_pos].to_string(), rest[colon_pos + 2..].to_string())
+            } else {
+                (rest.to_string(), String::new())
+            }
+        } else if let Some(rest) = gs.strip_prefix("WIP on ") {
+            if let Some(colon_pos) = rest.find(": ") {
+                (rest[..colon_pos].to_string(), rest[colon_pos + 2..].to_string())
+            } else {
+                (rest.to_string(), String::new())
+            }
+        } else {
+            (String::new(), gs.to_string())
+        };
+        entries.push(StashEntry {
+            index,
+            message,
+            branch,
+            hash: parts[2].to_string(),
+        });
+    }
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn git_stash_pop(path: String, index: u32) -> Result<(), String> {
+    let ref_str = format!("stash@{{{}}}", index);
+    run_git(&["stash", "pop", &ref_str], &path).map(|_| ())
+}
+
+#[tauri::command]
+pub async fn git_stash_apply(path: String, index: u32) -> Result<(), String> {
+    let ref_str = format!("stash@{{{}}}", index);
+    run_git(&["stash", "apply", &ref_str], &path).map(|_| ())
+}
+
+#[tauri::command]
+pub async fn git_stash_drop(path: String, index: u32) -> Result<(), String> {
+    let ref_str = format!("stash@{{{}}}", index);
+    run_git(&["stash", "drop", &ref_str], &path).map(|_| ())
+}
+
+// ─── Diff + Push Variants ─────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn git_get_commit_diff(path: String, hash: String) -> Result<String, String> {
+    const MAX_DIFF_BYTES: usize = 200 * 1024;
+    let cwd_path = std::path::PathBuf::from(&path);
+    if !cwd_path.is_dir() {
+        return Err(format!("not a directory: {path}"));
+    }
+    let output = std::process::Command::new("git")
+        .args(["show", "--format=", "--patch", &hash])
+        .current_dir(&cwd_path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+    }
+    let stdout = output.stdout;
+    if stdout.len() > MAX_DIFF_BYTES {
+        let truncated = String::from_utf8_lossy(&stdout[..MAX_DIFF_BYTES]).into_owned();
+        Ok(format!("{truncated}\n\n[diff truncated — output exceeded 200 KB]"))
+    } else {
+        Ok(String::from_utf8_lossy(&stdout).into_owned())
+    }
+}
+
+#[tauri::command]
+pub async fn git_push_force_with_lease(
+    path: String,
+    remote: Option<String>,
+    branch: Option<String>,
+) -> Result<String, String> {
+    let remote_str = remote.unwrap_or_else(|| "origin".to_string());
+    let mut args = vec!["push".to_string(), "--force-with-lease".to_string(), remote_str.clone()];
+    if let Some(b) = branch {
+        args.push(b);
+    }
+    let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    run_git_merged(&args_refs, &path)
+}
+
+#[tauri::command]
+pub async fn git_push_set_upstream(
+    path: String,
+    remote: String,
+    branch: String,
+) -> Result<String, String> {
+    run_git_merged(&["push", "--set-upstream", &remote, &branch], &path)
+}
+
+// ─── Cherry-pick ──────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn git_cherry_pick(path: String, hash: String) -> Result<(), String> {
+    run_git(&["cherry-pick", &hash], &path).map(|_| ())
+}
+
+// ─── Tag Management ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn git_get_tags(path: String) -> Result<Vec<String>, String> {
+    let output = run_git(&["tag", "--sort=-version:refname"], &path)?;
+    Ok(output
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(|l| l.to_string())
+        .collect())
+}
+
+#[tauri::command]
+pub async fn git_create_tag(
+    path: String,
+    name: String,
+    message: Option<String>,
+    hash: Option<String>,
+) -> Result<(), String> {
+    let mut args: Vec<String> = vec!["tag".to_string()];
+    if let Some(ref msg) = message {
+        args.push("-a".to_string());
+        args.push(name.clone());
+        if let Some(ref h) = hash {
+            args.push(h.clone());
+        }
+        args.push("-m".to_string());
+        args.push(msg.clone());
+    } else {
+        args.push(name.clone());
+        if let Some(ref h) = hash {
+            args.push(h.clone());
+        }
+    }
+    let args_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    run_git(&args_refs, &path).map(|_| ())
+}
+
+#[tauri::command]
+pub async fn git_delete_tag(path: String, name: String) -> Result<(), String> {
+    run_git(&["tag", "-d", &name], &path).map(|_| ())
+}
+
+#[tauri::command]
+pub async fn git_push_tag(
+    path: String,
+    name: String,
+    remote: Option<String>,
+) -> Result<String, String> {
+    let remote_str = remote.unwrap_or_else(|| "origin".to_string());
+    run_git_merged(&["push", &remote_str, &name], &path)
 }

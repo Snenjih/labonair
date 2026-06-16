@@ -41,3 +41,16 @@ export interface CommitResult {
   hash: string;
   subject: string;
 }
+
+export interface StashEntry {
+  index: number;
+  message: string;
+  branch: string;
+  hash: string;
+}
+
+export type SelectionMode =
+  | { type: 'file'; path: string; staged: boolean }
+  | { type: 'section'; section: 'staged' | 'unstaged' | 'untracked' }
+  | { type: 'all' }
+  | { type: 'commit'; hash: string; repositoryPath: string };

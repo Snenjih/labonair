@@ -2,6 +2,13 @@ import { useRef, useMemo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
 import type { LayoutCommit, Edge } from "../types";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 const ROW_HEIGHT = 28;
 const LANE_WIDTH = 14;
@@ -39,9 +46,13 @@ interface Props {
   commits: LayoutCommit[];
   onSelectCommit: (commit: LayoutCommit) => void;
   selectedHash: string | null;
+  onViewChanges?: (commit: LayoutCommit) => void;
+  onCheckoutCommit?: (commit: LayoutCommit) => void;
+  onCreateBranchHere?: (commit: LayoutCommit) => void;
+  onCherryPick?: (commit: LayoutCommit) => void;
 }
 
-export function GitGraphCanvas({ commits, onSelectCommit, selectedHash }: Props) {
+export function GitGraphCanvas({ commits, onSelectCommit, selectedHash, onViewChanges, onCheckoutCommit, onCreateBranchHere, onCherryPick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
@@ -100,97 +111,141 @@ export function GitGraphCanvas({ commits, onSelectCommit, selectedHash }: Props)
           const isSelected = selectedHash === commit.hash;
 
           return (
-            <div
-              key={commit.hash}
-              style={{
-                position: "absolute",
-                top: virtualRow.start,
-                height: ROW_HEIGHT,
-                width: "100%",
-                left: 0,
-              }}
-              className={cn(
-                "flex items-center cursor-pointer hover:bg-accent/30 transition-colors",
-                isSelected && "bg-accent/50",
-              )}
-              onClick={() => onSelectCommit(commit)}
-            >
-              {/* Commit dot — positioned at lane */}
-              <div
-                style={{
-                  width: LEFT_PADDING + (commit.lane + 1) * LANE_WIDTH,
-                  flexShrink: 0,
-                  position: "relative",
-                  height: "100%",
-                }}
-              >
+            <ContextMenu key={commit.hash}>
+              <ContextMenuTrigger asChild>
                 <div
                   style={{
                     position: "absolute",
-                    left: LEFT_PADDING + commit.lane * LANE_WIDTH + LANE_WIDTH / 2 - DOT_RADIUS,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    width: DOT_RADIUS * 2,
-                    height: DOT_RADIUS * 2,
-                    borderRadius: "50%",
-                    backgroundColor: commit.color,
-                    boxShadow: isSelected ? `0 0 0 2px ${commit.color}60` : undefined,
+                    top: virtualRow.start,
+                    height: ROW_HEIGHT,
+                    width: "100%",
+                    left: 0,
                   }}
-                />
-              </div>
+                  className={cn(
+                    "flex items-center cursor-pointer hover:bg-accent/30 transition-colors",
+                    isSelected && "bg-accent/50",
+                  )}
+                  onClick={() => onSelectCommit(commit)}
+                >
+                  {/* Commit dot — positioned at lane */}
+                  <div
+                    style={{
+                      width: LEFT_PADDING + (commit.lane + 1) * LANE_WIDTH,
+                      flexShrink: 0,
+                      position: "relative",
+                      height: "100%",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: LEFT_PADDING + commit.lane * LANE_WIDTH + LANE_WIDTH / 2 - DOT_RADIUS,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: DOT_RADIUS * 2,
+                        height: DOT_RADIUS * 2,
+                        borderRadius: "50%",
+                        backgroundColor: commit.color,
+                        boxShadow: isSelected ? `0 0 0 2px ${commit.color}60` : undefined,
+                      }}
+                    />
+                  </div>
 
-              {/* Text content */}
-              <div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
-                {/* Ref pills */}
-                {commit.refs.map((ref) => {
-                  const refKind: "local" | "remote" | "tag" = ref.includes("/")
-                    ? "remote"
-                    : /^v\d/.test(ref)
-                      ? "tag"
-                      : "local";
-                  return (
-                    <span
-                      key={ref}
-                      className={cn(
-                        "shrink-0 rounded px-1 py-0 text-[10px] font-medium",
-                        refKind === "remote" && "opacity-70",
-                        refKind === "tag" && "bg-amber-500/20 text-amber-500"
-                      )}
-                      style={
-                        refKind !== "tag"
-                          ? {
-                              backgroundColor: `${commit.color}30`,
-                              color: commit.color,
-                              border: `1px solid ${commit.color}50`,
-                            }
-                          : {
-                              border: "1px solid rgb(245 158 11 / 0.4)",
-                            }
-                      }
-                      title={
-                        refKind === "remote"
-                          ? `Remote branch: ${ref}`
-                          : refKind === "tag"
-                            ? `Tag: ${ref}`
-                            : `Branch: ${ref}`
-                      }
-                    >
-                      {refKind === "remote" ? `· ${ref}` : ref}
+                  {/* Text content */}
+                  <div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
+                    {/* Ref pills */}
+                    {commit.refs.map((ref) => {
+                      const refKind: "local" | "remote" | "tag" = ref.includes("/")
+                        ? "remote"
+                        : /^v\d/.test(ref)
+                          ? "tag"
+                          : "local";
+                      return (
+                        <span
+                          key={ref}
+                          className={cn(
+                            "shrink-0 rounded px-1 py-0 text-[10px] font-medium",
+                            refKind === "remote" && "opacity-70",
+                            refKind === "tag" && "bg-amber-500/20 text-amber-500"
+                          )}
+                          style={
+                            refKind !== "tag"
+                              ? {
+                                  backgroundColor: `${commit.color}30`,
+                                  color: commit.color,
+                                  border: `1px solid ${commit.color}50`,
+                                }
+                              : {
+                                  border: "1px solid rgb(245 158 11 / 0.4)",
+                                }
+                          }
+                          title={
+                            refKind === "remote"
+                              ? `Remote branch: ${ref}`
+                              : refKind === "tag"
+                                ? `Tag: ${ref}`
+                                : `Branch: ${ref}`
+                          }
+                        >
+                          {refKind === "remote" ? `· ${ref}` : ref}
+                        </span>
+                      );
+                    })}
+
+                    {/* Subject */}
+                    <span className="min-w-0 truncate text-[12px] text-foreground">
+                      {commit.subject}
                     </span>
-                  );
-                })}
 
-                {/* Subject */}
-                <span className="min-w-0 truncate text-[12px] text-foreground">
-                  {commit.subject}
-                </span>
-
-                {/* Author + Date */}
-                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/60">
-                  {commit.authorName} · {formatDate(commit.timestamp)}
-                </span>
-              </div>
-            </div>
+                    {/* Author + Date */}
+                    <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/60">
+                      {commit.authorName} · {formatDate(commit.timestamp)}
+                    </span>
+                  </div>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent className="w-52">
+                <ContextMenuItem
+                  onClick={() => onViewChanges?.(commit)}
+                  className="text-xs"
+                >
+                  View Changes
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  onClick={() => onCheckoutCommit?.(commit)}
+                  className="text-xs"
+                >
+                  Checkout (detached HEAD)
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onClick={() => onCreateBranchHere?.(commit)}
+                  className="text-xs"
+                >
+                  Create Branch Here...
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  onClick={() => onCherryPick?.(commit)}
+                  className="text-xs"
+                >
+                  Cherry-pick
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  onClick={() => void navigator.clipboard.writeText(commit.hash)}
+                  className="text-xs"
+                >
+                  Copy Hash
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onClick={() => void navigator.clipboard.writeText(commit.shortHash)}
+                  className="text-xs"
+                >
+                  Copy Short Hash
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           );
         })}
       </div>

@@ -1,6 +1,57 @@
 # Handshake — Session State
 
-## Last Session: 2026-06-04 (App.tsx Decomposition + Tooling)
+## Last Session: 2026-06-16 (Source Control Feature Expansion — Full Implementation)
+
+### What Was Done
+Implemented a complete expansion of the Source Control feature via 5 sequential subagents. All `cargo check` ✅ and `tsc --noEmit` ✅ throughout.
+
+**New Rust commands** (src-tauri/src/modules/git/mod.rs + lib.rs):
+- Branch: `git_checkout_branch`, `git_create_branch`, `git_delete_branch`, `git_rename_branch`
+- Stash: `git_stash_push`, `git_stash_list`, `git_stash_pop`, `git_stash_apply`, `git_stash_drop`
+- Diff: `git_get_commit_diff`, `git_get_diff` extended with `ignore_whitespace` param
+- Push: `git_push_force_with_lease`, `git_push_set_upstream`
+- Tags: `git_get_tags`, `git_create_tag`, `git_delete_tag`, `git_push_tag`
+- Other: `git_cherry_pick`
+
+**New TypeScript types** (src/modules/source-control/types.ts):
+- `StashEntry` interface
+- `SelectionMode` discriminated union: `'file' | 'section' | 'all' | 'commit'`
+
+**New components created:**
+- `src/modules/source-control/components/BranchDropdown.tsx` — Popover with branch list, checkout, create, delete, remote branches, full tag management
+- `src/modules/source-control/components/NewBranchDialog.tsx` — Dialog for creating branches with fromRef support
+- `src/modules/source-control/components/StashPanel.tsx` — Collapsible stash list with apply/pop/drop actions
+- `src/modules/source-control/components/SideBySideDiff.tsx` — Two-column diff view with scroll sync
+- `src/modules/git-graph/components/CommitDiffPanel.tsx` — Full commit diff panel (360px, slide-in) with file nav
+
+**Components significantly updated:**
+- `BranchBar.tsx` — Branch name now opens BranchDropdown popover
+- `CommitForm.tsx` — Force push (--force-with-lease) with AlertDialog, upstream detection prompt, recent message history
+- `FileChangeList.tsx` — Section header click selects section for diff (toggleable)
+- `SourceControlPanel.tsx` — "All Changes" button with count, StashPanel wired in
+- `DiffViewer.tsx` — Major rewrite: dynamic header label, multi-file nav strip, side-by-side toggle, whitespace ignore toggle, conflict visualization (ours=purple, theirs=orange)
+- `GitGraphCanvas.tsx` — ContextMenu on every commit row (View Changes, Checkout, Create Branch Here, Cherry-pick, Copy Hash)
+- `GitGraphPane.tsx` — Checkout/cherry-pick/create-branch-from-commit workflows with AlertDialog confirms, CommitDiffPanel integration
+- `CommitDetailPanel.tsx` — "View full diff" eye button added
+- `sourceControlStore.ts` — Added branchList, stash, tags, recentMessages, currentBranch, selectionMode, diffViewMode, ignoreWhitespace
+- `useGitStatus.ts` — Fetches branches/stash/tags on each refresh; diff loading handles all SelectionMode types
+
+### Current State
+- Branch: `feat/source-control`
+- `cargo check` ✅ · `tsc --noEmit` ✅
+- NOT committed yet — changes are unstaged
+
+### What's Next
+- Commit all changes with conventional commit
+- Test all new features manually (branch checkout, stash, section diff, graph context menu)
+- Consider a PR for this feature branch
+
+### Blockers
+- None
+
+---
+
+## Previous Session: 2026-06-04 (App.tsx Decomposition + Tooling)
 
 ### What Was Done
 Decomposed `src/app/App.tsx` from 1370 → 181 lines into focused per-module hooks and components. Added Biome linting + knip dead-code detection. PR #73 open on branch `refactor/decompose-app-tsx-add-tooling`.

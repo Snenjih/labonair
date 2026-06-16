@@ -1,4 +1,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { EyeIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "@/lib/utils";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { useGitStatus } from "../lib/useGitStatus";
 import { BranchBar } from "./BranchBar";
@@ -6,6 +9,7 @@ import { FileChangeList } from "./FileChangeList";
 import { CommitForm } from "./CommitForm";
 import { DiffViewer } from "./DiffViewer";
 import { NoRepoState } from "./NoRepoState";
+import { StashPanel } from "./StashPanel";
 
 interface SourceControlPanelProps {
   rootPath: string | null;
@@ -18,6 +22,16 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
   const isRepo = useSourceControlStore((s) => s.isRepo);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
   const status = useSourceControlStore((s) => s.status);
+  const selectionMode = useSourceControlStore((s) => s.selectionMode);
+  const selectAll = useSourceControlStore((s) => s.selectAll);
+  const clearSelectedFile = useSourceControlStore((s) => s.clearSelectedFile);
+
+  const totalChanges =
+    (status?.staged.length ?? 0) +
+    (status?.unstaged.length ?? 0) +
+    (status?.untracked.length ?? 0);
+
+  const isAllSelected = selectionMode?.type === 'all';
 
   if (!isRepo) {
     return <NoRepoState rootPath={rootPath} onRefresh={refresh} />;
@@ -35,6 +49,25 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
 
       <ScrollArea className="flex-1">
         <div className="py-1">
+          {totalChanges > 0 && (
+            <button
+              type="button"
+              className={cn(
+                "mx-2 mb-1 flex h-6 w-[calc(100%-1rem)] items-center gap-1.5 rounded px-2 text-[10px] transition-colors",
+                isAllSelected
+                  ? "bg-accent/40 text-foreground/90"
+                  : "bg-muted/20 text-muted-foreground/70 hover:bg-muted/40 hover:text-muted-foreground"
+              )}
+              onClick={() => (isAllSelected ? clearSelectedFile() : selectAll())}
+            >
+              <HugeiconsIcon icon={EyeIcon} size={10} strokeWidth={2} />
+              <span>All Changes</span>
+              <span className="ml-auto font-mono text-[9px] tabular-nums opacity-60">
+                {totalChanges}
+              </span>
+            </button>
+          )}
+
           <FileChangeList
             files={status?.staged ?? []}
             section="staged"
@@ -51,6 +84,8 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
             onRefresh={refresh}
           />
         </div>
+
+        {repoRoot && <StashPanel repoRoot={repoRoot} onRefresh={refresh} />}
 
         {repoRoot && <CommitForm repoRoot={repoRoot} onRefresh={refresh} />}
 

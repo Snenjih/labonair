@@ -13,8 +13,13 @@ export function useGitStatus(rootPath: string | null) {
   const setIsStatusLoading = useSourceControlStore((s) => s.setIsStatusLoading);
   const setDiffContent = useSourceControlStore((s) => s.setDiffContent);
   const setIsDiffLoading = useSourceControlStore((s) => s.setIsDiffLoading);
-  const selectedFile = useSourceControlStore((s) => s.selectedFile);
+  const selectionMode = useSourceControlStore((s) => s.selectionMode);
+  const ignoreWhitespace = useSourceControlStore((s) => s.ignoreWhitespace);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const setStashEntries = useSourceControlStore((s) => s.setStashEntries);
+  const setBranchList = useSourceControlStore((s) => s.setBranchList);
+  const setIsBranchLoading = useSourceControlStore((s) => s.setIsBranchLoading);
+  const setTags = useSourceControlStore((s) => s.setTags);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
@@ -65,7 +70,42 @@ export function useGitStatus(rootPath: string | null) {
         setIsStatusLoading(false);
       }
     }
-  }, [rootPath, setRepoInfo, setStatus, setIsStatusLoading]);
+
+    // Fetch branches
+    setIsBranchLoading(true);
+    try {
+      const branches = await git.getBranches(root);
+      if (isMountedRef.current) {
+        setBranchList(branches);
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      if (isMountedRef.current) {
+        setIsBranchLoading(false);
+      }
+    }
+
+    // Fetch stash entries
+    try {
+      const stashes = await git.stashList(root);
+      if (isMountedRef.current) {
+        setStashEntries(stashes);
+      }
+    } catch {
+      // silently ignore
+    }
+
+    // Fetch tags
+    try {
+      const tags = await git.getTags(root);
+      if (isMountedRef.current) {
+        setTags(tags);
+      }
+    } catch {
+      // silently ignore
+    }
+  }, [rootPath, setRepoInfo, setStatus, setIsStatusLoading, setStashEntries, setBranchList, setIsBranchLoading, setTags]);
 
   const startPolling = useCallback(() => {
     if (intervalRef.current !== null) return;
@@ -107,37 +147,63 @@ export function useGitStatus(rootPath: string | null) {
     };
   }, [doRefresh, startPolling, stopPolling]);
 
-  // Load diff when selectedFile changes
+  // Load diff when selectionMode or ignoreWhitespace changes
   useEffect(() => {
-    if (!selectedFile || !repoRoot) {
+    if (!selectionMode || !repoRoot) {
       setDiffContent(null);
       return;
     }
 
     let cancelled = false;
     setIsDiffLoading(true);
-    git
-      .getDiff(repoRoot, selectedFile.path, selectedFile.staged)
-      .then((content) => {
+
+    async function loadDiff() {
+      try {
+        let content: string | null = null;
+
+        if (selectionMode!.type === 'file') {
+          content = await git.getDiff(repoRoot!, selectionMode!.path, selectionMode!.staged, ignoreWhitespace);
+        } else if (selectionMode!.type === 'section') {
+          const section = selectionMode!.section;
+          if (section === 'untracked') {
+            // Untracked files don't show in git diff — use sentinel
+            content = '__UNTRACKED_ONLY__';
+          } else {
+            const staged = section === 'staged';
+            content = await git.getDiff(repoRoot!, '.', staged, ignoreWhitespace);
+          }
+        } else if (selectionMode!.type === 'all') {
+          // Fetch staged and unstaged in parallel
+          const [staged, unstaged] = await Promise.all([
+            git.getDiff(repoRoot!, '.', true, ignoreWhitespace).catch(() => ''),
+            git.getDiff(repoRoot!, '.', false, ignoreWhitespace).catch(() => ''),
+          ]);
+          const parts = [staged, unstaged].filter(Boolean);
+          content = parts.join('\n');
+        } else if (selectionMode!.type === 'commit') {
+          content = await git.getCommitDiff(selectionMode!.repositoryPath, selectionMode!.hash);
+        }
+
         if (!cancelled) {
           setDiffContent(content);
         }
-      })
-      .catch(() => {
+      } catch {
         if (!cancelled) {
           setDiffContent(null);
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setIsDiffLoading(false);
         }
-      });
+      }
+    }
+
+    void loadDiff();
 
     return () => {
       cancelled = true;
     };
-  }, [selectedFile, repoRoot, setDiffContent, setIsDiffLoading]);
+  }, [selectionMode, repoRoot, ignoreWhitespace, setDiffContent, setIsDiffLoading]);
 
   return { refresh: () => void doRefresh() };
 }

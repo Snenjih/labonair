@@ -1,13 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { GitGraphTab } from "@/modules/tabs/types";
+import { git } from "@/modules/source-control/lib/gitInvoke";
+import { NewBranchDialog } from "@/modules/source-control/components/NewBranchDialog";
 import { useGitGraph } from "../lib/useGitGraph";
 import type { LayoutCommit } from "../types";
 import { GitGraphCanvas } from "./GitGraphCanvas";
 import { CommitDetailPanel } from "./CommitDetailPanel";
+import { CommitDiffPanel } from "./CommitDiffPanel";
 
 function LoadingSkeleton() {
   return (
@@ -43,6 +56,57 @@ interface Props {
 export function GitGraphPane({ tab, onOpenFile }: Props) {
   const { commits, isLoading, error, hasMore, loadMore, reload } = useGitGraph(tab.repositoryPath);
   const [selectedCommit, setSelectedCommit] = useState<LayoutCommit | null>(null);
+  const [commitDiffHash, setCommitDiffHash] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isActioning, setIsActioning] = useState(false);
+  const [checkoutConfirmCommit, setCheckoutConfirmCommit] = useState<LayoutCommit | null>(null);
+  const [cherryPickConfirmCommit, setCherryPickConfirmCommit] = useState<LayoutCommit | null>(null);
+  const [createBranchFromCommit, setCreateBranchFromCommit] = useState<string | null>(null);
+
+  // Auto-dismiss error after 8 seconds
+  useEffect(() => {
+    if (!actionError) return;
+    const timer = setTimeout(() => setActionError(null), 8000);
+    return () => clearTimeout(timer);
+  }, [actionError]);
+
+  async function handleCheckoutCommit(commit: LayoutCommit) {
+    setCheckoutConfirmCommit(commit);
+  }
+
+  async function doCheckout() {
+    if (!checkoutConfirmCommit) return;
+    setIsActioning(true);
+    setActionError(null);
+    try {
+      await git.checkoutBranch(tab.repositoryPath, checkoutConfirmCommit.hash);
+      reload();
+    } catch (e) {
+      setActionError(String(e));
+    } finally {
+      setIsActioning(false);
+      setCheckoutConfirmCommit(null);
+    }
+  }
+
+  async function handleCherryPick(commit: LayoutCommit) {
+    setCherryPickConfirmCommit(commit);
+  }
+
+  async function doCherryPick() {
+    if (!cherryPickConfirmCommit) return;
+    setIsActioning(true);
+    setActionError(null);
+    try {
+      await git.cherryPick(tab.repositoryPath, cherryPickConfirmCommit.hash);
+      reload();
+    } catch (e) {
+      setActionError(String(e));
+    } finally {
+      setIsActioning(false);
+      setCherryPickConfirmCommit(null);
+    }
+  }
 
   if (isLoading && commits.length === 0) {
     return <LoadingSkeleton />;
@@ -76,10 +140,28 @@ export function GitGraphPane({ tab, onOpenFile }: Props) {
           </button>
         </div>
 
+        {/* Error banner */}
+        {actionError && (
+          <div className="mx-2 mb-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[10px] text-red-400">
+            {actionError}
+            <button
+              type="button"
+              className="ml-2 opacity-60 hover:opacity-100"
+              onClick={() => setActionError(null)}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <GitGraphCanvas
           commits={commits}
           onSelectCommit={setSelectedCommit}
           selectedHash={selectedCommit?.hash ?? null}
+          onViewChanges={(commit) => setCommitDiffHash(commit.hash)}
+          onCheckoutCommit={handleCheckoutCommit}
+          onCreateBranchHere={(commit) => setCreateBranchFromCommit(commit.hash)}
+          onCherryPick={handleCherryPick}
         />
         {hasMore && (
           <div className="shrink-0 border-t border-border/60 p-2">
@@ -96,18 +178,88 @@ export function GitGraphPane({ tab, onOpenFile }: Props) {
         )}
       </div>
 
-      {/* Detail panel */}
+      {/* Detail / Diff panels */}
       <AnimatePresence>
-        {selectedCommit && (
+        {commitDiffHash && (
+          <CommitDiffPanel
+            key={`diff-${commitDiffHash}`}
+            hash={commitDiffHash}
+            repositoryPath={tab.repositoryPath}
+            onClose={() => setCommitDiffHash(null)}
+          />
+        )}
+        {selectedCommit && !commitDiffHash && (
           <CommitDetailPanel
             key={selectedCommit.hash}
             commit={selectedCommit}
             repositoryPath={tab.repositoryPath}
             onClose={() => setSelectedCommit(null)}
             onOpenFile={onOpenFile}
+            onViewChanges={(hash) => setCommitDiffHash(hash)}
           />
         )}
       </AnimatePresence>
+
+      {/* Checkout confirmation */}
+      <AlertDialog
+        open={!!checkoutConfirmCommit}
+        onOpenChange={(open) => !open && setCheckoutConfirmCommit(null)}
+      >
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Checkout commit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will enter detached HEAD state at{" "}
+              <code className="font-mono text-foreground">{checkoutConfirmCommit?.shortHash}</code>.
+              Any new commits will not be on a named branch. You can create a branch later with
+              "Create Branch Here".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void doCheckout()} disabled={isActioning}>
+              Checkout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cherry-pick confirmation */}
+      <AlertDialog
+        open={!!cherryPickConfirmCommit}
+        onOpenChange={(open) => !open && setCherryPickConfirmCommit(null)}
+      >
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cherry-pick commit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apply the changes from commit{" "}
+              <code className="font-mono text-foreground">{cherryPickConfirmCommit?.shortHash}</code>{" "}
+              "{cherryPickConfirmCommit?.subject?.slice(0, 60)}"
+              onto the current branch.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void doCherryPick()} disabled={isActioning}>
+              Cherry-pick
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* New branch from commit */}
+      <NewBranchDialog
+        open={!!createBranchFromCommit}
+        onOpenChange={(open) => !open && setCreateBranchFromCommit(null)}
+        repoRoot={tab.repositoryPath}
+        currentBranch=""
+        fromRef={createBranchFromCommit ?? undefined}
+        onSuccess={() => {
+          setCreateBranchFromCommit(null);
+          reload();
+        }}
+      />
     </div>
   );
 }

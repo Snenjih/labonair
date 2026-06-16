@@ -65,14 +65,16 @@ function getStatusConfig(statusChar: string): StatusConfig {
 
 export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps) {
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
-  const selectedFile = useSourceControlStore((s) => s.selectedFile);
+  const selectionMode = useSourceControlStore((s) => s.selectionMode);
   const selectFile = useSourceControlStore((s) => s.selectFile);
 
   const isStaged = section === "staged";
   const statusChar = isStaged ? file.indexStatus : file.worktreeStatus;
   const { letter, className: statusClassName } = getStatusConfig(statusChar);
   const isSelected =
-    selectedFile?.path === file.path && selectedFile?.staged === isStaged;
+    selectionMode?.type === 'file' &&
+    selectionMode.path === file.path &&
+    selectionMode.staged === isStaged;
 
   // For renames: show "newName ← oldName"
   const displayName =

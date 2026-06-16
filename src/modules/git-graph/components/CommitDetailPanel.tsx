@@ -10,6 +10,7 @@ interface CommitDetailPanelProps {
   onClose: () => void;
   repositoryPath: string;
   onOpenFile?: (path: string) => void;
+  onViewChanges?: (hash: string) => void;
 }
 
 function formatDate(ts: number): string {
@@ -54,6 +55,7 @@ export function CommitDetailPanel({
   onClose,
   repositoryPath,
   onOpenFile,
+  onViewChanges,
 }: CommitDetailPanelProps) {
   const [statOutput, setStatOutput] = useState<string | null>(null);
   const [loadingStat, setLoadingStat] = useState(false);
@@ -106,6 +108,19 @@ export function CommitDetailPanel({
             {commit.authorName} · {formatDate(commit.timestamp)}
           </p>
         </div>
+        {onViewChanges && (
+          <button
+            type="button"
+            className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors"
+            title="View full diff"
+            onClick={() => onViewChanges(commit.hash)}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        )}
         <Button variant="ghost" size="icon" className="size-6 shrink-0" onClick={onClose}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="18" y1="6" x2="6" y2="18" />
