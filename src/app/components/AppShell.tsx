@@ -98,6 +98,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onRevealInTerminal: tabs.cdInNewTab,
     onAttachToAgent: ai.handleAttachFileToAgent,
     onSnippetRun: tabs.handleSnippetRun,
+    onOpenGitGraph: tabs.openGitGraphTab,
   };
 
   const shell = (

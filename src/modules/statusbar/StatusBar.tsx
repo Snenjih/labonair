@@ -9,6 +9,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   FolderTreeIcon,
   FlashIcon,
+  GitBranchIcon,
   Globe02Icon,
   LayoutTopIcon,
 } from "@hugeicons/core-free-icons";
@@ -19,7 +20,7 @@ import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { WorkspaceTab } from "@/modules/tabs/types";
 
-export type SidebarPanel = "explorer" | "snippets" | "hosts" | "tabs" | null;
+export type SidebarPanel = "explorer" | "snippets" | "source-control" | "hosts" | "tabs" | null;
 
 type Props = {
   home: string | null;
@@ -38,6 +39,7 @@ type Props = {
 const PANEL_BUTTONS: Array<{ panel: SidebarPanel; icon: typeof FolderTreeIcon; title: string }> = [
   { panel: "explorer", icon: FolderTreeIcon, title: "Explorer (Cmd+B)" },
   { panel: "snippets", icon: FlashIcon, title: "Snippets" },
+  { panel: "source-control", icon: GitBranchIcon, title: "Source Control" },
 ];
 
 export const StatusBar = React.memo(function StatusBar({

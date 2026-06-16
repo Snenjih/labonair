@@ -14,6 +14,7 @@ import {
   ComputerTerminal02Icon,
   Folder01Icon,
   Folder02Icon,
+  GitBranchIcon,
   GitCompareIcon,
   Globe02Icon,
   Home03Icon,
@@ -40,6 +41,7 @@ export function labelFor(t: Tab): string {
   if (t.kind === "ai-diff") return t.title;
   if (t.kind === "home") return t.title;
   if (t.kind === "sftp") return t.title;
+  if (t.kind === "git-graph") return "Git Graph";
   const wt = t as WorkspaceTab;
   const activeSession = wt.sessions[wt.activePaneId];
   if (activeSession?.kind === "local" && activeSession.cwd) {
@@ -74,6 +76,11 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
   if (tab.kind === "sftp") {
     return (
       <HugeiconsIcon icon={CloudServerIcon} size={14} strokeWidth={1.75} className="shrink-0" />
+    );
+  }
+  if (tab.kind === "git-graph") {
+    return (
+      <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} className="shrink-0" />
     );
   }
   if (tab.kind === "workspace") {

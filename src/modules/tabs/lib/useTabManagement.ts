@@ -70,6 +70,7 @@ export interface TabManagementReturn {
   handleSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
   execSnippet: ReturnType<typeof useSnippetExec>["execSnippet"];
   captureActiveSelection: () => string | null;
+  openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
 }
 
 export function useTabManagement({
@@ -86,6 +87,7 @@ export function useTabManagement({
     updateTab,
     setActiveId,
     newSshTab,
+    openGitGraphTab,
   } = useTabsStore.getState();
 
   // ── Reactive subscriptions ────────────────────────────────────────────────
@@ -384,5 +386,6 @@ export function useTabManagement({
     handleSnippetRun,
     execSnippet,
     captureActiveSelection,
+    openGitGraphTab,
   };
 }

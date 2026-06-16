@@ -56,6 +56,7 @@ export type TabsState = {
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
+  openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
   setActivePaneId: (tabId: number, paneId: string) => void;
   updatePaneSessionCwd: (tabId: number, sessionId: string, cwd: string) => void;
   splitPane: (tabId: number, direction: PaneDirection) => void;
@@ -434,6 +435,26 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       activeId: id,
       _nextId: s._nextId + 1,
     }));
+  },
+
+  openGitGraphTab: (repositoryPath, initialBranch) => {
+    const existing = get().tabs.find(
+      (t) => t.kind === "git-graph" && t.repositoryPath === repositoryPath,
+    );
+    if (existing) {
+      set({ activeId: existing.id });
+      return existing.id;
+    }
+    const id = get()._nextId;
+    set((s) => ({
+      tabs: [
+        { id, kind: "git-graph" as const, title: "Git Graph", repositoryPath, initialBranch },
+        ...s.tabs,
+      ],
+      activeId: id,
+      _nextId: s._nextId + 1,
+    }));
+    return id;
   },
 
   setActivePaneId: (tabId, paneId) => {

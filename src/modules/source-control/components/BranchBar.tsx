@@ -1,0 +1,117 @@
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { GitBranchIcon, Refresh01Icon, GitForkIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { cn } from "@/lib/utils";
+import { useSourceControlStore } from "../store/sourceControlStore";
+import { git } from "../lib/gitInvoke";
+
+interface BranchBarProps {
+  onOpenGitGraph: (repoPath: string, branch: string) => void;
+  onRefresh: () => void;
+}
+
+export function BranchBar({ onOpenGitGraph, onRefresh }: BranchBarProps) {
+  const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const status = useSourceControlStore((s) => s.status);
+  const [currentBranch, setCurrentBranch] = useState<string>("");
+
+  useEffect(() => {
+    if (!repoRoot) return;
+    git
+      .getCurrentBranch(repoRoot)
+      .then(setCurrentBranch)
+      .catch(() => setCurrentBranch(""));
+  }, [repoRoot]);
+
+  const ahead = status?.ahead ?? 0;
+  const behind = status?.behind ?? 0;
+  const mergeInProgress = status?.mergeInProgress ?? false;
+  const rebaseInProgress = status?.rebaseInProgress ?? false;
+  const cherryPickInProgress = status?.cherryPickInProgress ?? false;
+  const inProgress = mergeInProgress || rebaseInProgress || cherryPickInProgress;
+
+  function handleOpenGraph() {
+    if (repoRoot && currentBranch) {
+      onOpenGitGraph(repoRoot, currentBranch);
+    }
+  }
+
+  return (
+    <div className="border-b border-border/60">
+      {/* Main branch row */}
+      <div className="flex h-8 items-center gap-1.5 px-2">
+        <HugeiconsIcon
+          icon={GitBranchIcon}
+          size={12}
+          strokeWidth={2}
+          className="shrink-0 text-muted-foreground/60"
+        />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex-1 truncate text-[11px] font-medium text-foreground/80">
+                {currentBranch || "—"}
+              </span>
+            </TooltipTrigger>
+            {currentBranch && (
+              <TooltipContent side="bottom">
+                <span>{currentBranch}</span>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
+
+        {/* ahead / behind pills */}
+        {ahead > 0 && (
+          <span className="flex items-center gap-0.5 rounded-full bg-green-500/15 px-1.5 py-0.5 text-[9px] font-medium tabular-nums text-green-500">
+            ↑{ahead}
+          </span>
+        )}
+        {behind > 0 && (
+          <span className="flex items-center gap-0.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-medium tabular-nums text-red-500">
+            ↓{behind}
+          </span>
+        )}
+
+        {/* Action buttons */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6 text-muted-foreground hover:text-foreground"
+          onClick={onRefresh}
+          title="Refresh"
+        >
+          <HugeiconsIcon icon={Refresh01Icon} size={12} strokeWidth={2} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6 text-muted-foreground hover:text-foreground"
+          onClick={handleOpenGraph}
+          title="Open Git Graph"
+          disabled={!repoRoot || !currentBranch}
+        >
+          <HugeiconsIcon icon={GitForkIcon} size={12} strokeWidth={2} />
+        </Button>
+      </div>
+
+      {/* In-progress state banner */}
+      {inProgress && (
+        <div
+          className={cn(
+            "border-t border-border/40 px-3 py-1.5 text-[10px] font-medium",
+            mergeInProgress && "bg-orange-500/10 text-orange-400",
+            rebaseInProgress && "bg-orange-500/10 text-orange-400",
+            cherryPickInProgress && "bg-yellow-500/10 text-yellow-400"
+          )}
+        >
+          {mergeInProgress && "Merge in progress — resolve conflicts, then commit or Abort"}
+          {rebaseInProgress && "Rebase in progress — resolve conflicts, then continue or Abort"}
+          {cherryPickInProgress && "Cherry-pick in progress"}
+        </div>
+      )}
+    </div>
+  );
+}

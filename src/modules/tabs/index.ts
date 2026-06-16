@@ -16,6 +16,7 @@ export type {
   QuickConnectParams,
   SftpTab,
   HomeTab,
+  GitGraphTab,
 } from "./types";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
 export { useTabManagement } from "./lib/useTabManagement";

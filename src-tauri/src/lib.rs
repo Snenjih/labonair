@@ -2,7 +2,7 @@ mod modules;
 
 use modules::{
     fs::{self, paths},
-    pty, secrets, shell,
+    git, pty, secrets, shell,
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete, groups_update}},
     credentials::{credentials_get_all, credentials_create, credentials_update, credentials_delete, credentials_get_hosts_using, credential_generate_keypair},
     ssh::{SshState, TrustState, client::{ssh_connect, ssh_connect_quick, ssh_trust_host, ssh_remove_known_host, ssh_disconnect}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_rename, sftp_delete, sftp_mkdir, sftp_chmod, sftp_calculate_size, sftp_chown, sftp_deep_search, prepare_remote_edit, save_remote_edit}, tunnels::{TunnelState, ssh_start_tunnels, ssh_stop_tunnels}},
@@ -580,6 +580,23 @@ pub fn run() {
             modules::scrollback::scrollback_save,
             modules::scrollback::scrollback_load,
             modules::scrollback::scrollback_cleanup,
+            git::git_is_repo,
+            git::git_get_repo_root,
+            git::git_get_status,
+            git::git_get_current_branch,
+            git::git_get_branches,
+            git::git_get_diff,
+            git::git_stage_file,
+            git::git_unstage_file,
+            git::git_stage_all,
+            git::git_discard_file,
+            git::git_commit,
+            git::git_push,
+            git::git_pull,
+            git::git_fetch,
+            git::git_abort,
+            git::git_get_log,
+            git::git_get_commit_detail,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

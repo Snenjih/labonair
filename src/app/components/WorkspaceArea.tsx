@@ -10,6 +10,7 @@ import { PreviewStack } from "@/modules/preview";
 import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { SftpStack } from "@/modules/sftp/SftpStack";
+import { GitGraphStack } from "@/modules/git-graph";
 import { useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import { WorkspaceStack } from "@/modules/terminal/WorkspaceStack";
 import type { WorkspacePaneHandle, TerminalPaneHandle } from "@/modules/terminal";
@@ -66,6 +67,7 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
   const isPreviewTab = activeTabKind === "preview";
   const isAiDiffTab = activeTabKind === "ai-diff";
   const isHomeTab = activeTabKind === "home";
+  const isGitGraphTab = activeTabKind === "git-graph";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -131,6 +133,15 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           onOpenRemoteEditor={onOpenRemoteEditor}
           onPathsChange={onSftpPathsChange}
         />
+        <div
+          className={cn(
+            "absolute inset-0",
+            isGitGraphTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
+          )}
+          aria-hidden={!isGitGraphTab}
+        >
+          <GitGraphStack />
+        </div>
       </div>
 
       {keysLoaded ? (
