@@ -116,7 +116,8 @@ export function checkWritable(path: string): SafetyResult {
 
   const norm = normalize(path);
   for (const prefix of FORBIDDEN_PREFIXES) {
-    if (norm.startsWith(prefix)) {
+    // normalize() lowercases the path, so compare against lowercased prefix too
+    if (norm.startsWith(prefix.toLowerCase())) {
       return {
         ok: false,
         reason: `Refused: writes under "${prefix}" are not allowed.`,
