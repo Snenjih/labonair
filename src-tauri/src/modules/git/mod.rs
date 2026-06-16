@@ -612,5 +612,5 @@ pub async fn git_get_log(
 /// Returns the full detail (message + stat) of a single commit.
 #[tauri::command]
 pub async fn git_get_commit_detail(path: String, hash: String) -> Result<String, String> {
-    run_git(&["show", "--stat", &format!("--format=%B"), &hash], &path)
+    run_git(&["show", "--stat", "--format=%B", &hash], &path)
 }
