@@ -1,6 +1,6 @@
 pub mod db;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Host {
     pub id: String,
     pub name: String,
@@ -28,7 +28,7 @@ pub struct Host {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct Group {
     pub id: String,
     pub name: String,
