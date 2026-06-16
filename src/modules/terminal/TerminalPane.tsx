@@ -144,9 +144,9 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
         containerRef={containerRef}
         decorations={session.blockDecorations}
         mode={session.blockMode}
-        sessionId={tabId}
         settings={blockPrefs}
         searchAddon={searchAddonRef.current}
+        onInjectCommand={(cmd) => session.write(cmd)}
       />
     ) : null;
 

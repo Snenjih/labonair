@@ -83,7 +83,9 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
     const icon =
       activeSession?.kind === "ssh"
         ? ComputerTerminal02Icon
-        : TerminalIcon;
+        : activeSession?.terminalMode === "block"
+          ? LayoutGridIcon
+          : TerminalIcon;
     return (
       <HugeiconsIcon icon={icon} size={14} strokeWidth={1.75} className="shrink-0" />
     );

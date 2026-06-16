@@ -35,3 +35,4 @@ export interface BlockChromeSettings {
 }
 
 export const HEADER_HEIGHT_PX = 24;
+export const HEADER_HEIGHT_COMPACT_PX = 20;

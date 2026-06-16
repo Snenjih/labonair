@@ -679,9 +679,9 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         containerRef={containerRef}
         decorations={blockDecorationsRef.current}
         mode={blockMode}
-        sessionId={session.id}
         settings={blockSettings}
         searchAddon={searchRef.current}
+        onInjectCommand={(cmd) => invoke("ssh_pty_write", { sessionId, data: cmd }).catch(console.error)}
       />
     ) : null;
 

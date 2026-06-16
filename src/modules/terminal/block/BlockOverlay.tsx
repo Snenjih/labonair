@@ -18,9 +18,10 @@ interface BlockOverlayProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   decorations: BlockDecorations | null;
   mode: BlockMode;
-  sessionId: string;
   settings: BlockChromeSettings & { autoCollapseOnAltScreen: boolean };
   searchAddon: SearchAddon | null;
+  // Fix 8: callback to write a command directly into the PTY
+  onInjectCommand?: (command: string) => void;
 }
 
 const EMPTY_VISIBLE: VisibleBlocks = { blocks: [], sticky: null };
@@ -40,6 +41,7 @@ export function BlockOverlay({
   mode,
   settings,
   searchAddon,
+  onInjectCommand,
 }: BlockOverlayProps) {
   if (mode === "alt" && settings.autoCollapseOnAltScreen) {
     return <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" />;
@@ -52,6 +54,7 @@ export function BlockOverlay({
       decorations={decorations}
       settings={settings}
       searchAddon={searchAddon}
+      onInjectCommand={onInjectCommand}
     />
   );
 }
@@ -62,18 +65,22 @@ function BlockOverlayInner({
   decorations,
   settings,
   searchAddon,
+  onInjectCommand,
 }: {
   term: Terminal | null;
   containerRef: React.RefObject<HTMLDivElement | null>;
   decorations: BlockDecorations | null;
   settings: BlockChromeSettings;
   searchAddon: SearchAddon | null;
+  onInjectCommand?: (command: string) => void;
 }) {
   const [visibleBlocks, setVisibleBlocks] = useState<VisibleBlocks>(EMPTY_VISIBLE);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [searchTarget, setSearchTarget] = useState<BlockMeta | null>(null);
+  // Fix 10: preserve search query across open/close cycles
+  const [searchQuery, setSearchQuery] = useState("");
 
   const lastSig = useRef("");
   const rafRef = useRef<number | null>(null);
@@ -131,9 +138,10 @@ function BlockOverlayInner({
     useChatStore.getState().attachSelection(text, "terminal");
   };
 
+  // Fix 8: write directly to PTY instead of via AI chat store
   const handleRerun = (block: BlockMeta) => {
-    if (!block.command) return;
-    useChatStore.getState().injectCommand(block.command);
+    if (!block.command || !onInjectCommand) return;
+    onInjectCommand(block.command + "\n");
   };
 
   const handleToggleCollapse = (id: string) => {
@@ -160,7 +168,8 @@ function BlockOverlayInner({
           onCopyOutput={() => handleCopyOutput(block)}
           onSearch={() => setSearchTarget(block)}
           onAttachToAi={() => handleAttachToAi(block)}
-          onRerun={() => handleRerun(block)}
+          // Fix 8: only pass onRerun if the PTY callback is available
+          onRerun={onInjectCommand ? () => handleRerun(block) : undefined}
           settings={settings}
         />
       ))}
@@ -174,6 +183,8 @@ function BlockOverlayInner({
           term={term}
           searchAddon={searchAddon}
           onClose={() => setSearchTarget(null)}
+          initialQuery={searchQuery}
+          onQueryChange={setSearchQuery}
         />
       )}
     </div>

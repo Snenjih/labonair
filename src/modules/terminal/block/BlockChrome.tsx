@@ -3,14 +3,15 @@ import {
   ArrowReloadHorizontalIcon,
   ArrowRight01Icon,
   Copy01Icon,
+  Copy02Icon,
   Search01Icon,
   SparklesIcon,
-  TerminalIcon,
+  Tick01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
 import type { BlockChromeSettings, PositionedBlock } from "./lib/types";
-import { HEADER_HEIGHT_PX } from "./lib/types";
+import { HEADER_HEIGHT_COMPACT_PX, HEADER_HEIGHT_PX } from "./lib/types";
 
 interface BlockChromeProps {
   block: PositionedBlock;
@@ -24,7 +25,7 @@ interface BlockChromeProps {
   onCopyOutput: () => void;
   onSearch: () => void;
   onAttachToAi: () => void;
-  onRerun: () => void;
+  onRerun?: () => void;
   settings: BlockChromeSettings;
 }
 
@@ -72,6 +73,25 @@ export function BlockChrome({
     };
   }, [block.isRunning]);
 
+  // Fix 4: copy feedback state
+  const [copiedId, setCopiedId] = useState<"cmd" | "out" | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
+  }, []);
+
+  const flash = (id: "cmd" | "out") => {
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    setCopiedId(id);
+    copiedTimerRef.current = setTimeout(() => setCopiedId(null), 1400);
+  };
+
+  // Fix 1: compact header height
+  const headerH = settings.compactHeaders ? HEADER_HEIGHT_COMPACT_PX : HEADER_HEIGHT_PX;
+
   return (
     <div
       className="pointer-events-none absolute left-0 right-0"
@@ -98,8 +118,8 @@ export function BlockChrome({
         <div
           className="absolute left-0 right-0 bg-background border-b border-border"
           style={{
-            top: block.headerTop + HEADER_HEIGHT_PX,
-            height: Math.max(0, block.bottom - (block.headerTop + HEADER_HEIGHT_PX)),
+            top: block.headerTop + headerH,
+            height: Math.max(0, block.bottom - (block.headerTop + headerH)),
           }}
         />
       )}
@@ -108,7 +128,8 @@ export function BlockChrome({
       {settings.showHeader && (
         <div
           className={cn(
-            "pointer-events-auto absolute left-0 right-0 flex h-6 items-center gap-2 px-2",
+            "pointer-events-auto absolute left-0 right-0 flex items-center gap-2 px-2",
+            settings.compactHeaders ? "h-5" : "h-6",
             "bg-background border-b border-border",
             "transition-colors duration-150",
             isSelected && "bg-accent/30",
@@ -137,7 +158,7 @@ export function BlockChrome({
           >
             <HugeiconsIcon
               icon={ArrowRight01Icon}
-              size={10}
+              size={settings.compactHeaders ? 9 : 10}
               strokeWidth={2}
               className={cn(
                 "transition-transform duration-150",
@@ -172,39 +193,42 @@ export function BlockChrome({
               </span>
             )}
 
-            {/* Exit code badge */}
-            {settings.showExitCode &&
-              block.exitCode !== null &&
-              block.exitCode !== 0 && (
-                <span
-                  className={cn(
-                    "rounded px-1 py-0.5 font-mono text-[10px] leading-none",
-                    "bg-destructive/10 text-destructive",
-                  )}
-                >
-                  {block.exitCode}
-                </span>
-              )}
+            {/* Fix 2: Exit code badge — show for all completed commands including exit 0 */}
+            {settings.showExitCode && block.exitCode !== null && (
+              <span
+                className={cn(
+                  "rounded px-1 py-0.5 font-mono text-[10px] leading-none",
+                  block.exitCode === 0
+                    ? "bg-primary/10 text-primary"
+                    : "bg-destructive/10 text-destructive",
+                )}
+              >
+                {block.exitCode}
+              </span>
+            )}
 
             {/* Toolbar — visible only when hovered or selected */}
             {(isHovered || isSelected) && (
               <div className="flex items-center gap-0.5">
+                {/* Fix 3 & 4: copy command with feedback */}
                 <IconButton
                   title="Copy command"
-                  icon={Copy01Icon}
-                  onClick={(e) => { e.stopPropagation(); onCopyCommand(); }}
+                  icon={copiedId === "cmd" ? Tick01Icon : Copy01Icon}
+                  onClick={(e) => { e.stopPropagation(); onCopyCommand(); flash("cmd"); }}
                 />
+                {/* Fix 3 & 4: copy output with correct icon + feedback */}
                 <IconButton
                   title="Copy output"
-                  icon={TerminalIcon}
-                  onClick={(e) => { e.stopPropagation(); onCopyOutput(); }}
+                  icon={copiedId === "out" ? Tick01Icon : Copy02Icon}
+                  onClick={(e) => { e.stopPropagation(); onCopyOutput(); flash("out"); }}
                 />
                 <IconButton
                   title="Search in block"
                   icon={Search01Icon}
                   onClick={(e) => { e.stopPropagation(); onSearch(); }}
                 />
-                {!block.isRunning && (
+                {/* Fix 8: Only show re-run button when callback is provided */}
+                {!block.isRunning && onRerun && (
                   <IconButton
                     title="Re-run command"
                     icon={ArrowReloadHorizontalIcon}

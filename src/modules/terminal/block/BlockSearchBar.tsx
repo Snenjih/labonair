@@ -21,7 +21,6 @@ interface Match {
 
 function findMatches(text: string, query: string, startLine: number): Match[] {
   if (!query || !text) return [];
-  const lower = text.toLowerCase();
   const lq = query.toLowerCase();
   const lines = text.split("\n");
   const matches: Match[] = [];
@@ -44,8 +43,6 @@ function findMatches(text: string, query: string, startLine: number): Match[] {
     }
     offset += line.length + 1; // +1 for \n
   }
-  // Suppress unused variable lint
-  void lower;
   return matches;
 }
 
@@ -55,6 +52,9 @@ interface BlockSearchBarProps {
   term: Terminal | null;
   searchAddon: SearchAddon | null;
   onClose: () => void;
+  // Fix 10: preserve search query across open/close cycles
+  initialQuery?: string;
+  onQueryChange?: (q: string) => void;
 }
 
 export function BlockSearchBar({
@@ -63,8 +63,10 @@ export function BlockSearchBar({
   term,
   searchAddon,
   onClose,
+  initialQuery,
+  onQueryChange,
 }: BlockSearchBarProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery ?? "");
   const [currentIdx, setCurrentIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -107,6 +109,7 @@ export function BlockSearchBar({
     const value = e.target.value;
     setQuery(value);
     setCurrentIdx(0);
+    onQueryChange?.(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       if (value && term && matches.length > 0) {
