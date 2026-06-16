@@ -41,7 +41,7 @@ export function labelFor(t: Tab): string {
   if (t.kind === "ai-diff") return t.title;
   if (t.kind === "home") return t.title;
   if (t.kind === "sftp") return t.title;
-  if (t.kind === "git-graph") return "Git Graph";
+  if (t.kind === "git-graph") return t.title; // title already contains "Git Graph · branchName"
   const wt = t as WorkspaceTab;
   const activeSession = wt.sessions[wt.activePaneId];
   if (activeSession?.kind === "local" && activeSession.cwd) {

@@ -12,6 +12,7 @@ export const git = {
   stageFile: (path: string, file: string) => invoke<void>("git_stage_file", { path, file }),
   unstageFile: (path: string, file: string) => invoke<void>("git_unstage_file", { path, file }),
   stageAll: (path: string) => invoke<void>("git_stage_all", { path }),
+  unstageAll: (path: string) => invoke<void>("git_unstage_all", { path }),
   discardFile: (path: string, file: string) => invoke<void>("git_discard_file", { path, file }),
   commit: (path: string, message: string, amend: boolean) =>
     invoke<CommitResult>("git_commit", { path, message, amend }),

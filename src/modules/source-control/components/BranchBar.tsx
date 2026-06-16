@@ -23,7 +23,7 @@ export function BranchBar({ onOpenGitGraph, onRefresh }: BranchBarProps) {
       .getCurrentBranch(repoRoot)
       .then(setCurrentBranch)
       .catch(() => setCurrentBranch(""));
-  }, [repoRoot]);
+  }, [repoRoot, status]); // re-fetch branch when status changes (e.g. after commit or checkout)
 
   const ahead = status?.ahead ?? 0;
   const behind = status?.behind ?? 0;

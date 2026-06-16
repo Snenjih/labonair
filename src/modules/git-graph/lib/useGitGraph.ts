@@ -40,5 +40,9 @@ export function useGitGraph(repositoryPath: string) {
     void load(totalLoaded + PAGE_INCREMENT);
   }, [load, totalLoaded]);
 
-  return { commits, isLoading, error, hasMore, loadMore };
+  const reload = useCallback(() => {
+    void load(totalLoaded);
+  }, [load, totalLoaded]);
+
+  return { commits, isLoading, error, hasMore, loadMore, reload };
 }

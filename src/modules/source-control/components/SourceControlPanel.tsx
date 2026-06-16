@@ -27,6 +27,12 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
     <div className="flex h-full flex-col overflow-hidden">
       <BranchBar onOpenGitGraph={onOpenGitGraph} onRefresh={refresh} />
 
+      {status?.hasConflicts && (
+        <div className="mx-2 mb-1 rounded border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-[10px] text-orange-400">
+          Merge conflicts detected — resolve before committing.
+        </div>
+      )}
+
       <ScrollArea className="flex-1">
         <div className="py-1">
           <FileChangeList

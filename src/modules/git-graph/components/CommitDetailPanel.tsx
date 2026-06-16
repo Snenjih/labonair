@@ -53,6 +53,7 @@ export function CommitDetailPanel({
   commit,
   onClose,
   repositoryPath,
+  onOpenFile,
 }: CommitDetailPanelProps) {
   const [statOutput, setStatOutput] = useState<string | null>(null);
   const [loadingStat, setLoadingStat] = useState(false);
@@ -175,7 +176,13 @@ export function CommitDetailPanel({
             <div className="space-y-0.5">
               {fileStats.map((fs, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-[11px]">
-                  <span className="min-w-0 flex-1 truncate text-foreground/80">{fs.file}</span>
+                  <button
+                    className="min-w-0 flex-1 truncate text-left text-foreground/80 cursor-pointer hover:text-foreground transition-colors"
+                    title={onOpenFile ? `Open ${fs.file}` : fs.file}
+                    onClick={() => onOpenFile?.(fs.file)}
+                  >
+                    {fs.file}
+                  </button>
                   {fs.additions > 0 && (
                     <span className="shrink-0 font-mono text-[10px] text-green-400">
                       +{fs.additions}

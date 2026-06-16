@@ -4,7 +4,11 @@ import type { GitGraphTab } from "@/modules/tabs/types";
 import { useShallow } from "zustand/react/shallow";
 import { GitGraphPane } from "./GitGraphPane";
 
-export function GitGraphStack() {
+interface GitGraphStackProps {
+  onOpenFile?: (path: string) => void;
+}
+
+export function GitGraphStack({ onOpenFile }: GitGraphStackProps) {
   const tabs = useTabsStore(
     useShallow((s) => s.tabs.filter((t): t is GitGraphTab => t.kind === "git-graph")),
   );
@@ -19,7 +23,7 @@ export function GitGraphStack() {
           key={tab.id}
           className={cn("h-full", tab.id === activeId ? "block" : "hidden")}
         >
-          <GitGraphPane tab={tab} />
+          <GitGraphPane tab={tab} onOpenFile={onOpenFile} />
         </div>
       ))}
     </>

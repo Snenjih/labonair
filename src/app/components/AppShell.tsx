@@ -159,6 +159,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                     panelOpen={ctrl.panelOpen}
                     aiEnabled={prefs.aiEnabled}
                     hasComposer={ctrl.hasComposer}
+                    onOpenGitGraphFile={tabs.handleOpenFile}
                   />
                 </ResizablePanel>
                 {prefs.sidebarPosition === "right" && (

@@ -29,9 +29,9 @@ interface CommitFormProps {
   onRefresh: () => void;
 }
 
-function charCountClass(len: number): string {
+function firstLineClass(len: number): string {
   if (len === 0) return "text-muted-foreground/40";
-  if (len < 50) return "text-green-500";
+  if (len <= 50) return "text-green-500";
   if (len <= 72) return "text-yellow-500";
   return "text-red-500";
 }
@@ -153,6 +153,13 @@ export function CommitForm({ repoRoot, onRefresh }: CommitFormProps) {
 
   return (
     <div className="border-t border-border/60 px-2 py-2">
+      {/* Hint: no staged files */}
+      {status && status.staged.length === 0 && (status.unstaged.length > 0 || status.untracked.length > 0) && (
+        <p className="mb-1.5 text-[10px] text-muted-foreground/70">
+          Stage files above to enable commit.
+        </p>
+      )}
+
       {/* Textarea */}
       <div className="relative mb-1.5">
         <Textarea
@@ -171,9 +178,15 @@ export function CommitForm({ repoRoot, onRefresh }: CommitFormProps) {
 
       {/* Character counter + AI button row */}
       <div className="mb-2 flex items-center justify-between">
-        <span className={cn("font-mono text-[10px] tabular-nums", charCountClass(commitMessage.length))}>
-          {commitMessage.length} chars
-        </span>
+        {(() => {
+          const firstLine = commitMessage.split("\n")[0] ?? "";
+          const firstLineLen = firstLine.length;
+          return (
+            <span className={cn("font-mono text-[10px] tabular-nums", firstLineClass(firstLineLen))}>
+              {firstLineLen}/72
+            </span>
+          );
+        })()}
         <Button
           variant="ghost"
           size="sm"

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Cancel01Icon, SourceCodeIcon } from "@hugeicons/core-free-icons";
@@ -31,10 +32,27 @@ function DiffLine({ line }: { line: string }) {
 }
 
 export function DiffViewer() {
+  const status = useSourceControlStore((s) => s.status);
   const selectedFile = useSourceControlStore((s) => s.selectedFile);
   const diffContent = useSourceControlStore((s) => s.diffContent);
   const isDiffLoading = useSourceControlStore((s) => s.isDiffLoading);
   const clearSelectedFile = useSourceControlStore((s) => s.clearSelectedFile);
+
+  // Derive: is the selected file still present in the current status?
+  const fileStillExists =
+    selectedFile && status
+      ? selectedFile.staged
+        ? status.staged.some((f) => f.path === selectedFile.path)
+        : status.unstaged.some((f) => f.path === selectedFile.path) ||
+          status.untracked.some((f) => f.path === selectedFile.path)
+      : false;
+
+  // If the file was removed from all lists (e.g. unstaged/discarded), clear the diff
+  useEffect(() => {
+    if (selectedFile && status && !fileStillExists) {
+      clearSelectedFile();
+    }
+  }, [selectedFile, status, fileStillExists, clearSelectedFile]);
 
   if (!selectedFile) return null;
 

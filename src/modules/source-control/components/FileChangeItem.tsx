@@ -1,6 +1,17 @@
 import { cn } from "@/lib/utils";
 import { PlusSignIcon, MinusSignIcon, Delete01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
 import type { FileStatus } from "../types";
@@ -19,6 +30,16 @@ function basename(path: string): string {
 type StatusConfig = {
   letter: string;
   className: string;
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  M: "Modified",
+  A: "Added",
+  D: "Deleted",
+  R: "Renamed",
+  C: "Copied",
+  U: "Conflict",
+  "?": "Untracked",
 };
 
 function getStatusConfig(statusChar: string): StatusConfig {
@@ -81,8 +102,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     }
   }
 
-  async function handleDiscard(e: React.MouseEvent) {
-    e.stopPropagation();
+  async function handleDiscard() {
     if (!repoRoot) return;
     try {
       await git.discardFile(repoRoot, file.path);
@@ -107,6 +127,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
           "flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold leading-none",
           statusClassName
         )}
+        title={STATUS_LABELS[letter] ?? letter}
       >
         {letter}
       </span>
@@ -138,14 +159,37 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
             >
               <HugeiconsIcon icon={PlusSignIcon} size={10} strokeWidth={2} />
             </button>
-            <button
-              type="button"
-              className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-red-500/20 hover:text-red-500"
-              onClick={handleDiscard}
-              title="Discard changes"
-            >
-              <HugeiconsIcon icon={Delete01Icon} size={10} strokeWidth={2} />
-            </button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-red-500/20 hover:text-red-500"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Discard changes"
+                >
+                  <HugeiconsIcon icon={Delete01Icon} size={10} strokeWidth={2} />
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent size="sm">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently discard all changes to{" "}
+                    <span className="font-mono text-foreground">{basename(file.path)}</span>. This
+                    cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => void handleDiscard()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Discard
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </>
         )}
         {section === "untracked" && (

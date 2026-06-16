@@ -439,7 +439,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   openGitGraphTab: (repositoryPath, initialBranch) => {
     const existing = get().tabs.find(
-      (t) => t.kind === "git-graph" && t.repositoryPath === repositoryPath,
+      (t) =>
+        t.kind === "git-graph" &&
+        t.repositoryPath === repositoryPath &&
+        t.initialBranch === initialBranch,
     );
     if (existing) {
       set({ activeId: existing.id });
@@ -448,7 +451,13 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const id = get()._nextId;
     set((s) => ({
       tabs: [
-        { id, kind: "git-graph" as const, title: "Git Graph", repositoryPath, initialBranch },
+        {
+          id,
+          kind: "git-graph" as const,
+          title: `Git Graph · ${initialBranch}`,
+          repositoryPath,
+          initialBranch,
+        },
         ...s.tabs,
       ],
       activeId: id,

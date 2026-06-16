@@ -4,6 +4,9 @@ import { git } from "./gitInvoke";
 
 const POLL_INTERVAL_MS = 2000;
 
+// Polling stops automatically when the panel unmounts (SidebarContent conditionally renders
+// SourceControlPanel only when activePanel === "source-control"). No extra active-panel
+// check is needed here — the useEffect cleanup handles it on unmount.
 export function useGitStatus(rootPath: string | null) {
   const setRepoInfo = useSourceControlStore((s) => s.setRepoInfo);
   const setStatus = useSourceControlStore((s) => s.setStatus);

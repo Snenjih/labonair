@@ -36,7 +36,7 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
     if (!repoRoot) return;
     try {
       if (section === "staged") {
-        await git.unstageFile(repoRoot, ".");
+        await git.unstageAll(repoRoot);
       } else {
         await git.stageAll(repoRoot);
       }

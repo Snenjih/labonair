@@ -142,19 +142,43 @@ export function GitGraphCanvas({ commits, onSelectCommit, selectedHash }: Props)
               {/* Text content */}
               <div className="flex min-w-0 flex-1 items-center gap-2 pr-2">
                 {/* Ref pills */}
-                {commit.refs.map((ref) => (
-                  <span
-                    key={ref}
-                    className="shrink-0 rounded px-1 py-0 text-[10px] font-medium"
-                    style={{
-                      backgroundColor: `${commit.color}30`,
-                      color: commit.color,
-                      border: `1px solid ${commit.color}50`,
-                    }}
-                  >
-                    {ref}
-                  </span>
-                ))}
+                {commit.refs.map((ref) => {
+                  const refKind: "local" | "remote" | "tag" = ref.includes("/")
+                    ? "remote"
+                    : /^v\d/.test(ref)
+                      ? "tag"
+                      : "local";
+                  return (
+                    <span
+                      key={ref}
+                      className={cn(
+                        "shrink-0 rounded px-1 py-0 text-[10px] font-medium",
+                        refKind === "remote" && "opacity-70",
+                        refKind === "tag" && "bg-amber-500/20 text-amber-500"
+                      )}
+                      style={
+                        refKind !== "tag"
+                          ? {
+                              backgroundColor: `${commit.color}30`,
+                              color: commit.color,
+                              border: `1px solid ${commit.color}50`,
+                            }
+                          : {
+                              border: "1px solid rgb(245 158 11 / 0.4)",
+                            }
+                      }
+                      title={
+                        refKind === "remote"
+                          ? `Remote branch: ${ref}`
+                          : refKind === "tag"
+                            ? `Tag: ${ref}`
+                            : `Branch: ${ref}`
+                      }
+                    >
+                      {refKind === "remote" ? `· ${ref}` : ref}
+                    </span>
+                  );
+                })}
 
                 {/* Subject */}
                 <span className="min-w-0 truncate text-[12px] text-foreground">

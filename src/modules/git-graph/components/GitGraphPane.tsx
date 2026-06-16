@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
+import { Refresh01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { GitGraphTab } from "@/modules/tabs/types";
 import { useGitGraph } from "../lib/useGitGraph";
 import type { LayoutCommit } from "../types";
@@ -35,10 +37,11 @@ function EmptyState({ message }: { message: string }) {
 
 interface Props {
   tab: GitGraphTab;
+  onOpenFile?: (path: string) => void;
 }
 
-export function GitGraphPane({ tab }: Props) {
-  const { commits, isLoading, error, hasMore, loadMore } = useGitGraph(tab.repositoryPath);
+export function GitGraphPane({ tab, onOpenFile }: Props) {
+  const { commits, isLoading, error, hasMore, loadMore, reload } = useGitGraph(tab.repositoryPath);
   const [selectedCommit, setSelectedCommit] = useState<LayoutCommit | null>(null);
 
   if (isLoading && commits.length === 0) {
@@ -57,6 +60,22 @@ export function GitGraphPane({ tab }: Props) {
     <div className="flex h-full min-h-0">
       {/* Graph canvas */}
       <div className="flex min-h-0 flex-1 flex-col">
+        {/* Toolbar */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-1">
+          <span className="truncate text-[11px] text-muted-foreground">
+            {tab.repositoryPath.split("/").pop()}
+          </span>
+          <button
+            type="button"
+            onClick={reload}
+            disabled={isLoading}
+            title="Refresh git graph"
+            className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-accent hover:text-foreground disabled:opacity-40"
+          >
+            <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.75} />
+          </button>
+        </div>
+
         <GitGraphCanvas
           commits={commits}
           onSelectCommit={setSelectedCommit}
@@ -85,6 +104,7 @@ export function GitGraphPane({ tab }: Props) {
             commit={selectedCommit}
             repositoryPath={tab.repositoryPath}
             onClose={() => setSelectedCommit(null)}
+            onOpenFile={onOpenFile}
           />
         )}
       </AnimatePresence>

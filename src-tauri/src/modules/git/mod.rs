@@ -201,9 +201,14 @@ pub async fn git_get_status(path: String) -> Result<GitStatus, String> {
         let filename: String = chars.collect();
 
         // Consume original path for renames/copies (next NUL token).
+        // Format: "XY new_path\0old_path\0" — after parsing "XY new_path" at tokens[i],
+        // tokens[i+1] is the old_path. We read it at the current i (after i += 1 below)
+        // but we must NOT double-increment — so read tokens[i] first, then increment.
         let original_path: Option<String> = if x == 'R' || x == 'C' || y == 'R' || y == 'C' {
-            i += 1;
-            tokens.get(i).map(|s| s.to_string()).filter(|s| !s.is_empty())
+            // Peek at the next token without incrementing yet; we'll increment after reading.
+            let orig = tokens.get(i + 1).map(|s| s.to_string()).filter(|s| !s.is_empty());
+            i += 1; // consume the old_path token so the loop's i += 1 moves past it
+            orig
         } else {
             None
         };
@@ -431,6 +436,20 @@ pub async fn git_unstage_file(path: String, file: String) -> Result<(), String> 
 #[tauri::command]
 pub async fn git_stage_all(path: String) -> Result<(), String> {
     run_git(&["add", "-A"], &path).map(|_| ())
+}
+
+/// Unstages all staged changes.
+/// Uses `git reset HEAD` which is the canonical way to unstage everything.
+/// Falls back to `git rm --cached -r .` for repositories with no commits yet.
+#[tauri::command]
+pub async fn git_unstage_all(path: String) -> Result<(), String> {
+    match run_git(&["reset", "HEAD"], &path) {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            // No commits yet — use rm --cached to unstage everything
+            run_git(&["rm", "--cached", "-r", "."], &path).map(|_| ())
+        }
+    }
 }
 
 /// Discards worktree changes for a specific file.

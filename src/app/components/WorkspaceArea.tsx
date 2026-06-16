@@ -37,6 +37,7 @@ export interface WorkspaceAreaProps {
   panelOpen: boolean;
   aiEnabled: boolean;
   hasComposer: boolean;
+  onOpenGitGraphFile?: (path: string) => void;
 }
 
 export const WorkspaceArea = React.memo(function WorkspaceArea({
@@ -61,6 +62,7 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
   panelOpen,
   aiEnabled,
   hasComposer,
+  onOpenGitGraphFile,
 }: WorkspaceAreaProps) {
   const activeTabKind = useTabsStore(selectActiveTabKind);
   const isEditorTab = activeTabKind === "editor";
@@ -140,7 +142,7 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           )}
           aria-hidden={!isGitGraphTab}
         >
-          <GitGraphStack />
+          <GitGraphStack onOpenFile={onOpenGitGraphFile} />
         </div>
       </div>
 
