@@ -1,14 +1,15 @@
-name: Dependabot Security Audit
+name: Security Audit
 
 on:
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
 
 permissions: {}
 
 jobs:
   audit:
-    if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
