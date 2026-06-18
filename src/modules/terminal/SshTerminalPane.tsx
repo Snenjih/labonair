@@ -81,7 +81,11 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const [hasError, setHasError] = useState(false);
     const [isDisconnected, setIsDisconnected] = useState(false);
     const [disconnectReason, setDisconnectReason] = useState("");
+    const [reconnectCountdown, setReconnectCountdown] = useState(0);
+    const [reconnectAttempt, setReconnectAttempt] = useState(0);
+    const [autoReconnectFailed, setAutoReconnectFailed] = useState(false);
     const rightClickPastes = usePreferencesStore((s) => s.terminalRightClickPastes);
+    const sshAutoReconnectMaxAttempts = usePreferencesStore((s) => s.sshAutoReconnectMaxAttempts);
     const [hasSelection, setHasSelection] = useState(false);
     const [sudoPopup, setSudoPopup] = useState<{ x: number; y: number } | null>(null);
     // Real terminal dimensions measured from the actual container element before
@@ -102,6 +106,9 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const sudoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const outputTailRef = useRef<string>("");
     const sudoPopupRef = useRef<{ x: number; y: number } | null>(null);
+    const reconnectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const intentionalDisconnectRef = useRef(false);
+    const reconnectAttemptRef = useRef(0);
 
     // Measure the real container dimensions once the pane is actually visible.
     // We use a ResizeObserver instead of a one-shot useLayoutEffect because
@@ -156,6 +163,15 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     }, []);
 
     const handleReconnect = useCallback(() => {
+      // Clean up auto-reconnect state
+      if (reconnectTimerRef.current) {
+        clearInterval(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      intentionalDisconnectRef.current = false;
+      setReconnectCountdown(0);
+      setAutoReconnectFailed(false);
+      // existing cleanup:
       termRef.current?.dispose();
       termRef.current = null;
       fitRef.current = null;
@@ -167,6 +183,53 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       setIsConnected(false);
       setHasError(false);
     }, [sessionId, session.hostId]);
+
+    const handleCancelReconnect = useCallback(() => {
+      if (reconnectTimerRef.current) {
+        clearInterval(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      intentionalDisconnectRef.current = true;
+      setReconnectCountdown(0);
+      setAutoReconnectFailed(false);
+      setReconnectAttempt(0);
+      reconnectAttemptRef.current = 0;
+    }, []);
+
+    const startAutoReconnect = useCallback(() => {
+      const prefs = usePreferencesStore.getState();
+      const delay = Math.max(1, prefs.sshAutoReconnectDelay);
+      const maxAttempts = prefs.sshAutoReconnectMaxAttempts;
+
+      reconnectAttemptRef.current += 1;
+      const attempt = reconnectAttemptRef.current;
+
+      if (attempt > maxAttempts) {
+        setAutoReconnectFailed(true);
+        setReconnectCountdown(0);
+        return;
+      }
+
+      setReconnectAttempt(attempt);
+      setReconnectCountdown(delay);
+
+      if (reconnectTimerRef.current) clearInterval(reconnectTimerRef.current);
+      reconnectTimerRef.current = setInterval(() => {
+        setReconnectCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(reconnectTimerRef.current!);
+            reconnectTimerRef.current = null;
+            handleReconnect();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }, [handleReconnect]);
+
+    // Keep a stable ref to startAutoReconnect for use inside event listeners
+    const startAutoReconnectRef = useRef(startAutoReconnect);
+    startAutoReconnectRef.current = startAutoReconnect;
 
     const handleSudoFill = useCallback(() => {
       const pw = sudoPasswordRef.current;
@@ -355,6 +418,20 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           message: payload.reason || "The connection was dropped unexpectedly.",
           source: session.title || "SSH",
         });
+        // Auto-reconnect: skip on intentional disconnect or auth failure
+        const prefs = usePreferencesStore.getState();
+        const isAuthFailure = (payload.reason ?? "").toLowerCase().includes("auth");
+        if (!intentionalDisconnectRef.current && prefs.sshAutoReconnect && !isAuthFailure) {
+          reconnectAttemptRef.current = 0;
+          startAutoReconnectRef.current();
+        }
+      }).then((unlisten) => cleanups.push(unlisten));
+
+      listen<{ session_id: string }>("session_established", ({ payload }) => {
+        if (payload.session_id !== sessionId) return;
+        reconnectAttemptRef.current = 0;
+        setReconnectAttempt(0);
+        setAutoReconnectFailed(false);
       }).then((unlisten) => cleanups.push(unlisten));
 
       (async () => {
@@ -548,6 +625,10 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         disposed = true;
         cleanups.forEach((fn) => fn());
         if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
+        if (reconnectTimerRef.current) {
+          clearInterval(reconnectTimerRef.current);
+          reconnectTimerRef.current = null;
+        }
         sudoPopupRef.current = null;
         sudoPasswordRef.current = null;
         invoke("ssh_disconnect", { sessionId }).catch(console.error);
@@ -614,10 +695,56 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         )}
         {isDisconnected && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80">
-            <div className="rounded-xl border border-border bg-card p-6 shadow-xl flex flex-col items-center gap-3 max-w-xs text-center">
+            <div className="rounded-xl border border-border bg-card p-6 shadow-xl flex flex-col items-center gap-3 max-w-sm w-full text-center">
               <span className="text-base font-semibold text-foreground">Connection Lost</span>
-              <span className="text-sm text-muted-foreground">{disconnectReason}</span>
-              <Button onClick={handleReconnect}>Reconnect</Button>
+              {disconnectReason && (
+                <span className="text-sm text-muted-foreground">{disconnectReason}</span>
+              )}
+              {reconnectCountdown > 0 && !autoReconnectFailed && (
+                <>
+                  <span className="text-sm text-muted-foreground">
+                    Auto-reconnecting in {reconnectCountdown}s…{" "}
+                    <span className="text-xs">(Attempt {reconnectAttempt} / {sshAutoReconnectMaxAttempts})</span>
+                  </span>
+                  <div className="flex gap-2 w-full">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 h-8 text-xs"
+                      onClick={handleCancelReconnect}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="flex-1 h-8 text-xs"
+                      onClick={() => {
+                        if (reconnectTimerRef.current) {
+                          clearInterval(reconnectTimerRef.current);
+                          reconnectTimerRef.current = null;
+                        }
+                        setReconnectCountdown(0);
+                        handleReconnect();
+                      }}
+                    >
+                      Reconnect Now
+                    </Button>
+                  </div>
+                </>
+              )}
+              {autoReconnectFailed && (
+                <>
+                  <span className="text-sm text-muted-foreground">
+                    Could not reconnect after {sshAutoReconnectMaxAttempts} attempts.
+                  </span>
+                  <Button size="sm" onClick={() => { setAutoReconnectFailed(false); reconnectAttemptRef.current = 0; handleReconnect(); }}>
+                    Retry
+                  </Button>
+                </>
+              )}
+              {reconnectCountdown === 0 && !autoReconnectFailed && (
+                <Button onClick={handleReconnect}>Reconnect</Button>
+              )}
             </div>
           </div>
         )}

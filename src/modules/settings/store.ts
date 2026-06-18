@@ -182,6 +182,11 @@ export type Preferences = {
   // --- Zen Mode ---
   zenModeShowHeader: boolean;
   zenModeShowStatusbar: boolean;
+
+  // --- SSH ---
+  sshAutoReconnect: boolean;
+  sshAutoReconnectDelay: number;
+  sshAutoReconnectMaxAttempts: number;
 };
 
 const KEY_THEME = "theme";
@@ -298,6 +303,9 @@ const KEY_TITLEBAR_ICONS_POSITION = "titlebarsIconsPosition";
 const KEY_TABS_LOCATION = "tabsLocation";
 const KEY_ZEN_MODE_SHOW_HEADER = "zenModeShowHeader";
 const KEY_ZEN_MODE_SHOW_STATUSBAR = "zenModeShowStatusbar";
+const KEY_SSH_AUTO_RECONNECT = "sshAutoReconnect";
+const KEY_SSH_AUTO_RECONNECT_DELAY = "sshAutoReconnectDelay";
+const KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS = "sshAutoReconnectMaxAttempts";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -421,6 +429,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
   zenModeShowHeader: true,
   zenModeShowStatusbar: true,
+
+  sshAutoReconnect: false,
+  sshAutoReconnectDelay: 5,
+  sshAutoReconnectMaxAttempts: 3,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -732,6 +744,13 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_ZEN_MODE_SHOW_HEADER) ?? DEFAULT_PREFERENCES.zenModeShowHeader,
     zenModeShowStatusbar:
       get<boolean>(KEY_ZEN_MODE_SHOW_STATUSBAR) ?? DEFAULT_PREFERENCES.zenModeShowStatusbar,
+
+    sshAutoReconnect:
+      get<boolean>(KEY_SSH_AUTO_RECONNECT) ?? DEFAULT_PREFERENCES.sshAutoReconnect,
+    sshAutoReconnectDelay:
+      get<number>(KEY_SSH_AUTO_RECONNECT_DELAY) ?? DEFAULT_PREFERENCES.sshAutoReconnectDelay,
+    sshAutoReconnectMaxAttempts:
+      get<number>(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS) ?? DEFAULT_PREFERENCES.sshAutoReconnectMaxAttempts,
   };
 }
 
@@ -983,6 +1002,21 @@ export async function setZenModeShowHeader(value: boolean): Promise<void> {
 
 export async function setZenModeShowStatusbar(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_ZEN_MODE_SHOW_STATUSBAR, value);
+  await (await getStore()).save();
+}
+
+export async function setSshAutoReconnect(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_SSH_AUTO_RECONNECT, value);
+  await (await getStore()).save();
+}
+
+export async function setSshAutoReconnectDelay(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SSH_AUTO_RECONNECT_DELAY, value);
+  await (await getStore()).save();
+}
+
+export async function setSshAutoReconnectMaxAttempts(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS, value);
   await (await getStore()).save();
 }
 
@@ -1422,6 +1456,9 @@ export async function onPreferencesChange(
     [KEY_TABS_LOCATION]: "tabsLocation",
     [KEY_ZEN_MODE_SHOW_HEADER]: "zenModeShowHeader",
     [KEY_ZEN_MODE_SHOW_STATUSBAR]: "zenModeShowStatusbar",
+    [KEY_SSH_AUTO_RECONNECT]: "sshAutoReconnect",
+    [KEY_SSH_AUTO_RECONNECT_DELAY]: "sshAutoReconnectDelay",
+    [KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS]: "sshAutoReconnectMaxAttempts",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];

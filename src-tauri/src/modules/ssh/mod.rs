@@ -1,4 +1,5 @@
 pub mod client;
+pub mod config_parser;
 pub mod exec;
 pub mod pty;
 pub mod sftp;
@@ -28,6 +29,8 @@ pub struct SshSession {
     pub channel: Option<ssh2::Channel>,
     /// Set to true by ssh_disconnect so the reader thread exits cleanly.
     pub shutdown: Arc<AtomicBool>,
+    /// Holds the bridge thread for jump-host tunnels. Dropped when the session is removed.
+    pub _jump_bridge: Option<std::thread::JoinHandle<()>>,
 }
 
 /// Clones the `Arc<Mutex<SessionHandle>>` from the SshState map and releases
