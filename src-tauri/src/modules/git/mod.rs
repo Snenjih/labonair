@@ -5,6 +5,7 @@ use std::process::{Command, Stdio};
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct FileStatus {
     pub path: String,
     pub original_path: Option<String>, // for renames
@@ -13,6 +14,7 @@ pub struct FileStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct GitStatus {
     pub staged: Vec<FileStatus>,
     pub unstaged: Vec<FileStatus>,
@@ -26,6 +28,7 @@ pub struct GitStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Branch {
     pub name: String,
     pub is_current: bool,
@@ -36,6 +39,7 @@ pub struct Branch {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CommitInfo {
     pub hash: String,
     pub short_hash: String,
@@ -45,6 +49,9 @@ pub struct CommitInfo {
     pub timestamp: i64,
     pub subject: String,
     pub refs: Vec<String>, // branch names, tags
+    pub files_changed: u32,
+    pub insertions: u32,
+    pub deletions: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -62,6 +69,23 @@ pub struct StashEntry {
 }
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
+
+fn parse_shortstat(s: &str) -> (u32, u32, u32) {
+    let mut files = 0u32;
+    let mut ins = 0u32;
+    let mut del = 0u32;
+    for part in s.split(',') {
+        let part = part.trim();
+        if part.contains("file") {
+            files = part.split_whitespace().next().unwrap_or("0").parse().unwrap_or(0);
+        } else if part.contains("insertion") {
+            ins = part.split_whitespace().next().unwrap_or("0").parse().unwrap_or(0);
+        } else if part.contains("deletion") {
+            del = part.split_whitespace().next().unwrap_or("0").parse().unwrap_or(0);
+        }
+    }
+    (files, ins, del)
+}
 
 /// Synchronous helper: validate cwd, run git with the given args, return trimmed stdout.
 /// Returns Err(stderr) on non-zero exit or if git is not found.
@@ -551,26 +575,29 @@ pub async fn git_get_log(
     all_branches: bool,
 ) -> Result<Vec<CommitInfo>, String> {
     let n = limit.unwrap_or(500).to_string();
-    // NUL-separated fields per commit; commits separated by newlines.
-    let format = "--format=%H%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D%x00---END---";
+    // %x1e (ASCII record separator) starts each commit; %x00 separates fields.
+    let format = "--format=%x1e%H%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D";
 
     let mut args = vec!["log"];
     if all_branches {
         args.push("--all");
     }
-    args.extend(["-n", &n, format]);
+    args.extend(["-n", &n, format, "--shortstat"]);
 
     let raw = run_git(&args, &path)?;
 
     let mut commits: Vec<CommitInfo> = Vec::new();
 
-    for entry in raw.split("---END---") {
-        let entry = entry.trim_matches('\n').trim();
-        if entry.is_empty() {
+    for record in raw.split('\x1e') {
+        let record = record.trim_matches('\n').trim();
+        if record.is_empty() {
             continue;
         }
 
-        let parts: Vec<&str> = entry.splitn(7, '\0').collect();
+        // First line: NUL-separated fields. Remainder: optional shortstat.
+        let (header, stat_part) = record.split_once('\n').unwrap_or((record, ""));
+
+        let parts: Vec<&str> = header.splitn(7, '\x00').collect();
         if parts.len() < 7 {
             continue;
         }
@@ -607,6 +634,8 @@ pub async fn git_get_log(
             })
             .collect();
 
+        let (files_changed, insertions, deletions) = parse_shortstat(stat_part.trim());
+
         commits.push(CommitInfo {
             hash,
             short_hash,
@@ -616,6 +645,9 @@ pub async fn git_get_log(
             timestamp,
             subject,
             refs,
+            files_changed,
+            insertions,
+            deletions,
         });
     }
 

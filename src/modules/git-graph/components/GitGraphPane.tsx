@@ -154,15 +154,17 @@ export function GitGraphPane({ tab, onOpenFile }: Props) {
           </div>
         )}
 
-        <GitGraphCanvas
-          commits={commits}
-          onSelectCommit={setSelectedCommit}
-          selectedHash={selectedCommit?.hash ?? null}
-          onViewChanges={(commit) => setCommitDiffHash(commit.hash)}
-          onCheckoutCommit={handleCheckoutCommit}
-          onCreateBranchHere={(commit) => setCreateBranchFromCommit(commit.hash)}
-          onCherryPick={handleCherryPick}
-        />
+        <div className="min-h-0 flex-1">
+          <GitGraphCanvas
+            commits={commits}
+            onSelectCommit={setSelectedCommit}
+            selectedHash={selectedCommit?.hash ?? null}
+            onViewChanges={(commit) => setCommitDiffHash(commit.hash)}
+            onCheckoutCommit={handleCheckoutCommit}
+            onCreateBranchHere={(commit) => setCreateBranchFromCommit(commit.hash)}
+            onCherryPick={handleCherryPick}
+          />
+        </div>
         {hasMore && (
           <div className="shrink-0 border-t border-border/60 p-2">
             <Button

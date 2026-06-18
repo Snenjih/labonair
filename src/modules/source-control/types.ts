@@ -35,6 +35,9 @@ export interface CommitInfo {
   timestamp: number;
   subject: string;
   refs: string[];
+  filesChanged: number;
+  insertions: number;
+  deletions: number;
 }
 
 export interface CommitResult {
