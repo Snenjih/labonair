@@ -14,7 +14,7 @@ import type {
 
 export interface TabActions {
   setActiveId: (id: number) => void;
-  newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newTab: (cwd?: string, initialCommand?: string, sessionId?: string, terminalMode?: "standard" | "block") => number;
   newSshTab: (hostId: string, title: string, cwd?: string, initialCommand?: string, sessionId?: string) => number;
   newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
   openFileTab: (path: string) => number | null;
@@ -74,10 +74,10 @@ async function restoreWorkspaceTab(
     } else if (rootSession.hostId) {
       tabId = actions.newSshTab(rootSession.hostId, rootSession.title, rootSession.cwd, rootSession.initialCommand, rootSession.id);
     } else {
-      tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id);
+      tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id, rootSession.terminalMode);
     }
   } else {
-    tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id);
+    tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id, rootSession.terminalMode);
   }
 
   // Reconstruct the split pane tree if there are multiple panes

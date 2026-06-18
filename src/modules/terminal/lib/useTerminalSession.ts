@@ -308,9 +308,9 @@ export function useTerminalSession({
         }
 
         if (prefs.blockTerminalScrollbackPersistence === "metadata" && sessionId) {
-          void loadBlockMeta(sessionId).then((blocks) => {
-            if (blocks) decorations.hydrateFromMeta(blocks);
-          });
+          // Await before PTY opens so cursor position is stable when calculating marker offsets
+          const savedBlocks = await loadBlockMeta(sessionId);
+          if (savedBlocks && !disposed) decorations.hydrateFromMeta(savedBlocks);
 
           let saveTimer: ReturnType<typeof setTimeout> | null = null;
           const unsubSave = decorations.subscribe(() => {

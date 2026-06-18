@@ -32,6 +32,7 @@ export interface SessionDataSnapshot {
   hostId?: string;
   quickConnect?: { username: string; hostAddress: string; port: number };
   initialCommand?: string;
+  terminalMode?: "standard" | "block";
 }
 
 export interface EditorTabSnapshot {

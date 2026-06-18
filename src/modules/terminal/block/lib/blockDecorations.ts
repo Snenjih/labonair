@@ -304,14 +304,16 @@ export class BlockDecorations {
 
   hydrateFromMeta(blocks: BlockMeta[]): void {
     const buf = this.term.buffer.active;
-    const baseY = buf.baseY;
+    // registerMarker(offset) places at: (buf.baseY + buf.cursorY) + offset
+    // so to hit absolute line L we need offset = L - (baseY + cursorY)
+    const absoluteCursorLine = buf.baseY + buf.cursorY;
     const existingIds = new Set(this.entries.map((e) => e.id));
 
     for (const b of blocks) {
       if (existingIds.has(b.id)) continue;
 
-      const startOffset = Math.max(0, b.startLine - baseY);
-      const endOffset = Math.max(startOffset, b.endLine - baseY);
+      const startOffset = b.startLine - absoluteCursorLine;
+      const endOffset = Math.max(startOffset, b.endLine - absoluteCursorLine);
 
       const startMarker = this.term.registerMarker(startOffset);
       const endMarker = this.term.registerMarker(endOffset);
