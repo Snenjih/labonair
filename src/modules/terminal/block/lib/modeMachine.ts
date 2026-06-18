@@ -1,83 +1,35 @@
-import type { Terminal } from "@xterm/xterm";
-import type { BlockMode } from "./types";
+// Pure state machine — no class, no xterm imports
 
-export class ModeMachine {
-  private _mode: BlockMode = "prompt";
-  private altScreen = false;
-  private readonly listeners: Set<(mode: BlockMode) => void> = new Set();
-  private readonly disposers: (() => void)[] = [];
+export type BlockMode = "prompt" | "running" | "alt";
 
-  constructor(term: Terminal) {
-    const hEnter = term.parser.registerCsiHandler(
-      { prefix: "?", final: "h" },
-      (params) => {
-        if (params[0] === 1049) this.setAlt(true);
-        return false;
-      },
-    );
-    const hExit = term.parser.registerCsiHandler(
-      { prefix: "?", final: "l" },
-      (params) => {
-        if (params[0] === 1049) this.setAlt(false);
-        return false;
-      },
-    );
-    const osc133 = term.parser.registerOscHandler(133, (data: string) => {
-      const code = data[0];
-      let phase: "prompt" | "running" | null = null;
-      if (code === "A" || code === "B" || code === "D") phase = "prompt";
-      else if (code === "C") phase = "running";
-      if (phase !== null) {
-        const next = this.altScreen ? "alt" : phase;
-        if (next !== this._mode) {
-          this._mode = next;
-          this.emit();
-        }
-      }
-      return false;
-    });
+export type ModeState = {
+  phase: "prompt" | "running";
+  altScreen: boolean;
+};
 
-    this.disposers.push(
-      () => hEnter.dispose(),
-      () => hExit.dispose(),
-      () => osc133.dispose(),
-    );
-  }
+export function initialModeState(): ModeState {
+  return { phase: "prompt", altScreen: false };
+}
 
-  get mode(): BlockMode {
-    return this._mode;
-  }
+export type ModeEvent =
+  | { type: "osc133"; code: "A" | "B" | "C" | "D" }
+  | { type: "alt"; active: boolean };
 
-  subscribe(listener: (mode: BlockMode) => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-
-  dispose(): void {
-    for (const d of this.disposers) {
-      try {
-        d();
-      } catch {}
+export function reduceMode(state: ModeState, event: ModeEvent): ModeState {
+  switch (event.type) {
+    case "osc133": {
+      const phase: "prompt" | "running" = event.code === "C" ? "running" : "prompt";
+      if (phase === state.phase) return state;
+      return { ...state, phase };
     }
-    this.disposers.length = 0;
-    this.listeners.clear();
-  }
-
-  private setAlt(active: boolean): void {
-    if (this.altScreen === active) return;
-    this.altScreen = active;
-    const next: BlockMode = active
-      ? "alt"
-      : this._mode === "alt"
-        ? "prompt"
-        : this._mode;
-    if (next !== this._mode) {
-      this._mode = next;
-      this.emit();
+    case "alt": {
+      if (event.active === state.altScreen) return state;
+      return { ...state, altScreen: event.active };
     }
   }
+}
 
-  private emit(): void {
-    for (const l of this.listeners) l(this._mode);
-  }
+export function modeOf(state: ModeState): BlockMode {
+  if (state.altScreen) return "alt";
+  return state.phase;
 }

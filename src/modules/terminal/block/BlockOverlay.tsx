@@ -4,7 +4,9 @@ import type { Terminal } from "@xterm/xterm";
 import { useEffect, useRef, useState } from "react";
 import { BlockChrome } from "./BlockChrome";
 import { BlockSearchBar } from "./BlockSearchBar";
+import { BlockWatermark } from "./BlockWatermark";
 import { StickyHeader } from "./StickyHeader";
+import { capAttachOutput } from "./lib/outputCap";
 import type { BlockDecorations } from "./lib/blockDecorations";
 import type {
   BlockChromeSettings,
@@ -14,14 +16,19 @@ import type {
 } from "./lib/types";
 
 interface BlockOverlayProps {
+  // Callback-based data access
+  subscribe: (cb: () => void) => () => void;
+  getVisible: () => VisibleBlocks;
+  readOutput: (block: BlockMeta) => string;
+  promptReady: boolean;
+  onRunAgain: (command: string) => void;
+  onRestoreFocus: () => void;
+  // Passthrough for BlockSearchBar
   term: Terminal | null;
-  containerRef: React.RefObject<HTMLDivElement | null>;
   decorations: BlockDecorations | null;
   mode: BlockMode;
   settings: BlockChromeSettings & { autoCollapseOnAltScreen: boolean };
   searchAddon: SearchAddon | null;
-  // Fix 8: callback to write a command directly into the PTY
-  onInjectCommand?: (command: string) => void;
 }
 
 const EMPTY_VISIBLE: VisibleBlocks = { blocks: [], sticky: null };
@@ -35,13 +42,17 @@ function visibleSignature(v: VisibleBlocks): string {
 }
 
 export function BlockOverlay({
+  subscribe,
+  getVisible,
+  readOutput,
+  promptReady,
+  onRunAgain,
+  onRestoreFocus,
   term,
-  containerRef,
   decorations,
   mode,
   settings,
   searchAddon,
-  onInjectCommand,
 }: BlockOverlayProps) {
   if (mode === "alt" && settings.autoCollapseOnAltScreen) {
     return <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden" />;
@@ -49,49 +60,55 @@ export function BlockOverlay({
 
   return (
     <BlockOverlayInner
+      subscribe={subscribe}
+      getVisible={getVisible}
+      readOutput={readOutput}
+      promptReady={promptReady}
+      onRunAgain={onRunAgain}
+      onRestoreFocus={onRestoreFocus}
       term={term}
-      containerRef={containerRef}
       decorations={decorations}
       settings={settings}
       searchAddon={searchAddon}
-      onInjectCommand={onInjectCommand}
     />
   );
 }
 
 function BlockOverlayInner({
+  subscribe,
+  getVisible,
+  readOutput,
+  promptReady,
+  onRunAgain,
   term,
-  containerRef,
   decorations,
   settings,
   searchAddon,
-  onInjectCommand,
 }: {
+  subscribe: (cb: () => void) => () => void;
+  getVisible: () => VisibleBlocks;
+  readOutput: (block: BlockMeta) => string;
+  promptReady: boolean;
+  onRunAgain: (command: string) => void;
+  onRestoreFocus: () => void;
   term: Terminal | null;
-  containerRef: React.RefObject<HTMLDivElement | null>;
   decorations: BlockDecorations | null;
   settings: BlockChromeSettings;
   searchAddon: SearchAddon | null;
-  onInjectCommand?: (command: string) => void;
 }) {
   const [visibleBlocks, setVisibleBlocks] = useState<VisibleBlocks>(EMPTY_VISIBLE);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [searchTarget, setSearchTarget] = useState<BlockMeta | null>(null);
-  // Fix 10: preserve search query across open/close cycles
   const [searchQuery, setSearchQuery] = useState("");
 
   const lastSig = useRef("");
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!decorations) return;
-
     const update = () => {
-      const container = containerRef.current;
-      if (!container) return;
-      const next = decorations.visibleBlocks(container);
+      const next = getVisible();
       const sig = visibleSignature(next);
       if (sig !== lastSig.current) {
         lastSig.current = sig;
@@ -108,7 +125,7 @@ function BlockOverlayInner({
     };
 
     update();
-    const unsubscribe = decorations.subscribe(scheduleRaf);
+    const unsubscribe = subscribe(scheduleRaf);
 
     return () => {
       unsubscribe();
@@ -117,31 +134,28 @@ function BlockOverlayInner({
         rafRef.current = null;
       }
     };
-  }, [decorations, containerRef]);
+  }, [subscribe, getVisible]);
 
   const handleCopyCommand = (command: string) => {
     navigator.clipboard.writeText(command).catch(() => {});
   };
 
   const handleCopyOutput = (block: BlockMeta) => {
-    if (!decorations) return;
-    const output = decorations.readBlock(block);
+    const output = readOutput(block);
     navigator.clipboard.writeText(output).catch(() => {});
   };
 
   const handleAttachToAi = (block: BlockMeta) => {
-    if (!decorations) return;
-    const output = decorations.readBlock(block);
+    const output = capAttachOutput(readOutput(block));
     const text = output
       ? `$ ${block.command}\n${output}`
       : `$ ${block.command}`;
     useChatStore.getState().attachSelection(text, "terminal");
   };
 
-  // Fix 8: write directly to PTY instead of via AI chat store
   const handleRerun = (block: BlockMeta) => {
-    if (!block.command || !onInjectCommand) return;
-    onInjectCommand(block.command + "\n");
+    if (!block.command) return;
+    onRunAgain(block.command);
   };
 
   const handleToggleCollapse = (id: string) => {
@@ -154,6 +168,8 @@ function BlockOverlayInner({
 
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+      <BlockWatermark visible={promptReady && visibleBlocks.blocks.length === 0} />
+
       {visibleBlocks.blocks.map((block) => (
         <BlockChrome
           key={block.id}
@@ -168,8 +184,7 @@ function BlockOverlayInner({
           onCopyOutput={() => handleCopyOutput(block)}
           onSearch={() => setSearchTarget(block)}
           onAttachToAi={() => handleAttachToAi(block)}
-          // Fix 8: only pass onRerun if the PTY callback is available
-          onRerun={onInjectCommand ? () => handleRerun(block) : undefined}
+          onRerun={() => handleRerun(block)}
           settings={settings}
         />
       ))}

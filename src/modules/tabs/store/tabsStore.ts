@@ -45,6 +45,35 @@ export function getActiveBlockDecorations(
   return blockDecorationRegistry.get(tab.activePaneId) ?? null;
 }
 
+// ─── Block session registry ──────────────────────────────────────────────────
+// Provides cross-component access to block terminal submit/interrupt/CWD/mode APIs
+
+export type BlockSessionAPI = {
+  submit: (text: string) => void;
+  interrupt: () => void;
+  getCwd: () => string | null;
+  subscribeMode: (cb: () => void) => () => void;
+  getMode: () => import("@/modules/terminal/block").BlockMode;
+};
+
+const blockSessionRegistry = new Map<string, BlockSessionAPI>();
+
+export function registerBlockSession(
+  sessionId: string,
+  api: BlockSessionAPI,
+): () => void {
+  blockSessionRegistry.set(sessionId, api);
+  return () => blockSessionRegistry.delete(sessionId);
+}
+
+export function getActiveBlockSession(
+  state: TabsState,
+): BlockSessionAPI | null {
+  const tab = state.tabs.find((t) => t.id === state.activeId);
+  if (!tab || tab.kind !== "workspace") return null;
+  return blockSessionRegistry.get(tab.activePaneId) ?? null;
+}
+
 // ─── State shape ─────────────────────────────────────────────────────────────
 
 export type TabsState = {

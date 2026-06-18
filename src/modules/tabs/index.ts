@@ -28,4 +28,7 @@ export {
   selectIsActiveBlockTerminal,
   registerBlockDecorations,
   getActiveBlockDecorations,
+  registerBlockSession,
+  getActiveBlockSession,
 } from "./store/tabsStore";
+export type { BlockSessionAPI } from "./store/tabsStore";

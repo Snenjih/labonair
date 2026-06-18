@@ -140,13 +140,22 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     const blockOverlay = terminalMode === "block" ? (
       <BlockOverlay
+        subscribe={(cb) => {
+          if (!session.blockDecorations) return () => {};
+          return session.blockDecorations.subscribe(cb);
+        }}
+        getVisible={() =>
+          session.blockDecorations?.visibleBlocks() ?? { blocks: [], sticky: null }
+        }
+        readOutput={(block) => session.blockDecorations?.readBlock(block) ?? ""}
         term={session.termRef.current}
-        containerRef={containerRef}
         decorations={session.blockDecorations}
         mode={session.blockMode}
         settings={blockPrefs}
         searchAddon={searchAddonRef.current}
-        onInjectCommand={(cmd) => session.write(cmd)}
+        promptReady={session.blockMode === "prompt"}
+        onRunAgain={(cmd) => session.write(cmd + "\r")}
+        onRestoreFocus={() => session.focus()}
       />
     ) : null;
 

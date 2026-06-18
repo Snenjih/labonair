@@ -24,6 +24,7 @@ import { useComposer, type FileAttachment } from "../lib/composer";
 import { SLASH_COMMANDS } from "../lib/slashCommands";
 import type { Directive } from "../lib/directives";
 import { useDirectivesStore } from "../store/directivesStore";
+import { ShellInput } from "@/modules/terminal/block";
 import { AgentSwitcher } from "./AgentSwitcher";
 import { DirectivePickerContent, type PickerItem } from "./DirectivePicker";
 import { FilePickerContent, type FileSearchHit } from "./FilePicker";
@@ -262,86 +263,90 @@ export function AiInputBar() {
         <Popover open={pickerOpen}>
           <PopoverAnchor asChild>
             <div className="flex items-center gap-2">
-              <textarea
-                ref={c.textareaRef}
-                value={c.value}
-                onChange={(e) => c.setValue(e.target.value)}
-                onKeyUp={updateTrigger}
-                onClick={updateTrigger}
-                onSelect={updateTrigger}
-                onKeyDown={(e) => {
-                  if (fileTrigger !== null) {
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setFileActiveIndex((i) =>
-                        Math.min(i + 1, Math.max(0, fileHits.length - 1)),
-                      );
-                      return;
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setFileActiveIndex((i) => Math.max(0, i - 1));
-                      return;
-                    }
-                    if (e.key === "Tab" || e.key === "Enter") {
-                      const hit = fileHits[fileActiveIndex];
-                      if (hit) {
+              {sendTarget === "terminal" && isBlockTerminal ? (
+                <ShellInput onRestoreFocus={() => { /* noop — focus handled by submit callback */ }} />
+              ) : (
+                <textarea
+                  ref={c.textareaRef}
+                  value={c.value}
+                  onChange={(e) => c.setValue(e.target.value)}
+                  onKeyUp={updateTrigger}
+                  onClick={updateTrigger}
+                  onSelect={updateTrigger}
+                  onKeyDown={(e) => {
+                    if (fileTrigger !== null) {
+                      if (e.key === "ArrowDown") {
                         e.preventDefault();
-                        onPickFile(hit);
+                        setFileActiveIndex((i) =>
+                          Math.min(i + 1, Math.max(0, fileHits.length - 1)),
+                        );
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setFileActiveIndex((i) => Math.max(0, i - 1));
+                        return;
+                      }
+                      if (e.key === "Tab" || e.key === "Enter") {
+                        const hit = fileHits[fileActiveIndex];
+                        if (hit) {
+                          e.preventDefault();
+                          onPickFile(hit);
+                          return;
+                        }
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setFileTrigger(null);
+                        return;
+                      }
+                    } else if (trigger !== null) {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setActiveIndex((i) =>
+                          Math.min(i + 1, Math.max(0, filteredItems.length - 1)),
+                        );
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setActiveIndex((i) => Math.max(0, i - 1));
+                        return;
+                      }
+                      if (e.key === "Tab" || e.key === "Enter") {
+                        if (filteredItems.length > 0) {
+                          e.preventDefault();
+                          pickActive();
+                          return;
+                        }
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setTrigger(null);
                         return;
                       }
                     }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setFileTrigger(null);
-                      return;
-                    }
-                  } else if (trigger !== null) {
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setActiveIndex((i) =>
-                        Math.min(i + 1, Math.max(0, filteredItems.length - 1)),
-                      );
-                      return;
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setActiveIndex((i) => Math.max(0, i - 1));
-                      return;
-                    }
-                    if (e.key === "Tab" || e.key === "Enter") {
-                      if (filteredItems.length > 0) {
+                    if (e.key === "Enter") {
+                      const isModEnter = e.metaKey || e.ctrlKey;
+                      if (c.isBusy) {
                         e.preventDefault();
-                        pickActive();
+                        if (isModEnter && !pickerOpen) c.enqueue();
                         return;
                       }
+                      if (!e.shiftKey) {
+                        e.preventDefault();
+                        c.submit();
+                      }
                     }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setTrigger(null);
-                      return;
-                    }
-                  }
-                  if (e.key === "Enter") {
-                    const isModEnter = e.metaKey || e.ctrlKey;
-                    if (c.isBusy) {
-                      e.preventDefault();
-                      if (isModEnter && !pickerOpen) c.enqueue();
-                      return;
-                    }
-                    if (!e.shiftKey) {
-                      e.preventDefault();
-                      c.submit();
-                    }
-                  }
-                }}
-                placeholder={sendTarget === "terminal" ? "Type a command and press Enter…" : "Ask Nexum anything   ·   @ files   ·   # directives"}
-                rows={1}
-                className={cn(
-                  "max-h-40 flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none",
-                  "placeholder:text-muted-foreground/60",
-                )}
-              />
+                  }}
+                  placeholder={sendTarget === "terminal" ? "Type a command and press Enter…" : "Ask Nexum anything   ·   @ files   ·   # directives"}
+                  rows={1}
+                  className={cn(
+                    "max-h-40 flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none",
+                    "placeholder:text-muted-foreground/60",
+                  )}
+                />
+              )}
               {isBlockTerminal && (
                 <div className="flex shrink-0 items-center rounded-md bg-background border border-border/50 p-0.5 gap-0.5">
                   <button
@@ -375,7 +380,7 @@ export function AiInputBar() {
                 </div>
               )}
               {sendTarget !== "terminal" && <AgentSwitcher />}
-              {sendTarget === "terminal" ? (
+              {sendTarget === "terminal" && isBlockTerminal ? null : sendTarget === "terminal" ? (
                 <Button
                   type="button"
                   size="icon"

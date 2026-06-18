@@ -7,7 +7,6 @@ import type { TerminalSessionData } from "@/modules/tabs";
 import {
   BlockDecorations,
   BlockOverlay,
-  ModeMachine,
   buildOsc133InjectionScript,
   loadBlockMeta,
   saveBlockMeta,
@@ -48,7 +47,7 @@ import { useNotificationStore } from "@/modules/notifications/store/useNotificat
 import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { dropPaths } from "./lib/drop-paths";
 import { SshLoadingScreen } from "./SshLoadingScreen";
-import { registerBlockDecorations } from "@/modules/tabs";
+import { registerBlockDecorations, registerBlockSession } from "@/modules/tabs";
 import { SudoFillPopup } from "./SudoFillPopup";
 import type { TerminalPaneHandle } from "./TerminalPane";
 
@@ -462,17 +461,29 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
         // Block mode setup
         if (session.terminalMode === "block") {
-          const decorations = new BlockDecorations(t, () => "");
+          const decorations = new BlockDecorations(t, () => "", {
+            onMode: (mode) => { if (!disposed) setBlockMode(mode); },
+          });
           decorations.init();
           blockDecorationsRef.current = decorations;
 
           const unregisterDeco = registerBlockDecorations(session.id, decorations);
           cleanups.push(unregisterDeco);
 
-          const mm = new ModeMachine(t);
-          const unsubMode = mm.subscribe((mode) => {
-            if (!disposed) setBlockMode(mode);
+          const unregisterSession = registerBlockSession(session.id, {
+            submit: (text: string) => {
+              const data = text.includes("\n")
+                ? `\x1b[200~${text}\x1b[201~\r`
+                : `${text}\r`;
+              invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
+            },
+            interrupt: () =>
+              invoke("ssh_pty_write", { sessionId, data: "\x03" }).catch(console.error),
+            getCwd: () => null,
+            subscribeMode: (cb) => decorations.subscribeMode(cb),
+            getMode: () => decorations.mode,
           });
+          cleanups.push(unregisterSession);
 
           if (prefs.blockTerminalScrollbackPersistence === "metadata") {
             void loadBlockMeta(session.id).then((blocks) => {
@@ -494,7 +505,6 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           }
 
           cleanups.push(
-            () => { unsubMode(); mm.dispose(); },
             () => { decorations.dispose(); blockDecorationsRef.current = null; },
           );
         }
@@ -675,13 +685,24 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     const blockOverlay = session.terminalMode === "block" ? (
       <BlockOverlay
+        subscribe={(cb) => {
+          if (!blockDecorationsRef.current) return () => {};
+          return blockDecorationsRef.current.subscribe(cb);
+        }}
+        getVisible={() =>
+          blockDecorationsRef.current?.visibleBlocks() ?? { blocks: [], sticky: null }
+        }
+        readOutput={(block) => blockDecorationsRef.current?.readBlock(block) ?? ""}
         term={termRef.current}
-        containerRef={containerRef}
         decorations={blockDecorationsRef.current}
         mode={blockMode}
         settings={blockSettings}
         searchAddon={searchRef.current}
-        onInjectCommand={(cmd) => invoke("ssh_pty_write", { sessionId, data: cmd }).catch(console.error)}
+        promptReady={blockMode === "prompt"}
+        onRunAgain={(cmd) =>
+          invoke("ssh_pty_write", { sessionId, data: cmd + "\r" }).catch(console.error)
+        }
+        onRestoreFocus={() => termRef.current?.focus()}
       />
     ) : null;
 

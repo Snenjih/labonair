@@ -2,7 +2,6 @@ import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   BlockDecorations,
-  ModeMachine,
   saveBlockMeta,
   loadBlockMeta,
 } from "@/modules/terminal/block";
@@ -20,7 +19,7 @@ import { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { registerCwdHandler, registerPromptTracker } from "./osc-handlers";
 import { openPty, type PtySession } from "./pty-bridge";
-import { registerBlockDecorations } from "@/modules/tabs";
+import { registerBlockDecorations, registerBlockSession } from "@/modules/tabs";
 
 type Options = {
   container: React.RefObject<HTMLDivElement | null>;
@@ -276,7 +275,9 @@ export function useTerminalSession({
 
       // Block mode setup
       if (terminalMode === "block") {
-        const decorations = new BlockDecorations(term, () => currentCwdRef.current);
+        const decorations = new BlockDecorations(term, () => currentCwdRef.current, {
+          onMode: (mode) => { if (!disposed) setBlockMode(mode); },
+        });
         decorations.init();
         blockDecorationsRef.current = decorations;
         setBlockDecorations(decorations);
@@ -284,10 +285,21 @@ export function useTerminalSession({
         if (sessionId) {
           const unregister = registerBlockDecorations(sessionId, decorations);
           cleanups.push(unregister);
-        }
 
-        const modeMachine = new ModeMachine(term);
-        const unsubMode = modeMachine.subscribe((mode) => setBlockMode(mode));
+          const unregisterSession = registerBlockSession(sessionId, {
+            submit: (text: string) => {
+              const data = text.includes("\n")
+                ? `\x1b[200~${text}\x1b[201~\r`
+                : `${text}\r`;
+              ptyRef.current?.write(data);
+            },
+            interrupt: () => ptyRef.current?.write("\x03"),
+            getCwd: () => currentCwdRef.current ?? null,
+            subscribeMode: (cb) => decorations.subscribeMode(cb),
+            getMode: () => decorations.mode,
+          });
+          cleanups.push(unregisterSession);
+        }
 
         if (prefs.blockTerminalScrollbackPersistence === "metadata" && sessionId) {
           void loadBlockMeta(sessionId).then((blocks) => {
@@ -309,7 +321,6 @@ export function useTerminalSession({
         }
 
         cleanups.push(
-          () => { unsubMode(); modeMachine.dispose(); },
           () => { decorations.dispose(); blockDecorationsRef.current = null; setBlockDecorations(null); },
         );
       }

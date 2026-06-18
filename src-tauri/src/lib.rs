@@ -589,6 +589,10 @@ pub fn run() {
             pty::block_meta::block_meta_save,
             pty::block_meta::block_meta_load,
             pty::block_meta::block_meta_cleanup,
+            pty::history::history_suggest,
+            pty::history::history_commands,
+            pty::history::history_list,
+            pty::history::history_record,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

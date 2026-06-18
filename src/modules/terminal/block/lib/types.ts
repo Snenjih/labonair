@@ -36,3 +36,18 @@ export interface BlockChromeSettings {
 
 export const HEADER_HEIGHT_PX = 24;
 export const HEADER_HEIGHT_COMPACT_PX = 20;
+
+export interface BlockMatch {
+  blockId: string;
+  absoluteLine: number;
+  start: number;
+  end: number;
+  preview: string;
+}
+
+export interface BlockContext {
+  command: string;
+  output: string;
+  cwd: string;
+  exitCode: number | null;
+}

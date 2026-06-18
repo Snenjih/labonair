@@ -1,4 +1,13 @@
 import type { IDecoration, IMarker, Terminal } from "@xterm/xterm";
+import {
+  initialModeState,
+  modeOf,
+  reduceMode,
+  type BlockMode,
+  type ModeState,
+} from "./modeMachine";
+import { computeRange } from "./blockRange";
+import { readRangeText } from "./readBlock";
 import type { BlockMeta, PositionedBlock, VisibleBlocks } from "./types";
 
 const MAX_BLOCKS = 1000;
@@ -6,15 +15,6 @@ const MAX_BLOCKS = 1000;
 function getCssVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-}
-
-type MarkerLike = { line: number; isDisposed: boolean };
-type LineRange = { start: number; end: number };
-
-function computeRange(start: MarkerLike, end: MarkerLike): LineRange | null {
-  if (start.isDisposed || end.isDisposed) return null;
-  if (start.line < 0 || end.line < 0) return null;
-  return { start: start.line, end: Math.max(start.line, end.line) };
 }
 
 function parseExitCode(s: string): number | null {
@@ -43,20 +43,32 @@ type LiveBlock = {
   startMarker: IMarker;
 };
 
+type BlockDecorationsOptions = {
+  onCwd?: (cwd: string) => void;
+  onMode?: (mode: BlockMode) => void;
+  onViewport?: () => void;
+};
+
 export class BlockDecorations {
   private readonly entries: Entry[] = [];
   private live: LiveBlock | null = null;
   private cwd = "";
   private idSeq = 0;
   private altScreen = false;
+  private modeState: ModeState = initialModeState();
+  private readonly modeListeners: Set<() => void> = new Set();
   private readonly listeners: Set<() => void> = new Set();
   private readonly disposers: (() => void)[] = [];
   private viewportRaf: number | null = null;
+  private readonly options: BlockDecorationsOptions;
 
   constructor(
     private readonly term: Terminal,
     private readonly getCwd: () => string,
-  ) {}
+    options: BlockDecorationsOptions = {},
+  ) {
+    this.options = options;
+  }
 
   init(): void {
     this.cwd = this.getCwd();
@@ -65,6 +77,21 @@ export class BlockDecorations {
       this.onOsc133(data);
       return false;
     });
+
+    const hEnter = this.term.parser.registerCsiHandler(
+      { prefix: "?", final: "h" },
+      (params) => {
+        if (params[0] === 1049) this.handleAlt(true);
+        return false;
+      },
+    );
+    const hExit = this.term.parser.registerCsiHandler(
+      { prefix: "?", final: "l" },
+      (params) => {
+        if (params[0] === 1049) this.handleAlt(false);
+        return false;
+      },
+    );
 
     const onWriteParsed = this.term.onWriteParsed(() => {
       const isAlt = this.term.buffer.active.type === "alternate";
@@ -79,6 +106,8 @@ export class BlockDecorations {
 
     this.disposers.push(
       () => osc133.dispose(),
+      () => hEnter.dispose(),
+      () => hExit.dispose(),
       () => onWriteParsed.dispose(),
       () => onScroll.dispose(),
       () => onRender.dispose(),
@@ -98,6 +127,7 @@ export class BlockDecorations {
     }
     this.disposers.length = 0;
     this.listeners.clear();
+    this.modeListeners.clear();
   }
 
   subscribe(listener: () => void): () => void {
@@ -105,12 +135,36 @@ export class BlockDecorations {
     return () => this.listeners.delete(listener);
   }
 
-  visibleBlocks(container: HTMLElement): VisibleBlocks {
+  subscribeMode(listener: () => void): () => void {
+    this.modeListeners.add(listener);
+    return () => this.modeListeners.delete(listener);
+  }
+
+  get mode(): BlockMode {
+    return modeOf(this.modeState);
+  }
+
+  hasAnyBlock(): boolean {
+    return this.entries.length > 0 || this.live !== null;
+  }
+
+  commandLines(): number[] {
+    return this.entries
+      .map((e) => (e.startMarker.isDisposed ? -1 : e.startMarker.line))
+      .filter((l) => l >= 0);
+  }
+
+  visibleBlocks(): VisibleBlocks {
     if (this.altScreen) return { blocks: [], sticky: null };
     const { term } = this;
     if (term.rows === 0) return { blocks: [], sticky: null };
 
-    const cellHeight = container.clientHeight / term.rows;
+    // Get cell height from xterm's rendered screen element (accurate on HiDPI)
+    const screen = term.element?.querySelector(".xterm-screen") as HTMLElement | null;
+    if (!screen) return { blocks: [], sticky: null };
+
+    const rect = screen.getBoundingClientRect();
+    const cellHeight = rect.height / term.rows;
     if (cellHeight <= 0) return { blocks: [], sticky: null };
 
     const buf = term.buffer.active;
@@ -189,24 +243,14 @@ export class BlockDecorations {
     return { blocks: out, sticky };
   }
 
-  readBlock(block: BlockMeta): string {
-    const e = this.entries.find((x) => x.id === block.id);
-    const r = e
-      ? computeRange(e.startMarker, e.endMarker)
-      : null;
-    const startLine = r ? r.start : block.startLine;
-    const endLine = r ? r.end : block.endLine;
-
-    const buf = this.term.buffer.active;
-    const last = Math.min(endLine, buf.length - 1);
-    const lines: string[] = [];
-    for (let i = startLine; i <= last; i++) {
-      lines.push(buf.getLine(i)?.translateToString(true) ?? "");
-    }
-    while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
-      lines.pop();
-    }
-    return lines.join("\n");
+  readBlock(meta: BlockMeta): string {
+    const e = this.entries.find((x) => x.id === meta.id);
+    const r = e ? computeRange(e.startMarker, e.endMarker) : null;
+    return readRangeText(
+      this.term,
+      r?.start ?? meta.startLine,
+      r?.end ?? meta.endLine,
+    );
   }
 
   getViewportY(): number {
@@ -289,8 +333,17 @@ export class BlockDecorations {
   }
 
   private onOsc133(data: string): void {
-    const code = data[0];
+    const code = data[0] as "A" | "B" | "C" | "D";
     const rest = data.length > 2 && data[1] === ";" ? data.slice(2) : "";
+
+    const prevMode = modeOf(this.modeState);
+    this.modeState = reduceMode(this.modeState, { type: "osc133", code });
+    const nextMode = modeOf(this.modeState);
+    if (nextMode !== prevMode) {
+      this.options.onMode?.(nextMode);
+      for (const l of this.modeListeners) l();
+    }
+
     switch (code) {
       case "C":
         this.startBlock(rest);
@@ -298,10 +351,23 @@ export class BlockDecorations {
       case "D":
         this.finishBlock(rest);
         break;
+      // A, B: only update mode state (done above), no block lifecycle change
     }
-    // Always refresh cwd from the live getter
+
     this.cwd = this.getCwd();
+    this.options.onCwd?.(this.cwd);
     this.notify();
+  }
+
+  private handleAlt(active: boolean): void {
+    const prevMode = modeOf(this.modeState);
+    this.modeState = reduceMode(this.modeState, { type: "alt", active });
+    const nextMode = modeOf(this.modeState);
+    if (nextMode !== prevMode) {
+      this.options.onMode?.(nextMode);
+      for (const l of this.modeListeners) l();
+      this.notify();
+    }
   }
 
   private startBlock(command: string): void {

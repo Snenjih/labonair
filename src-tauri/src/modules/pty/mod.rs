@@ -1,4 +1,5 @@
 pub mod block_meta;
+pub mod history;
 mod session;
 mod shell_init;
 
