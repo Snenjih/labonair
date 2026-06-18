@@ -86,9 +86,9 @@ pub fn open_shell_channel(
 
         // Carry buffer for incomplete multi-byte UTF-8 sequences. When a read ends
         // in the middle of a multi-byte character (e.g. a 3-byte box-drawing glyph
-        // split across a 4096-byte boundary), we keep the trailing bytes here and
-        // prepend them to the next read so the full character is emitted intact
-        // rather than replaced with U+FFFD by from_utf8_lossy.
+        // split across a 4096-byte boundary), the trailing incomplete bytes are kept
+        // here and prepended to the next chunk. Definitively invalid sequences
+        // (e.g. Latin-1 bytes, binary) are replaced with U+FFFD via flush_carry.
         let mut carry: Vec<u8> = Vec::new();
 
         loop {
@@ -121,24 +121,7 @@ pub fn open_shell_channel(
                     Ok(n) => {
                         ka_consecutive_fails = 0; // live data proves connection is alive
                         carry.extend_from_slice(&buf[..n]);
-                        // Find the longest valid UTF-8 prefix. Utf8Error::valid_up_to()
-                        // points to the byte just past the last complete character.
-                        let valid_end = match std::str::from_utf8(&carry) {
-                            Ok(_) => carry.len(),
-                            Err(e) => e.valid_up_to(),
-                        };
-                        if valid_end == 0 {
-                            // All accumulated bytes are the start of an incomplete
-                            // sequence — wait for the next read chunk.
-                            None
-                        } else {
-                            // SAFETY: verified as valid UTF-8 above.
-                            let s = unsafe {
-                                String::from_utf8_unchecked(carry[..valid_end].to_vec())
-                            };
-                            carry.drain(..valid_end);
-                            Some(s)
-                        }
+                        flush_carry(&mut carry)
                     }
                     Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => None,
                     Err(e) => {
@@ -209,6 +192,52 @@ pub fn open_shell_channel(
     });
 
     Ok((channel, shutdown))
+}
+
+/// Decode as much valid UTF-8 from `carry` as possible, replacing definitively
+/// invalid byte sequences with U+FFFD. Incomplete sequences at the *end* of
+/// `carry` are left in place so the next read can complete them.
+///
+/// `Utf8Error` distinguishes two cases at the error position:
+///   `error_len() == None`    → incomplete (lead byte without enough continuation
+///                              bytes yet) — keep in carry and wait.
+///   `error_len() == Some(n)` → invalid (the n bytes are definitively not UTF-8,
+///                              e.g. Latin-1, overlong, surrogate halves) — replace
+///                              with U+FFFD and drain, then continue scanning.
+fn flush_carry(carry: &mut Vec<u8>) -> Option<String> {
+    if carry.is_empty() {
+        return None;
+    }
+    let mut out = String::with_capacity(carry.len());
+    loop {
+        match std::str::from_utf8(carry) {
+            Ok(s) => {
+                out.push_str(s);
+                carry.clear();
+                break;
+            }
+            Err(e) => {
+                let valid_end = e.valid_up_to();
+                if valid_end > 0 {
+                    // SAFETY: from_utf8 verified [..valid_end] is valid UTF-8.
+                    out.push_str(unsafe { std::str::from_utf8_unchecked(&carry[..valid_end]) });
+                    carry.drain(..valid_end);
+                }
+                match e.error_len() {
+                    None => {
+                        // Incomplete sequence at end of carry — wait for the next chunk.
+                        break;
+                    }
+                    Some(n) => {
+                        // Definitively invalid bytes — substitute and keep scanning.
+                        out.push('\u{FFFD}');
+                        carry.drain(..n);
+                    }
+                }
+            }
+        }
+    }
+    if out.is_empty() { None } else { Some(out) }
 }
 
 fn humanize_disconnect_reason(raw: &str) -> String {
