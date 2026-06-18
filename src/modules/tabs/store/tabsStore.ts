@@ -167,21 +167,34 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   openDefaultTab: () => {
     if (_defaultTabOpened) return;
     _defaultTabOpened = true;
-    const defaultStartupTab = usePreferencesStore.getState().defaultStartupTab;
+    const prefs = usePreferencesStore.getState();
+    const defaultStartupTab = prefs.defaultStartupTab;
+    const startupTerminalCount = Math.min(3, Math.max(1, prefs.startupTerminalCount ?? 1));
     const homeId = get()._nextId;
     const homeTab = { id: homeId, kind: "home" as const, title: "Home" };
     if (defaultStartupTab === "terminal") {
-      const termId = homeId + 1;
-      const sessionId = newSessionId();
-      const termTab: WorkspaceTab = {
-        id: termId,
-        kind: "workspace",
-        title: "shell",
-        activePaneId: sessionId,
-        layout: makeLeaf(sessionId),
-        sessions: { [sessionId]: { id: sessionId, kind: "local", title: "shell" } },
-      };
-      set((s) => ({ tabs: [homeTab, termTab], activeId: termId, _nextId: s._nextId + 2 }));
+      const newTabs: (typeof homeTab | WorkspaceTab)[] = [homeTab];
+      let nextId = homeId + 1;
+      let lastTermId = homeId;
+      for (let i = 0; i < startupTerminalCount; i++) {
+        const sessionId = newSessionId();
+        const termTab: WorkspaceTab = {
+          id: nextId,
+          kind: "workspace",
+          title: "shell",
+          activePaneId: sessionId,
+          layout: makeLeaf(sessionId),
+          sessions: { [sessionId]: { id: sessionId, kind: "local", title: "shell" } },
+        };
+        newTabs.push(termTab);
+        lastTermId = nextId;
+        nextId++;
+      }
+      set((s) => ({
+        tabs: newTabs,
+        activeId: lastTermId,
+        _nextId: s._nextId + 1 + startupTerminalCount,
+      }));
     } else {
       set((s) => ({
         tabs: [homeTab],

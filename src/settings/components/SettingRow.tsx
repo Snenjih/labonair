@@ -43,7 +43,7 @@ export function SettingRow({ title, description, hint, children, className }: Pr
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-4 px-3 py-2.5">
+      <div className="flex items-start justify-between gap-4 px-3 py-[var(--ui-row-py)]">
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-[12.5px] font-medium">{title}</span>
           {description ? (
