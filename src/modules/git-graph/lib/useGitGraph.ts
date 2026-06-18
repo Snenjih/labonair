@@ -12,6 +12,7 @@ export function useGitGraph(repositoryPath: string) {
   const [error, setError] = useState<string | null>(null);
   const [totalLoaded, setTotalLoaded] = useState(PAGE_SIZE);
   const [hasMore, setHasMore] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
 
   const load = useCallback(
     async (limit: number) => {
@@ -22,6 +23,7 @@ export function useGitGraph(repositoryPath: string) {
         setHasMore(raw.length === limit);
         setCommits(buildGraphLayout(raw));
         setTotalLoaded(limit);
+        setLastRefreshedAt(new Date());
       } catch (e) {
         setError(String(e));
       } finally {
@@ -44,5 +46,5 @@ export function useGitGraph(repositoryPath: string) {
     void load(totalLoaded);
   }, [load, totalLoaded]);
 
-  return { commits, isLoading, error, hasMore, loadMore, reload };
+  return { commits, isLoading, error, hasMore, loadMore, reload, lastRefreshedAt };
 }

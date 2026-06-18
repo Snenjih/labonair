@@ -1,21 +1,6 @@
 import type { CommitInfo } from "@/modules/source-control/types";
 import type { LayoutCommit, GraphEdge } from "../types";
 
-const LANE_COLORS = [
-  "#60a5fa", // blue-400
-  "#c084fc", // purple-400
-  "#34d399", // emerald-400
-  "#fbbf24", // amber-400
-  "#f472b6", // pink-400
-  "#22d3ee", // cyan-400
-  "#fb923c", // orange-400
-  "#a3e635", // lime-400
-];
-
-function laneColor(index: number): string {
-  return LANE_COLORS[index % LANE_COLORS.length];
-}
-
 function firstFreeSlot(lanes: (string | null)[]): number {
   for (let i = 0; i < lanes.length; i++) {
     if (lanes[i] === null) return i;
@@ -31,6 +16,7 @@ function trimTrailing(lanes: (string | null)[]): (string | null)[] {
 
 export function buildGraphLayout(commits: CommitInfo[]): LayoutCommit[] {
   const lanes: (string | null)[] = [];
+  const laneMap = new Map<string, number>(); // hash → lane index (O(1) lookup)
   const result: LayoutCommit[] = [];
 
   commits.forEach((commit, row) => {
@@ -56,14 +42,18 @@ export function buildGraphLayout(commits: CommitInfo[]): LayoutCommit[] {
       const v = lanesBefore[i];
       if (v === null) continue;
       if (v === commit.hash && i !== lane) {
-        topEdges.push({ kind: "merge", fromLane: i, toLane: lane, color: laneColor(i) });
+        topEdges.push({ kind: "merge", fromLane: i, toLane: lane, colorIndex: i % 8 });
       } else {
-        topEdges.push({ kind: "straight", lane: i, color: laneColor(i) });
+        topEdges.push({ kind: "straight", lane: i, colorIndex: i % 8 });
       }
     }
 
     // Consume all claiming lanes; reset fresh allocations too.
-    for (const idx of claiming) lanes[idx] = null;
+    for (const idx of claiming) {
+      const prev = lanes[idx];
+      if (prev) laneMap.delete(prev);
+      lanes[idx] = null;
+    }
     if (claiming.length === 0) lanes[lane] = null;
 
     // Bottom-half edges: place parents and fan out branches.
@@ -72,21 +62,24 @@ export function buildGraphLayout(commits: CommitInfo[]): LayoutCommit[] {
 
     if (parents.length > 0) {
       lanes[lane] = parents[0]; // first parent keeps the same lane
+      if (parents[0]) laneMap.set(parents[0], lane);
 
       for (let p = 1; p < parents.length; p++) {
         const parentHash = parents[p];
-        let parentLane = lanes.indexOf(parentHash);
+        // O(1) lookup instead of O(n) indexOf
+        let parentLane = laneMap.get(parentHash) ?? -1;
         if (parentLane === -1) {
           parentLane = firstFreeSlot(lanes);
           if (parentLane === lanes.length) lanes.push(null);
           lanes[parentLane] = parentHash;
+          laneMap.set(parentHash, parentLane);
         }
         if (parentLane !== lane) {
           bottomEdges.push({
             kind: "branch",
             fromLane: lane,
             toLane: parentLane,
-            color: laneColor(parentLane),
+            colorIndex: parentLane % 8,
           });
         }
       }
@@ -101,7 +94,7 @@ export function buildGraphLayout(commits: CommitInfo[]): LayoutCommit[] {
     for (let i = 0; i < lanes.length; i++) {
       if (lanes[i] === null) continue;
       if (branchTargets.has(i)) continue;
-      bottomEdges.push({ kind: "straight", lane: i, color: laneColor(i) });
+      bottomEdges.push({ kind: "straight", lane: i, colorIndex: i % 8 });
     }
 
     const trimmed = trimTrailing(lanes);
@@ -113,7 +106,7 @@ export function buildGraphLayout(commits: CommitInfo[]): LayoutCommit[] {
       ...commit,
       row,
       lane,
-      color: laneColor(lane),
+      colorIndex: lane % 8,
       laneCount,
       topEdges,
       bottomEdges,

@@ -48,13 +48,34 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function RefreshAge({ date }: { date: Date }) {
+  const [, forceUpdate] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => forceUpdate((n) => n + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const seconds = Math.round((Date.now() - date.getTime()) / 1000);
+  const label =
+    seconds < 60
+      ? `${seconds}s ago`
+      : `${Math.round(seconds / 60)}m ago`;
+
+  return (
+    <span className="text-[10px] text-muted-foreground/40">
+      {label}
+    </span>
+  );
+}
+
 interface Props {
   tab: GitGraphTab;
   onOpenFile?: (path: string) => void;
 }
 
 export function GitGraphPane({ tab }: Props) {
-  const { commits, isLoading, error, hasMore, loadMore, reload } = useGitGraph(tab.repositoryPath);
+  const { commits, isLoading, error, hasMore, loadMore, reload, lastRefreshedAt } = useGitGraph(tab.repositoryPath);
   const [selectedCommit, setSelectedCommit] = useState<LayoutCommit | null>(null);
   const [commitDiffHash, setCommitDiffHash] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -129,15 +150,18 @@ export function GitGraphPane({ tab }: Props) {
           <span className="truncate text-[11px] text-muted-foreground">
             {tab.repositoryPath.split("/").pop()}
           </span>
-          <button
-            type="button"
-            onClick={reload}
-            disabled={isLoading}
-            title="Refresh git graph"
-            className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-accent hover:text-foreground disabled:opacity-40"
-          >
-            <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.75} />
-          </button>
+          <div className="flex items-center gap-2">
+            {lastRefreshedAt && <RefreshAge date={lastRefreshedAt} />}
+            <button
+              type="button"
+              onClick={reload}
+              disabled={isLoading}
+              title="Refresh git graph"
+              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-accent hover:text-foreground disabled:opacity-40"
+            >
+              <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.75} />
+            </button>
+          </div>
         </div>
 
         {/* Error banner */}

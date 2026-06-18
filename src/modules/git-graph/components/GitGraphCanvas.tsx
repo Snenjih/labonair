@@ -15,6 +15,22 @@ import {
 const ROW_HEIGHT = 32;
 const TABLE_HEADER_HEIGHT = 26;
 
+// Color values for lane-colored ref pills (must match GraphRail's LANE_STROKE_COLORS).
+const LANE_PILL_COLORS = [
+  "rgb(96, 165, 250)",   // blue-400
+  "rgb(192, 132, 252)",  // purple-400
+  "rgb(52, 211, 153)",   // emerald-400
+  "rgb(251, 191, 36)",   // amber-400
+  "rgb(244, 114, 182)",  // pink-400
+  "rgb(34, 211, 238)",   // cyan-400
+  "rgb(251, 146, 60)",   // orange-400
+  "rgb(163, 230, 53)",   // lime-400
+] as const;
+
+function laneColor(colorIndex: number): string {
+  return LANE_PILL_COLORS[colorIndex % LANE_PILL_COLORS.length];
+}
+
 const AVATAR_COLORS = [
   "#60a5fa", "#a78bfa", "#34d399", "#fb923c",
   "#f472b6", "#22d3ee", "#fbbf24", "#818cf8",
@@ -201,9 +217,9 @@ export function GitGraphCanvas({
                               style={
                                 !isTag
                                   ? {
-                                      backgroundColor: `${commit.color}25`,
-                                      color: commit.color,
-                                      border: `1px solid ${commit.color}40`,
+                                      backgroundColor: `${laneColor(commit.colorIndex)}25`,
+                                      color: laneColor(commit.colorIndex),
+                                      border: `1px solid ${laneColor(commit.colorIndex)}40`,
                                     }
                                   : { border: "1px solid rgb(245 158 11 / 0.35)" }
                               }

@@ -8,6 +8,23 @@ export const MAX_VISIBLE_LANES = 6;
 const STRAIGHT_WIDTH = 1.5;
 const CURVE_WIDTH = 1.5;
 
+// SVG stroke attributes require color strings, not CSS class names.
+// These rgb values match Tailwind's color palette for light/dark compatibility.
+const LANE_STROKE_COLORS = [
+  "rgb(96, 165, 250)",   // blue-400
+  "rgb(192, 132, 252)",  // purple-400
+  "rgb(52, 211, 153)",   // emerald-400
+  "rgb(251, 191, 36)",   // amber-400
+  "rgb(244, 114, 182)",  // pink-400
+  "rgb(34, 211, 238)",   // cyan-400
+  "rgb(251, 146, 60)",   // orange-400
+  "rgb(163, 230, 53)",   // lime-400
+] as const;
+
+function laneColor(colorIndex: number): string {
+  return LANE_STROKE_COLORS[colorIndex % LANE_STROKE_COLORS.length];
+}
+
 function laneX(lane: number): number {
   return RAIL_PADDING_X + lane * LANE_WIDTH;
 }
@@ -25,7 +42,7 @@ function renderTopEdge(edge: GraphEdge, midY: number): ReactElement | null {
       <line
         key={`t-s-${edge.lane}`}
         x1={x} y1={0} x2={x} y2={midY}
-        stroke={edge.color}
+        stroke={laneColor(edge.colorIndex)}
         strokeWidth={STRAIGHT_WIDTH}
         strokeLinecap="round"
       />
@@ -41,7 +58,7 @@ function renderTopEdge(edge: GraphEdge, midY: number): ReactElement | null {
         key={`t-m-${edge.fromLane}-${edge.toLane}`}
         d={`M ${xFrom} 0 C ${xFrom} ${c1y}, ${xTo} ${c1y}, ${xTo} ${midY}`}
         fill="none"
-        stroke={edge.color}
+        stroke={laneColor(edge.colorIndex)}
         strokeWidth={CURVE_WIDTH}
         strokeLinecap="round"
       />
@@ -58,7 +75,7 @@ function renderBottomEdge(edge: GraphEdge, midY: number, bottomY: number): React
       <line
         key={`b-s-${edge.lane}`}
         x1={x} y1={midY} x2={x} y2={bottomY}
-        stroke={edge.color}
+        stroke={laneColor(edge.colorIndex)}
         strokeWidth={STRAIGHT_WIDTH}
         strokeLinecap="round"
       />
@@ -74,7 +91,7 @@ function renderBottomEdge(edge: GraphEdge, midY: number, bottomY: number): React
         key={`b-b-${edge.fromLane}-${edge.toLane}`}
         d={`M ${xFrom} ${midY} C ${xFrom} ${c1y}, ${xTo} ${c1y}, ${xTo} ${bottomY}`}
         fill="none"
-        stroke={edge.color}
+        stroke={laneColor(edge.colorIndex)}
         strokeWidth={CURVE_WIDTH}
         strokeLinecap="round"
       />
@@ -111,7 +128,7 @@ export const GraphRail = memo(function GraphRail({ commit, rowHeight, maxLaneCou
         cx={nodeX}
         cy={midY}
         r={active ? 4.5 : 3.5}
-        fill={commit.color}
+        fill={laneColor(commit.colorIndex)}
         stroke="var(--background)"
         strokeWidth={1.5}
       />
@@ -121,7 +138,7 @@ export const GraphRail = memo(function GraphRail({ commit, rowHeight, maxLaneCou
           cy={midY}
           r={6.5}
           fill="none"
-          stroke={commit.color}
+          stroke={laneColor(commit.colorIndex)}
           strokeOpacity={0.35}
           strokeWidth={1.4}
         />
