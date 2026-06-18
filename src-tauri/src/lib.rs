@@ -618,6 +618,8 @@ pub fn run() {
             git::git_get_diff_stats,
             git::git_get_commit_numstat,
             git::git_get_remote_url,
+            git::git_add_to_gitignore,
+            git::git_add_to_exclude,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

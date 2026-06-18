@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { PlusSignIcon, MinusSignIcon, Delete01Icon } from "@hugeicons/core-free-icons";
+import { PlusSignIcon, MinusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   AlertDialog,
@@ -10,8 +11,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
@@ -42,24 +50,26 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
   const diffStats = useSourceControlStore((s) => s.diffStats);
   const openGitDiffTab = useTabsStore((s) => s.openGitDiffTab);
+  const setDiffViewMode = useSourceControlStore((s) => s.setDiffViewMode);
+
+  const [showDiscard, setShowDiscard] = useState(false);
 
   const isStaged = section === "staged";
   const statusChar = isStaged ? file.indexStatus : file.worktreeStatus;
   const statusColor = STATUS_COLORS[statusChar] ?? "bg-muted/80 text-muted-foreground/60";
 
-  // Find stats for this file in this section
-  const stat = diffStats.find((s) => s.path === file.path && s.staged === isStaged)
-    ?? diffStats.find((s) => s.path === file.path);
-
-  // Path decomposition
-  const pathParts = file.path.split("/");
-  const fileName = pathParts[pathParts.length - 1] ?? file.path;
-  const dirPath = pathParts.length > 1 ? "..." + pathParts.slice(-2, -1).join("") + "/" : "";
+  const stat =
+    diffStats.find((s) => s.path === file.path && s.staged === isStaged) ??
+    diffStats.find((s) => s.path === file.path);
 
   const isRename = !!file.originalPath;
+  const fileName = basename(file.path);
+  const displayName = isRename
+    ? `${basename(file.path)} ← ${basename(file.originalPath!)}`
+    : fileName;
 
-  async function handleStage(e: React.MouseEvent) {
-    e.stopPropagation();
+  async function handleStage(e?: React.MouseEvent) {
+    e?.stopPropagation();
     if (!repoRoot) return;
     try {
       await git.stageFile(repoRoot, file.path);
@@ -67,8 +77,8 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     } catch { /* ignore */ }
   }
 
-  async function handleUnstage(e: React.MouseEvent) {
-    e.stopPropagation();
+  async function handleUnstage(e?: React.MouseEvent) {
+    e?.stopPropagation();
     if (!repoRoot) return;
     try {
       await git.unstageFile(repoRoot, file.path);
@@ -84,106 +94,159 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     } catch { /* ignore */ }
   }
 
-  function handleClick() {
+  async function handleAddToGitignore() {
+    if (!repoRoot) return;
+    try {
+      await git.addToGitignore(repoRoot, file.path);
+      onRefresh();
+    } catch { /* ignore */ }
+  }
+
+  async function handleAddToExclude() {
+    if (!repoRoot) return;
+    try {
+      await git.addToExclude(repoRoot, file.path);
+    } catch { /* ignore */ }
+  }
+
+  function handleOpenDiff() {
     if (!repoRoot) return;
     openGitDiffTab(repoRoot, file.path, isStaged, section);
   }
 
+  function handleOpenDiffSplit() {
+    if (!repoRoot) return;
+    setDiffViewMode("split");
+    openGitDiffTab(repoRoot, file.path, isStaged, section);
+  }
+
   return (
-    <div
-      className="group/item flex h-7 cursor-pointer items-center gap-2 rounded px-2 transition-colors hover:bg-accent/30"
-      onClick={handleClick}
-      title={file.path}
-    >
-      {/* Status badge */}
-      <span
-        className={cn(
-          "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-[9px] font-bold leading-none",
-          statusColor,
-        )}
-      >
-        {statusChar}
-      </span>
-
-      {/* Filename */}
-      <span className="min-w-0 shrink-0 text-[11.5px] font-medium text-foreground/90 truncate max-w-[120px]">
-        {isRename ? `${basename(file.path)} ← ${basename(file.originalPath!)}` : fileName}
-      </span>
-
-      {/* Truncated directory path */}
-      {!isRename && dirPath && (
-        <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground/35">
-          {dirPath}
-        </span>
-      )}
-      {(isRename || !dirPath) && <span className="flex-1" />}
-
-      {/* Diff stats */}
-      {stat && (stat.added > 0 || stat.removed > 0) && (
-        <span className="flex shrink-0 items-center gap-1 text-[10px] tabular-nums opacity-0 transition-opacity group-hover/item:opacity-100">
-          {stat.added > 0 && <span className="font-medium text-green-500">+{stat.added}</span>}
-          {stat.removed > 0 && <span className="font-medium text-red-500">−{stat.removed}</span>}
-        </span>
-      )}
-
-      {/* Action buttons — always reserve space, show on hover */}
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100">
-        {section === "staged" && (
-          <button
-            type="button"
-            className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-            onClick={handleUnstage}
-            title="Unstage"
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            className="group/item flex h-7 cursor-pointer items-center gap-1.5 rounded px-2 transition-colors hover:bg-accent/30"
+            onClick={handleOpenDiff}
+            title={file.path}
           >
-            <HugeiconsIcon icon={MinusSignIcon} size={10} strokeWidth={2} />
-          </button>
-        )}
-        {(section === "unstaged" || section === "untracked") && (
-          <>
-            <button
-              type="button"
-              className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-              onClick={handleStage}
-              title="Stage"
+            {/* Status badge */}
+            <span
+              className={cn(
+                "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-[9px] font-bold leading-none",
+                statusColor,
+              )}
             >
-              <HugeiconsIcon icon={PlusSignIcon} size={10} strokeWidth={2} />
-            </button>
-            {section === "unstaged" && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-red-500/20 hover:text-red-500"
-                    onClick={(e) => e.stopPropagation()}
-                    title="Discard changes"
-                  >
-                    <HugeiconsIcon icon={Delete01Icon} size={10} strokeWidth={2} />
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent size="sm">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Discard changes?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently discard all changes to{" "}
-                      <span className="font-mono text-foreground">{basename(file.path)}</span>. This
-                      cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => void handleDiscard()}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Discard
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              {statusChar}
+            </span>
+
+            {/* Filename — flex-1 so it truncates when sidebar is narrow */}
+            <span className="min-w-0 flex-1 truncate text-[11.5px] font-medium text-foreground/90">
+              {displayName}
+            </span>
+
+            {/* Diff stats — always visible */}
+            {stat && (stat.added > 0 || stat.removed > 0) && (
+              <span className="flex shrink-0 items-center gap-1 text-[10px] tabular-nums">
+                {stat.added > 0 && (
+                  <span className="font-medium text-green-500">+{stat.added}</span>
+                )}
+                {stat.removed > 0 && (
+                  <span className="font-medium text-red-500">−{stat.removed}</span>
+                )}
+              </span>
             )}
-          </>
-        )}
-      </div>
-    </div>
+
+            {/* Stage / Unstage button — always visible */}
+            <div className="flex shrink-0 items-center">
+              {section === "staged" ? (
+                <button
+                  type="button"
+                  className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                  onClick={(e) => void handleUnstage(e)}
+                  title="Unstage"
+                >
+                  <HugeiconsIcon icon={MinusSignIcon} size={10} strokeWidth={2} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                  onClick={(e) => void handleStage(e)}
+                  title="Stage"
+                >
+                  <HugeiconsIcon icon={PlusSignIcon} size={10} strokeWidth={2} />
+                </button>
+              )}
+            </div>
+          </div>
+        </ContextMenuTrigger>
+
+        <ContextMenuContent className="min-w-52">
+          {section === "staged" ? (
+            <ContextMenuItem onSelect={() => void handleUnstage()}>
+              Unstage File
+              <ContextMenuShortcut>—</ContextMenuShortcut>
+            </ContextMenuItem>
+          ) : (
+            <ContextMenuItem onSelect={() => void handleStage()}>
+              Stage File
+              <ContextMenuShortcut>—</ContextMenuShortcut>
+            </ContextMenuItem>
+          )}
+          {section === "unstaged" && (
+            <ContextMenuItem
+              variant="destructive"
+              onSelect={() => setShowDiscard(true)}
+            >
+              Discard Changes
+              <ContextMenuShortcut>⌫</ContextMenuShortcut>
+            </ContextMenuItem>
+          )}
+
+          <ContextMenuSeparator />
+
+          <ContextMenuItem onSelect={() => void handleAddToGitignore()}>
+            Add to .gitignore
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => void handleAddToExclude()}>
+            Add to .git/info/exclude
+          </ContextMenuItem>
+
+          <ContextMenuSeparator />
+
+          <ContextMenuItem onSelect={handleOpenDiff}>
+            Open Diff
+            <ContextMenuShortcut>↵</ContextMenuShortcut>
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={handleOpenDiffSplit}>
+            Open Diff (File)
+            <ContextMenuShortcut>⌃↵</ContextMenuShortcut>
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      {/* Discard confirmation — rendered outside ContextMenu to avoid portal nesting issues */}
+      <AlertDialog open={showDiscard} onOpenChange={setShowDiscard}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently discard all changes to{" "}
+              <span className="font-mono text-foreground">{fileName}</span>. This cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleDiscard()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

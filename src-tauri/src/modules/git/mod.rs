@@ -934,3 +934,55 @@ pub async fn git_get_diff_stats(path: String) -> Result<Vec<FileDiffStat>, Strin
     stats.extend(parse_numstat(&unstaged_out, false));
     Ok(stats)
 }
+
+#[tauri::command]
+pub async fn git_add_to_gitignore(path: String, file: String) -> Result<(), String> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let gitignore_path = std::path::Path::new(&path).join(".gitignore");
+    let existing = std::fs::read_to_string(&gitignore_path).unwrap_or_default();
+    let entry = format!("/{}", file.trim_start_matches('/'));
+
+    if existing.lines().any(|l| l.trim() == entry.trim() || l.trim() == file.trim()) {
+        return Ok(());
+    }
+
+    let mut f = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&gitignore_path)
+        .map_err(|e| e.to_string())?;
+
+    if !existing.is_empty() && !existing.ends_with('\n') {
+        writeln!(f).map_err(|e| e.to_string())?;
+    }
+    writeln!(f, "{}", entry).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn git_add_to_exclude(path: String, file: String) -> Result<(), String> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let exclude_path = std::path::Path::new(&path).join(".git/info/exclude");
+    let existing = std::fs::read_to_string(&exclude_path).unwrap_or_default();
+    let entry = file.trim_start_matches('/').to_string();
+
+    if existing.lines().any(|l| l.trim() == entry.trim()) {
+        return Ok(());
+    }
+
+    let mut f = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&exclude_path)
+        .map_err(|e| e.to_string())?;
+
+    if !existing.is_empty() && !existing.ends_with('\n') {
+        writeln!(f).map_err(|e| e.to_string())?;
+    }
+    writeln!(f, "{}", entry).map_err(|e| e.to_string())?;
+    Ok(())
+}

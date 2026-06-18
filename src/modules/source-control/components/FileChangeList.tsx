@@ -28,9 +28,25 @@ const SECTION_LABELS: Record<FileChangeListProps["section"], string> = {
 export function FileChangeList({ files, section, onRefresh }: FileChangeListProps) {
   const [collapsed, setCollapsed] = useState(false);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const diffStats = useSourceControlStore((s) => s.diffStats);
   const selectionMode = useSourceControlStore((s) => s.selectionMode);
   const selectSection = useSourceControlStore((s) => s.selectSection);
   const clearSelectedFile = useSourceControlStore((s) => s.clearSelectedFile);
+
+  const isStaged = section === "staged";
+  const sectionStats = files.reduce(
+    (acc, f) => {
+      const stat =
+        diffStats.find((s) => s.path === f.path && s.staged === isStaged) ??
+        diffStats.find((s) => s.path === f.path);
+      if (stat) {
+        acc.added += stat.added;
+        acc.removed += stat.removed;
+      }
+      return acc;
+    },
+    { added: 0, removed: 0 },
+  );
 
   const label = SECTION_LABELS[section];
 
@@ -103,6 +119,16 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
           <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">
             {files.length}
           </span>
+          {(sectionStats.added > 0 || sectionStats.removed > 0) && (
+            <span className="flex items-center gap-1 text-[9px] tabular-nums">
+              {sectionStats.added > 0 && (
+                <span className="font-medium text-green-500">+{sectionStats.added}</span>
+              )}
+              {sectionStats.removed > 0 && (
+                <span className="font-medium text-red-500">−{sectionStats.removed}</span>
+              )}
+            </span>
+          )}
         </button>
 
         {/* Stage all / unstage all */}

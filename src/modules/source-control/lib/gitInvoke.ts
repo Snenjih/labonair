@@ -65,4 +65,8 @@ export const git = {
     invoke<string>("git_get_commit_numstat", { path, hash }),
   getRemoteUrl: (path: string, remote?: string) =>
     invoke<string>("git_get_remote_url", { path, remote: remote ?? null }),
+  addToGitignore: (path: string, file: string) =>
+    invoke<void>("git_add_to_gitignore", { path, file }),
+  addToExclude: (path: string, file: string) =>
+    invoke<void>("git_add_to_exclude", { path, file }),
 };
