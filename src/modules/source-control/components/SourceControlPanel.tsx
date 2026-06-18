@@ -31,7 +31,7 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <BranchBar onOpenGitGraph={onOpenGitGraph} onRefresh={refresh} />
+      <BranchBar onRefresh={refresh} />
 
       {/* Header: change count + stage all */}
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/50 px-3">
@@ -69,7 +69,7 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
       </ScrollArea>
 
       {/* Commit form pinned at bottom */}
-      {repoRoot && <CommitForm repoRoot={repoRoot} onRefresh={refresh} />}
+      {repoRoot && <CommitForm repoRoot={repoRoot} onRefresh={refresh} onOpenGitGraph={onOpenGitGraph} />}
     </div>
   );
 }
