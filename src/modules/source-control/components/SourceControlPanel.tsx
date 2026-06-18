@@ -1,7 +1,4 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { EyeIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { cn } from "@/lib/utils";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { useGitStatus } from "../lib/useGitStatus";
 import { BranchBar } from "./BranchBar";
@@ -22,15 +19,14 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
   const isRepo = useSourceControlStore((s) => s.isRepo);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
   const status = useSourceControlStore((s) => s.status);
-  const selectionMode = useSourceControlStore((s) => s.selectionMode);
   const selectAll = useSourceControlStore((s) => s.selectAll);
   const clearSelectedFile = useSourceControlStore((s) => s.clearSelectedFile);
+  const selectionMode = useSourceControlStore((s) => s.selectionMode);
 
-  const totalChanges =
-    (status?.staged.length ?? 0) +
-    (status?.unstaged.length ?? 0) +
-    (status?.untracked.length ?? 0);
-
+  const stagedCount = status?.staged.length ?? 0;
+  const unstagedCount = status?.unstaged.length ?? 0;
+  const untrackedCount = status?.untracked.length ?? 0;
+  const totalChanges = stagedCount + unstagedCount + untrackedCount;
   const isAllSelected = selectionMode?.type === 'all';
 
   if (!isRepo) {
@@ -41,33 +37,38 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
     <div className="flex h-full flex-col overflow-hidden">
       <BranchBar onOpenGitGraph={onOpenGitGraph} onRefresh={refresh} />
 
+      {/* Panel header: change count + stage all */}
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/50 px-3">
+        <span className="text-[11px] text-muted-foreground/60">
+          {totalChanges > 0 ? (
+            <>
+              <span className="font-semibold text-foreground/80">{totalChanges}</span>
+              {" "}Change{totalChanges !== 1 ? "s" : ""}
+            </>
+          ) : (
+            "No changes"
+          )}
+        </span>
+        {totalChanges > 0 && (
+          <button
+            type="button"
+            className="rounded px-2 py-0.5 text-[10px] font-medium text-muted-foreground/60 transition-colors hover:bg-accent/50 hover:text-foreground/80"
+            onClick={() => (isAllSelected ? clearSelectedFile() : selectAll())}
+          >
+            {isAllSelected ? "Deselect All" : "Stage All"}
+          </button>
+        )}
+      </div>
+
       {status?.hasConflicts && (
-        <div className="mx-2 mb-1 rounded border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-[10px] text-orange-400">
+        <div className="mx-3 my-1 rounded border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-[10px] text-orange-400">
           Merge conflicts detected — resolve before committing.
         </div>
       )}
 
-      <ScrollArea className="flex-1">
+      {/* Scrollable file list */}
+      <ScrollArea className="min-h-0 flex-1">
         <div className="py-1">
-          {totalChanges > 0 && (
-            <button
-              type="button"
-              className={cn(
-                "mx-2 mb-1 flex h-6 w-[calc(100%-1rem)] items-center gap-1.5 rounded px-2 text-[10px] transition-colors",
-                isAllSelected
-                  ? "bg-accent/40 text-foreground/90"
-                  : "bg-muted/20 text-muted-foreground/70 hover:bg-muted/40 hover:text-muted-foreground"
-              )}
-              onClick={() => (isAllSelected ? clearSelectedFile() : selectAll())}
-            >
-              <HugeiconsIcon icon={EyeIcon} size={10} strokeWidth={2} />
-              <span>All Changes</span>
-              <span className="ml-auto font-mono text-[9px] tabular-nums opacity-60">
-                {totalChanges}
-              </span>
-            </button>
-          )}
-
           <FileChangeList
             files={status?.staged ?? []}
             section="staged"
@@ -86,11 +87,11 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
         </div>
 
         {repoRoot && <StashPanel repoRoot={repoRoot} onRefresh={refresh} />}
-
-        {repoRoot && <CommitForm repoRoot={repoRoot} onRefresh={refresh} />}
-
         <DiffViewer />
       </ScrollArea>
+
+      {/* Commit form pinned at bottom */}
+      {repoRoot && <CommitForm repoRoot={repoRoot} onRefresh={refresh} />}
     </div>
   );
 }

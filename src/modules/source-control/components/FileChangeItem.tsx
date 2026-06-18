@@ -76,11 +76,13 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     selectionMode.path === file.path &&
     selectionMode.staged === isStaged;
 
-  // For renames: show "newName ← oldName"
-  const displayName =
-    file.originalPath
-      ? `${basename(file.path)} ← ${basename(file.originalPath)}`
-      : basename(file.path);
+  // Split path into directory + filename for display
+  const pathParts = file.path.split("/");
+  const fileName = pathParts[pathParts.length - 1] ?? file.path;
+  const dirPath = pathParts.length > 1 ? pathParts.slice(0, -1).join("/") + "/" : "";
+
+  // For renames we keep simple display
+  const isRename = !!file.originalPath;
 
   async function handleStage(e: React.MouseEvent) {
     e.stopPropagation();
@@ -117,7 +119,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
   return (
     <div
       className={cn(
-        "group/item flex h-[22px] cursor-pointer items-center gap-1 rounded px-1 transition-colors",
+        "group/item flex h-6 cursor-pointer items-center gap-1.5 rounded px-2 transition-colors",
         isSelected ? "bg-accent/50" : "hover:bg-accent/30"
       )}
       onClick={() => selectFile(file.path, isStaged)}
@@ -126,7 +128,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
       {/* Status letter badge */}
       <span
         className={cn(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded text-[9px] font-bold leading-none",
+          "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-[9px] font-bold leading-none",
           statusClassName
         )}
         title={STATUS_LABELS[letter] ?? letter}
@@ -134,9 +136,26 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
         {letter}
       </span>
 
-      {/* Filename */}
-      <span className="flex-1 truncate text-[11px] text-foreground/80">
-        {displayName}
+      {/* Path: dim directory + bold filename, or rename display */}
+      <span className="flex min-w-0 flex-1 items-baseline gap-0 truncate">
+        {isRename ? (
+          <span className="truncate text-[11px] text-foreground/75">
+            {basename(file.path)}
+            <span className="mx-1 text-muted-foreground/40">←</span>
+            {basename(file.originalPath!)}
+          </span>
+        ) : (
+          <>
+            {dirPath && (
+              <span className="shrink truncate text-[10px] text-muted-foreground/40">
+                {dirPath}
+              </span>
+            )}
+            <span className="shrink-0 text-[11px] font-medium text-foreground/85">
+              {fileName}
+            </span>
+          </>
+        )}
       </span>
 
       {/* Action buttons — visible on hover */}

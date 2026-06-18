@@ -212,7 +212,7 @@ export function CommitForm({ repoRoot, onRefresh }: CommitFormProps) {
     (status?.mergeInProgress ?? false) || (status?.rebaseInProgress ?? false);
 
   return (
-    <div className="border-t border-border/60 px-2 py-2">
+    <div className="shrink-0 border-t border-border/50 px-2.5 py-2.5">
       {/* Hint: no staged files */}
       {status && status.staged.length === 0 && (status.unstaged.length > 0 || status.untracked.length > 0) && (
         <p className="mb-1.5 text-[10px] text-muted-foreground/70">

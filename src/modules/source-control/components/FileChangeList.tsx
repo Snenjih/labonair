@@ -20,9 +20,9 @@ interface FileChangeListProps {
 }
 
 const SECTION_LABELS: Record<FileChangeListProps["section"], string> = {
-  staged: "Staged Changes",
+  staged: "Staged",
   unstaged: "Changes",
-  untracked: "Untracked Files",
+  untracked: "Untracked",
 };
 
 export function FileChangeList({ files, section, onRefresh }: FileChangeListProps) {
@@ -53,16 +53,18 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
   }
 
   return (
-    <div className="mb-1">
+    <div className="mb-0.5">
       {/* Section header */}
       <div
         className={cn(
-          "group/hdr flex h-6 cursor-pointer items-center gap-1 px-2 transition-colors",
-          isSectionSelected ? "bg-accent/20" : "hover:bg-muted/20"
+          "group/hdr flex h-6 cursor-pointer items-center gap-1.5 px-3 transition-colors",
+          isSectionSelected ? "bg-accent/15" : "hover:bg-muted/15"
         )}
       >
-        {/* Chevron — only collapses, stops propagation */}
-        <span
+        {/* Collapse chevron */}
+        <button
+          type="button"
+          className="flex shrink-0 items-center"
           onClick={(e) => {
             e.stopPropagation();
             setCollapsed((c) => !c);
@@ -70,15 +72,16 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
         >
           <HugeiconsIcon
             icon={collapsed ? ArrowRight01Icon : ArrowDown01Icon}
-            size={9}
+            size={8}
             strokeWidth={2.5}
-            className="shrink-0 text-muted-foreground/40"
+            className="text-muted-foreground/35 transition-colors group-hover/hdr:text-muted-foreground/60"
           />
-        </span>
+        </button>
 
         {/* Label + count — clicking selects section */}
-        <span
-          className="flex flex-1 cursor-pointer items-center gap-1"
+        <button
+          type="button"
+          className="flex flex-1 items-center gap-1.5 text-left"
           onClick={() => {
             if (isSectionSelected) {
               clearSelectedFile();
@@ -89,24 +92,24 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
         >
           <span
             className={cn(
-              "select-none truncate text-[10px] font-medium uppercase tracking-wider",
+              "select-none text-[10px] font-semibold uppercase tracking-widest",
               isSectionSelected
-                ? "text-foreground/80"
-                : "text-muted-foreground/60 group-hover/hdr:text-muted-foreground"
+                ? "text-foreground/75"
+                : "text-muted-foreground/50 group-hover/hdr:text-muted-foreground/70"
             )}
           >
             {label}
           </span>
-          <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted-foreground/40">
+          <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">
             {files.length}
           </span>
-        </span>
+        </button>
 
-        {/* Stage all / unstage all button */}
+        {/* Stage all / unstage all */}
         <Button
           variant="ghost"
           size="icon"
-          className="ml-0.5 size-4 opacity-0 transition-opacity group-hover/hdr:opacity-100"
+          className="ml-auto size-4 shrink-0 opacity-0 transition-opacity group-hover/hdr:opacity-100"
           title={section === "staged" ? "Unstage All" : "Stage All"}
           onClick={(e) => {
             e.stopPropagation();
@@ -123,7 +126,7 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
 
       {/* File list */}
       {!collapsed && files.length > 0 && (
-        <div className="px-1 pb-1">
+        <div className="px-1 pb-0.5">
           {files.map((file) => (
             <FileChangeItem
               key={`${file.path}:${file.indexStatus}:${file.worktreeStatus}`}
