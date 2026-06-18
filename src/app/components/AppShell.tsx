@@ -16,6 +16,7 @@ import { ThemeProvider } from "@/modules/theme";
 import { type TabManagementReturn, type AiDiffStatus, useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import type { AiLiveBridgeReturn } from "@/modules/ai";
 import { AiOverlays, CloseDialogs, SidebarContent, WorkspaceArea } from "@/app/components";
+import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
 
 // ─── Stable store actions threaded down from App ─────────────────────────────
 export interface AppShellStoreActions {
@@ -74,6 +75,12 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
   const activeId = useTabsStore((s) => s.activeId);
   const activeTabKind = useTabsStore(selectActiveTabKind);
 
+  const onNewGitGraph = () => {
+    const { repoRoot, currentBranch } = useSourceControlStore.getState();
+    const path = repoRoot ?? ctrl.explorerRoot ?? "";
+    tabs.openGitGraphTab(path, currentBranch);
+  };
+
   const sidebarPassthrough = {
     sidebarRef: sidebar.sidebarRef,
     activePanel: sidebar.activePanel,
@@ -99,6 +106,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onAttachToAgent: ai.handleAttachFileToAgent,
     onSnippetRun: tabs.handleSnippetRun,
     onOpenGitGraph: tabs.openGitGraphTab,
+    onNewGitGraph,
   };
 
   const shell = (
@@ -125,6 +133,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onOpenKeybindings={() => void openSettingsWindow("shortcuts")}
                 onOpenHostManager={tabs.onOpenHostManager}
                 onOpenThemes={() => useCommandStore.getState().openToPage("themes")}
+                onNewGitGraph={onNewGitGraph}
               />
             )}
 

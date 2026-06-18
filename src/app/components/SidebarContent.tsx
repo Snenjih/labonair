@@ -39,6 +39,7 @@ export interface SidebarContentProps {
   onSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
   // Source control
   onOpenGitGraph: (repoPath: string, branch: string) => void;
+  onNewGitGraph?: () => void;
 }
 
 export function SidebarContent({
@@ -66,6 +67,7 @@ export function SidebarContent({
   onAttachToAgent,
   onSnippetRun,
   onOpenGitGraph,
+  onNewGitGraph,
 }: SidebarContentProps) {
   return (
     <ResizablePanel
@@ -97,6 +99,7 @@ export function SidebarContent({
             onCloseOthers={onCloseOthers}
             onCloseAll={onCloseAll}
             onDuplicate={onDuplicate}
+            onNewGitGraph={onNewGitGraph}
           />
         ) : activePanel === "snippets" ? (
           <SnippetsPanel onRun={onSnippetRun} />

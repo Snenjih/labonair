@@ -119,6 +119,7 @@ interface NewTabDropdownItemsProps {
   onNewSsh: (hostId: string, title: string) => void;
   onNewSftp: (hostId: string, title: string) => void;
   onOpenHostManager: () => void;
+  onNewGitGraph?: () => void;
 }
 
 export function NewTabDropdownItems({
@@ -128,6 +129,7 @@ export function NewTabDropdownItems({
   onNewSsh,
   onNewSftp,
   onOpenHostManager,
+  onNewGitGraph,
 }: NewTabDropdownItemsProps) {
   const recentHosts = useRecentHosts();
   return (
@@ -147,6 +149,12 @@ export function NewTabDropdownItems({
         <span className="flex-1">Preview</span>
         <span className="text-xs text-muted-foreground">⌘P</span>
       </DropdownMenuItem>
+      {onNewGitGraph && (
+        <DropdownMenuItem onSelect={onNewGitGraph}>
+          <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} />
+          <span className="flex-1">Git Graph</span>
+        </DropdownMenuItem>
+      )}
       <DropdownMenuSeparator />
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>

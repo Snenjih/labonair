@@ -30,6 +30,7 @@ type Props = {
   onCloseOthers: (id: number) => void;
   onCloseAll: () => void;
   onDuplicate: (id: number) => void;
+  onNewGitGraph?: () => void;
 };
 
 export function SidebarTabList({
@@ -44,6 +45,7 @@ export function SidebarTabList({
   onCloseOthers,
   onCloseAll,
   onDuplicate,
+  onNewGitGraph,
 }: Props) {
   const tabs = useTabsStore((s) => s.tabs);
   const activeId = useTabsStore((s) => s.activeId);
@@ -156,6 +158,7 @@ export function SidebarTabList({
               onNewSsh={onNewSsh}
               onNewSftp={onNewSftp}
               onOpenHostManager={onOpenHostManager}
+              onNewGitGraph={onNewGitGraph}
             />
           </DropdownMenuContent>
         </DropdownMenu>
