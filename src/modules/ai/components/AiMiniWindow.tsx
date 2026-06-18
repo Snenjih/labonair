@@ -343,7 +343,7 @@ function ContextIndicator({ messages }: { messages: UIMessage[] }) {
           {hasRealTokens && tokens.cacheReadTokens > 0 && (
             <div className="flex items-center justify-between text-muted-foreground">
               <span>Cache read</span>
-              <span className="font-mono text-green-500">{formatTokens(tokens.cacheReadTokens)}</span>
+              <span className="font-mono text-success">{formatTokens(tokens.cacheReadTokens)}</span>
             </div>
           )}
           {hasRealTokens && tokens.reasoningTokens > 0 && (
@@ -357,7 +357,7 @@ function ContextIndicator({ messages }: { messages: UIMessage[] }) {
             <span className="font-mono text-foreground">{formatTokens(max)}</span>
           </div>
           {compactionNotice && (
-            <div className="mt-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-500">
+            <div className="mt-1 rounded bg-warning/10 px-1.5 py-0.5 text-[10px] text-warning">
               Context compacted — {compactionNotice.droppedCount} old tool results elided
             </div>
           )}

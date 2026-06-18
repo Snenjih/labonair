@@ -8,12 +8,12 @@ type ThemeThumbnailProps = {
 export function ThemeThumbnail({ colors, className }: ThemeThumbnailProps) {
   const hasColors = Object.keys(colors).length > 0;
 
-  const bg = hasColors ? (colors["background"] ?? "#0f111a") : "var(--background)";
+  const bg = hasColors ? (colors["background"] ?? "var(--background, #0f111a)") : "var(--background)";
   const sidebar = hasColors
-    ? (colors["sidebar"] ?? colors["secondary"] ?? colors["muted"] ?? "#1e2130")
+    ? (colors["sidebar"] ?? colors["secondary"] ?? colors["muted"] ?? "var(--sidebar, var(--secondary, #1e2130))")
     : "var(--sidebar, var(--secondary))";
-  const primary = hasColors ? (colors["primary"] ?? "#6366f1") : "var(--primary)";
-  const border = hasColors ? (colors["border"] ?? "#252836") : "var(--border)";
+  const primary = hasColors ? (colors["primary"] ?? "var(--primary, #6366f1)") : "var(--primary)";
+  const border = hasColors ? (colors["border"] ?? "var(--border, #252836)") : "var(--border)";
 
   return (
     <div

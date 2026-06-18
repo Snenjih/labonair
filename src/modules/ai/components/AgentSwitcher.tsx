@@ -59,7 +59,7 @@ export function AgentSwitcher({ isMiniWindow }: { isMiniWindow?: boolean }) {
           )}
           title={`Agent: ${active.name}`}
         >
-          <HugeiconsIcon icon={ActiveIcon} size={11} strokeWidth={1.75} />
+          <HugeiconsIcon icon={ActiveIcon} size={12} strokeWidth={1.75} />
           <span className="max-w-[7rem] truncate">{active.name}</span>
           <HugeiconsIcon
             icon={ArrowDown01Icon}
