@@ -39,7 +39,7 @@ Before working on any area, read the relevant context file:
 - **Command Palette** → [`docs/memory/command_palette_context.md`](./docs/memory/command_palette_context.md) — How to add commands, sub-menus, callbacks, reactive labels; full file map & gotchas
 
 ## Pull Requests
-Read `.github/PULL_REQUEST_TEMPLATE.md` and create PRs using that template via the `gh` command.
+Read `.github/PULL_REQUEST_TEMPLATE.md` and create PRs using that template via the `gh` command. - Add accurat testing infos including expected behavior, edge cases, and regression tests for the changed features.
 
 ### PR Creation Workflow (automatic)
 When asked to create a PR for current changes, always follow this sequence without asking:
