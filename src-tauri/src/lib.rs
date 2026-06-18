@@ -615,6 +615,7 @@ pub fn run() {
             git::git_create_tag,
             git::git_delete_tag,
             git::git_push_tag,
+            git::git_get_diff_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -101,7 +101,17 @@ export type GitGraphTab = {
   initialBranch: string;
 };
 
-export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | GitGraphTab;
+export type GitDiffTab = {
+  id: number;
+  kind: "git-diff";
+  title: string;
+  repoRoot: string;
+  filePath: string;
+  staged: boolean;
+  section: "staged" | "unstaged" | "untracked";
+};
+
+export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | GitGraphTab | GitDiffTab;
 
 export type TabPatch = Partial<{
   title: string;

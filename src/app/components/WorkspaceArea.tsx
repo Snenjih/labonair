@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { AiInputBar } from "@/modules/ai";
 import { AiInputBarConnect } from "@/modules/ai/components/AiInputBar";
-import { AiDiffStack, EditorStack } from "@/modules/editor";
+import { AiDiffStack, EditorStack, GitDiffStack } from "@/modules/editor";
 import type { EditorPaneHandle } from "@/modules/editor";
 import { HomeDashboard } from "@/modules/hosts";
 import { PreviewStack } from "@/modules/preview";
@@ -70,6 +70,7 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
   const isAiDiffTab = activeTabKind === "ai-diff";
   const isHomeTab = activeTabKind === "home";
   const isGitGraphTab = activeTabKind === "git-graph";
+  const isGitDiffTab = activeTabKind === "git-diff";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -143,6 +144,15 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           aria-hidden={!isGitGraphTab}
         >
           <GitGraphStack onOpenFile={onOpenGitGraphFile} />
+        </div>
+        <div
+          className={cn(
+            "absolute inset-0 px-3 pt-2 pb-2",
+            isGitDiffTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
+          )}
+          aria-hidden={!isGitDiffTab}
+        >
+          <GitDiffStack />
         </div>
       </div>
 

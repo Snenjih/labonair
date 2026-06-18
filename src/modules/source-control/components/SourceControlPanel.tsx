@@ -2,11 +2,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { useGitStatus } from "../lib/useGitStatus";
 import { BranchBar } from "./BranchBar";
-import { FileChangeList } from "./FileChangeList";
 import { CommitForm } from "./CommitForm";
-import { DiffViewer } from "./DiffViewer";
 import { NoRepoState } from "./NoRepoState";
-import { StashPanel } from "./StashPanel";
+import { TrackedSection } from "./TrackedSection";
+import { UntrackedSection } from "./UntrackedSection";
 
 interface SourceControlPanelProps {
   rootPath: string | null;
@@ -19,15 +18,12 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
   const isRepo = useSourceControlStore((s) => s.isRepo);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
   const status = useSourceControlStore((s) => s.status);
-  const selectAll = useSourceControlStore((s) => s.selectAll);
-  const clearSelectedFile = useSourceControlStore((s) => s.clearSelectedFile);
-  const selectionMode = useSourceControlStore((s) => s.selectionMode);
 
   const stagedCount = status?.staged.length ?? 0;
   const unstagedCount = status?.unstaged.length ?? 0;
   const untrackedCount = status?.untracked.length ?? 0;
-  const totalChanges = stagedCount + unstagedCount + untrackedCount;
-  const isAllSelected = selectionMode?.type === 'all';
+  const trackedCount = stagedCount + unstagedCount;
+  const totalChanges = trackedCount + untrackedCount;
 
   if (!isRepo) {
     return <NoRepoState rootPath={rootPath} onRefresh={refresh} />;
@@ -37,7 +33,7 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
     <div className="flex h-full flex-col overflow-hidden">
       <BranchBar onOpenGitGraph={onOpenGitGraph} onRefresh={refresh} />
 
-      {/* Panel header: change count + stage all */}
+      {/* Header: change count + stage all */}
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-border/50 px-3">
         <span className="text-[11px] text-muted-foreground/60">
           {totalChanges > 0 ? (
@@ -49,15 +45,6 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
             "No changes"
           )}
         </span>
-        {totalChanges > 0 && (
-          <button
-            type="button"
-            className="rounded px-2 py-0.5 text-[10px] font-medium text-muted-foreground/60 transition-colors hover:bg-accent/50 hover:text-foreground/80"
-            onClick={() => (isAllSelected ? clearSelectedFile() : selectAll())}
-          >
-            {isAllSelected ? "Deselect All" : "Stage All"}
-          </button>
-        )}
       </div>
 
       {status?.hasConflicts && (
@@ -69,25 +56,16 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
       {/* Scrollable file list */}
       <ScrollArea className="min-h-0 flex-1">
         <div className="py-1">
-          <FileChangeList
-            files={status?.staged ?? []}
-            section="staged"
+          <TrackedSection
+            staged={status?.staged ?? []}
+            unstaged={status?.unstaged ?? []}
             onRefresh={refresh}
           />
-          <FileChangeList
-            files={status?.unstaged ?? []}
-            section="unstaged"
-            onRefresh={refresh}
-          />
-          <FileChangeList
+          <UntrackedSection
             files={status?.untracked ?? []}
-            section="untracked"
             onRefresh={refresh}
           />
         </div>
-
-        {repoRoot && <StashPanel repoRoot={repoRoot} onRefresh={refresh} />}
-        <DiffViewer />
       </ScrollArea>
 
       {/* Commit form pinned at bottom */}

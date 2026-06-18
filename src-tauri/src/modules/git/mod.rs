@@ -887,3 +887,37 @@ pub async fn git_push_tag(
     let remote_str = remote.unwrap_or_else(|| "origin".to_string());
     run_git_merged(&["push", &remote_str, &name], &path)
 }
+
+// ─── Diff Stats ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDiffStat {
+    pub path: String,
+    pub added: u32,
+    pub removed: u32,
+    pub staged: bool,
+}
+
+fn parse_numstat(output: &str, staged: bool) -> Vec<FileDiffStat> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.splitn(3, '\t').collect();
+            if parts.len() < 3 { return None; }
+            let added = parts[0].parse::<u32>().unwrap_or(0);
+            let removed = parts[1].parse::<u32>().unwrap_or(0);
+            let path = parts[2].to_string();
+            Some(FileDiffStat { path, added, removed, staged })
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub async fn git_get_diff_stats(path: String) -> Result<Vec<FileDiffStat>, String> {
+    let staged_out = run_git(&["diff", "--cached", "--numstat"], &path).unwrap_or_default();
+    let unstaged_out = run_git(&["diff", "--numstat"], &path).unwrap_or_default();
+    let mut stats = parse_numstat(&staged_out, true);
+    stats.extend(parse_numstat(&unstaged_out, false));
+    Ok(stats)
+}

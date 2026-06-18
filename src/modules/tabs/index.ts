@@ -17,6 +17,7 @@ export type {
   SftpTab,
   HomeTab,
   GitGraphTab,
+  GitDiffTab,
 } from "./types";
 export { useWorkspaceCwd } from "./lib/useWorkspaceCwd";
 export { useTabManagement } from "./lib/useTabManagement";

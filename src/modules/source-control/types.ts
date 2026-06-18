@@ -52,6 +52,13 @@ export interface StashEntry {
   hash: string;
 }
 
+export interface FileDiffStat {
+  path: string;
+  added: number;
+  removed: number;
+  staged: boolean;
+}
+
 export type SelectionMode =
   | { type: 'file'; path: string; staged: boolean }
   | { type: 'section'; section: 'staged' | 'unstaged' | 'untracked' }

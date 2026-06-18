@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { GitStatus, Branch, CommitInfo, CommitResult, StashEntry } from "../types";
+import type { GitStatus, Branch, CommitInfo, CommitResult, StashEntry, FileDiffStat } from "../types";
 
 export const git = {
   isRepo: (path: string) => invoke<boolean>("git_is_repo", { path }),
@@ -59,4 +59,6 @@ export const git = {
     invoke<void>("git_delete_tag", { path, name }),
   pushTag: (path: string, name: string, remote?: string) =>
     invoke<string>("git_push_tag", { path, name, remote: remote ?? null }),
+  getDiffStats: (path: string) =>
+    invoke<FileDiffStat[]>("git_get_diff_stats", { path }),
 };

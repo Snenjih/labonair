@@ -13,6 +13,7 @@ export function useGitStatus(rootPath: string | null) {
   const setIsStatusLoading = useSourceControlStore((s) => s.setIsStatusLoading);
   const setDiffContent = useSourceControlStore((s) => s.setDiffContent);
   const setIsDiffLoading = useSourceControlStore((s) => s.setIsDiffLoading);
+  const setDiffStats = useSourceControlStore((s) => s.setDiffStats);
   const selectionMode = useSourceControlStore((s) => s.selectionMode);
   const ignoreWhitespace = useSourceControlStore((s) => s.ignoreWhitespace);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
@@ -105,7 +106,17 @@ export function useGitStatus(rootPath: string | null) {
     } catch {
       // silently ignore
     }
-  }, [rootPath, setRepoInfo, setStatus, setIsStatusLoading, setStashEntries, setBranchList, setIsBranchLoading, setTags]);
+
+    // Fetch per-file diff stats for +N/-N display
+    try {
+      const stats = await git.getDiffStats(root);
+      if (isMountedRef.current) {
+        setDiffStats(stats);
+      }
+    } catch {
+      // silently ignore
+    }
+  }, [rootPath, setRepoInfo, setStatus, setIsStatusLoading, setStashEntries, setBranchList, setIsBranchLoading, setTags, setDiffStats]);
 
   const startPolling = useCallback(() => {
     if (intervalRef.current !== null) return;

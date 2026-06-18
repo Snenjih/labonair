@@ -13,6 +13,7 @@ import {
   basename,
   titleFromUrl,
   type AiDiffStatus,
+  type GitDiffTab,
   type PaneDirection,
   type PaneNode,
   type PaneSplit,
@@ -57,6 +58,7 @@ export type TabsState = {
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
   openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
+  openGitDiffTab: (repoRoot: string, filePath: string, staged: boolean, section: "staged" | "unstaged" | "untracked") => number;
   setActivePaneId: (tabId: number, paneId: string) => void;
   updatePaneSessionCwd: (tabId: number, sessionId: string, cwd: string) => void;
   splitPane: (tabId: number, direction: PaneDirection) => void;
@@ -460,6 +462,37 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         },
         ...s.tabs,
       ],
+      activeId: id,
+      _nextId: s._nextId + 1,
+    }));
+    return id;
+  },
+
+  openGitDiffTab: (repoRoot, filePath, staged, section) => {
+    const existing = get().tabs.find(
+      (t) =>
+        t.kind === "git-diff" &&
+        t.repoRoot === repoRoot &&
+        t.filePath === filePath &&
+        t.staged === staged,
+    );
+    if (existing) {
+      set({ activeId: existing.id });
+      return existing.id;
+    }
+    const id = get()._nextId;
+    const fileName = filePath.split("/").pop() ?? filePath;
+    const tab: GitDiffTab = {
+      id,
+      kind: "git-diff",
+      title: fileName,
+      repoRoot,
+      filePath,
+      staged,
+      section,
+    };
+    set((s) => ({
+      tabs: [...s.tabs, tab],
       activeId: id,
       _nextId: s._nextId + 1,
     }));

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GitStatus, Branch, StashEntry, SelectionMode } from "../types";
+import type { GitStatus, Branch, StashEntry, SelectionMode, FileDiffStat } from "../types";
 
 function loadRecentMessages(): string[] {
   try {
@@ -38,11 +38,15 @@ export interface SourceControlState {
   // tags
   tags: string[];
 
+  // diff stats per file
+  diffStats: FileDiffStat[];
+
   // recent commit messages
   recentMessages: string[];
 
   // actions
   setRepoInfo: (isRepo: boolean, repoRoot: string | null) => void;
+  setDiffStats: (stats: FileDiffStat[]) => void;
   setStatus: (status: GitStatus | null) => void;
   setIsStatusLoading: (loading: boolean) => void;
   selectFile: (path: string, staged: boolean) => void;
@@ -99,9 +103,11 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
 
   tags: [],
 
+  diffStats: [],
   recentMessages: loadRecentMessages(),
 
   setRepoInfo: (isRepo, repoRoot) => set({ isRepo, repoRoot }),
+  setDiffStats: (diffStats) => set({ diffStats }),
   setStatus: (status) => set({ status }),
   setIsStatusLoading: (isStatusLoading) => set({ isStatusLoading }),
   selectFile: (path, staged) => set({ selectionMode: { type: 'file', path, staged } }),
