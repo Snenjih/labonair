@@ -1,0 +1,63 @@
+---
+title: "App Crashes & Logs"
+description: "How to find crash logs and diagnostic information when Nexum crashes or misbehaves."
+---
+
+# App Crashes & Logs
+
+When Nexum crashes or behaves unexpectedly, the following resources help diagnose the cause.
+
+## Crash Logs
+
+macOS stores crash reports automatically for all applications. Look for Nexum crash reports at:
+
+```
+~/Library/Logs/DiagnosticReports/
+```
+
+Filter for files matching `Nexum-*.ips`. These `.ips` files contain the full crash stack trace, OS version, and memory state at the time of the crash. Attach the relevant `.ips` file when filing a bug report.
+
+You can also view crash reports in **Console.app**:
+1. Open Console.app (Applications → Utilities → Console)
+2. Select "Crash Reports" in the left sidebar
+3. Filter for "Nexum"
+
+## Tauri / Rust Backend Logs
+
+To see Rust backend log output (Tauri events, errors from the SSH/SFTP subsystem), launch Nexum from Terminal:
+
+```bash
+open -a Nexum
+```
+
+Stderr and log output from the Rust backend will print to the Terminal session. Alternatively, filter by "Nexum" in Console.app's live log stream.
+
+## WKWebView Crash ("WebContent Process Terminated")
+
+Nexum renders its UI in a WKWebView (Apple's WebKit renderer). Occasionally the WebContent subprocess — which is a separate OS process from Nexum itself — can crash. This is a WebKit renderer crash, not a Nexum crash.
+
+**Symptoms:** The UI goes blank; the window may disappear briefly.
+
+**Nexum's behavior:** Nexum detects the WebContent process termination event and automatically attempts to show the window again. Running terminal and SSH sessions in the Rust backend are not affected.
+
+**If it happens repeatedly:** Reduce the number of open tabs. Large numbers of xterm.js instances with WebGL rendering are the most common cause of WebContent memory pressure.
+
+## Reporting Bugs
+
+File bugs at the Nexum GitHub repository. Include:
+- A description of what you were doing when the crash occurred
+- The `Nexum-*.ips` crash report file
+- macOS version (`sw_vers`)
+- Nexum version (Help menu → About Nexum)
+
+## Resetting App Data
+
+If Nexum is in a broken state that persists across restarts, resetting all app data is the nuclear option:
+
+```bash
+rm -rf ~/.local/share/com.nexum.app/
+```
+
+:::warning
+This permanently deletes all saved hosts, custom themes, settings, and keyboard shortcut customizations. There is no recovery path. Export your hosts and themes before doing this.
+:::

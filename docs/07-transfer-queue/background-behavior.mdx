@@ -1,0 +1,65 @@
+---
+title: "Background Behavior"
+description: "How Nexum's transfer worker runs independently of the UI, when transfers stop, and what happens to the queue on app quit."
+---
+
+# Background Behavior
+
+Understanding how the Transfer Queue runs in the background helps you make informed decisions about when it is safe to navigate away from the SFTP tab or close the app.
+
+## The Worker Is Independent of the UI
+
+Transfers are enqueued via the `enqueue_transfer` IPC command and processed by a dedicated Rust background worker. This worker runs as a Tokio task inside the Tauri process — it has no dependency on any React component, tab, or view being mounted or visible.
+
+Practical implications:
+
+- **Closing the SFTP tab** does not interrupt or pause any active transfer
+- **Switching to a terminal tab, editor, or home screen** has no effect on transfers
+- **Opening new SSH sessions** or SFTP connections to other hosts does not interfere with running transfers
+- **Minimizing the app window** does not pause or slow transfers
+
+The only interface between the worker and the UI is the `transfer_progress` Tauri event stream. The worker emits these events regardless of whether the Transfer Queue panel is open or any component is subscribed to them.
+
+## When Transfers Stop
+
+A transfer stops under the following conditions:
+
+| Condition | Effect |
+|---|---|
+| User clicks Cancel | Transfer stops immediately at the next chunk boundary |
+| SSH connection drops | Transfer fails with a connection error; remaining queue items also fail |
+| App is quit | All active transfers are terminated immediately |
+| Transfer completes successfully | Worker moves to the next item in the queue |
+| Transfer hits a file conflict | Worker pauses and waits for `resolve_conflict` IPC response |
+
+## Queue Persistence
+
+The Transfer Queue is **not persisted to disk**. If Nexum is quit while transfers are active or pending, the queue is lost entirely. On next launch, the queue starts empty.
+
+There is no automatic resume functionality. Transfers that were interrupted by an app quit must be re-initiated manually.
+
+## Event Flow Summary
+
+```
+Frontend                     Rust Worker
+─────────                    ───────────
+enqueue_transfer()  ──────►  mpsc channel receiver
+                             │
+                             ▼
+                          SFTP transfer loop
+                             │
+                  ◄──────    transfer_progress events
+                             │
+                             ▼
+                          Next queue item
+```
+
+The frontend is a passive observer of transfer state. It can cancel a transfer (writing to a cancellation flag the worker checks), but otherwise the worker drives its own lifecycle.
+
+:::tip
+You can safely close the SFTP tab once you have started a large transfer. The transfer continues in the background and you will see progress in the titlebar indicator at all times.
+:::
+
+:::warning
+Do not quit Nexum while critical transfers are in progress. The queue is not persisted and there is no resume functionality — any interrupted transfer must be restarted from the beginning.
+:::

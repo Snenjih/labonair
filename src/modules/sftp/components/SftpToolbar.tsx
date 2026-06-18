@@ -5,6 +5,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Bookmark02Icon, Cancel01Icon, EyeIcon, ArrowUp01Icon, Refresh01Icon, TerminalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -72,18 +73,16 @@ export function SftpToolbar({
   return (
     <div className="h-9 bg-card border-b border-border px-1.5 flex items-center gap-1 shrink-0">
       {/* Up directory */}
-      <button
+      <Button
+        variant="ghost"
+        size="icon-xs"
         onClick={() => onNavigate(parentPath(path))}
-        className={cn(
-          "h-6 w-6 flex items-center justify-center rounded text-muted-foreground",
-          "hover:bg-muted/40 hover:text-foreground transition-colors duration-75",
-          "shrink-0",
-        )}
         title="Go up"
         tabIndex={-1}
+        className="shrink-0 text-muted-foreground hover:text-foreground"
       >
-        <HugeiconsIcon icon={ArrowUp01Icon} size={16} />
-      </button>
+        <HugeiconsIcon icon={ArrowUp01Icon} size={13} />
+      </Button>
 
       {/* Path input */}
       <input
@@ -110,7 +109,7 @@ export function SftpToolbar({
           "flex-1 h-6 min-w-0 px-2 rounded text-xs font-mono",
           "bg-muted/20 border border-transparent text-foreground",
           "placeholder:text-muted-foreground/40",
-          "focus:outline-none focus:bg-background focus:border-border",
+          "focus:outline-none focus:bg-background focus:border-border focus:ring-1 focus:ring-ring/30",
           "transition-colors duration-100",
         )}
       />
@@ -127,7 +126,7 @@ export function SftpToolbar({
             "w-36 h-6 px-2 rounded text-xs",
             "bg-muted/20 border border-border text-foreground",
             "placeholder:text-muted-foreground/40",
-            "focus:outline-none focus:bg-background focus:border-primary",
+            "focus:outline-none focus:bg-background focus:border-primary focus:ring-1 focus:ring-ring/30",
             "transition-colors duration-100",
           )}
         />
@@ -135,7 +134,9 @@ export function SftpToolbar({
 
       {/* Search toggle (remote pane only) */}
       {onDeepSearch && (
-        <button
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={() => {
             if (searchVisible) {
               setSearchValue("");
@@ -145,38 +146,41 @@ export function SftpToolbar({
               setSearchVisible(true);
             }
           }}
-          className={cn(
-            "h-6 w-6 flex items-center justify-center rounded transition-colors duration-75 shrink-0",
-            searchVisible
-              ? "text-primary bg-primary/10 hover:bg-primary/20"
-              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-          )}
           title="Search files"
           tabIndex={-1}
+          aria-pressed={searchVisible}
+          className={cn(
+            "shrink-0 transition-colors duration-75",
+            searchVisible
+              ? "text-primary bg-primary/10 hover:bg-primary/20"
+              : "text-muted-foreground hover:text-foreground",
+          )}
         >
-          <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.3" />
             <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
           </svg>
-        </button>
+        </Button>
       )}
 
       {/* Bookmarks dropdown */}
       {bookmarkKey && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              className={cn(
-                "h-6 w-6 flex items-center justify-center rounded transition-colors duration-75 shrink-0",
-                bookmarks.length > 0
-                  ? "text-primary hover:bg-primary/10"
-                  : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-              )}
+            <Button
+              variant="ghost"
+              size="icon-xs"
               title="Bookmarks"
               tabIndex={-1}
+              className={cn(
+                "shrink-0 transition-colors duration-75",
+                bookmarks.length > 0
+                  ? "text-primary hover:bg-primary/10"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
             >
-              <HugeiconsIcon icon={Bookmark02Icon} size={15} />
-            </button>
+              <HugeiconsIcon icon={Bookmark02Icon} size={13} />
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-72 max-h-64 overflow-y-auto">
             {bookmarks.length === 0 ? (
@@ -190,16 +194,18 @@ export function SftpToolbar({
                     onClick={() => onNavigate(bm)}
                   >
                     <span className="flex-1 truncate text-xs font-mono">{bm}</span>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
                       onClick={(e) => {
                         e.stopPropagation();
                         void removeBookmark(bookmarkKey, bm);
                       }}
-                      className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                      className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
                       title="Remove bookmark"
                     >
-                      <HugeiconsIcon icon={Cancel01Icon} size={13} />
-                    </button>
+                      <HugeiconsIcon icon={Cancel01Icon} size={12} />
+                    </Button>
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
@@ -213,52 +219,50 @@ export function SftpToolbar({
       )}
 
       {/* Refresh */}
-      <button
+      <Button
+        variant="ghost"
+        size="icon-xs"
         onClick={() => onNavigate(path)}
-        className={cn(
-          "h-6 w-6 flex items-center justify-center rounded text-muted-foreground",
-          "hover:bg-muted/40 hover:text-foreground transition-colors duration-75",
-          "shrink-0",
-        )}
         title="Refresh"
         tabIndex={-1}
+        className="shrink-0 text-muted-foreground hover:text-foreground"
       >
-        <HugeiconsIcon icon={Refresh01Icon} size={16} />
-      </button>
+        <HugeiconsIcon icon={Refresh01Icon} size={13} />
+      </Button>
 
       {/* Toggle hidden files */}
       {onToggleHidden && (
-        <button
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={onToggleHidden}
-          className={cn(
-            "h-6 w-6 flex items-center justify-center rounded transition-colors duration-75",
-            "shrink-0",
-            showHidden
-              ? "text-primary bg-primary/10 hover:bg-primary/20"
-              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-          )}
           title={showHidden ? "Hide hidden files" : "Show hidden files"}
           tabIndex={-1}
+          aria-pressed={showHidden}
+          className={cn(
+            "shrink-0 transition-colors duration-75",
+            showHidden
+              ? "text-primary bg-primary/10 hover:bg-primary/20"
+              : "text-muted-foreground hover:text-foreground",
+          )}
         >
-          <HugeiconsIcon icon={EyeIcon} size={16} />
-        </button>
+          <HugeiconsIcon icon={EyeIcon} size={13} />
+        </Button>
       )}
 
       {/* Open Terminal (remote pane only) */}
       {showOpenTerminal && (
-        <button
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={onOpenTerminal}
-          className={cn(
-            "h-6 px-2 flex items-center gap-1 rounded text-muted-foreground",
-            "hover:bg-muted/40 hover:text-foreground transition-colors duration-75",
-            "text-[10px] font-medium shrink-0",
-          )}
           title="Open terminal here"
           tabIndex={-1}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
         >
-          <HugeiconsIcon icon={TerminalIcon} size={14} />
+          <HugeiconsIcon icon={TerminalIcon} size={13} />
           <span>Term</span>
-        </button>
+        </Button>
       )}
     </div>
   );

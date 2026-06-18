@@ -1,0 +1,58 @@
+---
+title: "Conflict Resolution"
+description: "How Nexum handles file name conflicts during transfers, and the options available to resolve them."
+---
+
+# Conflict Resolution
+
+When a transfer destination already contains a file with the same name as an incoming file, Nexum pauses the transfer and presents a conflict resolution dialog. This prevents accidental overwrites and gives you control over how each conflict is handled.
+
+## When Conflicts Occur
+
+Conflicts can arise during:
+
+- **Uploads** — a file you are uploading has the same name as an existing file on the remote server
+- **Downloads** — a file you are downloading has the same name as an existing file in the local destination directory
+- **Folder transfers** — any file within a recursively transferred folder matches an existing file at the destination
+
+## The Conflict Dialog
+
+When a conflict is detected, the active transfer pauses and a modal dialog appears. The dialog shows:
+
+- The conflicting filename
+- The **existing file**: size and last-modified date
+- The **incoming file**: size and last-modified date
+
+This lets you compare both files before deciding how to proceed.
+
+## Resolution Options
+
+### Overwrite
+
+Replaces the existing file at the destination with the incoming file. The existing file is permanently removed.
+
+### Skip
+
+Leaves the existing file untouched and skips the incoming file. The transfer continues with the next item in the queue.
+
+### Rename
+
+Renames the incoming file before writing it to the destination. Nexum appends a suffix automatically (e.g., `report_copy.pdf`, or `report_2.pdf` if `report_copy.pdf` already exists). The original file at the destination is not affected.
+
+## Apply to All Conflicts
+
+The dialog includes an **"Apply to all conflicts in this transfer"** checkbox. When checked, the chosen resolution (overwrite, skip, or rename) is automatically applied to every subsequent conflict in the same transfer batch — no further dialogs appear.
+
+Leave the checkbox unchecked if you want to review each conflict individually.
+
+## How It Works Internally
+
+The Rust backend emits a `file_conflict` Tauri event when it encounters a naming collision during a transfer. The React UI receives this event, pauses rendering the transfer as in-progress, and shows the conflict modal. When you select a resolution, the frontend calls the `resolve_conflict` IPC command with the chosen action. The Rust worker receives the response and resumes the transfer accordingly.
+
+:::tip
+For bulk transfers where you are intentionally overwriting a remote directory (e.g., deploying updated files), check "Apply to all conflicts" and choose Overwrite. This completes the entire transfer without interruption.
+:::
+
+:::warning
+Choosing Overwrite is irreversible on the remote side — there is no undo. If you are unsure whether the remote copy has changes you want to keep, choose Rename or Skip and compare the files manually first.
+:::

@@ -1,0 +1,47 @@
+---
+title: "Setting Up an API Key"
+description: "How to add, manage, and remove your OpenAI API key in Nexum — stored securely in the macOS Keychain."
+---
+
+# Setting Up an API Key
+
+Nexum uses a Bring Your Own Key (BYOK) model. Before the AI assistant can respond, you need to supply an API key from OpenAI or a compatible provider. The key is stored exclusively in the **macOS Keychain** — never on disk, never in a settings file, never in plain text.
+
+## Adding Your Key
+
+There are two entry points:
+
+**Option A — Settings**
+1. Open Settings with `Cmd+,`
+2. Navigate to **Models & Agents**
+3. Paste your API key into the key field and press Enter or click Save
+
+**Option B — AI Panel**
+1. Open the AI panel (`Cmd+Shift+A`)
+2. Click the key icon in the panel header
+3. Enter your key in the dialog that appears and confirm
+
+Both paths store the key to the same Keychain entry (service name: `nexum-ai`). You only need to enter it once.
+
+## Key Validation
+
+The key is validated immediately on entry. If the key is malformed or rejected by the provider, Nexum displays an inline error — the key is not saved until validation succeeds. A green checkmark confirms a valid key is active.
+
+## Removing Your Key
+
+- **From Settings**: open Settings → Models & Agents → click the remove/trash icon next to the key field
+- **From Keychain**: open **Keychain Access** on your Mac, search for `nexum-ai`, and delete the entry manually
+
+After removal, the AI panel shows the key entry dialog again on next use.
+
+## Key Scope
+
+Your API key grants access to all models available on your OpenAI account (or compatible provider account). Model selection is handled separately — see [Choosing a Model](./choosing-a-model).
+
+:::warning
+Never share your API key. Nexum stores it securely in the macOS Keychain, but anyone with physical or remote access to your Mac could potentially use it. If you suspect your key has been compromised, revoke it immediately from your OpenAI account dashboard and add a new one.
+:::
+
+:::tip
+If you are using an OpenAI-compatible provider (such as Ollama running locally or a Groq endpoint), you set the custom base URL in the same Settings screen. The key field accepts any bearer token that the provider expects — it does not need to be an `sk-` prefixed OpenAI key.
+:::

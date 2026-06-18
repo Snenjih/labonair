@@ -1,0 +1,56 @@
+---
+title: "About & Updates"
+description: "Reference for the Nexum About panel: version info, update checks, licenses, and factory reset."
+---
+
+# About & Updates
+
+The About section provides version information, update management, legal notices, and the option to reset all settings to factory defaults. Open via **Settings (`Cmd+,`) → About**.
+
+## Version Information
+
+| Field | Description |
+|---|---|
+| **Version** | The current Nexum release version (e.g., `1.6.6`) |
+| **Build** | Build date and the short Git commit hash for this release |
+
+If you are filing a bug report, include both the Version and Build fields so the team can identify exactly which build you are running.
+
+## Checking for Updates
+
+Nexum automatically checks for updates on launch. You can also trigger a manual check at any time:
+
+- Click **Check for Updates** in the About panel.
+- Nexum contacts the update server and compares the current version against the latest release.
+- If an update is available, a prompt appears with the release notes and an option to download and install.
+- If you are already on the latest version, a confirmation message is shown.
+
+:::tip
+Updates are delivered as delta patches where possible — you download only what changed, not the full application bundle. This keeps update downloads small.
+:::
+
+## Changelog
+
+Click **View Changelog** to read the release notes for all Nexum versions. This opens either the in-app changelog view or the GitHub Releases page, depending on how Nexum was distributed.
+
+Reading the changelog before a major update is recommended — new releases may add settings, change defaults, or deprecate features.
+
+## Licenses
+
+Click **Licenses** to view the open-source third-party licenses for all libraries bundled in Nexum. This is required for compliance with MIT, Apache 2.0, and other open-source licenses used by Nexum's dependencies.
+
+## Reset All Settings
+
+Click **Reset All Settings** to restore every preference in Nexum to its factory default values.
+
+:::warning
+**Reset All Settings does NOT delete:**
+- Your saved hosts and host groups (stored in SQLite)
+- Installed custom themes
+- SSH keys or passwords (stored in macOS Keychain)
+- AI session history
+
+It DOES reset: all appearance preferences, terminal settings, editor settings, file manager settings, AI configuration (API key is cleared from Keychain), and all custom keyboard shortcuts.
+:::
+
+A confirmation dialog is shown before the reset is applied. After reset, Nexum restarts automatically to apply the defaults.

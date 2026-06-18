@@ -1,0 +1,58 @@
+---
+title: "First Launch"
+description: "A step-by-step walkthrough for setting up your first SSH connection after installing Nexum."
+---
+
+# First Launch
+
+When you open Nexum for the first time, the app launches directly into the **Home Dashboard** — the central hub for managing all of your SSH and SFTP connections. The host list is empty, and a large "+" button invites you to add your first host.
+
+This page walks you through creating your first connection and getting oriented in the interface.
+
+## Step 1: Create a Host
+
+Click the **"+"** button in the Host Manager to open the **Host Form Panel**. Fill in the connection details:
+
+- **Display Name** — A label for the connection (e.g., "Production Web Server").
+- **Hostname / IP** — The address of the remote server.
+- **Port** — Defaults to `22`; change this only if your server uses a non-standard SSH port.
+- **Username** — Your login username on the remote server.
+- **Authentication Method** — Choose from:
+  - **Password** — Enter the password; it is stored securely in the macOS Keychain, never on disk.
+  - **SSH Key** — Select a private key file from your filesystem (e.g., `~/.ssh/id_ed25519`).
+  - **SSH Agent** — Forward authentication to a running SSH agent.
+
+Click **Save** to add the host to your list.
+
+## Step 2: Connect
+
+With your host saved, click it in the Home Dashboard list, then choose **Connect SSH** or **Open SFTP** from the action buttons.
+
+- **Connect SSH** opens a new tab with a full interactive SSH terminal session.
+- **Open SFTP** opens a split-pane SFTP file manager tab showing your local filesystem on the left and the remote filesystem on the right.
+
+If this is your first connection to that host, Nexum will show a **known-hosts verification** dialog with the server's fingerprint. Verify the fingerprint matches what your server administrator provided, then click **Trust & Connect**.
+
+## Step 3: Explore the Interface
+
+Once connected, take a moment to get oriented:
+
+- The **Tab Bar** at the top shows your open tabs. The SSH terminal tab you just opened appears here.
+- The **Sidebar** on the left shows your local file explorer (toggle with `Cmd+B`).
+- The **Status Bar** at the bottom shows the current working directory, connection info, and AI status.
+- The **Command Palette** (`Cmd+K`) gives you instant keyboard access to every feature in the app — connecting to hosts, opening new tabs, running commands, and more.
+
+:::tip
+Use `Cmd+K` to open the Command Palette and type any host name. Nexum will let you connect to it directly without navigating back to the Home Dashboard.
+:::
+
+## What to Try Next
+
+- Open a second SSH tab to the same or a different host with `Cmd+T`.
+- Browse and transfer files by opening an **SFTP tab** for your host.
+- Press `Cmd+,` to open **Settings** and configure your theme, fonts, and AI API key.
+- Press `Cmd+Shift+A` to open the **AI Panel** and start a conversation.
+
+:::warning
+If a connection fails immediately with "No route to host," check that your Mac's firewall or VPN is not blocking outbound connections on port 22. On macOS 12–14, certain local network routing issues can also affect SSH — see the macOS TCP troubleshooting guide for details.
+:::

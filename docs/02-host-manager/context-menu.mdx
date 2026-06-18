@@ -1,0 +1,47 @@
+---
+title: "Context Menu"
+description: "Right-click any host card in the Home Dashboard to access connection and management actions."
+---
+
+# Context Menu
+
+The context menu is the fastest way to act on a specific host without opening any additional panels. It is available on every host card in the Home Dashboard.
+
+## Opening the Context Menu
+
+- **Right-click** any host card to open the context menu at the cursor position.
+- On touch-capable trackpads, a **long-press** also triggers the context menu.
+
+## Available Actions
+
+### Connect SSH
+
+Opens a new `ssh-terminal` tab and initiates an SSH connection to the host. This is the same action as double-clicking the host card.
+
+### Open SFTP
+
+Opens a new `sftp` tab showing the remote filesystem for that host. Useful when you need to browse files without opening an interactive shell.
+
+### Edit
+
+Opens the slide-out form drawer pre-populated with the host's current configuration. Equivalent to hovering over the card and clicking the pencil icon.
+
+### Duplicate
+
+Creates a new host with all the same settings as the original — same hostname, port, username, and auth method. The display name is suffixed with " (Copy)" to distinguish it. The duplicate opens immediately in the edit form so you can customize it before saving.
+
+:::tip
+**Duplicate** is ideal for servers that share a common configuration but differ only in hostname or username — for example, multiple nodes in a cluster.
+:::
+
+### Copy Hostname
+
+Copies the host's IP address or domain name to the system clipboard. Useful for pasting into a terminal command or a browser address bar.
+
+### Delete
+
+Opens a confirmation dialog before permanently removing the host and its associated Keychain entry. See [Editing & Deleting Hosts](./editing-deleting-hosts) for details.
+
+## Context Menu on Multiple Selected Hosts
+
+If you have multiple hosts selected (via `Cmd+Click` or `Shift+Click`) and right-click one of them, the context menu shows only the actions applicable to a group selection: **Move to Group** and **Delete**. Single-host actions like Edit and Duplicate are hidden in this mode.

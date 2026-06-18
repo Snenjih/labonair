@@ -1,0 +1,48 @@
+---
+title: "Editor Settings"
+description: "Configure auto-save, line numbers, word wrap, tab size, and bracket matching in the Nexum code editor."
+---
+
+# Editor Settings
+
+All editor preferences live in **Settings** (`Cmd+,`) under the **Editor** section. Changes apply to all open editor tabs immediately — there is no per-file override system.
+
+## Auto-Save
+
+Controls when the editor writes unsaved changes to disk.
+
+| Mode | Behavior |
+|---|---|
+| **Off** | Changes are only saved when you press `Cmd+S` manually. |
+| **After Delay** | Nexum saves 1 second after your last keystroke. Ideal for most workflows. |
+| **On Focus Change** | Saves whenever the editor tab loses focus (you switch tabs, switch apps, etc.). |
+
+:::tip
+**After Delay** is the recommended default. It gives you a brief window to undo a mistake before the save fires, while still protecting against accidental data loss.
+:::
+
+## Line Numbers
+
+Toggle the line number gutter on or off. Hiding line numbers gives you a few extra pixels of horizontal space — useful on smaller displays or when reviewing prose/Markdown files.
+
+## Word Wrap
+
+When enabled, lines longer than the visible editor width wrap onto the next visual line instead of requiring horizontal scrolling. The file content itself is not changed — no newline characters are inserted.
+
+You can toggle word wrap quickly without opening Settings: press `Cmd+K`, search **"Toggle: Editor Word Wrap"**, and select it. The toggle takes effect immediately and persists for the session.
+
+## Tab Size
+
+Choose how many spaces a tab character is rendered as. Options: **2**, **4**, or **8** spaces. This is a display-only setting — it does not convert tabs to spaces or vice versa in the file.
+
+## Bracket Matching
+
+When the cursor is adjacent to a bracket, parenthesis, or brace, Nexum highlights the matching counterpart. This helps navigate nested structures in code. Disable it if you find the highlight distracting.
+
+## Settings scope
+
+Editor settings are global — they apply to every editor tab, including remote file editing tabs. Per-project or per-language overrides are not currently supported.
+
+:::warning
+Auto-Save does not apply to remote file tabs — those require an active SFTP connection to upload. Pressing `Cmd+S` on a remote file always triggers an explicit upload regardless of the Auto-Save setting.
+:::

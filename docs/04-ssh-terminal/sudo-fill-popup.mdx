@@ -1,0 +1,53 @@
+---
+title: "Sudo Fill Popup"
+description: "How Nexum detects sudo password prompts and offers to fill your saved host password automatically."
+---
+
+# Sudo Fill Popup
+
+Running `sudo` commands is a routine part of server administration. Nexum includes a small quality-of-life feature that detects `sudo` password prompts and offers to fill in your saved host credentials — without storing passwords in any insecure location.
+
+## How it works
+
+Nexum monitors the terminal output stream for patterns that match common `sudo` password prompts, such as:
+
+```
+[sudo] password for alice:
+Password:
+```
+
+When a matching pattern is detected, a small **Sudo Fill popup** appears just above the terminal input area. The popup shows:
+
+- The name of the host
+- A **Fill Password** button
+
+Clicking **Fill Password** sends the host's saved password (retrieved from the macOS Keychain) directly to the SSH PTY, exactly as if you had typed it. The password is never written to a file, never placed in the clipboard, and never logged.
+
+You can dismiss the popup at any time and type the password manually instead.
+
+:::tip
+The popup appears only when a prompt pattern is detected. It will not appear for standard command output that happens to contain the word "password".
+:::
+
+## Security model
+
+Nexum never auto-submits the password. The sequence is always:
+
+1. Prompt detected → popup appears
+2. You click **Fill Password** (explicit user action)
+3. Password sent to PTY
+
+This ensures you remain in control. There is no background auto-fill that could send credentials at an unexpected moment.
+
+:::warning
+The Sudo Fill feature works only for hosts with a saved password in the macOS Keychain. If you authenticated with a public key and no password is stored for the host, the popup will not appear.
+:::
+
+## Manual password entry
+
+If you prefer to type your password manually, simply dismiss the popup by clicking the **X** button or pressing `Escape`. The prompt remains active in the terminal and you can type freely.
+
+## Limitations
+
+- The feature detects the most common `sudo` prompt patterns. Custom PAM prompts with non-standard wording may not trigger the popup.
+- The popup is a convenience helper — it does not bypass `sudo` security or modify `sudoers` configuration in any way.

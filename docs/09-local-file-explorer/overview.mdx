@@ -1,0 +1,37 @@
+---
+title: "Local File Explorer Overview"
+description: "An introduction to the Nexum sidebar file tree for browsing and opening local files."
+---
+
+# Local File Explorer Overview
+
+The Local File Explorer is a sidebar tree view that lets you browse your local filesystem without leaving Nexum. It is designed for quick navigation and file opening — not as a full-featured file manager.
+
+## Toggling the sidebar
+
+Press `Cmd+B` or click the sidebar icon in the status bar to show or hide the file explorer panel. The sidebar state (open or closed) is remembered between sessions.
+
+## File icons
+
+Every file and folder in the tree is accompanied by a Material Design icon sourced from the `material-icon-theme` package. Icons are resolved by `iconResolver.ts` using the file extension and well-known filenames (e.g., `Dockerfile`, `.eslintrc`, `package.json` each get their own distinct icon). This makes it easy to scan a directory and spot file types at a glance.
+
+## Explorer root and CWD sync
+
+The explorer does not start at a hardcoded path. Its root directory stays in sync with the **current working directory (CWD) of the active terminal tab**. This is powered by the `useWorkspaceCwd` hook, which reads from the tabs Zustand store.
+
+When you `cd` into a project folder in your terminal, the explorer updates automatically to show that folder's contents. When you switch to a different terminal tab, the explorer follows that tab's CWD. See [Explorer & Terminal Sync](./explorer-terminal-sync) for details.
+
+## What the explorer does (and does not do)
+
+| Supported | Not supported |
+|---|---|
+| Browse folders and files | Delete files |
+| Open files in editor tabs | Move or copy files |
+| Inline rename | Create new files or folders |
+| Context menu actions | Drag-and-drop |
+
+File system mutations (create, delete, move) are intentionally left to the terminal. The explorer is a read-navigate-open tool only.
+
+:::tip
+Keep your terminal and explorer side by side: use the terminal for destructive operations and the explorer for quick visual navigation and opening files for editing.
+:::

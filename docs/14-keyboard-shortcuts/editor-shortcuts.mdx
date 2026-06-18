@@ -1,0 +1,52 @@
+---
+title: "Editor Shortcuts"
+description: "Keyboard shortcuts for the CodeMirror 6 file editor in Nexum."
+---
+
+# Editor Shortcuts
+
+These shortcuts are active when an `editor` tab is focused. Nexum's editor is powered by CodeMirror 6 and supports standard macOS text editing conventions in addition to the shortcuts listed here.
+
+## Full Reference
+
+| Action | Shortcut |
+|---|---|
+| Save File | `Cmd+S` |
+| Undo | `Cmd+Z` |
+| Redo | `Cmd+Shift+Z` |
+| Find in File | `Cmd+F` |
+| Find & Replace | `Cmd+H` |
+| Go to Line | `Cmd+G` |
+| Select All | `Cmd+A` |
+| Toggle Comment | `Cmd+/` |
+| Indent | `Tab` |
+| Outdent | `Shift+Tab` |
+| Toggle Word Wrap | Command Palette → "Toggle: Editor Word Wrap" |
+
+## Saving Files
+
+`Cmd+S` saves the file. For remote files opened via the SFTP remote edit workflow, saving writes the changes back to the remote server via the `save_remote_edit` Rust command. A status indicator in the tab title shows unsaved changes.
+
+## Find and Replace
+
+`Cmd+F` opens the inline find bar at the top of the editor. `Cmd+H` opens find and replace mode. Both support regular expressions. Press `Escape` to close the find bar.
+
+## Comment Toggling
+
+`Cmd+/` toggles line comments for the current language. In multi-line selections, it applies or removes the comment prefix from every selected line. The correct comment syntax is determined by the active language mode (e.g., `//` for JavaScript, `#` for Python/YAML, `--` for SQL).
+
+## Indentation
+
+`Tab` indents the current line (or selection) by one level. `Shift+Tab` outdents. The indent character (spaces or tabs) and width are configured in Settings → Editor.
+
+## Go to Line
+
+`Cmd+G` opens a prompt where you can type a line number to jump to. Useful when a build error references a specific line.
+
+## Word Wrap
+
+Word wrap does not have a direct keyboard shortcut. Use the Command Palette (`Cmd+K` → "Toggle: Editor Word Wrap") to toggle it. The state is persisted per-session.
+
+:::tip
+`Cmd+/` works on the current line even without a selection — you do not need to select text first to toggle a comment.
+:::

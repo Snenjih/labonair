@@ -1,0 +1,60 @@
+---
+title: "Navigating the File Browser"
+description: "How to move around the local and remote panes, sort columns, filter listings, and use the path bar."
+---
+
+# Navigating the File Browser
+
+Each pane in the SFTP File Manager — local and remote — is built around the same navigation model. Once you are familiar with one side, the other behaves identically.
+
+## Path Bar
+
+At the top of each pane sits the path breadcrumb bar. It shows the current directory as a series of clickable segments. Click any segment to jump directly to that ancestor directory.
+
+You can also type a path directly: click the path bar to switch it into text-input mode, type the full absolute path, and press `Enter` to navigate there immediately. Press `Escape` to cancel without navigating.
+
+## Going Up and Down
+
+- **Enter a folder** — double-click any directory row to navigate into it
+- **Go up one level** — double-click the `..` row at the top of the listing, or click the parent segment in the breadcrumb
+- **Jump to any ancestor** — click the desired segment in the breadcrumb bar
+
+## Filter Bar
+
+Each pane has an inline text filter below the toolbar. Type any substring to instantly narrow the visible listing to matching file and folder names. The filter works entirely in memory — it does not send any additional SFTP requests to the server, so it is instantaneous regardless of directory size.
+
+Clear the filter by pressing `Escape` or deleting the text. The full listing is restored immediately.
+
+:::tip
+For directories with thousands of files, type a few characters in the filter bar to isolate the item you need before browsing. The filter is instant and requires no extra network roundtrip.
+:::
+
+## Column Headers and Sorting
+
+The listing displays four columns:
+
+| Column | Description |
+|---|---|
+| Name | File or folder name with icon |
+| Date Modified | Last modification timestamp |
+| Size | File size (human-readable) |
+| Type | File extension or kind |
+
+Click any column header to sort by that column. Click the same header again to reverse the sort direction. An arrow indicator shows the active sort column and direction.
+
+Sorting is performed in-memory and does not trigger a new directory fetch.
+
+## Refreshing
+
+The directory listing is fetched when you navigate to a folder. If the remote contents have changed since you last loaded the listing, press `Cmd+R` or click the refresh icon in the pane toolbar to re-fetch the current directory.
+
+## Starting Points
+
+- The **local pane** opens at your home directory (`~` / `/Users/<you>` on macOS)
+- The **remote pane** opens at the SSH user's home directory (as reported by the SFTP server)
+
+You can navigate both panes independently. The remote pane reflects the live state of the server at the time of the last fetch.
+
+:::warning
+On high-latency connections (e.g., servers on the other side of the world), navigating into large directories may take a moment while `sftp_read_dir` fetches the listing. A loading spinner appears in the pane toolbar during the fetch. Avoid rapid successive navigations on very slow links.
+:::

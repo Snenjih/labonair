@@ -1,0 +1,72 @@
+---
+title: "Installation"
+description: "How to install Nexum on macOS via Homebrew, DMG, or from source."
+---
+
+# Installation
+
+Nexum runs on macOS 12 (Monterey) or later and supports both Apple Silicon (M1/M2/M3) and Intel Macs. There are three ways to install it: Homebrew Cask, a manual DMG download, or building from source.
+
+## Option 1: Homebrew (Recommended)
+
+If you have [Homebrew](https://brew.sh) installed, Nexum is available as a Cask:
+
+```bash
+brew install nexum
+```
+
+Homebrew handles all future updates when you run `brew upgrade nexum`. This is the recommended path for most users.
+
+## Option 2: Manual DMG Download
+
+1. Go to the [GitHub Releases page](https://github.com/nexum-app/nexum/releases).
+2. Download the latest `.dmg` file (choose `arm64` for Apple Silicon or `x86_64` for Intel).
+3. Open the `.dmg`, then drag **Nexum.app** into your **Applications** folder.
+4. Eject the disk image.
+5. Double-click Nexum in Applications to launch.
+
+:::warning
+macOS Gatekeeper may show a "cannot be opened because the developer cannot be verified" dialog on first launch. Right-click the app icon, choose **Open**, then confirm. This is a one-time step for downloaded apps outside the App Store.
+:::
+
+## Option 3: Build from Source
+
+Building Nexum from source requires:
+
+- **Rust** (stable toolchain) — install via [rustup](https://rustup.rs)
+- **Node.js** (LTS or current)
+- **pnpm** — install with `npm install -g pnpm`
+- macOS Xcode Command Line Tools — run `xcode-select --install` if not already present
+
+Clone the repository and build:
+
+```bash
+git clone https://github.com/nexum-app/nexum.git
+cd nexum
+pnpm install
+pnpm tauri build
+```
+
+The compiled `.app` bundle will be in `src-tauri/target/release/bundle/macos/`.
+
+:::tip
+For active development, use `pnpm tauri dev` instead of `pnpm tauri build`. This starts a hot-reloading dev server for the frontend while the Rust backend recompiles on changes.
+:::
+
+## First-Launch Permissions
+
+On the very first launch, macOS will prompt for one or more permissions:
+
+- **Network access** — required for SSH/SFTP connections to remote hosts.
+- **Keychain access** — Nexum stores SSH passwords and API keys in the macOS Keychain. Accept the prompt to allow this; credentials are never stored anywhere else.
+
+Grant these permissions when asked. Nexum does not request microphone, camera, or location access.
+
+## System Requirements
+
+| Requirement | Minimum |
+|---|---|
+| macOS version | 12.0 (Monterey) |
+| Architecture | Apple Silicon or Intel x86_64 |
+| RAM | 256 MB (512 MB recommended) |
+| Disk space | ~60 MB |

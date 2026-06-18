@@ -1,0 +1,54 @@
+---
+title: "Creating a Host"
+description: "Add a new SSH or SFTP host to the Home Dashboard using the host configuration form."
+---
+
+# Creating a Host
+
+Adding a host to Nexum saves its connection details so you can connect with a single click — no need to remember hostnames, ports, or key paths.
+
+## Opening the Host Form
+
+There are two ways to open the **Add Host** form:
+
+- Click the **+** button in the top-right corner of the Home Dashboard.
+- Open the Command Palette (`Cmd+K`) and type **"Add Host"**.
+
+Either method opens a slide-out drawer on the right side of the screen containing the host configuration form.
+
+## Required Fields
+
+Fill in the following details to create a valid host entry:
+
+| Field | Description |
+|---|---|
+| **Display Name** | A friendly label shown on the host card (e.g. "Production Web Server") |
+| **Hostname / IP** | The server's domain name or IP address (e.g. `192.168.1.10` or `web.example.com`) |
+| **Port** | SSH port — defaults to `22` |
+| **Username** | The SSH login user (e.g. `ubuntu`, `root`, `deploy`) |
+
+## Authentication Method
+
+Choose how Nexum authenticates with this server:
+
+- **Password** — enter a password; it is stored securely in the macOS Keychain, never on disk.
+- **SSH Key** — provide the path to a private key file (e.g. `~/.ssh/id_ed25519`). The file stays on disk; only the passphrase (if any) is stored in Keychain.
+- **Key + Passphrase** — SSH key with an encrypted passphrase. The passphrase is stored in Keychain by the host's UUID.
+
+## Optional Fields
+
+- **Group** — assign the host to an existing group, or type a new group name to create one on the fly.
+- **Description / Notes** — free-text notes visible in the host card tooltip.
+- **Color Label** — choose a color tag for quick visual identification in the dashboard.
+
+## Saving the Host
+
+Click **Save** at the bottom of the form. The new host card appears in the Home Dashboard immediately. If you assigned a group, the card is placed inside that group's section.
+
+:::tip
+You can create a group and a host at the same time. Just type a new group name in the Group field while filling out the host form — the group is created automatically on save.
+:::
+
+:::warning
+Nexum does not generate SSH key pairs. Use `ssh-keygen` in the terminal to create keys, then point Nexum to the resulting private key file. Make sure the key file has permissions `600` (`chmod 600 ~/.ssh/id_ed25519`).
+:::

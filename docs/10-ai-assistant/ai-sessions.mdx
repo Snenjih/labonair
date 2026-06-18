@@ -1,0 +1,47 @@
+---
+title: "AI Sessions"
+description: "Organize your AI conversations into persistent named sessions — one per project, context, or workflow."
+---
+
+# AI Sessions
+
+Sessions are the top-level unit of organization for your AI conversations. Each session holds its own independent message history, model selection, and context. Sessions persist across app restarts and are stored locally — no data is synced to any server.
+
+## The Default Session
+
+When you open the AI panel for the first time, a default session is created automatically. If you only ever work on one thing at a time, you can use this single session indefinitely.
+
+## Creating a Session
+
+Click the **"+"** button in the session switcher dropdown at the top of the AI panel. A new empty session is created and becomes active immediately. It is named "New Session" until the first message is sent, at which point the title is auto-derived from your first message.
+
+## Switching Sessions
+
+Click the session name in the AI panel header to open the session dropdown. All sessions are listed with their titles and a relative timestamp. Click any session to switch — the conversation history for that session loads instantly from local storage.
+
+## Renaming a Session
+
+Click directly on the session title in the panel header to enter inline edit mode. Type the new name and press Enter to confirm, or Escape to cancel. Manual titles are never overwritten by the auto-title logic.
+
+## Deleting a Session
+
+Open the session dropdown → locate the session you want to remove → click the menu icon → select **Delete Session**. Deletion is permanent and cannot be undone — the full message history for that session is removed from `terax-ai-sessions.json`.
+
+:::warning
+Deleting a session removes all its messages permanently. There is no recycle bin or undo. If a session contains important output (commands, file paths, generated code), copy it out before deleting.
+:::
+
+## Storage Location
+
+Sessions are persisted via `tauri-plugin-store` in the file `terax-ai-sessions.json` inside your app's local data directory. The file contains the session list, the active session ID, and per-session message histories keyed by session ID.
+
+You can inspect this file directly at:
+```
+~/Library/Application Support/com.nexum.app/terax-ai-sessions.json
+```
+
+## Tips for Session Organization
+
+- Create one session per SSH host or project you are working on
+- Use descriptive manual titles — the auto-title from the first message is often too specific
+- Long sessions (hundreds of messages) can slow down session hydration on app start; create a fresh session for new work rather than extending one indefinitely

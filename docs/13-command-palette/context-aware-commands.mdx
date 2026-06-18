@@ -1,0 +1,75 @@
+---
+title: "Context-Aware Commands"
+description: "Commands that appear only when a specific tab type is active in Nexum."
+---
+
+# Context-Aware Commands
+
+Not every command is relevant in every situation. Nexum filters the Command Palette based on the currently active tab type, keeping the list focused and free of noise. This feature is called context-aware commands.
+
+## How Context Is Determined
+
+Context is derived from the `kind` property of the currently active tab. Nexum recognizes four contexts:
+
+| Tab `kind` | Context |
+|---|---|
+| `terminal` or `ssh-terminal` | `terminal` |
+| `editor` | `editor` |
+| `sftp` | `sftp` |
+| `home` | `home` |
+
+Commands that have no `contexts` field are global commands — they always appear regardless of which tab is active.
+
+## Filtering Logic
+
+When you open the palette, the command registry checks the active tab's context against each command's `contexts` array. If the command's `contexts` list includes the current context (or the command has no `contexts` restriction), it is shown. Otherwise it is hidden.
+
+This filtering runs on every palette open, so switching tabs between palette sessions will update which commands appear.
+
+## Context-Specific Examples
+
+### Editor Context
+
+These commands are only shown when an `editor` tab is active:
+
+- **Format Document** — runs the file type's configured formatter
+- **Toggle Word Wrap** — toggles line wrapping in the CodeMirror editor
+- **Toggle Line Numbers** — shows or hides the line number gutter
+
+### SFTP Context
+
+These commands are only shown when an `sftp` tab is active:
+
+- **Refresh Directory** — reloads the current remote directory listing
+- **New Folder** — creates a directory at the current remote path
+- **Show Hidden Files** — toggles dot-file visibility
+
+### Terminal Context
+
+These commands are only shown when a `terminal` or `ssh-terminal` tab is active:
+
+- **Clear Terminal** — clears the xterm.js scrollback buffer
+
+### Home Context
+
+The home context is currently reserved for future dashboard-specific commands. No commands are home-exclusive in the current release.
+
+## Adding Context to a Custom Command
+
+If you are contributing a new command to the palette, add a `contexts` array to your command definition:
+
+```ts
+{
+  id: "editor.toggle-minimap",
+  title: "Toggle Minimap",
+  section: "Editor",
+  contexts: ["editor"],
+  onSelect: () => editorStore.toggleMinimap(),
+}
+```
+
+Omit `contexts` entirely for commands that should always appear.
+
+:::tip
+When you are unsure why a command is missing from the palette, check which tab type is currently active. Switching to the correct tab type will make the command appear.
+:::

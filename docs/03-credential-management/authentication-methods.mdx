@@ -1,0 +1,46 @@
+---
+title: "Authentication Methods"
+description: "Overview of the four SSH authentication methods supported by Nexum and how each handles credential storage."
+---
+
+# Authentication Methods
+
+Nexum supports four authentication methods for SSH connections. Each method is configured per-host in the **Auth** tab of the host form drawer. Credentials are always stored in the macOS Keychain — never in SQLite or any file on disk.
+
+## 1. Password
+
+Standard SSH password authentication. When you save a host with this method, Nexum stores the password in the macOS Keychain keyed by the host's UUID. On connection, the password is retrieved from Keychain and submitted automatically — you won't be prompted unless the stored password is wrong or has changed.
+
+If no password is saved, Nexum prompts you inline during the connection loading sequence. An optional **"Save password"** checkbox stores it for future connections.
+
+## 2. SSH Key
+
+Private key authentication without a passphrase. You provide the **path** to the private key file on your local filesystem (e.g. `~/.ssh/id_ed25519`). Nexum stores this path in SQLite with the host record. The key file itself is read from disk at connection time — Nexum never copies or caches its contents.
+
+Supported key types: `ed25519`, `RSA`, `ECDSA`.
+
+:::tip
+Ensure your key file has permissions `600`. If the permissions are too open, the SSH library will refuse to use the key. Run `chmod 600 ~/.ssh/id_ed25519` if needed.
+:::
+
+## 3. Key + Passphrase
+
+An SSH private key encrypted with a passphrase. The key file path is stored in SQLite (same as above), and the **passphrase** is stored in the macOS Keychain by host UUID. On connection, Nexum reads the key from disk and decrypts it using the Keychain-retrieved passphrase — no manual entry required.
+
+If no passphrase is saved, Nexum prompts for it inline during the connection flow with an option to save it for future use.
+
+## 4. 2FA / Keyboard-Interactive
+
+Some SSH servers require a second factor — TOTP codes (Google Authenticator, Authy), hardware security keys, or custom challenge-response prompts. These are handled via the SSH **keyboard-interactive** authentication mechanism.
+
+When the server issues a challenge, Nexum displays it as an **inline prompt** within the Loading Screen. You type the current code and submit. 2FA codes are **never saved** — they are one-time values that expire, so caching them would be both useless and a security risk.
+
+Keyboard-interactive can be combined with password authentication on servers that require both (called "multi-factor SSH").
+
+## Changing the Auth Method
+
+You can switch an existing host's authentication method at any time from the **Auth** tab in the edit form. Nexum handles the Keychain cleanup automatically:
+
+- Switching away from **Password** removes the stored password from Keychain.
+- Switching away from **Key + Passphrase** removes the stored passphrase from Keychain.
+- Switching to **SSH Key** (no passphrase) removes any previously stored passphrase.

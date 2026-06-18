@@ -1,0 +1,53 @@
+---
+title: "Tab & Pane Management"
+description: "Keyboard shortcuts for managing tabs and split panes in Nexum."
+---
+
+# Tab & Pane Management
+
+Nexum supports a multi-tab, split-pane workspace. All layout operations are accessible via keyboard shortcuts so you can build and navigate complex terminal/editor arrangements without reaching for the mouse.
+
+## Tab Operations
+
+| Action | Shortcut |
+|---|---|
+| New Tab | `Cmd+T` |
+| Close Tab / Pane | `Cmd+W` |
+| Next Tab | `Cmd+]` |
+| Previous Tab | `Cmd+[` |
+| Switch to Tab 1–9 | `Cmd+1` through `Cmd+9` |
+
+`Cmd+W` closes the focused pane if the tab contains split panes, or closes the entire tab if there is only one pane. `Cmd+9` always navigates to the last tab regardless of total count.
+
+## Split Pane Operations
+
+| Action | Shortcut |
+|---|---|
+| Split Pane Vertically | `Cmd+\` |
+| Split Pane Horizontally | `Cmd+Shift+\` |
+| Focus Pane Left | `Cmd+Option+Left` |
+| Focus Pane Right | `Cmd+Option+Right` |
+| Focus Pane Up | `Cmd+Option+Up` |
+| Focus Pane Down | `Cmd+Option+Down` |
+
+## Split Pane Behavior
+
+Splitting a pane creates a new empty terminal tab within the current tab's layout. Each pane is independent — it can run a different process, connect to a different SSH host, or display a different file in the editor. Panes within a tab are managed by `react-resizable-panels` and can be resized by dragging the divider.
+
+`Cmd+W` on a split-pane tab closes only the currently focused pane. When the last pane in a tab is closed, the tab itself closes.
+
+## Pane Focus Navigation
+
+`Cmd+Option+Arrow` moves keyboard focus to the adjacent pane in the indicated direction. This works regardless of whether panes are split vertically or horizontally. If there is no adjacent pane in a given direction, focus stays on the current pane.
+
+## Tab Switching
+
+Tabs are ordered left to right in the tab bar. `Cmd+]` and `Cmd+[` wrap around — pressing `Cmd+]` on the last tab moves to the first.
+
+:::tip
+For a four-pane workflow (two SSH hosts + SFTP + editor), open one tab per context and use `Cmd+1` through `Cmd+4` to switch between them instantly.
+:::
+
+:::tip
+Panes within a single tab share the same tab bar slot. Use split panes when you want two terminals side-by-side; use separate tabs when you want to keep contexts cleanly separated.
+:::

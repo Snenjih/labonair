@@ -1,0 +1,60 @@
+---
+title: "Keyboard Navigation"
+description: "Complete keyboard reference for navigating and operating the Command Palette."
+---
+
+# Keyboard Navigation
+
+The Command Palette is designed to be fully operable without a mouse. This page covers every keyboard interaction available within the palette.
+
+## Opening and Closing
+
+| Key | Behavior |
+|---|---|
+| `Cmd+K` | Open the palette (or close if already open) |
+| `Cmd+Shift+P` | Open the palette (VS Code-style alternative) |
+| `Escape` | See escape hierarchy below |
+
+## Navigating the Command List
+
+| Key | Behavior |
+|---|---|
+| `↑` / `↓` | Move selection up or down through the command list |
+| `Enter` | Execute the selected command, or navigate into a sub-page |
+
+When a command has a `subPageId`, pressing `Enter` opens that sub-page rather than executing an action. The search field clears and the header updates to show the current page name.
+
+## Escape Hierarchy
+
+The `Escape` key follows a three-step hierarchy — this behavior is intentional and differs from a standard dialog close:
+
+1. **First press** — clears the search text in the current input field
+2. **Second press** — navigates back one page (only if currently inside a sub-page)
+3. **Third press** — closes the palette entirely
+
+Nexum intercepts `Escape` before Radix UI's default dialog behavior to implement this custom flow. If the search field is already empty and you are on the root page, a single `Escape` closes the palette.
+
+## Typing to Search
+
+The search input is focused automatically when the palette opens. Start typing immediately — no need to click. Fuzzy matching runs against the command's title, subtitle, and section label.
+
+To clear your search without closing the palette, press `Escape` once (first step of the hierarchy).
+
+## Sub-Page Navigation
+
+When inside a sub-page (Hosts, Themes, Modes), the same `↑` / `↓` / `Enter` navigation applies to the sub-page items. The search field filters within the sub-page independently of any search you had typed at the root level.
+
+## Related Shortcuts
+
+| Key | Behavior |
+|---|---|
+| `Cmd+?` | Opens the Shortcuts Reference dialog (separate from the palette) |
+| `Cmd+,` | Opens Settings directly (bypasses the palette) |
+
+:::tip
+You almost never need the mouse inside the palette. Open with `Cmd+K`, type a few letters, and press `Enter`. The entire interaction takes under two seconds for any command.
+:::
+
+:::warning
+`Cmd+K` when a terminal tab is focused may first send a "clear screen" signal to the terminal before the palette opens, depending on your shell's keybinding configuration. If this happens, switch focus away from the terminal input before pressing `Cmd+K`, or use `Cmd+Shift+P` instead.
+:::

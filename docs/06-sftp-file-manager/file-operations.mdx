@@ -1,0 +1,63 @@
+---
+title: "File Operations"
+description: "Rename, delete, create folders, change permissions, copy paths, and open files for editing via the right-click context menu."
+---
+
+# File Operations
+
+Both panes in the SFTP File Manager support a full set of file management operations accessible through the right-click context menu. Some operations are available on both local and remote files; others are remote-only.
+
+## Accessing the Context Menu
+
+Right-click any file or folder in either pane to open the context menu. If you have multiple files selected, the context menu applies to the entire selection.
+
+## Available Operations
+
+### Rename
+
+Triggers an inline rename input directly in the file list row. The current filename is pre-filled and selected. Press `Enter` to confirm the new name, or `Escape` to cancel without making changes. Renaming on the remote side sends an `sftp_rename` IPC command to the Rust backend.
+
+### Delete
+
+Prompts a confirmation dialog before deleting. Behavior differs by pane:
+
+- **Local** — moves the file to the macOS Trash (recoverable)
+- **Remote** — permanently deletes the file or folder on the server via `sftp_delete`; this action cannot be undone
+
+:::warning
+Remote deletion is permanent. There is no recycle bin on the server side. Always confirm the filename before proceeding.
+:::
+
+### New Folder
+
+Creates a new folder in the currently open directory. An inline naming input appears at the top of the file list. Type the folder name and press `Enter` to create it, or `Escape` to cancel. The new folder appears immediately in the listing.
+
+### Chmod (Remote Only)
+
+Opens a permissions dialog for the selected remote file or folder. You can enter permissions in:
+
+- **Octal format** — e.g., `755`, `644`, `700`
+- **Symbolic format** — displayed alongside the octal input as a read-only reference (e.g., `rwxr-xr-x`)
+
+Click Apply to send the `sftp_chmod` IPC command. The updated permissions are reflected immediately in the file listing.
+
+### Copy Path
+
+Copies the full absolute path of the selected file to the clipboard. Useful for quickly referencing a path in your terminal or in a script.
+
+### Edit (Remote Only)
+
+Downloads the selected remote file to a temporary location and opens it in Nexum's built-in CodeMirror editor. Changes are automatically synced back to the server when you save. See [Remote Editing](/docs/06-sftp-file-manager/remote-editing) for full details.
+
+### Open in Terminal (Local Only)
+
+Opens a new terminal tab (`kind: "terminal"`) with the shell `cd`'d to the selected directory. If a file is selected rather than a folder, the terminal opens in the file's parent directory.
+
+## Keyboard Shortcuts
+
+| Action | Shortcut |
+|---|---|
+| Delete selected | `Backspace` |
+| Rename selected | `Enter` (when a single item is selected) |
+| Select all | `Cmd+A` |
+| Deselect all | `Escape` |

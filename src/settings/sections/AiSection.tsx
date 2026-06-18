@@ -96,7 +96,7 @@ const ICON_OPTIONS: AgentIconId[] = [
 
 function SubSectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[13px] font-semibold tracking-tight text-foreground">
+    <h3 className="text-sm font-semibold tracking-tight text-foreground">
       {children}
     </h3>
   );

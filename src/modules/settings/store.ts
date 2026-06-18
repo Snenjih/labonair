@@ -61,6 +61,7 @@ export type Preferences = {
   ollamaChatModelId: string;
   vimMode: boolean;
   defaultStartupTab: "terminal" | "host-manager";
+  startupTerminalCount: 1 | 2 | 3;
   sessionRestore: boolean;
   sessionScrollbackLines: number;
 
@@ -72,6 +73,10 @@ export type Preferences = {
   backgroundImage: string;
   backgroundOpacity: number;
   backgroundBlur: number;
+  backgroundTintColor: string;
+  backgroundTintOpacity: number;
+  appCornerRadius: number;
+  appDensity: "compact" | "default" | "relaxed";
 
   // --- Terminal ---
   terminalShell: string;
@@ -213,6 +218,11 @@ const KEY_APP_LINE_HEIGHT = "appLineHeight";
 const KEY_BG_IMAGE = "backgroundImage";
 const KEY_BG_OPACITY = "backgroundOpacity";
 const KEY_BG_BLUR = "backgroundBlur";
+const KEY_BG_TINT_COLOR = "backgroundTintColor";
+const KEY_BG_TINT_OPACITY = "backgroundTintOpacity";
+const KEY_APP_CORNER_RADIUS = "appCornerRadius";
+const KEY_APP_DENSITY = "appDensity";
+const KEY_STARTUP_TERMINAL_COUNT = "startupTerminalCount";
 
 const KEY_TERMINAL_SHELL = "terminalShell";
 const KEY_TERMINAL_DEFAULT_PATH = "terminalDefaultPath";
@@ -317,6 +327,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   ollamaChatModelId: "",
   vimMode: false,
   defaultStartupTab: "host-manager",
+  startupTerminalCount: 1,
   sessionRestore: false,
   sessionScrollbackLines: 1000,
 
@@ -327,6 +338,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   backgroundImage: "",
   backgroundOpacity: 30,
   backgroundBlur: 0,
+  backgroundTintColor: "#000000",
+  backgroundTintOpacity: 0,
+  appCornerRadius: 5,
+  appDensity: "default",
 
   terminalShell: "",
   terminalDefaultPath: "",
@@ -481,6 +496,10 @@ export async function loadPreferences(): Promise<Preferences> {
     defaultStartupTab:
       get<"terminal" | "host-manager">(KEY_DEFAULT_STARTUP_TAB) ??
       DEFAULT_PREFERENCES.defaultStartupTab,
+    startupTerminalCount: Math.min(
+      3,
+      Math.max(1, get<number>(KEY_STARTUP_TERMINAL_COUNT) ?? 1),
+    ) as 1 | 2 | 3,
     sessionRestore:
       get<boolean>(KEY_SESSION_RESTORE) ?? DEFAULT_PREFERENCES.sessionRestore,
     sessionScrollbackLines:
@@ -499,6 +518,20 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_BG_OPACITY) ?? DEFAULT_PREFERENCES.backgroundOpacity,
     backgroundBlur:
       get<number>(KEY_BG_BLUR) ?? DEFAULT_PREFERENCES.backgroundBlur,
+    backgroundTintColor:
+      get<string>(KEY_BG_TINT_COLOR) ?? DEFAULT_PREFERENCES.backgroundTintColor,
+    backgroundTintOpacity: Math.min(
+      100,
+      Math.max(0, get<number>(KEY_BG_TINT_OPACITY) ?? 0),
+    ),
+    appCornerRadius: Math.min(
+      20,
+      Math.max(0, get<number>(KEY_APP_CORNER_RADIUS) ?? 5),
+    ),
+    appDensity: ((): "compact" | "default" | "relaxed" => {
+      const v = get<string>(KEY_APP_DENSITY);
+      return v === "compact" || v === "relaxed" ? v : "default";
+    })(),
 
     terminalShell:
       get<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
@@ -862,6 +895,33 @@ export async function setBackgroundOpacity(value: number): Promise<void> {
 
 export async function setBackgroundBlur(value: number): Promise<void> {
   await (await getStore()).set(KEY_BG_BLUR, value);
+  await (await getStore()).save();
+}
+
+export async function setBackgroundTintColor(value: string): Promise<void> {
+  await (await getStore()).set(KEY_BG_TINT_COLOR, value);
+  await (await getStore()).save();
+}
+
+export async function setBackgroundTintOpacity(value: number): Promise<void> {
+  await (await getStore()).set(KEY_BG_TINT_OPACITY, Math.min(100, Math.max(0, value)));
+  await (await getStore()).save();
+}
+
+export async function setAppCornerRadius(value: number): Promise<void> {
+  await (await getStore()).set(KEY_APP_CORNER_RADIUS, Math.min(20, Math.max(0, value)));
+  await (await getStore()).save();
+}
+
+export async function setAppDensity(
+  value: "compact" | "default" | "relaxed",
+): Promise<void> {
+  await (await getStore()).set(KEY_APP_DENSITY, value);
+  await (await getStore()).save();
+}
+
+export async function setStartupTerminalCount(value: 1 | 2 | 3): Promise<void> {
+  await (await getStore()).set(KEY_STARTUP_TERMINAL_COUNT, value);
   await (await getStore()).save();
 }
 
@@ -1303,6 +1363,7 @@ export async function onPreferencesChange(
     [KEY_OLLAMA_CHAT_MODEL_ID]: "ollamaChatModelId",
     [KEY_VIM_MODE]: "vimMode",
     [KEY_DEFAULT_STARTUP_TAB]: "defaultStartupTab",
+    [KEY_STARTUP_TERMINAL_COUNT]: "startupTerminalCount",
     [KEY_SESSION_RESTORE]: "sessionRestore",
     [KEY_SESSION_SCROLLBACK_LINES]: "sessionScrollbackLines",
 
@@ -1313,6 +1374,10 @@ export async function onPreferencesChange(
     [KEY_BG_IMAGE]: "backgroundImage",
     [KEY_BG_OPACITY]: "backgroundOpacity",
     [KEY_BG_BLUR]: "backgroundBlur",
+    [KEY_BG_TINT_COLOR]: "backgroundTintColor",
+    [KEY_BG_TINT_OPACITY]: "backgroundTintOpacity",
+    [KEY_APP_CORNER_RADIUS]: "appCornerRadius",
+    [KEY_APP_DENSITY]: "appDensity",
 
     [KEY_TERMINAL_SHELL]: "terminalShell",
     [KEY_TERMINAL_DEFAULT_PATH]: "terminalDefaultPath",

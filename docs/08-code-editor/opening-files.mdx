@@ -1,0 +1,46 @@
+---
+title: "Opening Files"
+description: "All the ways to open a file in the Nexum code editor."
+---
+
+# Opening Files
+
+There are several entry points for opening a file in the editor. Each one creates a new `editor` tab (or brings an already-open tab to the front if the same file path is already loaded).
+
+## From the Local File Explorer
+
+Click any file in the sidebar tree. The file opens immediately in a new editor tab. The tab label shows the filename; hover the tab to see the full absolute path in a tooltip.
+
+## From the SFTP pane (remote files)
+
+In an open SFTP session, right-click any file and choose **Edit**. Nexum:
+
+1. Calls the `prepare_remote_edit` Rust command.
+2. Downloads the file to `/tmp/nexum_edits/<uuid>_<filename>`.
+3. Opens the local temp copy in a new editor tab with a cloud indicator.
+
+Saving with `Cmd+S` uploads the changes back to the remote host. See [Remote File Editing](./remote-file-editing) for the full workflow.
+
+## From the AI assistant
+
+When the AI uses the `write_file` tool it does not silently overwrite your file. Instead, Nexum opens an **AI Diff** tab showing exactly what would change. You review the diff and click **Accept** or **Reject**. If you accept, the file is written and a normal editor tab reflects the new content.
+
+## From the Command Palette
+
+Press `Cmd+K` to open the Command Palette, type **"Open File…"**, and select it. A system file picker appears. Choose any file — it opens in a new editor tab.
+
+## Size and type limits
+
+| Situation | Behavior |
+|---|---|
+| Remote file > 5 MB | Warning dialog — you can proceed or cancel |
+| Local binary file | Editor opens but displays raw bytes; editing is not recommended |
+| Local file > 5 MB | Warning shown; file still opens |
+
+:::tip
+Reopening a file that is already loaded in a tab brings that tab to the front instead of creating a duplicate — useful if you lost track of where a file is open.
+:::
+
+:::warning
+Binary files (images, compiled executables, archives) will appear as garbled text. There is no hex-editor mode — use the terminal for binary inspection.
+:::

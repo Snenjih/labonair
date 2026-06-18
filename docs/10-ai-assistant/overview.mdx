@@ -1,0 +1,44 @@
+---
+title: "AI Assistant Overview"
+description: "A built-in AI assistant that understands your terminal, files, and workspace — powered by your own API key."
+---
+
+# AI Assistant Overview
+
+Nexum ships with a fully integrated AI assistant that lives alongside your terminal and SFTP sessions. It is not a bolt-on chatbot — it has direct access to your workspace context, can read and write files, execute commands, and track multi-step tasks in real time.
+
+## How It Works
+
+The assistant is built on the [Vercel AI SDK](https://sdk.vercel.ai/) and communicates directly with OpenAI (or any compatible provider) from your machine. There is no Nexum server in the middle — your conversations and API calls are strictly between your Mac and the AI provider.
+
+The assistant is powered by an **agent loop**: it can call tools, inspect results, and continue reasoning across multiple steps until the task is complete or the step limit is reached.
+
+## Bring Your Own Key (BYOK)
+
+Nexum does not bundle any API credentials. You must supply your own OpenAI API key (or a key for a compatible provider such as Ollama or Groq) before the assistant becomes active. See [Setting Up an API Key](./setting-up-api-key) for the setup flow.
+
+## Opening the AI Panel
+
+Toggle the AI panel with `Cmd+Shift+A` or click the AI icon in the left sidebar. The panel floats over the workspace or can be docked, depending on your layout preference.
+
+## What the Assistant Can Do
+
+- **Read files and directories** — without asking for approval
+- **Write or create files** — pauses for your explicit approval before writing
+- **Run terminal commands** — shows you the exact command and waits for your go-ahead
+- **Access your live terminal context** — sees the current working directory and the last 300 lines of your terminal's scrollback buffer at the moment it needs them
+- **Manage multi-step tasks** — uses a built-in Todo Strip to track progress visibly
+
+## Session Persistence
+
+Conversations are organized into named **sessions**. Sessions survive app restarts — they are stored locally via `tauri-plugin-store` in `terax-ai-sessions.json` inside your app data directory. No conversation data ever leaves your machine except as part of the API request to your chosen AI provider.
+
+## Keyboard Shortcut
+
+| Action | Shortcut |
+|---|---|
+| Toggle AI panel | `Cmd+Shift+A` |
+
+:::tip
+The AI assistant works best when you have an active terminal tab open. It uses the terminal's current directory and recent output as live context, which significantly improves the quality of its responses for infrastructure and DevOps tasks.
+:::

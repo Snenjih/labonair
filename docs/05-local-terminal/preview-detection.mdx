@@ -1,0 +1,50 @@
+---
+title: "URL Preview Detection"
+description: "How Nexum detects URLs in terminal output and opens them in an in-app Preview tab or the system browser."
+---
+
+# URL Preview Detection
+
+Nexum monitors terminal output for URLs and makes them interactive. Instead of manually copying a URL and opening a browser, you can click directly in the terminal to view the page — without leaving Nexum.
+
+## How URLs are detected
+
+Nexum's `usePreviewDetection` hook applies regex matching to each line of terminal output as it arrives. It recognizes:
+
+- `http://` URLs
+- `https://` URLs
+
+Detected URLs are rendered as **underlined, clickable links** inline in the terminal output. The xterm.js URL addon handles the underlining and hover state.
+
+## Clicking a URL
+
+Clicking a detected URL opens the page in a new **Preview tab** inside Nexum. The Preview tab renders the URL using a WebView — the same engine that powers Safari on macOS. This is particularly useful for:
+
+- **Local dev servers** — click `http://localhost:3000` output from your Vite or Next.js dev server and see the running app immediately
+- **Documentation URLs** — open a `https://` link from a CLI tool's output without leaving your workspace
+- **API endpoints** — preview JSON responses from `curl` output or server startup messages
+
+## Opening in the system browser
+
+If you want to open a URL in your default system browser (Safari, Chrome, Firefox, etc.) instead of the in-app Preview tab, you have two options:
+
+- `Cmd+Click` the URL
+- Right-click the URL → **Open in Browser**
+
+:::tip
+For URLs that require authentication flows, OAuth redirects, or browser extensions to work correctly, use **Open in Browser** to avoid compatibility issues with the in-app WebView.
+:::
+
+## Preview tab behavior
+
+A Preview tab opened from the terminal behaves like a standard browser tab within Nexum:
+
+- You can navigate to other pages within the Preview tab
+- Reload with `Cmd+R`
+- Close the Preview tab with `Cmd+W` — this does not affect the originating terminal tab
+
+## Disabling URL detection
+
+URL detection is enabled by default. If you find the underlined links distracting or if they interfere with a terminal application's rendering, you can disable URL detection in **Settings → Terminal → URL Detection**.
+
+With URL detection off, URLs in terminal output are displayed as plain text.

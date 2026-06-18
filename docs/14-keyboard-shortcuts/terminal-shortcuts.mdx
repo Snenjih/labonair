@@ -1,0 +1,51 @@
+---
+title: "Terminal Shortcuts"
+description: "Keyboard shortcuts for local and SSH terminal sessions in Nexum."
+---
+
+# Terminal Shortcuts
+
+These shortcuts apply when a `terminal` or `ssh-terminal` tab is active. Some shortcuts are handled by the xterm.js layer; others are intercepted by Nexum before reaching the terminal.
+
+## Full Reference
+
+| Action | Shortcut |
+|---|---|
+| Copy | `Cmd+C` |
+| Paste | `Cmd+V` |
+| Select All | `Cmd+A` |
+| Clear Terminal | `Cmd+K` (when terminal is focused) |
+| Search in Terminal | `Cmd+F` |
+| Increase Font Size | `Cmd+=` |
+| Decrease Font Size | `Cmd+-` |
+| Reset Font Size | `Cmd+0` |
+| Scroll to Top | `Cmd+Home` |
+| Scroll to Bottom | `Cmd+End` |
+| Interrupt (SIGINT) | `Ctrl+C` |
+| EOF | `Ctrl+D` |
+
+## Copy and Paste Behavior
+
+`Cmd+C` copies the current text selection from the terminal buffer. If there is no active selection, it sends `SIGINT` (interrupt) to the running process — the same as `Ctrl+C`. This matches the behavior of native macOS terminal emulators.
+
+`Cmd+V` pastes from the system clipboard. Multi-line pastes are sent as-is; Nexum does not add a "bracketed paste" confirmation dialog, so be careful pasting commands from untrusted sources.
+
+## Clear Terminal
+
+`Cmd+K` clears the xterm.js scrollback buffer when the terminal is focused. Note that this shortcut also opens the Command Palette when the terminal is **not** focused. The terminal focus state determines which behavior fires.
+
+## Font Size
+
+Font size changes are applied per-tab and persist across sessions. `Cmd+0` resets to the base font size configured in Settings → Terminal.
+
+## Shell Control
+
+`Ctrl+C` sends `SIGINT` to the foreground process group — the standard way to interrupt a running command. `Ctrl+D` sends EOF, which closes most REPLs and interactive shells. These are standard POSIX signals passed through directly to the PTY.
+
+:::tip
+Use `Cmd+F` to search through terminal scrollback. This is useful for finding previous command output without scrolling manually.
+:::
+
+:::warning
+`Ctrl+D` in a shell with no running command will log you out of the SSH session or close the local terminal tab. Use it intentionally.
+:::

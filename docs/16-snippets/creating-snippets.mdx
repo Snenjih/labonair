@@ -1,0 +1,55 @@
+---
+title: "Creating Snippets"
+description: "How to create and save new snippets in Nexum."
+---
+
+# Creating Snippets
+
+Snippets are created through the Snippets panel in the sidebar. The process is straightforward: give the snippet a name, write the content, and save.
+
+## Opening the Snippets manager
+
+There are two ways to reach the Snippets panel:
+
+- **Command Palette** (`Cmd+K`) → type **"Snippets"** → select "Open Snippets Panel"
+- Click the **Snippets** icon in the sidebar panel selector
+
+## Creating a new snippet
+
+1. In the Snippets panel, click **New Snippet** (the `+` button in the panel header).
+2. A form appears with the following fields:
+
+   | Field | Required | Description |
+   |---|---|---|
+   | **Name** | Yes | The display label shown in the list and Command Palette search |
+   | **Content** | Yes | The text that will be inserted into the terminal |
+   | **Description** | No | Optional notes about when or why to use the snippet |
+
+3. Fill in the fields and click **Save**.
+
+The new snippet appears in the list immediately, sorted alphabetically by name.
+
+## Writing snippet content
+
+Snippet content can contain:
+
+- **Single-line commands** — e.g., `kubectl get pods -n production`
+- **Multi-line content** — paste a full shell script block; newlines are preserved
+- **Special characters** — pipes, redirects, quotes, and escape sequences are all valid
+- **Placeholders** — there is no variable substitution system; if you need dynamic values, insert the snippet and edit the terminal line before pressing `Enter`
+
+:::tip
+Give snippets descriptive names that you would naturally type in the Command Palette search. For example, `docker: run postgres 15 dev` is more searchable than `postgres_docker`. The name is your search key — optimize for it.
+:::
+
+## Editing an existing snippet
+
+In the Snippets panel, click the **Edit** icon (pencil) next to any snippet. The same form opens pre-populated with the current values. Make your changes and click **Save**. The updated snippet is available immediately.
+
+## Deleting a snippet
+
+Click the **Delete** icon (trash) next to the snippet in the panel. A confirmation prompt appears. Deletion is permanent — there is no undo.
+
+:::warning
+There is no export or backup mechanism for snippets. If you reinstall Nexum or move to a new machine, your snippets will not carry over automatically. Consider keeping a copy of important snippets in a text file in your dotfiles repository.
+:::

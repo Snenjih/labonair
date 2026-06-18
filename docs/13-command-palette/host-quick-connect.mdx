@@ -1,0 +1,50 @@
+---
+title: "Host Quick-Connect"
+description: "Connect to any saved host instantly via the Command Palette without opening the Home Dashboard."
+---
+
+# Host Quick-Connect
+
+The Command Palette provides the fastest path to connecting to a saved host. You can open an SSH terminal or SFTP session for any host in two keypresses — no need to navigate to the Home Dashboard.
+
+## Workflow
+
+1. Press `Cmd+K` to open the Command Palette
+2. Type the host name, IP address, or any part of the hostname
+3. Select **"Connect to Host..."** (or it may already be filtered to the right entry)
+4. The Hosts sub-page opens, listing all matching saved hosts
+5. Select **"Connect SSH"** or **"Open SFTP"** for the desired host
+
+The entire workflow takes under three seconds once you know the host name.
+
+## How Hosts Are Listed
+
+Each entry in the Hosts sub-page displays:
+
+- **Title** — the host's display name as configured in the Host Manager
+- **Subtitle** — the host's IP address (or hostname) and port in `IP:port` format
+
+Two actions are available per host:
+
+- **Connect SSH** — opens a new SSH terminal tab
+- **Open SFTP** — opens a new SFTP file manager tab
+
+## Real-Time Updates
+
+The host list in the sub-page is read directly from the Zustand hosts store, which is kept in sync with the Rust SQLite backend. Adding or editing a host in the Host Manager takes effect immediately — the next time you open the Hosts sub-page, the updated list is shown.
+
+## Recently Connected Hosts
+
+Recently connected hosts appear at the top of the list, making it easy to reconnect to servers you use frequently without needing to scroll or search.
+
+## Filtering Within the Sub-Page
+
+After entering the Hosts sub-page, the search field resets and you can type to filter the host list further. This is useful when you have a large number of saved hosts and want to narrow down to a specific one quickly.
+
+:::tip
+The Hosts sub-page is significantly faster than the Home Dashboard when you already know which host you want to connect to. Reserve the Home Dashboard for host management (create, edit, group, reorder).
+:::
+
+:::warning
+If a host does not appear in the list, it may not be saved in the Host Manager yet. Open the Home Dashboard (`Cmd+T` → Home) to add it.
+:::

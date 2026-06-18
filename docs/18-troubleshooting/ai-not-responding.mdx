@@ -1,0 +1,60 @@
+---
+title: "AI Not Responding"
+description: "Diagnose and fix issues with the Nexum AI assistant not responding or producing errors."
+---
+
+# AI Not Responding
+
+Nexum's AI assistant makes direct HTTPS calls to the OpenAI API using your BYOK (Bring Your Own Key) API key. If the AI is not responding, one of the following causes is most likely responsible.
+
+## "Invalid API Key"
+
+The API key stored in Nexum is incorrect, expired, or was revoked.
+
+**Resolution:**
+1. Open Settings → Models & Agents
+2. Delete the existing key and re-enter your API key
+3. API keys are stored in the macOS Keychain — Nexum never writes them to disk
+
+Verify your key is valid at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+
+## "Model Not Found"
+
+The selected model ID has been deprecated or renamed by OpenAI.
+
+**Resolution:** Open Settings → Models & Agents and change the model to `gpt-4o` or another currently available model. Check [OpenAI's model documentation](https://platform.openai.com/docs/models) for the current list of available models.
+
+## "Rate Limit Exceeded"
+
+Your OpenAI account has hit the request or token rate limit for your usage tier.
+
+**Resolution:**
+- Wait a few minutes and retry — rate limits reset on a rolling window
+- Reduce the frequency of AI requests
+- Upgrade your OpenAI API plan for higher rate limits at platform.openai.com
+
+## "Network Error"
+
+Nexum cannot reach the OpenAI API endpoint.
+
+**Resolution:** Check your internet connection. If you are on a corporate network, confirm that outbound HTTPS to `api.openai.com` is not blocked by a firewall or proxy.
+
+## Response Cuts Off Mid-Message
+
+The response hit the model's context window limit. The current session's message history has grown too large for the model to process in a single request.
+
+**Resolution:** Start a new AI session (click the `+` icon in the AI panel header). Long-running sessions with many tool calls accumulate context quickly.
+
+## Tools Not Executing
+
+If the AI panel shows a "Disconnected" or error state and tool calls (read file, run command, etc.) are not executing:
+
+1. Close the AI panel
+2. Re-open it with `Cmd+Shift+A`
+3. If the issue persists, restart Nexum
+
+Tool execution requires an active session. If the session state is corrupted, restarting creates a fresh session automatically.
+
+:::tip
+You can verify your API key and check usage/billing at [platform.openai.com/usage](https://platform.openai.com/usage) without leaving the current Nexum session.
+:::

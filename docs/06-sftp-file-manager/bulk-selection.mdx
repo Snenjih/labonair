@@ -1,0 +1,54 @@
+---
+title: "Bulk Selection"
+description: "Select multiple files using click, Cmd+Click, Shift+Click, and Cmd+A, then perform bulk transfers, deletes, and path copies."
+---
+
+# Bulk Selection
+
+The SFTP File Manager supports multi-file selection in both panes, following the same conventions used by macOS Finder and most native file managers. Once you have a selection, you can transfer, delete, or copy paths for all selected items at once.
+
+## Selection Methods
+
+### Single Select
+
+Click any file or folder to select it and deselect everything else.
+
+### Toggle Individual Items
+
+`Cmd+Click` toggles an individual file in or out of the current selection without affecting the rest. Use this to build up a non-contiguous selection by picking specific files throughout the listing.
+
+### Range Select
+
+`Shift+Click` selects a contiguous range from the last-clicked item to the item you shift-clicked. If nothing was previously selected, the range extends from the top of the list.
+
+### Select All
+
+`Cmd+A` selects every file and folder in the currently open directory. Combined with the filter bar, this is a powerful way to select all files matching a pattern: type a filter to narrow the listing, then press `Cmd+A` to select the visible results.
+
+### Deselect All
+
+Press `Escape` to clear the selection entirely.
+
+## Visual Feedback
+
+Selected rows are highlighted with an accent background color. A count badge in the pane toolbar shows how many items are currently selected (e.g., "3 selected"). The badge disappears when the selection is empty.
+
+## Bulk Operations
+
+With multiple files selected, the following operations act on all selected items:
+
+| Operation | How to trigger |
+|---|---|
+| Transfer | Drag the selection to the opposite pane, or click the Upload/Download toolbar button |
+| Delete | Right-click → Delete, or press `Backspace` |
+| Copy Path | Right-click → Copy Path (copies all paths, one per line) |
+
+Bulk transfers enqueue each selected item individually. They are processed sequentially by the background Rust worker. Progress for each file is shown in the Transfer Queue panel.
+
+:::tip
+To select all `.log` files in a directory: type `log` in the filter bar to show only matching files, then press `Cmd+A` to select them all. Drag to the local pane to download the entire set in one action.
+:::
+
+:::warning
+Bulk delete on the remote pane permanently removes all selected files and folders from the server. The confirmation dialog lists the count of items to be deleted. Double-check before confirming.
+:::

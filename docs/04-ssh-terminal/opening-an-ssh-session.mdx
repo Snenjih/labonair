@@ -1,0 +1,54 @@
+---
+title: "Opening an SSH Session"
+description: "Three ways to start an SSH terminal session in Nexum — from the dashboard, the command palette, or the SFTP pane."
+---
+
+# Opening an SSH Session
+
+Nexum gives you several entry points for starting an SSH terminal session. All of them open a new `ssh-terminal` tab with the host's display name as the tab label.
+
+## From the Home Dashboard
+
+The Home Dashboard is the default view when Nexum launches. Your saved hosts are listed here, organized by group.
+
+- **Double-click** any host card to open an SSH terminal session immediately.
+- **Right-click** a host card → select **Connect SSH** from the context menu.
+
+This is the fastest path if you already know which host you want.
+
+## From the Command Palette
+
+Press `Cmd+K` to open the Command Palette from anywhere in the app.
+
+1. Start typing the host name or IP address.
+2. Matching hosts appear in the results list.
+3. Select a host and choose **Connect SSH**.
+
+The Command Palette is ideal when you have many hosts and want to filter by name without scrolling the dashboard.
+
+:::tip
+The Command Palette also accepts partial matches and is case-insensitive, so typing a fragment of a hostname or an alias is enough to find the right host.
+:::
+
+## From the SFTP Pane
+
+When you already have an SFTP session open and want a terminal in the same directory:
+
+1. In the SFTP tab, navigate to the remote directory you want to work in.
+2. Click the **Open Terminal Here** button in the SFTP toolbar (terminal icon).
+
+A new SSH Terminal tab opens and automatically runs `cd <current_remote_directory>` after connecting. The new session uses the same host credentials as the SFTP session — no re-authentication prompt.
+
+This is particularly useful for quickly running commands in the directory you are already browsing.
+
+## Multiple simultaneous sessions
+
+You can open as many SSH sessions as you need. Each session gets its own tab. Multiple sessions to the same host are fully supported — for example, one session for monitoring logs and another for editing files.
+
+:::warning
+Each SSH tab counts as a separate TCP connection to the server. Keep your server's `MaxSessions` and `MaxStartups` SSH configuration in mind if you open a large number of tabs to a single host.
+:::
+
+## Tab label
+
+The tab label shows the host's **display name** as configured in the Host Manager, not the raw hostname or IP. If you have not set a display name, the hostname is used as a fallback.

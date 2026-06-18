@@ -1,0 +1,51 @@
+---
+title: "Editing & Deleting Hosts"
+description: "Update host connection details or remove hosts from the Home Dashboard."
+---
+
+# Editing & Deleting Hosts
+
+You can update a host's connection details at any time without affecting active sessions. Changes take effect the next time you connect.
+
+## Opening a Host for Editing
+
+Two ways to open the edit form:
+
+- **Right-click** the host card → select **Edit** from the context menu.
+- **Hover** over the host card → click the **pencil icon** that appears in the top-right corner of the card.
+
+Either action opens the same slide-out form drawer used when creating a host.
+
+## Form Tabs
+
+The edit form is organized into tabs to keep things manageable:
+
+| Tab | Contents |
+|---|---|
+| **Basic** | Display name, hostname/IP, port, group assignment, description, color label |
+| **Auth** | Authentication method (Password / SSH Key / Key + Passphrase), credential fields |
+| **Advanced** | Connection timeout, keep-alive settings, and other SSH options |
+
+Navigate between tabs freely — unsaved changes persist across tab switches within the drawer.
+
+## Saving Changes
+
+Click **Save** at the bottom of the form. Host metadata (name, hostname, port, etc.) is written to SQLite immediately. If you changed a password or passphrase, the corresponding entry in the macOS Keychain is updated using the host's UUID as the lookup key — the old credential is replaced, not duplicated.
+
+:::tip
+You can change the auth method for an existing host at any time. If you switch from Password to SSH Key, Nexum removes the old Keychain password entry and stores the key passphrase (if any) instead.
+:::
+
+## Deleting a Host
+
+To delete a host:
+
+1. Right-click the host card → **Delete**.
+2. A confirmation dialog appears listing the host's display name and hostname.
+3. Click **Delete** to confirm.
+
+Deletion is permanent and cannot be undone. Nexum automatically removes the host's Keychain entry (password or passphrase) at the same time, so no orphaned credentials are left behind.
+
+:::warning
+There is no undo for host deletion. If you accidentally delete a host, you will need to recreate it manually. Consider using **Duplicate** first if you are restructuring your host list and want a safety copy.
+:::

@@ -1,0 +1,62 @@
+---
+title: "Connection Lifecycle"
+description: "Step-by-step walkthrough of how an SSH session is established, kept alive, and torn down in Nexum."
+---
+
+# Connection Lifecycle
+
+Every SSH session in Nexum goes through a well-defined lifecycle. Understanding each phase helps you diagnose authentication issues, interpret security prompts, and know what to expect when a connection drops.
+
+## 1. Connecting
+
+When you open an SSH session, the terminal area is replaced by an **SSH Loading Screen**. It displays:
+
+- The host's display name
+- An animated progress indicator
+
+No data is sent to the server yet — Nexum is establishing the TCP connection.
+
+## 2. Authentication
+
+Once the TCP connection is up, Nexum attempts authentication in this order:
+
+1. **Keychain lookup** — Nexum fetches the saved password or passphrase from the macOS Keychain automatically. If valid credentials are found, authentication proceeds without any prompt.
+2. **Public-key auth** — key pairs in `~/.ssh/` are tried if configured for the host.
+3. **Inline auth prompt** — if credentials are missing, expired, or rejected, an inline prompt appears inside the tab asking for a password or passphrase.
+4. **Keyboard-interactive / 2FA** — multi-step challenges (such as TOTP codes) surface as additional inline prompts. Each challenge appears as a separate input field with the server's prompt message.
+
+## 3. Known-hosts check
+
+After the TCP handshake, the server presents its host key. Nexum verifies it against `~/.ssh/known_hosts`:
+
+- **Match** — verification passes silently; authentication continues.
+- **New host** — a dialog asks you to confirm and optionally trust the fingerprint.
+- **Mismatch** — a **security warning dialog** is shown with the expected and received fingerprints. This can indicate a changed server key (legitimate after a reinstall) or a man-in-the-middle attack. You must explicitly accept or reject before the session proceeds.
+
+:::warning
+Never accept a fingerprint mismatch without independently verifying the server's current host key. Contact your server administrator if you are unsure.
+:::
+
+## 4. Session established
+
+When authentication and key verification succeed, the Rust backend fires the `session_established {tab_id}` Tauri event. The Loading Screen fades out and the xterm.js terminal becomes interactive.
+
+## 5. Active session
+
+With the session live, data flows in both directions:
+
+- **Input** — keystrokes and paste events are sent via the `ssh_pty_write` IPC command from the frontend to the Rust SSH channel, then forwarded to the server.
+- **Output** — server output arrives as `ssh_pty_output {tab_id, data}` Tauri events, which are fed directly into the xterm.js renderer.
+
+Window resize events trigger `ssh_pty_resize`, keeping `$COLUMNS` and `$LINES` accurate on the server.
+
+## 6. Disconnect
+
+A session ends in one of two ways:
+
+- **Intentional close** — closing the tab sends a teardown signal; Rust closes the SSH channel cleanly.
+- **Connection drop** — if the server closes the connection or the network is lost, the tab shows a **Disconnected** banner with a **Reconnect** button. Clicking Reconnect runs through the full lifecycle again from step 1.
+
+:::tip
+If a session drops frequently, check your server's `ClientAliveInterval` / `ClientAliveCountMax` SSH daemon settings and ensure they are set to reasonable values for your network.
+:::

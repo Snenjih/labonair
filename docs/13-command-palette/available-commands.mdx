@@ -1,0 +1,75 @@
+---
+title: "Available Commands"
+description: "A grouped reference of every command available in the Command Palette."
+---
+
+# Available Commands
+
+Commands in the palette are organized into named sections. Some sections are always visible; others appear only when a specific tab type is active. The sections below describe every command available in the default installation.
+
+## Application
+
+These commands are always visible regardless of context.
+
+| Command | Action |
+|---|---|
+| Settings | Opens the Settings window (`Cmd+,`) |
+| Reload Window | Reloads the Tauri WebView (safe when no terminal is focused) |
+| Open Shortcuts | Opens the Keyboard Shortcuts reference dialog |
+| Toggle Sidebar | Shows or hides the file explorer sidebar |
+| Toggle AI Panel | Shows or hides the AI assistant panel |
+
+## Layout
+
+Tab and pane management commands, always available.
+
+| Command | Action |
+|---|---|
+| New Tab | Opens a new home tab |
+| New Terminal Tab | Opens a new local terminal tab directly |
+| Split Pane Vertically | Splits the active pane into left/right halves |
+| Split Pane Horizontally | Splits the active pane into top/bottom halves |
+| Close Pane | Closes the currently focused pane |
+| Close Tab | Closes the active tab |
+
+## Hosts
+
+The **"Connect to Host..."** entry opens a hosts sub-page. This sub-page lists every saved host with its display name as the title and `IP:port` as the subtitle. From this sub-page you can choose either "Connect SSH" or "Open SFTP" for any host.
+
+The host list updates in real-time as hosts are added, edited, or deleted in the Host Manager.
+
+## Themes
+
+The **"Switch Theme..."** entry opens a themes sub-page listing all installed themes by name and author. Hovering a theme triggers a live CSS variable preview — the UI updates instantly to show how the theme looks before you commit. Press `Enter` or click to apply permanently.
+
+## Mode
+
+The **"Switch App Mode..."** entry opens a mode sub-page with three options:
+
+- Light
+- Dark
+- System (follows macOS appearance)
+
+## Editor
+
+These commands appear **only when an editor tab is active**.
+
+| Command | Action |
+|---|---|
+| Format Document | Runs the configured formatter for the current file type |
+| Toggle Word Wrap | Enables or disables line wrapping in the editor |
+| Toggle Line Numbers | Shows or hides the line number gutter |
+
+## SFTP
+
+These commands appear **only when an SFTP tab is active**.
+
+| Command | Action |
+|---|---|
+| Refresh Directory | Reloads the current remote directory listing |
+| New Folder | Creates a new folder in the current remote path |
+| Show Hidden Files | Toggles visibility of dot-prefixed files and directories |
+
+:::tip
+Use the search field to jump to any command instantly. You rarely need to scroll through sections manually — just type a few letters of the command you want.
+:::

@@ -1,0 +1,49 @@
+---
+title: "Tool Approval"
+description: "How the approval flow works when the AI wants to write files, create directories, or run commands."
+---
+
+# Tool Approval
+
+When the AI agent needs to perform an action that modifies your system — writing a file, creating a directory, or running a shell command — it stops and asks for your explicit permission. This is a deliberate safety boundary, not an option you can disable.
+
+## The Approval Card
+
+When the AI reaches an approval-required tool call, the agent loop pauses and an **Approval Card** appears inline in the conversation. The card shows:
+
+- **Tool name** — `write_file`, `create_directory`, or `run_command`
+- **Parameters** — the exact inputs the AI intends to use (file path, command string, directory path)
+- **Description** — a plain-language summary of what the action will do
+
+No further AI output arrives until you respond to the card.
+
+## Responding to a Card
+
+Each card has two buttons:
+
+| Button | Effect |
+|---|---|
+| **Allow** | Executes the tool with the shown parameters; the agent continues |
+| **Deny** | Skips this tool call; the agent is informed it was denied and tries an alternative |
+
+After you respond, the agent resumes automatically. If multiple tool calls were batched in the same step, each one gets its own card — you resolve them one at a time.
+
+## After Approval
+
+The tool runs and its result appears as an expandable inline card beneath the Approval Card. For `write_file`, an **AI Diff tab** opens in the workspace showing a before/after view of the file, so you can review the exact changes that were written.
+
+## There Is No "Allow All"
+
+Each tool call requires individual approval. This is by design — blanket approval for a sequence of file writes or command executions is a common source of unintended consequences. Reviewing each action takes only a second and keeps you in control.
+
+## Denying a Tool Call
+
+Denying does not end the agent run. The AI receives a denial response for that specific tool call and attempts to complete the task through a different approach — for example, asking you to run a command manually, or suggesting an edit rather than writing the file directly.
+
+:::tip
+You can deny a `run_command` tool call if the proposed command looks risky or unexpected. The AI will try an alternative approach. If you are unsure about a command, deny it and ask the AI to explain what it would have done — it will clarify before trying again.
+:::
+
+:::tip
+For `write_file` calls, always check the AI Diff tab that opens after approval. It shows exactly what changed line by line. If the diff is not what you expected, you can manually revert the file — the original version is not automatically saved, so consider using version control or making a backup beforehand on important files.
+:::

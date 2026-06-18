@@ -1,0 +1,56 @@
+---
+title: "Tab Persistence (SSH/SFTP)"
+description: "How Nexum keeps SSH and SFTP sessions alive in the background when you switch away from a tab."
+---
+
+# Tab Persistence (SSH/SFTP)
+
+One of Nexum's most important behaviors is that **switching away from a tab does not end its session**. SSH connections, active terminal processes, and SFTP transfers all continue running in the background while you are looking at a different tab.
+
+## How It Works
+
+Nexum renders all open tabs simultaneously in the DOM — they are never unmounted when you switch away. Instead, inactive tabs are hidden using CSS:
+
+```css
+visibility: hidden;
+pointer-events: none;
+```
+
+This is intentional and foundational to the architecture. The underlying PTY process (local or SSH), the network socket, and any running command all continue exactly as if you were still looking at the tab. When you switch back, the view repaints from the same live stream — no reconnection, no stale output, no missed data.
+
+## Practical Implications
+
+**SSH sessions stay connected.** If you start a long-running command on a remote server (`rsync`, `make`, a database migration), you can switch to your editor tab to review code while it runs. The SSH session doesn't time out, disconnect, or lose output.
+
+**SFTP transfers keep running.** File transfers enqueued in an SFTP tab continue in the background while you work in a terminal. The transfer queue indicator in the Header shows progress at a glance without requiring you to keep the SFTP tab visible.
+
+**Terminal output keeps buffering.** xterm.js continues receiving and buffering output in the background. When you return to the tab, you see everything that was printed while you were away — including content that scrolled past the visible area.
+
+**Switching back is instant.** Because the tab was never unmounted, there is zero reconnection delay. Focus returns immediately and the terminal is ready for input.
+
+:::tip
+You can use this to run parallel workflows across many tabs. Start a build in one SSH tab, monitor logs in another, edit files in an editor tab, and browse the remote filesystem in an SFTP tab — all at the same time, all alive simultaneously.
+:::
+
+## Closing vs. Switching
+
+The key distinction is:
+
+- **Switch away** (`Cmd+1`–`9`, clicking a tab) → session keeps running.
+- **Close** (`Cmd+W`, clicking ×) → session is terminated immediately and permanently.
+
+There is no "pause" or "suspend" state for tabs. Once a tab is closed, its PTY process is killed, the SSH socket is closed, and there is no recovery path.
+
+:::warning
+Do not close an SSH tab if you have an active command running on the remote server that you care about. The SSH session termination sends a hangup signal to the remote shell, which will kill foreground processes. Use `nohup`, `tmux`, or `screen` on the remote side if you need a process to outlive the SSH connection itself.
+:::
+
+## Why Not Unmount?
+
+Unmounting and remounting terminal tabs on every switch would require:
+
+1. Destroying and recreating the xterm.js WebGL renderer (expensive).
+2. Buffering all missed PTY output server-side and replaying it (complex, lossy).
+3. Re-establishing the PTY attachment and resync state.
+
+The hidden-tab approach is simpler, faster, and lossless. The only trade-off is memory: each open tab holds its DOM, WebGL surface, and output buffer in RAM. Nexum uses `@tanstack/react-virtual` for SFTP file lists and bounded terminal scrollback (configurable in Settings) to keep per-tab memory usage practical even with many tabs open.

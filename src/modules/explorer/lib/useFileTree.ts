@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { handleApiError } from "@/lib/errors";
 import { useCallback, useEffect, useState } from "react";
 import { useLocalExplorerStore } from "./useLocalExplorerStore";
@@ -85,9 +86,47 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     }
   }, [rootPath, setRootPath, fetchChildren]);
 
+  // Sync OS watchers with the current tree state on mount/unmount/root change.
+  // The expanded Set in the store survives component unmounts, so on remount we
+  // restore all watchers that were active before the sidebar panel switch.
+  useEffect(() => {
+    if (!rootPath) {
+      void invoke("fs_sync_watchers", { paths: [] });
+      return () => {};
+    }
+    const expandedPaths = [...useLocalExplorerStore.getState().expanded];
+    void invoke("fs_sync_watchers", { paths: [rootPath, ...expandedPaths] });
+
+    return () => {
+      void invoke("fs_sync_watchers", { paths: [] });
+    };
+  }, [rootPath]);
+
+  // Listen for OS-level directory change events and refresh the affected dir.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen<{ path: string }>("fs:dir-changed", (event) => {
+      const { path } = event.payload;
+      const currentNodes = useLocalExplorerStore.getState().nodes;
+      if (currentNodes[path] !== undefined) {
+        void fetchChildren(path);
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
+  }, [fetchChildren]);
+
   const toggle = useCallback(
     (path: string) => {
+      // Read expansion state BEFORE toggling so we know which direction we went.
+      const wasExpanded = useLocalExplorerStore.getState().expanded.has(path);
       toggleExpanded(path);
+      if (wasExpanded) {
+        void invoke("fs_unwatch_dir", { path });
+      } else {
+        void invoke("fs_watch_dir", { path });
+      }
       const node = useLocalExplorerStore.getState().nodes[path];
       if (!node || node.status === "error") {
         void fetchChildren(path);
@@ -99,6 +138,7 @@ export function useFileTree(rootPath: string | null, options?: Options) {
   const expand = useCallback(
     (path: string) => {
       addExpanded(path);
+      void invoke("fs_watch_dir", { path });
       if (!useLocalExplorerStore.getState().nodes[path]) {
         void fetchChildren(path);
       }

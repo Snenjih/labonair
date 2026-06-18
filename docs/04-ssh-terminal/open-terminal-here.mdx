@@ -1,0 +1,41 @@
+---
+title: "Open Terminal Here"
+description: "Launch an SSH terminal tab directly from the SFTP file manager, pre-navigated to the current remote directory."
+---
+
+# Open Terminal Here
+
+When you are browsing a remote server's filesystem in the SFTP pane, you often need to drop into a shell to run a command in that exact directory. The **Open Terminal Here** button eliminates the friction of switching to a terminal and typing `cd /long/nested/path`.
+
+## Using the feature
+
+1. Open an SFTP session to any host.
+2. Navigate to the remote directory you want to work in.
+3. Click the **terminal icon** in the SFTP toolbar (remote pane header).
+
+A new SSH Terminal tab opens immediately. Once the session is established, Nexum automatically runs:
+
+```bash
+cd /path/to/current/remote/directory
+```
+
+The command is injected right after the shell prompt appears, so by the time you see the terminal, you are already in the correct directory.
+
+## No re-authentication
+
+The new SSH terminal session uses the same host credentials as the existing SFTP session. Nexum retrieves the credentials from the macOS Keychain as usual — you will not be asked to log in again.
+
+:::tip
+This works even when the SFTP session uses public-key authentication. The SSH terminal session performs its own independent key negotiation using the same stored key, so the experience is seamless.
+:::
+
+## Relationship between SFTP and SSH sessions
+
+SFTP and SSH terminal sessions are independent connections to the same host. Closing the SSH terminal tab opened with "Open Terminal Here" does not affect the SFTP session, and vice versa. You can have both open at the same time and work in parallel.
+
+## Common use cases
+
+- **Quick file edits** — navigate to a config directory in SFTP, open a terminal, and edit the file with `vim` or `nano`.
+- **Permissions fixes** — browse to a directory in SFTP, open a terminal, and run `chmod` or `chown` on specific files.
+- **Service restarts** — after uploading a new binary or config via SFTP, jump to a terminal in the same directory to restart the service.
+- **Log inspection** — navigate to `/var/log/` in SFTP to see what log files exist, then open a terminal to `tail -f` the relevant one.

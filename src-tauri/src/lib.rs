@@ -474,6 +474,7 @@ pub fn run() {
         .manage(pty::PtyState::default())
         .manage(shell::ShellState::default())
         .manage(secrets::SecretsState::default())
+        .manage(fs::watcher::WatcherState::default())
         .invoke_handler(tauri::generate_handler![
             pty::pty_open,
             pty::pty_write,
@@ -482,6 +483,9 @@ pub fn run() {
             fs::tree::list_subdirs,
             fs::tree::fs_read_dir,
             fs::tree::fs_resolve_path,
+            fs::watcher::fs_watch_dir,
+            fs::watcher::fs_unwatch_dir,
+            fs::watcher::fs_sync_watchers,
             fs::file::fs_read_file,
             fs::file::fs_write_file,
             fs::file::fs_stat,

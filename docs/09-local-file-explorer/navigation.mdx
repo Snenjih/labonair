@@ -1,0 +1,42 @@
+---
+title: "Navigation"
+description: "How to navigate folders and files in the Nexum Local File Explorer."
+---
+
+# Navigation
+
+The Local File Explorer tree is built for quick keyboard and mouse navigation. You can move through deeply nested project directories without taking your hands off the keyboard.
+
+## Mouse navigation
+
+- **Click a folder** — expands or collapses it in place. The folder's contents load on first expand and are cached for the session.
+- **Click a file** — opens it in a new editor tab immediately.
+- **Click the disclosure arrow** (▶/▼) — toggles expansion without changing focus.
+
+## Keyboard navigation
+
+When the explorer panel has focus:
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` | Move selection up or down one item |
+| `→` | Expand a collapsed folder (or move into an already-expanded one) |
+| `←` | Collapse an expanded folder (or move to its parent) |
+| `Enter` | Open the selected file in an editor tab / toggle folder expansion |
+| `Escape` | Dismiss any open context menu |
+
+## Sort order
+
+Folders always appear before files. Within each group, items are sorted alphabetically (case-insensitive). There is no option to change the sort order — use the terminal `ls` command if you need custom sorting.
+
+## Expand / Collapse all
+
+Right-click any folder to access **Expand All** and **Collapse All** options in the context menu. These actions apply recursively to all descendants of the clicked folder, not to the entire tree.
+
+## Navigating up from the root
+
+The explorer root is driven by the active terminal's CWD. To navigate to a parent directory, switch to the terminal tab and run `cd ..` — the explorer root will follow. Alternatively, `cd` to any absolute path in the terminal to jump the explorer root to that location instantly.
+
+:::tip
+For large monorepos, collapse top-level folders you are not working in to keep the tree manageable. Use `Expand All` only on the specific subtree you need.
+:::

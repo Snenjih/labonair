@@ -1,0 +1,60 @@
+---
+title: "Terminal Rendering Issues"
+description: "Fix visual glitches, blank screens, and rendering problems in Nexum's terminal emulator."
+---
+
+# Terminal Rendering Issues
+
+Nexum uses xterm.js with a WebGL addon for hardware-accelerated terminal rendering. Most rendering issues are caused by the WebGL layer, font encoding, or layout measurement edge cases.
+
+## Blank or Black Terminal
+
+The terminal pane appears completely black after opening a new tab or SSH session.
+
+**Cause:** The WebGL renderer failed to initialize, typically because the GPU context was unavailable or WebGL is disabled.
+
+**Resolution:** Nexum automatically falls back to the canvas 2D renderer when WebGL initialization fails. If the terminal is still blank after the fallback:
+1. Close and reopen the terminal tab
+2. If still blank, restart Nexum entirely
+3. If the issue persists across restarts, disable the WebGL addon in Settings → Terminal
+
+## Garbled or Corrupted Characters
+
+Non-ASCII characters appear as boxes, question marks, or random symbols.
+
+**Cause:** Character encoding mismatch — your shell is not using UTF-8.
+
+**Resolution:** Add the following to your `.bashrc` or `.zshrc` on the server:
+```bash
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+```
+Then reconnect. Most modern Linux distributions default to UTF-8, but some minimal server images do not.
+
+## Text Not Wrapping Correctly
+
+Long lines overflow horizontally instead of wrapping, or wrap at the wrong column width.
+
+**Cause:** A window resize event failed to send the updated PTY dimensions (rows/columns) to the shell.
+
+**Resolution:** Close and reopen the terminal tab. This forces a fresh PTY allocation with the correct current size. You can also trigger a re-fit by resizing the Nexum window slightly.
+
+## Colors Look Wrong
+
+Terminal colors do not match what you see in other terminal emulators, or ANSI colors appear washed out or incorrect.
+
+**Cause:** A theme color mapping issue — the active Nexum theme may override ANSI palette colors in an unexpected way.
+
+**Resolution:** Switch to a different theme (Command Palette → "Switch Theme...") and check whether the colors normalize. If a specific theme causes the issue, report it as a theme color mapping bug.
+
+## xterm.js Not Fitting Container
+
+A thin strip of empty space appears beside the terminal, or the terminal seems narrower than the pane.
+
+**Cause:** A rare layout measurement race condition during pane initialization.
+
+**Resolution:** Toggle the sidebar (`Cmd+B` twice) or split and immediately unsplit a pane. Either action triggers a layout recalculation and xterm.js re-fit.
+
+:::tip
+If you frequently see WebGL rendering issues on an older Intel Mac, disable the WebGL addon permanently in Settings → Terminal to use the canvas renderer by default. The performance difference is minor on older hardware.
+:::

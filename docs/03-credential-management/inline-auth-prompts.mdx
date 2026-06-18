@@ -1,0 +1,55 @@
+---
+title: "Inline Auth Prompts"
+description: "How Nexum handles authentication failures and interactive challenges using inline prompts within the connection Loading Screen."
+---
+
+# Inline Auth Prompts
+
+When a connection requires additional authentication input — because no credential is saved, a saved credential is wrong, or the server requires a second factor — Nexum does not open a separate modal window. Instead, the **SSH Loading Screen** transforms in place into an inline authentication form, keeping the entire connection flow contained within the tab.
+
+## When Inline Prompts Appear
+
+| Situation | Prompt Type |
+|---|---|
+| No password saved for this host | Password prompt |
+| Saved password was rejected by server | Password prompt (with error message) |
+| Key is encrypted and no passphrase is saved | Passphrase prompt |
+| Server requires keyboard-interactive (TOTP, etc.) | 2FA / challenge prompt |
+
+## Password Prompt
+
+Shown when SSH password authentication is required and no password is currently stored in Keychain for this host.
+
+- Enter the password in the inline input field.
+- Check **"Save password"** to store it in the macOS Keychain for future connections.
+- Press `Enter` or click **Connect** to retry the connection immediately.
+
+If the password is wrong, the prompt reappears with a brief error message beneath the field.
+
+## Passphrase Prompt
+
+Shown when the configured SSH key is encrypted with a passphrase and no passphrase is currently stored in Keychain.
+
+- Enter the passphrase for the private key file.
+- Check **"Save passphrase"** to store it in Keychain keyed by the host's UUID.
+- Submit to retry the connection using the decrypted key.
+
+## 2FA / Keyboard-Interactive Prompt
+
+Shown when the server sends a keyboard-interactive challenge — typically a TOTP code request (Google Authenticator, Authy, etc.) or a custom PAM challenge message. The server's challenge message is displayed verbatim above the input field so you know exactly what is being asked.
+
+- Enter the current TOTP code or challenge response.
+- **2FA codes are never saved.** They expire in seconds and caching them would provide no benefit.
+- Submit to send the response to the server. If further challenges follow (multi-step keyboard-interactive), additional prompts appear in sequence.
+
+:::warning
+Never share a TOTP code with anyone. Nexum only transmits it directly to the SSH server — it is not logged, cached, or sent anywhere else.
+:::
+
+## Submitting and Retrying
+
+All inline prompts retry the connection immediately on submit — there is no separate "Reconnect" button. If authentication succeeds, the prompt disappears and the terminal (or SFTP browser) becomes active. If it fails again, the appropriate prompt reappears.
+
+## Styling and Layout
+
+All inline auth prompts are rendered inside the Loading Screen component — the same space occupied by the connection progress indicators. No overlays, no modal dialogs, and no focus traps that interfere with other open tabs. The rest of the Nexum workspace remains accessible while a prompt is waiting for input.

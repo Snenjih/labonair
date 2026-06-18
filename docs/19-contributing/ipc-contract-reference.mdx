@@ -1,0 +1,81 @@
+---
+title: "IPC Contract Reference"
+description: "Complete reference of Tauri invoke() commands and Rust-to-frontend events in Nexum."
+---
+
+# IPC Contract Reference
+
+All communication between the React frontend and the Rust backend uses Tauri's IPC layer. This page is the authoritative reference for all registered commands and events.
+
+## Rust Commands (`invoke()`)
+
+### Host Management
+
+| Command | Description |
+|---|---|
+| `hosts_get_all` | Returns all saved hosts as a JSON array |
+| `hosts_create` | Creates a new host record in SQLite |
+| `hosts_update` | Updates an existing host record |
+| `hosts_delete` | Deletes a host by ID |
+| `groups_get_all` | Returns all host groups |
+| `groups_create` | Creates a new group |
+| `groups_delete` | Deletes a group by ID |
+
+### SSH & Terminal
+
+| Command | Description |
+|---|---|
+| `ssh_connect` | Opens an SSH connection and returns a session ID |
+| `ssh_disconnect` | Closes an SSH session |
+| `ssh_pty_write` | Sends data to an SSH PTY session |
+| `ssh_pty_resize` | Sends a resize event (rows/cols) to an SSH PTY |
+| `pty_open` | Opens a local PTY session |
+| `pty_write` | Sends data to a local PTY session |
+| `pty_resize` | Resizes a local PTY session |
+| `pty_close` | Closes a local PTY session |
+| `shell_run_command` | One-shot subshell exec (used by AI tools only) |
+
+### SFTP
+
+| Command | Description |
+|---|---|
+| `sftp_read_dir` | Lists directory contents at a remote path |
+| `sftp_rename` | Renames a remote file or directory |
+| `sftp_delete` | Deletes a remote file or directory |
+| `sftp_mkdir` | Creates a remote directory |
+| `sftp_chmod` | Changes permissions on a remote file |
+| `enqueue_transfer` | Adds a file transfer to the background queue |
+| `cancel_transfer` | Cancels a queued or in-progress transfer |
+| `resolve_conflict` | Resolves a file conflict (overwrite / skip / rename) |
+| `prepare_remote_edit` | Downloads a remote file for local editing |
+| `save_remote_edit` | Uploads edited file content back to the remote |
+
+### Themes
+
+| Command | Description |
+|---|---|
+| `themes_get_all` | Returns all installed themes |
+| `theme_import` | Imports a theme JSON file |
+| `theme_export` | Exports a theme to a JSON file |
+| `theme_delete` | Deletes a theme by ID |
+
+## Tauri Events (Rust → React)
+
+These events are emitted by the Rust backend and received via `listen()` in the frontend.
+
+| Event | Payload | Description |
+|---|---|---|
+| `transfer_progress` | `{ id, bytes_sent, total_bytes, status }` | Transfer queue progress update |
+| `file_conflict` | `{ transfer_id, remote_path, local_path }` | Transfer conflict requiring user resolution |
+| `ssh_pty_output` | `{ tab_id: string, data: string }` | SSH terminal output chunk |
+| `auth_required` | `{ tab_id, prompt_message, is_2fa }` | Auth prompt (password or 2FA code) |
+| `session_established` | `{ tab_id }` | SSH connection fully authenticated |
+| `known_hosts_warning` | `{ tab_id, fingerprint, host, is_mismatch }` | Server fingerprint check required |
+
+:::tip
+For new features that require a long-running background task, use a Tauri event (emitted from a `tokio::spawn` task) rather than polling via `invoke()`. This keeps the UI reactive without unnecessary request overhead.
+:::
+
+:::warning
+The `shell_run_command` command is reserved for AI tool use. Do not use it as a general-purpose shell executor from other UI surfaces — it bypasses the PTY session model and does not support interactive input.
+:::

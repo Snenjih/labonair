@@ -1,0 +1,98 @@
+---
+title: "Theme JSON Format"
+description: "Full reference for the Nexum theme JSON schema including all required color keys."
+---
+
+# Theme JSON Format
+
+A Nexum theme is a single JSON file with three top-level fields and a flat `colors` map. All color values must be valid HEX strings (3- or 6-digit, with `#` prefix).
+
+## Full Schema
+
+```json
+{
+  "name": "My Theme",
+  "author": "Your Name",
+  "type": "dark",
+  "colors": {
+    "background": "#0f111a",
+    "foreground": "#e4e4e5",
+    "card": "#161824",
+    "card_foreground": "#e4e4e5",
+    "popover": "#161824",
+    "popover_foreground": "#e4e4e5",
+    "primary": "#6366f1",
+    "primary_foreground": "#ffffff",
+    "secondary": "#1e2030",
+    "secondary_foreground": "#e4e4e5",
+    "muted": "#1e2030",
+    "muted_foreground": "#6b7280",
+    "accent": "#1e2030",
+    "accent_foreground": "#e4e4e5",
+    "destructive": "#e06c75",
+    "border": "#2a2d3e",
+    "input": "#2a2d3e",
+    "ring": "#6366f1",
+    "terminal_black": "#1c1e2b",
+    "terminal_red": "#e06c75",
+    "terminal_green": "#98c379",
+    "terminal_yellow": "#e5c07b",
+    "terminal_blue": "#61afef",
+    "terminal_magenta": "#c678dd",
+    "terminal_cyan": "#56b6c2",
+    "terminal_white": "#abb2bf",
+    "terminal_bright_black": "#5c6370",
+    "terminal_bright_red": "#e06c75",
+    "terminal_bright_green": "#98c379",
+    "terminal_bright_yellow": "#e5c07b",
+    "terminal_bright_blue": "#61afef",
+    "terminal_bright_magenta": "#c678dd",
+    "terminal_bright_cyan": "#56b6c2",
+    "terminal_bright_white": "#ffffff"
+  }
+}
+```
+
+## Top-Level Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Display name shown in the Theme Picker |
+| `author` | string | No | Attribution shown in the Theme Picker |
+| `type` | `"dark"` or `"light"` | Yes | Sets the OS titlebar color scheme |
+
+The `type` field tells macOS whether to render the native window titlebar in dark or light mode. Use `"dark"` for themes with a dark background and `"light"` for themes with a light background.
+
+## UI Color Keys
+
+These tokens map to CSS custom properties on `:root` and drive the entire app shell:
+
+| Key | Purpose |
+|---|---|
+| `background` | Main app background |
+| `foreground` | Primary text color |
+| `card` / `card_foreground` | Card and panel surfaces |
+| `popover` / `popover_foreground` | Dropdowns, tooltips, context menus |
+| `primary` / `primary_foreground` | Accent color (buttons, active states) |
+| `secondary` / `secondary_foreground` | Secondary surfaces |
+| `muted` / `muted_foreground` | Subdued backgrounds and placeholder text |
+| `accent` / `accent_foreground` | Hover states, subtle highlights |
+| `destructive` | Delete and error states |
+| `border` | Dividers and component borders |
+| `input` | Input field background |
+| `ring` | Focus ring color |
+
+## Terminal ANSI Color Keys
+
+All 16 `terminal_*` keys are required. They map directly to xterm.js's color slots:
+
+- `terminal_black` through `terminal_white` — the standard 8 ANSI colors (indices 0–7)
+- `terminal_bright_black` through `terminal_bright_white` — the bright variants (indices 8–15)
+
+:::warning
+Omitting any `terminal_*` key causes xterm.js to fall back to its built-in defaults for that slot, breaking color consistency with the rest of your theme. Always include all 16 keys.
+:::
+
+:::tip
+All color values must be 6-digit HEX strings prefixed with `#`. Short 3-digit hex and named CSS colors are not supported by the theme engine.
+:::

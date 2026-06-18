@@ -1,0 +1,37 @@
+---
+title: "Snippets Overview"
+description: "An introduction to Nexum Snippets — saved text blocks for quick insertion into terminal sessions."
+---
+
+# Snippets Overview
+
+Snippets are saved text blocks that let you insert frequently used content into a terminal session with a few keystrokes. If you find yourself typing the same connection strings, deployment commands, configuration blocks, or one-liners repeatedly, snippets eliminate that repetition entirely.
+
+## What snippets are for
+
+Common use cases include:
+
+- **Shell commands** — long `curl` commands, `docker run` invocations, `kubectl` queries
+- **Connection strings** — database DSNs, API base URLs, environment variable exports
+- **Configuration blocks** — nginx server blocks, systemd unit templates, SSH config entries
+- **Maintenance scripts** — log rotation commands, backup invocations, cron expressions
+- **Multi-line scripts** — short shell scripts that you run regularly but do not want to keep in a separate file
+
+## Where snippets are stored
+
+Snippets are stored locally in Nexum's application data directory on your Mac. They are not synced to any cloud service and are not tied to a specific host or session. All snippets are available in every terminal tab.
+
+## How to access snippets
+
+There are two ways to reach your snippets:
+
+1. **Command Palette** (`Cmd+K`) — search for a snippet by name and insert it directly into the active terminal.
+2. **Snippets panel** — a dedicated panel in the sidebar that lists all saved snippets and lets you browse, create, edit, and delete them.
+
+## Insertion behavior
+
+Snippets insert text at the current cursor position in the active terminal PTY. They do not execute — the content is pasted as text and you press `Enter` to run it (or not). This means you can inspect or modify the snippet content before running, just as you would with any pasted text.
+
+:::tip
+Snippets are ideal for commands with multiple flags that are hard to remember but wrong to run without double-checking. The insert-then-review workflow keeps you in control.
+:::

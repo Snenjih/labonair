@@ -1,0 +1,52 @@
+---
+title: "Switching Themes"
+description: "How to open the Theme Picker and change your active theme in Nexum."
+---
+
+# Switching Themes
+
+Nexum provides two entry points to switch themes: the Settings window and the Command Palette. Both open the same Theme Picker overlay.
+
+## Opening the Theme Picker
+
+**Via Settings:**
+
+1. Press `Cmd+,` to open Settings.
+2. Navigate to **Appearance** in the left sidebar.
+3. Click the **Theme** button — this opens the Theme Picker overlay.
+
+**Via Command Palette:**
+
+1. Press `Cmd+K` to open the Command Palette.
+2. Type `Switch Theme` and select the result.
+3. You are taken directly to the Themes sub-page in the palette.
+
+## Using the Theme Picker
+
+The Theme Picker lists all available themes in a scrollable grid — built-in themes appear first, followed by user-installed themes in alphabetical order.
+
+### Live Preview on Hover
+
+Hover over any theme in the list to instantly preview it. The application's CSS variables are updated in real time, so you see the exact colors applied to the terminal, editor, and app shell before committing to a choice. Move your cursor away to revert to the current theme.
+
+### Activating a Theme
+
+Click any theme tile to permanently activate it. The selected theme is highlighted with a checkmark badge. The change takes effect immediately across the entire application:
+
+- The terminal updates its background and all 16 ANSI color slots.
+- The editor refreshes its syntax token colors.
+- The app shell (sidebar, header, panels) repaints with the new palette.
+
+No restart is required.
+
+## Active Theme Indicator
+
+The Theme Picker always shows which theme is currently active. When you reopen the picker, the active theme is scrolled into view and marked with a checkmark so you always know your current selection.
+
+:::tip
+Use `Cmd+K` → "Switch Theme" for the fastest workflow when you want to cycle through themes quickly. The Command Palette keeps the last sub-page in memory during the same session.
+:::
+
+:::warning
+Switching themes while a long-running SSH session is active is safe — it only affects rendering and does not interrupt any connections or transfers.
+:::

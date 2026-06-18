@@ -1,0 +1,74 @@
+---
+title: "Interface Overview"
+description: "A map of every UI region in Nexum — tab bar, header, sidebar, workspace, and status bar."
+---
+
+# Interface Overview
+
+Nexum's layout is designed around a central **workspace** flanked by supporting chrome. Every region is purpose-built to stay out of your way while keeping the tools you need one shortcut away. This page describes each area and its key interactions.
+
+## Tab Bar
+
+The **Tab Bar** runs across the top of the window and displays all currently open tabs. Each tab shows an icon indicating its type (terminal, SSH, SFTP, editor, home) and a label derived from the session or file name.
+
+- Click any tab to switch to it.
+- `Cmd+T` opens a new Home tab.
+- `Cmd+W` closes the active tab.
+- `Cmd+1` through `Cmd+9` jump to a specific tab by position.
+- Right-click a tab for additional options: rename, duplicate, close others.
+
+:::tip
+Switching tabs does not disconnect SSH sessions or stop SFTP transfers. Background sessions continue running while another tab is active.
+:::
+
+## Header / Titlebar
+
+The **Header** sits above the tab bar and contains the app name, the **transfer queue indicator** (a progress badge that appears during active file transfers), and the native macOS window controls. On Apple Silicon Macs with a notch, Nexum insets the header content to avoid overlap.
+
+The transfer queue indicator is clickable — it opens a transfer status panel showing active, queued, and recently completed transfers.
+
+## Sidebar
+
+The **Sidebar** occupies the left edge of the window and is toggleable with `Cmd+B`. It contains two panels:
+
+- **File Explorer** — A local directory tree. Navigate your filesystem, open files in editor tabs, and drag files to SFTP tabs to upload them.
+- **AI Panel** — The AI assistant chat interface. Type a prompt, attach selections from the terminal or editor, and invoke AI tools. Toggle the AI panel specifically with `Cmd+Shift+A`.
+
+The sidebar is resizable by dragging its right edge.
+
+## Workspace
+
+The **Workspace** is the large center area where tab content renders. Depending on the active tab kind:
+
+- **Home** — Host Manager dashboard with host list and connection actions.
+- **Terminal / SSH Terminal** — A full xterm.js WebGL terminal.
+- **SFTP** — A split-pane file manager.
+- **Editor** — A CodeMirror 6 code editor.
+- **AI Diff** — A diff review panel for AI-proposed file changes.
+
+The workspace supports **split panes** — you can divide it horizontally or vertically to view two tabs side by side. See the Split Panes guide for details.
+
+## Status Bar
+
+The **Status Bar** runs along the bottom of the window. It displays:
+
+- **Cwd Breadcrumb** — The current working directory of the active terminal, updated in real time via shell integration OSC sequences.
+- **AI Status Indicator** — Shows whether the AI agent is idle, thinking, or running a tool.
+- **Connection Info** — For SSH/SFTP tabs, shows the remote host and username.
+
+## Settings
+
+Press `Cmd+,` to open the **Settings** window. Settings is a separate modal window with a sidebar navigation covering: General, Appearance, Terminal, Editor, SSH, AI, and About sections.
+
+## Command Palette
+
+The **Command Palette** is the fastest way to access any feature. Open it with `Cmd+K` or `Cmd+Shift+P`. Type to filter:
+
+- Host names → connect via SSH or SFTP
+- Tab actions → new tab, close tab, split pane
+- App actions → open settings, toggle sidebar, check for updates
+- File actions → open file, recent files
+
+:::tip
+The Command Palette works from anywhere in the app, including inside a focused terminal. Press `Cmd+K` and start typing — you do not need to click away from the terminal first.
+:::

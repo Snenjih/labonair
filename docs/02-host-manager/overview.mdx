@@ -1,0 +1,41 @@
+---
+title: "Host Manager Overview"
+description: "The Home Dashboard is your central hub for managing saved SSH and SFTP hosts in Nexum."
+---
+
+# Host Manager Overview
+
+The **Home Dashboard** is the default landing page when you open Nexum. It gives you a searchable, organized view of every saved host — so you can reach any server in seconds without memorizing connection details.
+
+## Accessing the Host Manager
+
+Open the Home Dashboard at any time by clicking the **Home** tab in the tab bar, or pressing `Cmd+Shift+H`. If you have no hosts saved yet, the dashboard shows an empty state with a prompt to add your first host.
+
+## Layout
+
+Hosts are displayed as cards arranged in a grid (or list, depending on your view preference). Cards show the host's display name, hostname, username, and any assigned color label. Hosts are organized into **groups** — collapsible sections that let you separate production, staging, and personal servers at a glance.
+
+A **search bar** at the top of the dashboard filters hosts by display name, hostname, or username in real time. This works across all groups simultaneously.
+
+## Data Storage
+
+Nexum uses a strict two-store model to protect your credentials:
+
+- **Host metadata** (display name, hostname, port, username, auth method, group assignment) is stored in a local SQLite database at `~/.local/share/com.nexum.app/nexum.db`.
+- **Passwords and passphrases** are stored separately in the macOS Keychain, referenced by the host's unique UUID — never written to SQLite or any file on disk.
+
+This means that even if someone copies your database file, they cannot obtain any credentials from it.
+
+## Connecting to a Host
+
+Double-click any host card to open an SSH terminal connection. Right-click a card to choose between **Connect SSH** and **Open SFTP**, or to access edit and management actions.
+
+:::tip
+Use the Command Palette (`Cmd+K`) and type "Add Host" or "Connect" to quickly reach any host management action from anywhere in the app.
+:::
+
+## What's Next
+
+- [Creating a Host](./creating-a-host) — add your first server
+- [Host Groups](./host-groups) — organize hosts into logical collections
+- [Connecting to a Host](./connecting-to-a-host) — understand the connection flow and auth prompts

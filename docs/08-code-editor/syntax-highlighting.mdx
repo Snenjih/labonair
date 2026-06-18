@@ -1,0 +1,47 @@
+---
+title: "Syntax Highlighting"
+description: "How Nexum auto-detects file languages and applies syntax highlighting using CodeMirror 6 language packs."
+---
+
+# Syntax Highlighting
+
+Nexum uses **CodeMirror 6** language packs for syntax highlighting. Language detection is fully automatic — you never need to select a language from a dropdown.
+
+## How language detection works
+
+When a file opens, Nexum's `languageResolver.ts` module inspects the file extension and maps it to the appropriate CodeMirror language pack. If the extension is recognized, the correct grammar loads immediately. If the file has no extension (or an unrecognized one), the editor falls back to plain text mode with no highlighting applied.
+
+## Supported languages
+
+The following languages are supported out of the box:
+
+| Category | Languages |
+|---|---|
+| Web | TypeScript, JavaScript, TSX, JSX, HTML, CSS, SCSS |
+| Systems | Rust, C, C++ |
+| Scripting | Python, Ruby, Lua |
+| DevOps | Shell/Bash, Zsh, YAML, TOML, Dockerfile, Nginx config |
+| Data | JSON, XML, SQL |
+| Go ecosystem | Go, Go templates |
+| Documentation | Markdown, MDX |
+| Other | Kotlin, Java, Swift, PHP, and more |
+
+:::tip
+If a file uses an unconventional extension, rename it temporarily (or use the remote edit workflow) to get correct highlighting. For example, renaming `Makefile.custom` to `Makefile` will trigger Makefile highlighting.
+:::
+
+## Theme integration
+
+Syntax colors are not hardcoded. Nexum injects the active theme's CSS variables into the CodeMirror editor, so keywords, strings, comments, and other tokens all follow the current Nexum theme. Switching themes in Settings updates syntax colors across all open editor tabs in real time — no reload required.
+
+## Lazy loading
+
+Language packs are loaded on demand. Only the grammar for the file currently being opened is fetched at that moment. Switching between a Rust file and a Python file loads the Python pack only when you open the Python file. This keeps Nexum's startup time fast regardless of how many language packs are bundled.
+
+## Plain text fallback
+
+Files without a recognized extension (e.g., `Makefile`, `Vagrantfile`, lock files with unusual names) open in plain text mode. All other editor functionality — auto-save, word wrap, line numbers, bracket matching — remains fully available.
+
+:::warning
+Syntax highlighting is a display-only feature. It never modifies the file content. Changing themes or the detected language does not alter what is saved to disk.
+:::

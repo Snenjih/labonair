@@ -1,0 +1,55 @@
+---
+title: "Theme Switcher via Palette"
+description: "Switch and preview themes instantly using the Command Palette without opening Settings."
+---
+
+# Theme Switcher via Palette
+
+The Command Palette provides a quick path to switching themes with live preview, so you can see exactly how a theme looks before committing to it. This is faster than navigating to Settings → Appearance.
+
+## Opening the Theme Sub-Page
+
+1. Press `Cmd+K` to open the Command Palette
+2. Type `theme` or select **"Switch Theme..."** from the list
+3. The Themes sub-page opens, listing all installed themes
+
+## Theme List
+
+Each entry in the Themes sub-page shows:
+
+- **Name** — the theme's display name
+- **Author** — the theme creator's name or handle
+
+The currently active theme is marked with a checkmark indicator on the right side of the row.
+
+## Live Preview
+
+Hovering over any theme in the sub-page triggers an immediate live preview. Nexum injects the theme's CSS variables onto `document.documentElement.style`, updating every color in the UI in real time. This is the same preview mechanism used in the Settings Theme Picker.
+
+The preview is non-destructive while you are in the palette — your actual saved theme preference has not changed yet.
+
+## Applying a Theme
+
+Press `Enter` or click the theme name to apply it permanently. Nexum:
+
+1. Sets the theme as the active theme in the preferences store
+2. Writes the selection to persistent storage (via `tauri-plugin-store`)
+3. Closes the palette
+
+## Canceling
+
+Press `Escape` to cancel without changing the theme. Nexum reverts the live preview CSS variables back to your previously active theme. The escape hierarchy applies:
+
+1. First `Escape` clears the search text within the sub-page
+2. Second `Escape` goes back to the main palette page
+3. Third `Escape` closes the palette entirely
+
+In all cases, no theme change is committed unless you pressed `Enter` or clicked a theme.
+
+:::tip
+Use the search field in the Themes sub-page to filter by theme name or author. This is useful when you have a large collection of community themes installed.
+:::
+
+:::tip
+To install new themes, use Settings → Appearance → Theme Picker → Import. Once imported, themes appear in the palette immediately.
+:::

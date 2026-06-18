@@ -1,0 +1,48 @@
+---
+title: "Multi-Select & Bulk Actions"
+description: "Select multiple hosts at once to move or delete them in a single operation."
+---
+
+# Multi-Select & Bulk Actions
+
+When you need to reorganize or clean up multiple hosts at once, Nexum's multi-select mode lets you act on a set of hosts in a single step rather than repeating the same action for each one individually.
+
+## Selecting Multiple Hosts
+
+| Action | Result |
+|---|---|
+| `Cmd+Click` a host card | Adds or removes that host from the selection |
+| `Shift+Click` a host card | Selects all hosts between the last-selected card and the clicked card |
+| Click an empty area of the dashboard | Deselects all |
+| Press `Escape` | Clears the entire selection |
+
+Multi-select works across groups — you can select hosts from different group sections in the same operation.
+
+## The Bulk Action Toolbar
+
+As soon as two or more hosts are selected, a **bulk action toolbar** slides up at the bottom of the Home Dashboard. The toolbar shows:
+
+- A count of selected hosts (e.g. "5 hosts selected").
+- The available bulk actions.
+
+The toolbar dismisses automatically when the selection is cleared.
+
+## Available Bulk Actions
+
+### Move to Group
+
+Opens a dropdown listing all existing groups plus an **Ungrouped** option. Select a destination group to reassign all selected hosts at once. The move is saved to SQLite immediately and the dashboard updates in place.
+
+### Delete
+
+Triggers a single confirmation dialog listing the number of hosts to be deleted (e.g. "Delete 5 hosts?"). Confirming permanently removes all selected hosts and their corresponding macOS Keychain entries.
+
+:::warning
+Bulk delete is irreversible. All Keychain entries for the selected hosts are removed at the same time. Double-check your selection before confirming.
+:::
+
+## Tips for Efficient Reorganization
+
+- Use `Shift+Click` to quickly grab a contiguous block of hosts that all belong in the same target group.
+- To move hosts between groups without bulk delete, select them and use **Move to Group** rather than deleting and re-creating.
+- The `Escape` key is the fastest way to deselect everything if you change your mind mid-operation.

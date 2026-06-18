@@ -1,0 +1,52 @@
+---
+title: "Sub-Agents (Experimental)"
+description: "How Nexum's AI can spawn secondary agent instances to handle complex multi-part tasks in parallel or in sequence."
+---
+
+# Sub-Agents (Experimental)
+
+For particularly complex tasks, the main AI agent can delegate subtasks to **sub-agents** — independent AI instances with their own context window, tool access, and reasoning loop. This is an experimental feature currently available when the `subagent` tool is included in the active tool set.
+
+## What Is a Sub-Agent?
+
+A sub-agent is a separate invocation of the AI model that runs a focused task on behalf of the main agent. The main agent defines the subtask clearly, hands it off, and waits for the result. The sub-agent works through its assigned task using the same tools (read_file, write_file, run_command, etc.) and returns a summary of what it did and what it found.
+
+Think of it as the main agent delegating to a specialist: "go investigate the authentication module and tell me what is wrong."
+
+## When Sub-Agents Are Used
+
+The main agent decides autonomously when to use sub-agents. It typically does so when:
+
+- A task has clearly separable parts that each require significant independent reasoning
+- One part of a task requires deep file exploration that would pollute the main context window
+- A subtask is well-defined enough to be delegated with a clear scope
+
+You cannot manually invoke a sub-agent directly — the main agent creates them as part of its tool calling.
+
+## UI: Nested Agent Cards
+
+Sub-agent activity is shown inline in the conversation as a **nested card** with a distinct visual style. Each card shows:
+
+- The subtask description passed to the sub-agent
+- The sub-agent's tool calls (expandable)
+- The final result returned to the main agent
+
+The main agent's reasoning picks up from where the sub-agent's result left off.
+
+## Security and Restrictions
+
+Sub-agents are subject to the same security deny-list and approval requirements as the main agent. A sub-agent that tries to write a file will still surface an Approval Card in the main conversation — sub-delegation does not bypass human-in-the-loop controls.
+
+## Current Limitations
+
+- Sub-agents are experimental and may not be available in all configurations
+- Sub-agents do not have access to the live terminal context (CWD and buffer) — only the main agent receives live context
+- Deeply nested sub-agents (sub-agents spawning their own sub-agents) are not supported
+
+:::warning
+Because sub-agents run independently, errors in a sub-agent task may not be immediately obvious in the main conversation. If the main agent's output seems incomplete or inconsistent, expand the sub-agent card to inspect what the sub-agent actually did and returned.
+:::
+
+:::tip
+Sub-agents work best when your task is clearly decomposable. For most everyday tasks — editing a file, running a command, explaining an error — the main agent alone is sufficient. Sub-agents add value for tasks like "audit the entire authentication system and propose fixes" where deep isolated investigation is genuinely useful.
+:::

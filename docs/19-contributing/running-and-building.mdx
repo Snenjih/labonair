@@ -1,0 +1,93 @@
+---
+title: "Running & Building"
+description: "How to set up the development environment and build Nexum from source."
+---
+
+# Running & Building
+
+This page covers everything you need to get Nexum running locally from source.
+
+## Prerequisites
+
+Before running any commands, ensure the following are installed:
+
+- **Rust** — stable toolchain via [rustup](https://rustup.rs/)
+- **Node.js** — version 20 or higher
+- **pnpm** — install via `npm install -g pnpm`
+- **macOS** — Nexum is currently macOS-only
+- **Xcode Command Line Tools** — run `xcode-select --install` if not already installed
+
+## Install Dependencies
+
+```bash
+pnpm install
+```
+
+This installs all JavaScript dependencies. Rust dependencies are managed by Cargo and downloaded automatically on first build.
+
+## Development Modes
+
+### Frontend Only (Fast)
+
+```bash
+pnpm dev
+```
+
+Starts the Vite dev server with HMR. The app runs in a browser tab at `localhost:1420`. Tauri IPC calls are mocked or unavailable — use this mode for rapid UI iteration.
+
+### Full Tauri App (Recommended)
+
+```bash
+pnpm tauri dev
+```
+
+Builds the Rust backend, starts the Vite dev server, and opens the full Nexum app window. All IPC calls work. The Rust backend is rebuilt automatically when you change `.rs` files (via `cargo watch`). Frontend changes HMR instantly without restarting the Rust process.
+
+Initial Rust compilation takes 2–5 minutes on first run. Subsequent incremental builds are seconds.
+
+## Production Build
+
+```bash
+pnpm tauri build
+```
+
+Produces a signed `.app` bundle and optional `.dmg` installer in `src-tauri/target/release/bundle/`. This requires a valid macOS code signing identity for distribution; unsigned builds work for local testing.
+
+## Verification Commands
+
+Run these before every commit and PR:
+
+```bash
+# TypeScript type check — must produce zero errors
+pnpm exec tsc --noEmit
+
+# Rust compilation check — must produce zero errors
+cd src-tauri && cargo check
+
+# Rust linting — address all warnings
+cd src-tauri && cargo clippy
+
+# JavaScript/TypeScript linting
+pnpm lint
+
+# Code formatting
+pnpm format
+
+# Combined lint + format + fix
+pnpm check
+
+# Dead code detection
+pnpm knip
+```
+
+## Common Issues
+
+**`cargo check` fails on first run** — Run `rustup update stable` to ensure you have the latest stable Rust toolchain.
+
+**WKWebView crashes in dev mode** — Use `pnpm tauri dev` and check the terminal output for Rust panics. If the UI is blank, the WebContent process crashed — restart with `pnpm tauri dev`.
+
+**`pnpm install` fails with peer dependency errors** — Ensure you are using Node.js 20+. Run `node --version` to check.
+
+:::tip
+Use `pnpm dev` for pure UI work (styling, component layout, command palette behavior) and `pnpm tauri dev` for any work that requires actual SSH connections, file system access, or Rust command changes.
+:::

@@ -1,0 +1,59 @@
+---
+title: "Changelog & Release Notes"
+description: "Where to find Nexum's version history, how releases are structured, and what each section means."
+---
+
+# Changelog & Release Notes
+
+Nexum follows [Semantic Versioning](https://semver.org) (`major.minor.patch`) and maintains a full changelog in the repository. Every release has structured notes so you know exactly what changed and whether anything requires action on your part.
+
+## Where to Find the Changelog
+
+- **In the repository:** `CHANGELOG.md` at the root of the project contains the full version history in chronological order, newest first.
+- **On GitHub:** The [Releases page](https://github.com/nexum-app/nexum/releases) mirrors the changelog entries as individual release notes, formatted for the web.
+- **In the app:** When the auto-updater detects a new version, it displays an abridged version of the release notes inside the "Update Available" dialog — so you can read what's new before choosing to install.
+
+## How Releases Are Structured
+
+Each release entry in `CHANGELOG.md` follows this structure:
+
+```
+## [x.y.z] - YYYY-MM-DD
+
+### Added
+- New features introduced in this release.
+
+### Changed
+- Modifications to existing behavior.
+
+### Fixed
+- Bug fixes. References GitHub issue numbers where applicable (#123).
+
+### Removed
+- Features or options that have been removed.
+
+### Breaking Changes
+- Any change that requires user action or may affect existing configuration.
+```
+
+The **Breaking Changes** section only appears when a release contains something that could disrupt existing workflows — for example, a renamed IPC command, a changed settings key, or a removed feature. If this section is absent, the update is safe to apply without any manual intervention.
+
+## Version Numbering
+
+| Component | Meaning |
+|---|---|
+| `major` | Significant architectural change or breaking overhaul |
+| `minor` | New features, new tab types, new integrations |
+| `patch` | Bug fixes, performance improvements, small UI polish |
+
+Pre-release versions (alpha, beta, release candidates) are published to GitHub with the `-alpha.N`, `-beta.N`, or `-rc.N` suffix and are not surfaced by the auto-updater in stable builds.
+
+## Staying Up to Date
+
+- **Watch the repository** on GitHub (click Watch → Custom → Releases) to get an email notification for every new release.
+- **Star the repository** to follow development progress.
+- Enable **automatic update checks** in Settings (`Cmd+,`) → General so Nexum notifies you in-app when a new version is ready.
+
+:::tip
+The `CHANGELOG.md` file also functions as a useful reference when debugging unexpected behavior after an update. If something stopped working after a specific version, search the changelog for that version's "Changed" or "Breaking Changes" entries to find the relevant modification.
+:::

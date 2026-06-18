@@ -1,0 +1,47 @@
+---
+title: "File Manager Settings"
+description: "Reference for Nexum's File Manager settings: view mode, SFTP conflict behavior, and hidden files."
+---
+
+# File Manager Settings
+
+File Manager settings configure the behavior of the Home Dashboard host grid and the SFTP file manager used during remote sessions. Open them via **Settings (`Cmd+,`) → File Manager**.
+
+## Default View
+
+Controls the layout of the Home Dashboard, where your saved hosts and groups are displayed:
+
+| Option | Behavior |
+|---|---|
+| Grid | Host cards displayed in a visual grid with connection status indicators |
+| List | Hosts displayed as a compact, single-column list with more detail visible at once |
+
+The grid view is better for quick visual scanning across many hosts; the list view is more efficient when you have a large number of hosts and prefer density over visual card style.
+
+## SFTP Transfer Mode
+
+Determines the default behavior when a file transfer conflict is detected — that is, when a file being transferred already exists at the destination:
+
+| Option | Behavior |
+|---|---|
+| Always Ask | Nexum pauses the transfer and shows a conflict resolution dialog for each conflicting file (default) |
+| Always Overwrite | Conflicting destination files are silently replaced without prompting |
+| Always Skip | Conflicting files are skipped; existing destination files are not modified |
+
+:::warning
+**Always Overwrite** is convenient for automated-style workflows but carries risk — there is no undo for overwritten remote files. Use with caution on production servers.
+:::
+
+## Show Hidden Files
+
+When enabled, the SFTP file manager displays dotfiles (files and directories whose names begin with `.`) alongside regular files. Disabled by default.
+
+Toggle this setting to access configuration files like `.bashrc`, `.ssh/config`, or application config directories without leaving Nexum.
+
+:::tip
+You can also toggle hidden file visibility quickly from within the SFTP file manager toolbar without opening Settings — look for the eye icon in the toolbar.
+:::
+
+## Local Pane Start Path
+
+The default starting directory for the local pane in the SFTP split-pane view. Defaults to `~` (your home directory). Set this to any absolute path, for example `/var/www` or `/Users/you/projects`, if you consistently work from a specific location.

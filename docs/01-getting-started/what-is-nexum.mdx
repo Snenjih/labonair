@@ -1,0 +1,38 @@
+---
+title: "What is Nexum"
+description: "An overview of Nexum — the open-source macOS SSH/SFTP client, terminal emulator, and AI workspace."
+---
+
+# What is Nexum
+
+Nexum is an open-source, native macOS application that combines an SSH terminal client, SFTP file manager, local terminal emulator, and an AI assistant into a single cohesive workspace. It targets sysadmins and backend developers who need a fast, secure, and integrated environment for working on remote servers — without stitching together half a dozen separate tools.
+
+Think of it as Termius meets Zed: the connection management and protocol depth of a dedicated SSH client, the editor experience of a modern IDE, and the performance of a natively compiled Rust backend.
+
+## Core Features
+
+**SSH Terminals** — Connect to any SSH server. Each connection opens in its own tab using a full xterm.js WebGL terminal, supporting true color, ligatures, and shell integration via OSC sequences. Multiple SSH sessions can run concurrently with zero interference.
+
+**SFTP File Manager** — A split-pane SFTP browser with a local panel on the left and remote panel on the right. Supports drag-and-drop uploads, background transfers with a progress queue, conflict resolution, and inline remote file editing via a temp-file workflow.
+
+**Local Terminal** — A full local PTY session using `portable-pty` on the Rust side and xterm.js on the frontend. Supports zsh and bash with injected shell integration for cwd reporting and tab title updates.
+
+**CodeMirror 6 Editor** — An embedded code editor for local and remote files. Language detection, syntax highlighting, and a diff view for AI-generated changes are all built in.
+
+**AI Assistant (BYOK)** — A built-in AI chat panel powered by your own API key. The assistant has access to tools: it can read files, list directories, run commands (with your approval), and write changes back to disk. Sessions are persisted locally and organized into named conversations.
+
+**Host Manager** — A centralized Host Manager dashboard for organizing SSH/SFTP hosts into groups. Credentials are stored in the macOS Keychain via the system `keyring` — passwords are never written to disk or SQLite.
+
+## Performance
+
+Nexum is built to stay fast at scale. The SFTP file list uses `@tanstack/react-virtual` for virtual scrolling, maintaining 60 FPS with 10,000+ remote files. Terminal rendering uses the WebGL addon for xterm.js, offloading glyph compositing to the GPU.
+
+The backend is written in Rust with Tokio async I/O, so SSH connections, file transfers, and PTY sessions never block each other or the UI thread.
+
+## Technology Stack
+
+Nexum is built with Tauri v2 — a Rust + WebView framework for macOS (and eventually other platforms). The backend is pure Rust; the frontend is React 19 with TypeScript, Tailwind CSS v4, and shadcn/ui components.
+
+:::tip
+Nexum is fully open-source. If you hit a bug or want to contribute a feature, the repository is available on GitHub.
+:::

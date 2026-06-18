@@ -9,6 +9,7 @@ import { onKeysChanged } from "@/modules/settings/store";
 import { useKeybindsStore } from "@/modules/shortcuts";
 import { bootstrapTransferListeners } from "@/modules/sftp/store/transferStore";
 import { useThemeEngine } from "@/lib/useThemeEngine";
+import { useLayoutEngine } from "@/lib/useLayoutEngine";
 import { useTerminalCursorBlinkInterval } from "@/lib/useTerminalCursorBlinkInterval";
 import { handleApiError } from "@/lib/errors";
 import { homeDir } from "@tauri-apps/api/path";
@@ -65,6 +66,9 @@ export function useAppBootstrap(): AppBootstrapReturn {
 
   // Theme engine (owns its own effects internally)
   useThemeEngine();
+
+  // Layout engine — applies --radius and density class to <html>
+  useLayoutEngine();
 
   // Terminal cursor blink (owns its own effects internally)
   useTerminalCursorBlinkInterval();

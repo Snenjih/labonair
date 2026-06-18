@@ -1,0 +1,50 @@
+---
+title: "Auto-Updater"
+description: "How Nexum automatically checks for and installs updates in the background."
+---
+
+# Auto-Updater
+
+Nexum includes a built-in automatic updater powered by Tauri's update plugin. When a new version is released, Nexum detects it and walks you through the update process with minimal friction — no browser visits, no manual downloads.
+
+## How It Works
+
+Each time Nexum launches, it silently queries the GitHub Releases feed for the latest version. The check happens in the background and does not delay startup or block the UI in any way.
+
+If your installed version is already current, nothing happens. If a newer version is available, Nexum surfaces an **"Update Available"** dialog.
+
+## Update Flow
+
+1. **Detection** — On launch, Nexum compares the running version against the latest GitHub release.
+2. **Notification** — An "Update Available" dialog appears with the new version number and a summary of what's included (release notes pulled from the GitHub release).
+3. **Download** — Click **"Download & Install"** to begin. The update downloads in the background using Tauri's updater. A progress indicator shows in the dialog while the download is in progress.
+4. **Restart prompt** — Once the download is complete and the update is verified, Nexum prompts you to **restart the app** to apply the update. Your open session state is saved before restart.
+5. **Relaunch** — After restarting, Nexum launches with the new version. Your hosts, settings, themes, and AI session history are all preserved.
+
+:::tip
+You do not need to accept an update immediately. Close the update dialog and continue working — Nexum will remind you on the next launch. The update package is cached locally so the download does not repeat.
+:::
+
+## What the Updater Updates
+
+The auto-updater replaces the core Nexum app binary and frontend bundle. It does **not** modify:
+
+- Your host database (`hosts.db`)
+- macOS Keychain entries (SSH passwords, API keys)
+- Theme preferences and settings
+- AI conversation sessions
+- Local files in your home directory
+
+All user data is stored separately from the app bundle and survives updates.
+
+## Update Distribution
+
+Updates are distributed exclusively via **GitHub Releases**. Each release is code-signed and notarized by Apple, so macOS Gatekeeper accepts them without any additional prompts. The updater verifies the cryptographic signature before applying the update.
+
+:::warning
+If your Mac is managed by an organization's MDM policy and outbound connections to `github.com` are restricted, the auto-updater will silently fail to reach the update endpoint. In that case, use the Manual Update process or coordinate with your IT team to allow the connection.
+:::
+
+## Disabling Auto-Check
+
+If you prefer to check for updates on your own schedule, you can disable the automatic launch check in **Settings** (`Cmd+,`) → **General** → toggle off **Check for updates automatically**. You can still manually trigger a check at any time from the About section of Settings.
