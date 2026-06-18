@@ -11,9 +11,10 @@ import {
 } from "@/components/ui/context-menu";
 
 const ROW_HEIGHT = 36;
-const LANE_WIDTH = 12;
-const DOT_RADIUS = 3.5;
+const LANE_WIDTH = 9;
+const DOT_RADIUS = 3;
 const LEFT_PADDING = 6;
+const MAX_GRAPH_WIDTH = 140;
 
 const AVATAR_COLORS = [
   "#60a5fa", "#a78bfa", "#4ade80", "#fb923c",
@@ -64,7 +65,7 @@ function EdgeLine({ edge }: EdgeLineProps) {
       d={`M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`}
       fill="none"
       stroke={edge.color}
-      strokeWidth={1.5}
+      strokeWidth={1.25}
       opacity={0.65}
     />
   );
@@ -98,7 +99,7 @@ export function GitGraphCanvas({ commits, onSelectCommit, selectedHash, onViewCh
   );
   const graphWidth = Math.min(
     Math.max(LEFT_PADDING * 2 + (maxLane + 1) * LANE_WIDTH, 20),
-    200,
+    MAX_GRAPH_WIDTH,
   );
 
   const visibleRange = useMemo(() => {
