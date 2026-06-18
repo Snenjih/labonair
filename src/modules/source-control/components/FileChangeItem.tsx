@@ -24,6 +24,7 @@ import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
 import type { FileStatus } from "../types";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 
 interface FileChangeItemProps {
   file: FileStatus;
@@ -74,7 +75,9 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     try {
       await git.stageFile(repoRoot, file.path);
       onRefresh();
-    } catch { /* ignore */ }
+    } catch (e) {
+      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+    }
   }
 
   async function handleUnstage(e?: React.MouseEvent) {
@@ -83,7 +86,9 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     try {
       await git.unstageFile(repoRoot, file.path);
       onRefresh();
-    } catch { /* ignore */ }
+    } catch (e) {
+      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+    }
   }
 
   async function handleDiscard() {
@@ -91,7 +96,9 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     try {
       await git.discardFile(repoRoot, file.path);
       onRefresh();
-    } catch { /* ignore */ }
+    } catch (e) {
+      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+    }
   }
 
   async function handleAddToGitignore() {
@@ -99,14 +106,18 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     try {
       await git.addToGitignore(repoRoot, file.path);
       onRefresh();
-    } catch { /* ignore */ }
+    } catch (e) {
+      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+    }
   }
 
   async function handleAddToExclude() {
     if (!repoRoot) return;
     try {
       await git.addToExclude(repoRoot, file.path);
-    } catch { /* ignore */ }
+    } catch (e) {
+      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+    }
   }
 
   function handleOpenDiff() {

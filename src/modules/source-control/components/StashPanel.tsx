@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
 import type { StashEntry } from "../types";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 
 interface StashPanelProps {
   repoRoot: string;
@@ -53,8 +54,10 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
       const msg = String(e);
       if (msg.includes("conflict") || msg.includes("CONFLICT")) {
         setError("Conflicts after stash apply — resolve before proceeding");
+        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Apply Failed", message: "Conflicts after stash apply — resolve before proceeding" });
       } else {
         setError(msg);
+        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Apply Failed", message: msg });
       }
     } finally {
       setActionLoading(null);
@@ -71,8 +74,10 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
       const msg = String(e);
       if (msg.includes("conflict") || msg.includes("CONFLICT")) {
         setError("Conflicts after stash apply — resolve before proceeding");
+        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Pop Failed", message: "Conflicts after stash apply — resolve before proceeding" });
       } else {
         setError(msg);
+        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Pop Failed", message: msg });
       }
     } finally {
       setActionLoading(null);
@@ -88,6 +93,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
       onRefresh();
     } catch (e) {
       setError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Stash Drop Failed", message: String(e) });
     } finally {
       setActionLoading(null);
     }
@@ -221,6 +227,7 @@ export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
       onRefresh();
     } catch (e) {
       setStashError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Stash Failed", message: String(e) });
     } finally {
       setIsStashing(false);
     }

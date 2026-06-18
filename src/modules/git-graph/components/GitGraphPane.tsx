@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { GitGraphTab } from "@/modules/tabs/types";
 import { git } from "@/modules/source-control/lib/gitInvoke";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { NewBranchDialog } from "@/modules/source-control/components/NewBranchDialog";
 import { useGitGraph } from "../lib/useGitGraph";
 import type { LayoutCommit } from "../types";
@@ -104,6 +105,7 @@ export function GitGraphPane({ tab }: Props) {
       reload();
     } catch (e) {
       setActionError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Checkout Failed", message: String(e) });
     } finally {
       setIsActioning(false);
       setCheckoutConfirmCommit(null);
@@ -123,6 +125,7 @@ export function GitGraphPane({ tab }: Props) {
       reload();
     } catch (e) {
       setActionError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Cherry-pick Failed", message: String(e) });
     } finally {
       setIsActioning(false);
       setCherryPickConfirmCommit(null);

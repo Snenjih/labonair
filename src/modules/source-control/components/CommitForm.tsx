@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
 import { useAiCommitMessage } from "../lib/useAiCommitMessage";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import type { CommitInfo } from "../types";
 
 interface CommitFormProps {
@@ -71,8 +72,10 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
       addRecentMessage(commitMessage);
       setCommitMessage("");
       onRefresh();
+      useNotificationStore.getState().addNotification({ type: "success", title: "Committed", message: commitMessage.trim().slice(0, 80) });
     } catch (e) {
       setError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Commit Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -87,8 +90,10 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
       addRecentMessage(commitMessage);
       setCommitMessage("");
       onRefresh();
+      useNotificationStore.getState().addNotification({ type: "success", title: "Amended", message: "Last commit amended" });
     } catch (e) {
       setError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Amend Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }

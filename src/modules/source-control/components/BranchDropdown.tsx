@@ -28,6 +28,7 @@ import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
 import { NewBranchDialog } from "./NewBranchDialog";
 import type { Branch } from "../types";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 
 interface BranchDropdownProps {
   open: boolean;
@@ -75,6 +76,7 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
       onRefresh();
     } catch (e) {
       setTagError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Create Tag Failed", message: String(e) });
     } finally {
       setTagLoading(null);
     }
@@ -87,6 +89,7 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
       onRefresh();
     } catch (e) {
       setTagError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Push Tag Failed", message: String(e) });
     } finally {
       setTagLoading(null);
     }
@@ -100,6 +103,7 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
       onRefresh();
     } catch (e) {
       setTagError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Delete Tag Failed", message: String(e) });
     } finally {
       setTagLoading(null);
     }
@@ -423,6 +427,7 @@ export function BranchDropdown({
         displayMsg = `Could not checkout: uncommitted changes would be overwritten. Stash your changes first.`;
       }
       setCheckoutError(displayMsg);
+      useNotificationStore.getState().addNotification({ type: "error", title: "Checkout Failed", message: displayMsg });
     } finally {
       setCheckingOut(null);
     }
@@ -442,6 +447,7 @@ export function BranchDropdown({
         return;
       }
       setCheckoutError(`Could not delete branch: ${errMsg}`);
+      useNotificationStore.getState().addNotification({ type: "error", title: "Delete Branch Failed", message: errMsg });
       setDeleteConfirmBranch(null);
       setForceDeleteBranch(null);
     }

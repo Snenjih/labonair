@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
 import { BranchDropdown } from "./BranchDropdown";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 
 interface BranchBarProps {
   onRefresh: () => void;
@@ -68,9 +69,11 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     try {
       await git.push(repoRoot);
       onRefresh();
+      useNotificationStore.getState().addNotification({ type: "success", title: "Pushed", message: localBranch ? `${localBranch} pushed to remote` : "Pushed to remote" });
     } catch (e) {
       const errMsg = String(e);
       setError(errMsg);
+      useNotificationStore.getState().addNotification({ type: "error", title: "Push Failed", message: errMsg });
       if (
         errMsg.includes("no upstream") ||
         errMsg.includes("no tracking") ||
@@ -91,8 +94,10 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     try {
       await git.pull(repoRoot);
       onRefresh();
+      useNotificationStore.getState().addNotification({ type: "success", title: "Pulled", message: "Branch updated from remote" });
     } catch (e) {
       setError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Pull Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -105,8 +110,10 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     try {
       await git.fetch(repoRoot);
       onRefresh();
+      useNotificationStore.getState().addNotification({ type: "info", title: "Fetched", message: "Fetched all remotes" });
     } catch (e) {
       setError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Fetch Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -120,8 +127,10 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     try {
       await git.pushForceWithLease(repoRoot);
       onRefresh();
+      useNotificationStore.getState().addNotification({ type: "success", title: "Force Pushed", message: localBranch ? `${localBranch} force-pushed to remote` : "Force-pushed to remote" });
     } catch (e) {
       setError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Force Push Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -135,8 +144,10 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     try {
       await git.pushSetUpstream(repoRoot, "origin", currentBranch);
       onRefresh();
+      useNotificationStore.getState().addNotification({ type: "success", title: "Pushed & Upstream Set", message: localBranch ? `${localBranch} pushed with upstream set` : "Upstream set and pushed" });
     } catch (e) {
       setError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Push Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
