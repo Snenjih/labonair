@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { useGitStatus } from "../lib/useGitStatus";
@@ -19,6 +20,11 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
   const status = useSourceControlStore((s) => s.status);
   const diffStats = useSourceControlStore((s) => s.diffStats);
+  const error = useSourceControlStore((s) => s.error);
+
+  useEffect(() => {
+    void useSourceControlStore.getState().hydrateRecentMessages();
+  }, []);
 
   const stagedCount = status?.staged.length ?? 0;
   const unstagedCount = status?.unstaged.length ?? 0;
@@ -30,7 +36,7 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
   const totalRemoved = diffStats.reduce((sum, s) => sum + s.removed, 0);
 
   if (!isRepo) {
-    return <NoRepoState rootPath={rootPath} onRefresh={refresh} />;
+    return <NoRepoState rootPath={rootPath} onRefresh={refresh} errorMessage={error ?? undefined} />;
   }
 
   return (

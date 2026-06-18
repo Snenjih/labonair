@@ -386,7 +386,7 @@ export function BranchDropdown({
   const [showNewBranch, setShowNewBranch] = useState(false);
   const [deleteConfirmBranch, setDeleteConfirmBranch] = useState<string | null>(null);
   const [forceDeleteBranch, setForceDeleteBranch] = useState<string | null>(null);
-  const [tagsCollapsed, setTagsCollapsed] = useState(true);
+  const [remotesCollapsed, setRemotesCollapsed] = useState(true);
 
   const localBranches = useMemo(
     () => branchList.filter((b) => !b.isRemote),
@@ -454,7 +454,7 @@ export function BranchDropdown({
 
   const showRemotes = filter.trim()
     ? filteredRemote.length > 0
-    : !tagsCollapsed || filteredRemote.length > 0;
+    : !remotesCollapsed || filteredRemote.length > 0;
 
   return (
     <>
@@ -540,7 +540,7 @@ export function BranchDropdown({
                   <div className="border-t border-border/40">
                     <div
                       className="flex h-6 cursor-pointer items-center gap-1 px-2 hover:bg-accent/20"
-                      onClick={() => setTagsCollapsed((c) => !c)}
+                      onClick={() => setRemotesCollapsed((c) => !c)}
                     >
                       <HugeiconsIcon
                         icon={showRemotes && !filter ? ArrowDown01Icon : ArrowRight01Icon}

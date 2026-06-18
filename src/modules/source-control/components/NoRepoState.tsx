@@ -6,9 +6,10 @@ import { HugeiconsIcon } from "@hugeicons/react";
 interface NoRepoStateProps {
   rootPath: string | null;
   onRefresh: () => void;
+  errorMessage?: string;
 }
 
-export function NoRepoState({ rootPath, onRefresh }: NoRepoStateProps) {
+export function NoRepoState({ rootPath, onRefresh, errorMessage }: NoRepoStateProps) {
   async function handleGitInit() {
     if (!rootPath) return;
     try {
@@ -17,6 +18,15 @@ export function NoRepoState({ rootPath, onRefresh }: NoRepoStateProps) {
     } catch {
       // silently ignore — the next poll cycle will pick up the result
     }
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+        <p className="text-sm font-medium text-destructive">Git Error</p>
+        <p className="text-xs text-muted-foreground">{errorMessage}</p>
+      </div>
+    );
   }
 
   return (

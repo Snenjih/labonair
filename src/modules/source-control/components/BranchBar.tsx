@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useMemo } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import {
   DropdownMenu,
@@ -39,27 +39,17 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
   const operationInProgress = useSourceControlStore((s) => s.operationInProgress);
   const setOperationInProgress = useSourceControlStore((s) => s.setOperationInProgress);
   const currentBranch = useSourceControlStore((s) => s.currentBranch);
-  const setCurrentBranch = useSourceControlStore((s) => s.setCurrentBranch);
+  const branchList = useSourceControlStore((s) => s.branchList);
 
-  const [localBranch, setLocalBranch] = useState<string>("");
+  const localBranch = useMemo(
+    () => branchList.find((b) => b.isCurrent)?.name ?? "",
+    [branchList]
+  );
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForcePushConfirm, setShowForcePushConfirm] = useState(false);
   const [showSetUpstreamPrompt, setShowSetUpstreamPrompt] = useState(false);
-
-  useEffect(() => {
-    if (!repoRoot) return;
-    git
-      .getCurrentBranch(repoRoot)
-      .then((b) => {
-        setLocalBranch(b);
-        setCurrentBranch(b);
-      })
-      .catch(() => {
-        setLocalBranch("");
-        setCurrentBranch("");
-      });
-  }, [repoRoot, status, setCurrentBranch]);
 
   const ahead = status?.ahead ?? 0;
   const behind = status?.behind ?? 0;

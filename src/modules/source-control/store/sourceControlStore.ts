@@ -1,14 +1,12 @@
 import { create } from "zustand";
+import { load } from "@tauri-apps/plugin-store";
 import type { GitStatus, Branch, StashEntry, SelectionMode, FileDiffStat } from "../types";
 
-function loadRecentMessages(): string[] {
-  try {
-    const raw = localStorage.getItem("nexum:git:recent-messages");
-    if (!raw) return [];
-    return JSON.parse(raw) as string[];
-  } catch {
-    return [];
-  }
+const STORE_FILE = "nexum-git.json";
+const STORE_KEY = "recentMessages";
+
+function getStore() {
+  return load(STORE_FILE);
 }
 
 export interface SourceControlState {
@@ -77,6 +75,7 @@ export interface SourceControlState {
 
   // recent message actions
   addRecentMessage: (msg: string) => void;
+  hydrateRecentMessages: () => Promise<void>;
 }
 
 export const useSourceControlStore = create<SourceControlState>()((set) => ({
@@ -104,7 +103,7 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   tags: [],
 
   diffStats: [],
-  recentMessages: loadRecentMessages(),
+  recentMessages: [],
 
   setRepoInfo: (isRepo, repoRoot) => set({ isRepo, repoRoot }),
   setDiffStats: (diffStats) => set({ diffStats }),
@@ -136,11 +135,20 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   addRecentMessage: (msg) =>
     set((state) => {
       const deduped = [msg, ...state.recentMessages.filter((m) => m !== msg)].slice(0, 10);
-      try {
-        localStorage.setItem("nexum:git:recent-messages", JSON.stringify(deduped));
-      } catch {
-        // ignore storage errors
-      }
+      // Fire-and-forget persist
+      getStore()
+        .then((store) => store.set(STORE_KEY, deduped))
+        .catch(() => {});
       return { recentMessages: deduped };
     }),
+
+  hydrateRecentMessages: async () => {
+    try {
+      const store = await getStore();
+      const msgs = await store.get<string[]>(STORE_KEY);
+      useSourceControlStore.setState({ recentMessages: msgs ?? [] });
+    } catch {
+      // silently keep []
+    }
+  },
 }));

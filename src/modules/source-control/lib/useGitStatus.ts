@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "./gitInvoke";
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 3000;
 
 // Polling stops automatically when the panel unmounts (SidebarContent conditionally renders
 // SourceControlPanel only when activePanel === "source-control"). No extra active-panel
@@ -20,29 +20,44 @@ export function useGitStatus(rootPath: string | null) {
   const setStashEntries = useSourceControlStore((s) => s.setStashEntries);
   const setBranchList = useSourceControlStore((s) => s.setBranchList);
   const setIsBranchLoading = useSourceControlStore((s) => s.setIsBranchLoading);
+  const setCurrentBranch = useSourceControlStore((s) => s.setCurrentBranch);
   const setTags = useSourceControlStore((s) => s.setTags);
+  const setError = useSourceControlStore((s) => s.setError);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
+  const isRefreshingRef = useRef(false);
 
   const doRefresh = useCallback(async () => {
     if (!rootPath) {
       setRepoInfo(false, null);
       return;
     }
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
 
     let isRepo: boolean;
     try {
       isRepo = await git.isRepo(rootPath);
-    } catch {
+    } catch (e) {
+      const msg = String(e);
+      if (
+        msg.includes("not installed") ||
+        msg.includes("not in PATH") ||
+        msg.includes("not found")
+      ) {
+        setError("git is not installed or not in PATH");
+      }
       setRepoInfo(false, null);
+      isRefreshingRef.current = false;
       return;
     }
 
-    if (!isMountedRef.current) return;
+    if (!isMountedRef.current) { isRefreshingRef.current = false; return; }
 
     if (!isRepo) {
       setRepoInfo(false, null);
+      isRefreshingRef.current = false;
       return;
     }
 
@@ -51,72 +66,61 @@ export function useGitStatus(rootPath: string | null) {
       root = await git.getRepoRoot(rootPath);
     } catch {
       setRepoInfo(false, null);
+      isRefreshingRef.current = false;
       return;
     }
 
-    if (!isMountedRef.current) return;
+    if (!isMountedRef.current) { isRefreshingRef.current = false; return; }
 
+    // Check if repo root changed and clear stale diff selection
+    const prevRoot = useSourceControlStore.getState().repoRoot;
     setRepoInfo(true, root);
+    if (prevRoot !== null && prevRoot !== root) {
+      useSourceControlStore.getState().clearSelectedFile();
+    }
 
     setIsStatusLoading(true);
-    try {
-      const status = await git.getStatus(root);
-      if (isMountedRef.current) {
-        setStatus(status);
-      }
-    } catch {
-      // silently ignore status errors during polling
-    } finally {
-      if (isMountedRef.current) {
-        setIsStatusLoading(false);
-      }
-    }
-
-    // Fetch branches
     setIsBranchLoading(true);
-    try {
-      const branches = await git.getBranches(root);
-      if (isMountedRef.current) {
-        setBranchList(branches);
-      }
-    } catch {
-      // silently ignore
-    } finally {
-      if (isMountedRef.current) {
-        setIsBranchLoading(false);
-      }
-    }
 
-    // Fetch stash entries
-    try {
-      const stashes = await git.stashList(root);
-      if (isMountedRef.current) {
-        setStashEntries(stashes);
-      }
-    } catch {
-      // silently ignore
-    }
+    const [statusResult, branchesResult, stashResult, tagsResult, statsResult] =
+      await Promise.allSettled([
+        git.getStatus(root),
+        git.getBranches(root),
+        git.stashList(root),
+        git.getTags(root),
+        git.getDiffStats(root),
+      ]);
 
-    // Fetch tags
-    try {
-      const tags = await git.getTags(root);
-      if (isMountedRef.current) {
-        setTags(tags);
-      }
-    } catch {
-      // silently ignore
-    }
+    if (!isMountedRef.current) { isRefreshingRef.current = false; return; }
 
-    // Fetch per-file diff stats for +N/-N display
-    try {
-      const stats = await git.getDiffStats(root);
-      if (isMountedRef.current) {
-        setDiffStats(stats);
-      }
-    } catch {
-      // silently ignore
+    if (statusResult.status === "fulfilled") setStatus(statusResult.value);
+    setIsStatusLoading(false);
+
+    if (branchesResult.status === "fulfilled") {
+      setBranchList(branchesResult.value);
+      const current = branchesResult.value.find((b) => b.isCurrent)?.name ?? "";
+      setCurrentBranch(current);
     }
-  }, [rootPath, setRepoInfo, setStatus, setIsStatusLoading, setStashEntries, setBranchList, setIsBranchLoading, setTags, setDiffStats]);
+    setIsBranchLoading(false);
+
+    if (stashResult.status === "fulfilled") setStashEntries(stashResult.value);
+    if (tagsResult.status === "fulfilled") setTags(tagsResult.value);
+    if (statsResult.status === "fulfilled") setDiffStats(statsResult.value);
+
+    isRefreshingRef.current = false;
+  }, [
+    rootPath,
+    setRepoInfo,
+    setStatus,
+    setIsStatusLoading,
+    setStashEntries,
+    setBranchList,
+    setIsBranchLoading,
+    setCurrentBranch,
+    setTags,
+    setDiffStats,
+    setError,
+  ]);
 
   const startPolling = useCallback(() => {
     if (intervalRef.current !== null) return;
@@ -153,6 +157,7 @@ export function useGitStatus(rootPath: string | null) {
 
     return () => {
       isMountedRef.current = false;
+      isRefreshingRef.current = false;
       stopPolling();
       document.removeEventListener("visibilitychange", handleVisibility);
     };
