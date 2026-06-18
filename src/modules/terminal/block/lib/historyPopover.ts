@@ -1,11 +1,9 @@
-import { autocompletion } from "@codemirror/autocomplete";
-import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
+import type { CompletionContext, CompletionResult, CompletionSource } from "@codemirror/autocomplete";
 import { historyList } from "./history";
 
-export function historyPopoverExtension() {
-  const historySource = async (
-    ctx: CompletionContext,
-  ): Promise<CompletionResult | null> => {
+export function historyPopoverSource(): CompletionSource {
+  return async (ctx: CompletionContext): Promise<CompletionResult | null> => {
+    // Only activate on explicit trigger (e.g. Ctrl+Space / arrow-up intent)
     if (!ctx.explicit) return null;
     const prefix = ctx.state.doc.toString().trim();
     const items = await historyList(prefix, 20);
@@ -20,11 +18,4 @@ export function historyPopoverExtension() {
       })),
     };
   };
-
-  return autocompletion({
-    override: [historySource],
-    activateOnTyping: false,
-    closeOnBlur: true,
-    maxRenderedOptions: 20,
-  });
 }

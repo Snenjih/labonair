@@ -9,7 +9,7 @@ import {
   setGhostText,
   acceptGhostText,
 } from "./inlineSuggest";
-import { historyPopoverExtension } from "./historyPopover";
+import { historyPopoverSource } from "./historyPopover";
 import { pathCompleteSource } from "./pathComplete";
 import { historySuggest, historyRecord } from "./history";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -92,9 +92,13 @@ export function createShellEditor(
         keymap.of([...defaultKeymap, ...historyKeymap, ...completionKeymap]),
         history(),
         inlineSuggestField,
-        pathCompleteSource(callbacks.getCwd),
-        historyPopoverExtension(),
-        autocompletion({ closeOnBlur: false }),
+        // Single autocompletion instance — multiple instances cause "Config merge conflict for field override"
+        autocompletion({
+          override: [pathCompleteSource(callbacks.getCwd), historyPopoverSource()],
+          activateOnTyping: true,
+          closeOnBlur: false,
+          maxRenderedOptions: 20,
+        }),
         updateListener,
         EditorView.theme({
           "&": {

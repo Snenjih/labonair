@@ -1,18 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
-import { autocompletion } from "@codemirror/autocomplete";
 import type {
   CompletionContext,
   CompletionResult,
+  CompletionSource,
 } from "@codemirror/autocomplete";
-import type { Extension } from "@codemirror/state";
 
 interface DirEntry {
   name: string;
   kind: "file" | "dir" | "symlink";
 }
 
-export function pathCompleteSource(getCwd: () => string | null): Extension {
-  const source = async (
+export function pathCompleteSource(getCwd: () => string | null): CompletionSource {
+  return async (
     context: CompletionContext,
   ): Promise<CompletionResult | null> => {
     const before = context.matchBefore(/[\w./~-]+/);
@@ -72,6 +71,4 @@ export function pathCompleteSource(getCwd: () => string | null): Extension {
       validFor: /^[\w.-]*$/,
     };
   };
-
-  return autocompletion({ override: [source], activateOnTyping: true });
 }
