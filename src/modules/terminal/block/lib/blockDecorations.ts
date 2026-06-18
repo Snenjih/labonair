@@ -68,6 +68,8 @@ export class BlockDecorations {
     options: BlockDecorationsOptions = {},
   ) {
     this.options = options;
+    this.term.options.cursorInactiveStyle = "none";
+    this.term.options.cursorStyle = "bar";
   }
 
   init(): void {

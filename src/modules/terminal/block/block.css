@@ -57,3 +57,29 @@
 .nexum-shell-editor .cm-editor.cm-focused {
   outline: none;
 }
+
+/* Block chrome overlay — subtle, color only signals failure */
+
+/* Bottom divider drawn after each completed block */
+.bt-divider {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: color-mix(in srgb, var(--border) 80%, transparent);
+  pointer-events: none;
+}
+
+/* Destructive bottom divider for failed blocks */
+.bt-divider-fail {
+  background: color-mix(in srgb, var(--destructive) 50%, transparent);
+  height: 2px;
+}
+
+/* Search match highlight decoration */
+.bt-match {
+  background: rgba(255, 193, 84, 0.5);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 193, 84, 0.7);
+  pointer-events: none;
+}

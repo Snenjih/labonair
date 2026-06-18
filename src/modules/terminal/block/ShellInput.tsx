@@ -56,9 +56,14 @@ export function ShellInput({ onRestoreFocus }: ShellInputProps) {
   }, [activePaneId, onRestoreFocus]);
 
   return (
-    <div
-      ref={containerRef}
-      className="nexum-shell-editor flex-1 min-w-0"
-    />
+    <div className="flex items-center gap-2 w-full min-w-0">
+      <span className="select-none shrink-0 text-primary/80 font-mono text-sm leading-none">
+        ❯
+      </span>
+      <div
+        ref={containerRef}
+        className="nexum-shell-editor flex-1 min-w-0"
+      />
+    </div>
   );
 }

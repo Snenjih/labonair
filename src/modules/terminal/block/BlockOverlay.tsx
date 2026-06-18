@@ -99,7 +99,6 @@ function BlockOverlayInner({
   const [visibleBlocks, setVisibleBlocks] = useState<VisibleBlocks>(EMPTY_VISIBLE);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [searchTarget, setSearchTarget] = useState<BlockMeta | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -158,14 +157,6 @@ function BlockOverlayInner({
     onRunAgain(block.command);
   };
 
-  const handleToggleCollapse = (id: string) => {
-    setCollapsedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
   return (
     <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
       <BlockWatermark visible={promptReady && visibleBlocks.blocks.length === 0} />
@@ -176,10 +167,8 @@ function BlockOverlayInner({
           block={block}
           isHovered={hoveredId === block.id}
           isSelected={selectedId === block.id}
-          isCollapsed={collapsedIds.has(block.id)}
           onHover={setHoveredId}
           onSelect={setSelectedId}
-          onToggleCollapse={handleToggleCollapse}
           onCopyCommand={() => handleCopyCommand(block.command)}
           onCopyOutput={() => handleCopyOutput(block)}
           onSearch={() => setSearchTarget(block)}

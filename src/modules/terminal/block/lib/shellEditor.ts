@@ -131,7 +131,7 @@ export function createShellEditor(
           },
         }),
         EditorView.lineWrapping,
-        placeholder("Type a command…"),
+        placeholder("Run a command  —  ↑ history"),
       ],
     }),
   });
