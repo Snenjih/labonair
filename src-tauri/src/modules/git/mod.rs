@@ -660,6 +660,19 @@ pub async fn git_get_commit_detail(path: String, hash: String) -> Result<String,
     run_git(&["show", "--stat", "--format=%B", &hash], &path)
 }
 
+/// Returns numstat output for a single commit: `additions\tdeletions\tpath` per line.
+#[tauri::command]
+pub async fn git_get_commit_numstat(path: String, hash: String) -> Result<String, String> {
+    run_git(&["show", "--numstat", "--format=", &hash], &path)
+}
+
+/// Returns the fetch URL of the given remote (defaults to "origin").
+#[tauri::command]
+pub async fn git_get_remote_url(path: String, remote: Option<String>) -> Result<String, String> {
+    let r = remote.as_deref().unwrap_or("origin");
+    run_git(&["remote", "get-url", r], &path).map(|s| s.trim().to_string())
+}
+
 // ─── Branch Management ────────────────────────────────────────────────────────
 
 #[tauri::command]

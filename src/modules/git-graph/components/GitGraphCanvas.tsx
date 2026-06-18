@@ -1,4 +1,4 @@
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
 import type { LayoutCommit } from "../types";
@@ -27,12 +27,32 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
-function AuthorAvatar({ name }: { name: string }) {
+function parseGithubUserId(email: string): string | null {
+  const m = /^(\d+)\+.+@users\.noreply\.github\.com$/.exec(email);
+  return m ? m[1] : null;
+}
+
+function AuthorAvatar({ name, email }: { name: string; email: string }) {
+  const [imgError, setImgError] = useState(false);
+  const userId = parseGithubUserId(email);
+  const avatarUrl = userId ? `https://avatars.githubusercontent.com/u/${userId}?v=4&s=36` : null;
+
   const parts = name.trim().split(/\s+/);
   const initials =
     parts.length === 1
       ? parts[0].charAt(0).toUpperCase()
       : (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+
+  if (avatarUrl && !imgError) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="size-[18px] shrink-0 rounded-[3px] object-cover"
+        onError={() => setImgError(true)}
+      />
+    );
+  }
 
   return (
     <span
@@ -203,7 +223,7 @@ export function GitGraphCanvas({
 
                       {/* Author */}
                       <span className="ml-2 inline-flex h-[18px] max-w-full min-w-0 items-center gap-1.5 justify-self-start overflow-hidden rounded-md bg-foreground/6 pl-1 pr-1.5 text-[10.5px] font-medium text-foreground/80">
-                        <AuthorAvatar name={commit.authorName} />
+                        <AuthorAvatar name={commit.authorName} email={commit.authorEmail} />
                         <span className="min-w-0 truncate">{commit.authorName}</span>
                       </span>
 

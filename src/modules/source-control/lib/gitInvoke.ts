@@ -61,4 +61,8 @@ export const git = {
     invoke<string>("git_push_tag", { path, name, remote: remote ?? null }),
   getDiffStats: (path: string) =>
     invoke<FileDiffStat[]>("git_get_diff_stats", { path }),
+  getCommitNumstat: (path: string, hash: string) =>
+    invoke<string>("git_get_commit_numstat", { path, hash }),
+  getRemoteUrl: (path: string, remote?: string) =>
+    invoke<string>("git_get_remote_url", { path, remote: remote ?? null }),
 };

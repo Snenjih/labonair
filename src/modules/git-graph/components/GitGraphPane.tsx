@@ -53,7 +53,7 @@ interface Props {
   onOpenFile?: (path: string) => void;
 }
 
-export function GitGraphPane({ tab, onOpenFile }: Props) {
+export function GitGraphPane({ tab }: Props) {
   const { commits, isLoading, error, hasMore, loadMore, reload } = useGitGraph(tab.repositoryPath);
   const [selectedCommit, setSelectedCommit] = useState<LayoutCommit | null>(null);
   const [commitDiffHash, setCommitDiffHash] = useState<string | null>(null);
@@ -194,7 +194,6 @@ export function GitGraphPane({ tab, onOpenFile }: Props) {
             commit={selectedCommit}
             repositoryPath={tab.repositoryPath}
             onClose={() => setSelectedCommit(null)}
-            onOpenFile={onOpenFile}
             onViewChanges={(hash) => setCommitDiffHash(hash)}
           />
         )}
