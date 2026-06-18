@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
 import type { LayoutCommit } from "../types";
 import { GraphRail, MAX_VISIBLE_LANES, railWidth } from "./GraphRail";
+import { parseGithubUserId, getAvatarUrl, getCached, setCached } from "../lib/avatarCache";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -27,15 +28,16 @@ function getAvatarColor(name: string): string {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
-function parseGithubUserId(email: string): string | null {
-  const m = /^(\d+)\+.+@users\.noreply\.github\.com$/.exec(email);
-  return m ? m[1] : null;
-}
-
 function AuthorAvatar({ name, email }: { name: string; email: string }) {
-  const [imgError, setImgError] = useState(false);
   const userId = parseGithubUserId(email);
-  const avatarUrl = userId ? `https://avatars.githubusercontent.com/u/${userId}?v=4&s=36` : null;
+  // Initialize from shared cache so re-mounts skip the network entirely
+  const [status, setStatus] = useState<"pending" | "ok" | "error">(() => {
+    if (!userId) return "error";
+    const cached = getCached(userId);
+    if (cached === true) return "ok";
+    if (cached === false) return "error";
+    return "pending";
+  });
 
   const parts = name.trim().split(/\s+/);
   const initials =
@@ -43,13 +45,14 @@ function AuthorAvatar({ name, email }: { name: string; email: string }) {
       ? parts[0].charAt(0).toUpperCase()
       : (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 
-  if (avatarUrl && !imgError) {
+  if (userId && status !== "error") {
     return (
       <img
-        src={avatarUrl}
+        src={getAvatarUrl(userId, 36)}
         alt={name}
         className="size-[18px] shrink-0 rounded-[3px] object-cover"
-        onError={() => setImgError(true)}
+        onLoad={() => { setCached(userId, true); setStatus("ok"); }}
+        onError={() => { setCached(userId, false); setStatus("error"); }}
       />
     );
   }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { git } from "@/modules/source-control/lib/gitInvoke";
 import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
+import { getAvatarUrl, getCached, setCached } from "../lib/avatarCache";
 import { cn } from "@/lib/utils";
 import type { LayoutCommit } from "../types";
 
@@ -23,6 +24,7 @@ function parseGithubEmail(email: string): { userId: string; username: string } |
   const m = /^(\d+)\+(.+)@users\.noreply\.github\.com$/.exec(email);
   return m ? { userId: m[1], username: m[2] } : null;
 }
+
 
 function buildGithubCommitUrl(remoteUrl: string, hash: string): string | null {
   const m =
@@ -300,12 +302,29 @@ export function CommitDetailPanel({
 }: CommitDetailPanelProps) {
   const [numstatRaw, setNumstatRaw] = useState<string | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
-  const [avatarError, setAvatarError] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const githubInfo = parseGithubEmail(commit.authorEmail);
+  const userId = githubInfo?.userId ?? null;
+
+  // Initialize avatar status from shared cache to avoid re-fetching across panel opens
+  const [avatarStatus, setAvatarStatus] = useState<"pending" | "ok" | "error">(() => {
+    if (!userId) return "error";
+    const cached = getCached(userId);
+    if (cached === true) return "ok";
+    if (cached === false) return "error";
+    return "pending";
+  });
+
+  // Reset avatar status when the commit (and thus potentially the author) changes
+  useEffect(() => {
+    if (!userId) { setAvatarStatus("error"); return; }
+    const cached = getCached(userId);
+    setAvatarStatus(cached === true ? "ok" : cached === false ? "error" : "pending");
+  }, [userId]);
 
   useEffect(() => {
     setNumstatRaw(null);
-    setAvatarError(false);
     void git
       .getCommitNumstat(repositoryPath, commit.hash)
       .then(setNumstatRaw)
@@ -316,10 +335,6 @@ export function CommitDetailPanel({
       .catch(() => setRemoteUrl(null));
   }, [repositoryPath, commit.hash]);
 
-  const githubInfo = parseGithubEmail(commit.authorEmail);
-  const avatarUrl = githubInfo
-    ? `https://avatars.githubusercontent.com/u/${githubInfo.userId}?v=4&s=80`
-    : null;
   const githubCommitUrl =
     remoteUrl ? buildGithubCommitUrl(remoteUrl, commit.hash) : null;
 
@@ -360,12 +375,13 @@ export function CommitDetailPanel({
 
         {/* Avatar */}
         <div className="size-[60px] overflow-hidden rounded-full ring-2 ring-border/60">
-          {avatarUrl && !avatarError ? (
+          {userId && avatarStatus !== "error" ? (
             <img
-              src={avatarUrl}
+              src={getAvatarUrl(userId, 80)}
               alt={commit.authorName}
               className="size-full object-cover"
-              onError={() => setAvatarError(true)}
+              onLoad={() => { setCached(userId, true); setAvatarStatus("ok"); }}
+              onError={() => { setCached(userId, false); setAvatarStatus("error"); }}
             />
           ) : (
             <InitialsAvatar name={commit.authorName} />
