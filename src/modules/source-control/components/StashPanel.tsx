@@ -47,7 +47,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
     setActionLoading("apply");
     setError(null);
     try {
-      await git.stashApply(repoRoot, entry.index);
+      await git.stashApply(repoRoot, entry.hash);
       onRefresh();
     } catch (e) {
       const msg = String(e);
@@ -65,7 +65,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
     setActionLoading("pop");
     setError(null);
     try {
-      await git.stashPop(repoRoot, entry.index);
+      await git.stashPop(repoRoot, entry.hash);
       onRefresh();
     } catch (e) {
       const msg = String(e);
@@ -83,7 +83,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
     setActionLoading("drop");
     setError(null);
     try {
-      await git.stashDrop(repoRoot, entry.index);
+      await git.stashDrop(repoRoot, entry.hash);
       setShowDropConfirm(false);
       onRefresh();
     } catch (e) {

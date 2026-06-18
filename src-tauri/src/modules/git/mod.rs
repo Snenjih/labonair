@@ -796,76 +796,135 @@ pub async fn git_rename_branch(
 
 // ─── Stash Commands ───────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub async fn git_stash_push(path: String, message: Option<String>) -> Result<(), String> {
-    if let Some(msg) = message {
-        run_git(vec!["stash".to_string(), "push".to_string(), "-m".to_string(), msg], path).await.map(|_| ())
+/// Resolves a stash commit hash to its current numeric index.
+/// Needed because stash indices shift whenever entries are added or dropped.
+async fn find_stash_index_by_hash(path: &str, hash: &str) -> Result<u32, String> {
+    let output = run_git(
+        vec!["stash".to_string(), "list".to_string(), "--format=%gd|%H".to_string()],
+        path.to_string(),
+    )
+    .await?;
+    for line in output.lines() {
+        let parts: Vec<&str> = line.splitn(2, '|').collect();
+        if parts.len() == 2 && parts[1].trim() == hash {
+            let idx = parts[0]
+                .trim_start_matches("stash@{")
+                .trim_end_matches('}')
+                .parse::<u32>()
+                .unwrap_or(0);
+            return Ok(idx);
+        }
+    }
+    Err(format!(
+        "stash entry '{}' no longer exists — it may have already been dropped",
+        hash
+    ))
+}
+
+/// Parses the `%gs` format field into (branch, message).
+fn parse_stash_gs(gs: &str) -> (String, String) {
+    let rest = if let Some(r) = gs.strip_prefix("WIP on ") {
+        r
+    } else if let Some(r) = gs.strip_prefix("On ") {
+        r
     } else {
-        run_git(vec!["stash".to_string(), "push".to_string()], path).await.map(|_| ())
+        return (String::new(), gs.to_string());
+    };
+    if let Some(colon_pos) = rest.find(": ") {
+        (rest[..colon_pos].to_string(), rest[colon_pos + 2..].to_string())
+    } else {
+        (rest.to_string(), String::new())
     }
 }
 
 #[tauri::command]
+pub async fn git_stash_push(
+    path: String,
+    message: Option<String>,
+    include_untracked: Option<bool>,
+) -> Result<(), String> {
+    let mut args = vec!["stash".to_string(), "push".to_string()];
+    if include_untracked.unwrap_or(true) {
+        args.push("--include-untracked".to_string());
+    }
+    if let Some(ref msg) = message {
+        args.push("-m".to_string());
+        args.push(msg.clone());
+    }
+    run_git(args, path).await.map(|_| ())
+}
+
+#[tauri::command]
 pub async fn git_stash_list(path: String) -> Result<Vec<StashEntry>, String> {
-    let output = run_git(vec!["stash".to_string(), "list".to_string(), "--format=%gd|%gs|%H".to_string()], path).await?;
+    let output = run_git(
+        vec![
+            "stash".to_string(),
+            "list".to_string(),
+            "--format=%gd%x00%gs%x00%H%x1e".to_string(),
+        ],
+        path,
+    )
+    .await?;
+
     let mut entries: Vec<StashEntry> = Vec::new();
-    for line in output.lines() {
-        if line.is_empty() {
+    for record in output.split('\x1e') {
+        let record = record.trim();
+        if record.is_empty() {
             continue;
         }
-        let parts: Vec<&str> = line.splitn(3, '|').collect();
+        let parts: Vec<&str> = record.splitn(3, '\x00').collect();
         if parts.len() < 3 {
             continue;
         }
-        // parts[0] = "stash@{0}", parts[1] = "On main: message", parts[2] = hash
-        let ref_part = parts[0]; // "stash@{N}"
+        let ref_part = parts[0].trim();
         let index: u32 = ref_part
             .trim_start_matches("stash@{")
             .trim_end_matches('}')
             .parse()
             .unwrap_or(0);
-        let gs = parts[1]; // "On <branch>: <message>" or "WIP on <branch>: <message>"
-        let (branch, message) = if let Some(rest) = gs.strip_prefix("On ") {
-            if let Some(colon_pos) = rest.find(": ") {
-                (rest[..colon_pos].to_string(), rest[colon_pos + 2..].to_string())
-            } else {
-                (rest.to_string(), String::new())
-            }
-        } else if let Some(rest) = gs.strip_prefix("WIP on ") {
-            if let Some(colon_pos) = rest.find(": ") {
-                (rest[..colon_pos].to_string(), rest[colon_pos + 2..].to_string())
-            } else {
-                (rest.to_string(), String::new())
-            }
-        } else {
-            (String::new(), gs.to_string())
-        };
+        let (branch, message) = parse_stash_gs(parts[1]);
+        let hash = parts[2].trim().to_string();
         entries.push(StashEntry {
             index,
             message,
             branch,
-            hash: parts[2].to_string(),
+            hash,
         });
     }
     Ok(entries)
 }
 
 #[tauri::command]
-pub async fn git_stash_pop(path: String, index: u32) -> Result<(), String> {
-    let ref_str = format!("stash@{{{}}}", index);
-    run_git(vec!["stash".to_string(), "pop".to_string(), ref_str], path).await.map(|_| ())
+pub async fn git_stash_pop(path: String, hash: String) -> Result<(), String> {
+    let idx = find_stash_index_by_hash(&path, &hash).await?;
+    run_git(
+        vec!["stash".to_string(), "pop".to_string(), format!("stash@{{{}}}", idx)],
+        path,
+    )
+    .await
+    .map(|_| ())
 }
 
 #[tauri::command]
-pub async fn git_stash_apply(path: String, index: u32) -> Result<(), String> {
-    let ref_str = format!("stash@{{{}}}", index);
-    run_git(vec!["stash".to_string(), "apply".to_string(), ref_str], path).await.map(|_| ())
+pub async fn git_stash_apply(path: String, hash: String) -> Result<(), String> {
+    let idx = find_stash_index_by_hash(&path, &hash).await?;
+    run_git(
+        vec!["stash".to_string(), "apply".to_string(), format!("stash@{{{}}}", idx)],
+        path,
+    )
+    .await
+    .map(|_| ())
 }
 
 #[tauri::command]
-pub async fn git_stash_drop(path: String, index: u32) -> Result<(), String> {
-    let ref_str = format!("stash@{{{}}}", index);
-    run_git(vec!["stash".to_string(), "drop".to_string(), ref_str], path).await.map(|_| ())
+pub async fn git_stash_drop(path: String, hash: String) -> Result<(), String> {
+    let idx = find_stash_index_by_hash(&path, &hash).await?;
+    run_git(
+        vec!["stash".to_string(), "drop".to_string(), format!("stash@{{{}}}", idx)],
+        path,
+    )
+    .await
+    .map(|_| ())
 }
 
 // ─── Diff + Push Variants ─────────────────────────────────────────────────────

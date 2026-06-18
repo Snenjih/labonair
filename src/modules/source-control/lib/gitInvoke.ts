@@ -33,16 +33,20 @@ export const git = {
     invoke<void>("git_delete_branch", { path, name, force: force ?? false }),
   renameBranch: (path: string, oldName: string, newName: string) =>
     invoke<void>("git_rename_branch", { path, oldName, newName }),
-  stashPush: (path: string, message?: string) =>
-    invoke<void>("git_stash_push", { path, message: message ?? null }),
+  stashPush: (path: string, message?: string, includeUntracked?: boolean) =>
+    invoke<void>("git_stash_push", {
+      path,
+      message: message ?? null,
+      includeUntracked: includeUntracked ?? true,
+    }),
   stashList: (path: string) =>
     invoke<StashEntry[]>("git_stash_list", { path }),
-  stashPop: (path: string, index: number) =>
-    invoke<void>("git_stash_pop", { path, index }),
-  stashApply: (path: string, index: number) =>
-    invoke<void>("git_stash_apply", { path, index }),
-  stashDrop: (path: string, index: number) =>
-    invoke<void>("git_stash_drop", { path, index }),
+  stashPop: (path: string, hash: string) =>
+    invoke<void>("git_stash_pop", { path, hash }),
+  stashApply: (path: string, hash: string) =>
+    invoke<void>("git_stash_apply", { path, hash }),
+  stashDrop: (path: string, hash: string) =>
+    invoke<void>("git_stash_drop", { path, hash }),
   getCommitDiff: (path: string, hash: string) =>
     invoke<string>("git_get_commit_diff", { path, hash }),
   pushForceWithLease: (path: string, remote?: string, branch?: string) =>
