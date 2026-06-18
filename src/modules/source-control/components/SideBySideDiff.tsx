@@ -1,4 +1,5 @@
-import { useRef, useCallback } from "react";
+import { useRef, useMemo } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
 
 interface SideBySideDiffProps {
@@ -165,52 +166,36 @@ function DiffSideRow({ side, row }: DiffSideRowProps) {
 }
 
 export function SideBySideDiff({ diffContent }: SideBySideDiffProps) {
-  const rows = parseSideBySide(diffContent);
-  const leftRef = useRef<HTMLDivElement>(null);
-  const rightRef = useRef<HTMLDivElement>(null);
-  const isSyncing = useRef(false);
+  const rows = useMemo(() => parseSideBySide(diffContent), [diffContent]);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const syncLeft = useCallback(() => {
-    if (isSyncing.current) return;
-    isSyncing.current = true;
-    if (rightRef.current && leftRef.current) {
-      rightRef.current.scrollTop = leftRef.current.scrollTop;
-    }
-    isSyncing.current = false;
-  }, []);
-
-  const syncRight = useCallback(() => {
-    if (isSyncing.current) return;
-    isSyncing.current = true;
-    if (leftRef.current && rightRef.current) {
-      leftRef.current.scrollTop = rightRef.current.scrollTop;
-    }
-    isSyncing.current = false;
-  }, []);
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 20,
+    overscan: 15,
+  });
 
   return (
-    <div className="flex max-h-[300px] min-h-0 overflow-hidden">
-      {/* Left column */}
-      <div
-        ref={leftRef}
-        className="flex-1 overflow-auto border-r border-border/40"
-        onScroll={syncLeft}
-      >
-        {rows.map((row, i) => (
-          // eslint-disable-next-line react/no-array-index-key
-          <DiffSideRow key={i} side="left" row={row} />
-        ))}
-      </div>
-      {/* Right column */}
-      <div
-        ref={rightRef}
-        className="flex-1 overflow-auto"
-        onScroll={syncRight}
-      >
-        {rows.map((row, i) => (
-          // eslint-disable-next-line react/no-array-index-key
-          <DiffSideRow key={i} side="right" row={row} />
-        ))}
+    <div ref={scrollRef} className="max-h-[300px] overflow-auto">
+      <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const row = rows[virtualItem.index];
+          return (
+            <div
+              key={virtualItem.key}
+              style={{ position: 'absolute', top: virtualItem.start, width: '100%' }}
+              className="flex"
+            >
+              <div className="min-w-0 flex-1 overflow-hidden border-r border-border/40">
+                <DiffSideRow side="left" row={row} />
+              </div>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <DiffSideRow side="right" row={row} />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

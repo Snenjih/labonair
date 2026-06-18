@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -119,7 +119,8 @@ export function DiffViewer() {
   const setDiffViewMode = useSourceControlStore((s) => s.setDiffViewMode);
   const setIgnoreWhitespace = useSourceControlStore((s) => s.setIgnoreWhitespace);
 
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const ROW_HEIGHT = 20;
 
   // Derive whether the current selection is still valid
   const selectionStillValid = useMemo(() => {
@@ -163,11 +164,22 @@ export function DiffViewer() {
       .filter(Boolean);
   }, [diffContent]);
 
+  const parsedLines = useMemo(
+    () => (diffContent && diffContent !== '__UNTRACKED_ONLY__' ? parseDiffLines(diffContent) : []),
+    [diffContent]
+  );
+
+  const virtualizer = useVirtualizer({
+    count: parsedLines.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 20,
+  });
+
   function scrollToFile(fp: string) {
-    const id = `diff-file-${encodeURIComponent(fp)}`;
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const idx = parsedLines.findIndex((l) => l.fileAnchor === fp);
+    if (idx !== -1) {
+      virtualizer.scrollToIndex(idx, { align: 'start' });
     }
   }
 
@@ -303,92 +315,76 @@ export function DiffViewer() {
       ) : diffViewMode === 'split' ? (
         <SideBySideDiff diffContent={diffContent} />
       ) : (
-        <ScrollArea className="max-h-[300px] overflow-auto" ref={scrollAreaRef}>
+        <div ref={scrollRef} className="max-h-[300px] overflow-auto">
           {isTruncated && (
             <div className="border-b border-yellow-500/30 bg-yellow-500/10 px-2 py-1.5 text-[10px] text-yellow-500">
               Diff is too large — showing a truncated version.
             </div>
           )}
-          <div className="overflow-x-auto">
-            {/* Render lines with file anchors for multi-file navigation */}
-            {renderDiffWithAnchors(diffContent)}
+          <div
+            className="overflow-x-auto"
+            style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const entry = parsedLines[virtualItem.index];
+              return (
+                <div
+                  key={virtualItem.key}
+                  id={entry.fileAnchor ? `diff-file-${encodeURIComponent(entry.fileAnchor)}` : undefined}
+                  style={{ position: 'absolute', top: virtualItem.start, width: '100%' }}
+                >
+                  <DiffLine
+                    line={entry.line}
+                    isInOurs={entry.isInOurs}
+                    isInTheirs={entry.isInTheirs}
+                  />
+                </div>
+              );
+            })}
           </div>
-        </ScrollArea>
+        </div>
       )}
     </div>
   );
 }
 
-interface BufferedLine {
+interface ParsedDiffLine {
   line: string;
   isInOurs: boolean;
   isInTheirs: boolean;
+  fileAnchor?: string;
 }
 
-function renderDiffWithAnchors(diffContent: string) {
+function parseDiffLines(diffContent: string): ParsedDiffLine[] {
   const lines = diffContent.split("\n");
-  const result: React.ReactNode[] = [];
-  let fileBuffer: BufferedLine[] = [];
+  const result: ParsedDiffLine[] = [];
   let currentFile: string | null = null;
-
-  // Conflict zone state tracked across all lines
   let isInOurs = false;
   let isInTheirs = false;
 
-  function flushFile() {
-    if (currentFile !== null) {
-      const id = `diff-file-${encodeURIComponent(currentFile)}`;
-      result.push(
-        <div key={id} id={id}>
-          {fileBuffer.map((entry, i) => (
-            // eslint-disable-next-line react/no-array-index-key
-            <DiffLine key={i} line={entry.line} isInOurs={entry.isInOurs} isInTheirs={entry.isInTheirs} />
-          ))}
-        </div>
-      );
-      fileBuffer = [];
-      currentFile = null;
-    }
-  }
-
   for (const line of lines) {
-    // Track conflict zone transitions before deciding what flags to assign
     const enterOurs = line.startsWith("<<<<<<<");
     const enterSep = line.startsWith("=======");
     const enterTheirs = line.startsWith(">>>>>>>");
 
-    // Take a snapshot of the current zone for THIS line
     const lineIsInOurs = isInOurs;
     const lineIsInTheirs = isInTheirs;
 
-    // Then update state for subsequent lines
-    if (enterOurs) {
-      isInOurs = true;
-      isInTheirs = false;
-    } else if (enterSep && isInOurs) {
-      isInOurs = false;
-      isInTheirs = true;
-    } else if (enterTheirs && isInTheirs) {
-      isInTheirs = false;
-    }
+    if (enterOurs) { isInOurs = true; isInTheirs = false; }
+    else if (enterSep && isInOurs) { isInOurs = false; isInTheirs = true; }
+    else if (enterTheirs && isInTheirs) { isInTheirs = false; }
 
     const match = /^diff --git a\/.+ b\/(.+)$/.exec(line);
     if (match) {
-      flushFile();
-      // Reset conflict state when entering a new file diff
+      // Reset conflict state on new file
       isInOurs = false;
       isInTheirs = false;
       currentFile = match[1];
-      fileBuffer.push({ line, isInOurs: false, isInTheirs: false });
-    } else if (currentFile !== null) {
-      fileBuffer.push({ line, isInOurs: lineIsInOurs, isInTheirs: lineIsInTheirs });
+      result.push({ line, isInOurs: false, isInTheirs: false, fileAnchor: currentFile });
     } else {
-      result.push(
-        <DiffLine key={result.length} line={line} isInOurs={lineIsInOurs} isInTheirs={lineIsInTheirs} />
-      );
+      result.push({ line, isInOurs: lineIsInOurs, isInTheirs: lineIsInTheirs });
     }
   }
 
-  flushFile();
   return result;
 }
