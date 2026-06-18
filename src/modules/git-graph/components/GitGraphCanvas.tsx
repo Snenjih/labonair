@@ -96,7 +96,10 @@ export function GitGraphCanvas({ commits, onSelectCommit, selectedHash, onViewCh
     () => (commits.length > 0 ? Math.max(...commits.map((c) => c.lane)) : 0),
     [commits],
   );
-  const graphWidth = Math.max(LEFT_PADDING * 2 + (maxLane + 1) * LANE_WIDTH, 20);
+  const graphWidth = Math.min(
+    Math.max(LEFT_PADDING * 2 + (maxLane + 1) * LANE_WIDTH, 20),
+    200,
+  );
 
   const visibleRange = useMemo(() => {
     if (virtualItems.length === 0) return { start: 0, end: 0 };
@@ -160,9 +163,9 @@ export function GitGraphCanvas({ commits, onSelectCommit, selectedHash, onViewCh
       {/* Scrollable graph area */}
       <div ref={containerRef} className="min-h-0 flex-1 overflow-auto relative select-none">
         <div style={{ height: totalHeight, position: "relative" }}>
-          {/* SVG edge layer — confined to graph column width */}
+          {/* SVG edge layer — clipped to graph column width */}
           <svg
-            style={{ position: "absolute", top: 0, left: 0, width: graphWidth, height: totalHeight }}
+            style={{ position: "absolute", top: 0, left: 0, width: graphWidth, height: totalHeight, overflow: "hidden" }}
             className="pointer-events-none"
           >
             {visibleEdges.map((edge, i) => (
@@ -195,7 +198,7 @@ export function GitGraphCanvas({ commits, onSelectCommit, selectedHash, onViewCh
                   >
                     {/* Graph column: commit dot */}
                     <div
-                      style={{ width: graphWidth, flexShrink: 0, position: "relative", height: "100%" }}
+                      style={{ width: graphWidth, flexShrink: 0, position: "relative", height: "100%", overflow: "hidden" }}
                     >
                       <div
                         style={{
