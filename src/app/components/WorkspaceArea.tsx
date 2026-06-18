@@ -10,7 +10,7 @@ import { PreviewStack } from "@/modules/preview";
 import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { SftpStack } from "@/modules/sftp/SftpStack";
-import { useTabsStore, selectActiveTabKind } from "@/modules/tabs";
+import { useTabsStore, selectActiveTabKind, selectIsActiveBlockTerminal } from "@/modules/tabs";
 import { WorkspaceStack } from "@/modules/terminal/WorkspaceStack";
 import type { WorkspacePaneHandle, TerminalPaneHandle } from "@/modules/terminal";
 
@@ -62,6 +62,8 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
   hasComposer,
 }: WorkspaceAreaProps) {
   const activeTabKind = useTabsStore(selectActiveTabKind);
+  const isBlockTerminal = useTabsStore(selectIsActiveBlockTerminal);
+  const shouldShowInput = panelOpen || isBlockTerminal;
   const isEditorTab = activeTabKind === "editor";
   const isPreviewTab = activeTabKind === "preview";
   const isAiDiffTab = activeTabKind === "ai-diff";
@@ -137,10 +139,10 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
         <motion.div
           data-ai-input-bar
           initial={false}
-          animate={{ height: panelOpen ? "auto" : 0, opacity: panelOpen ? 1 : 0 }}
+          animate={{ height: shouldShowInput ? "auto" : 0, opacity: shouldShowInput ? 1 : 0 }}
           transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           className="overflow-hidden"
-          aria-hidden={!panelOpen}
+          aria-hidden={!shouldShowInput}
         >
           {aiEnabled && (hasComposer ? (
             <AiInputBar />

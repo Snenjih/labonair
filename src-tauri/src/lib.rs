@@ -440,6 +440,12 @@ pub fn run() {
                 }
             });
 
+            // Clean up stale block-meta files from sessions older than 30 days.
+            let app_handle_bm = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = pty::block_meta::block_meta_cleanup(app_handle_bm).await;
+            });
+
             // Build and set the native macOS (and cross-platform) menu bar.
             let menu = build_menu(app)?;
             app.set_menu(menu)?;
@@ -580,6 +586,13 @@ pub fn run() {
             modules::scrollback::scrollback_save,
             modules::scrollback::scrollback_load,
             modules::scrollback::scrollback_cleanup,
+            pty::block_meta::block_meta_save,
+            pty::block_meta::block_meta_load,
+            pty::block_meta::block_meta_cleanup,
+            pty::history::history_suggest,
+            pty::history::history_commands,
+            pty::history::history_list,
+            pty::history::history_record,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

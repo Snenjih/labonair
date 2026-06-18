@@ -177,6 +177,17 @@ export type Preferences = {
   // --- Zen Mode ---
   zenModeShowHeader: boolean;
   zenModeShowStatusbar: boolean;
+
+  // --- Block Terminal ---
+  blockTerminalScrollbackPersistence: "metadata" | "fresh";
+  blockTerminalShowHeader: boolean;
+  blockTerminalShowExitCode: boolean;
+  blockTerminalShowExecutionTime: boolean;
+  blockTerminalShowCwd: boolean;
+  blockTerminalCompactHeaders: boolean;
+  blockTerminalHighlightFailed: boolean;
+  blockTerminalAutoCollapseOnAltScreen: boolean;
+  blockTerminalSshInjectionTimeoutMs: number;
 };
 
 const KEY_THEME = "theme";
@@ -288,6 +299,15 @@ const KEY_TITLEBAR_ICONS_POSITION = "titlebarsIconsPosition";
 const KEY_TABS_LOCATION = "tabsLocation";
 const KEY_ZEN_MODE_SHOW_HEADER = "zenModeShowHeader";
 const KEY_ZEN_MODE_SHOW_STATUSBAR = "zenModeShowStatusbar";
+const KEY_BLOCK_TERMINAL_SCROLLBACK_PERSISTENCE = "blockTerminalScrollbackPersistence";
+const KEY_BLOCK_TERMINAL_SHOW_HEADER = "blockTerminalShowHeader";
+const KEY_BLOCK_TERMINAL_SHOW_EXIT_CODE = "blockTerminalShowExitCode";
+const KEY_BLOCK_TERMINAL_SHOW_EXECUTION_TIME = "blockTerminalShowExecutionTime";
+const KEY_BLOCK_TERMINAL_SHOW_CWD = "blockTerminalShowCwd";
+const KEY_BLOCK_TERMINAL_COMPACT_HEADERS = "blockTerminalCompactHeaders";
+const KEY_BLOCK_TERMINAL_HIGHLIGHT_FAILED = "blockTerminalHighlightFailed";
+const KEY_BLOCK_TERMINAL_AUTO_COLLAPSE_ON_ALT_SCREEN = "blockTerminalAutoCollapseOnAltScreen";
+const KEY_BLOCK_TERMINAL_SSH_INJECTION_TIMEOUT_MS = "blockTerminalSshInjectionTimeoutMs";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -406,6 +426,16 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
   zenModeShowHeader: true,
   zenModeShowStatusbar: true,
+
+  blockTerminalScrollbackPersistence: "metadata",
+  blockTerminalShowHeader: true,
+  blockTerminalShowExitCode: true,
+  blockTerminalShowExecutionTime: true,
+  blockTerminalShowCwd: true,
+  blockTerminalCompactHeaders: false,
+  blockTerminalHighlightFailed: true,
+  blockTerminalAutoCollapseOnAltScreen: true,
+  blockTerminalSshInjectionTimeoutMs: 3000,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -699,6 +729,25 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_ZEN_MODE_SHOW_HEADER) ?? DEFAULT_PREFERENCES.zenModeShowHeader,
     zenModeShowStatusbar:
       get<boolean>(KEY_ZEN_MODE_SHOW_STATUSBAR) ?? DEFAULT_PREFERENCES.zenModeShowStatusbar,
+
+    blockTerminalScrollbackPersistence:
+      get<"metadata" | "fresh">(KEY_BLOCK_TERMINAL_SCROLLBACK_PERSISTENCE) ?? DEFAULT_PREFERENCES.blockTerminalScrollbackPersistence,
+    blockTerminalShowHeader:
+      get<boolean>(KEY_BLOCK_TERMINAL_SHOW_HEADER) ?? DEFAULT_PREFERENCES.blockTerminalShowHeader,
+    blockTerminalShowExitCode:
+      get<boolean>(KEY_BLOCK_TERMINAL_SHOW_EXIT_CODE) ?? DEFAULT_PREFERENCES.blockTerminalShowExitCode,
+    blockTerminalShowExecutionTime:
+      get<boolean>(KEY_BLOCK_TERMINAL_SHOW_EXECUTION_TIME) ?? DEFAULT_PREFERENCES.blockTerminalShowExecutionTime,
+    blockTerminalShowCwd:
+      get<boolean>(KEY_BLOCK_TERMINAL_SHOW_CWD) ?? DEFAULT_PREFERENCES.blockTerminalShowCwd,
+    blockTerminalCompactHeaders:
+      get<boolean>(KEY_BLOCK_TERMINAL_COMPACT_HEADERS) ?? DEFAULT_PREFERENCES.blockTerminalCompactHeaders,
+    blockTerminalHighlightFailed:
+      get<boolean>(KEY_BLOCK_TERMINAL_HIGHLIGHT_FAILED) ?? DEFAULT_PREFERENCES.blockTerminalHighlightFailed,
+    blockTerminalAutoCollapseOnAltScreen:
+      get<boolean>(KEY_BLOCK_TERMINAL_AUTO_COLLAPSE_ON_ALT_SCREEN) ?? DEFAULT_PREFERENCES.blockTerminalAutoCollapseOnAltScreen,
+    blockTerminalSshInjectionTimeoutMs:
+      get<number>(KEY_BLOCK_TERMINAL_SSH_INJECTION_TIMEOUT_MS) ?? DEFAULT_PREFERENCES.blockTerminalSshInjectionTimeoutMs,
   };
 }
 
@@ -1243,6 +1292,51 @@ export async function setTabsLocation(value: "titlebar" | "sidebar"): Promise<vo
   await (await getStore()).save();
 }
 
+export async function setBlockTerminalScrollbackPersistence(value: "metadata" | "fresh"): Promise<void> {
+  await (await getStore()).set(KEY_BLOCK_TERMINAL_SCROLLBACK_PERSISTENCE, value);
+  await (await getStore()).save();
+}
+
+export async function setBlockTerminalShowHeader(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BLOCK_TERMINAL_SHOW_HEADER, value);
+  await (await getStore()).save();
+}
+
+export async function setBlockTerminalShowExitCode(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BLOCK_TERMINAL_SHOW_EXIT_CODE, value);
+  await (await getStore()).save();
+}
+
+export async function setBlockTerminalShowExecutionTime(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BLOCK_TERMINAL_SHOW_EXECUTION_TIME, value);
+  await (await getStore()).save();
+}
+
+export async function setBlockTerminalShowCwd(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BLOCK_TERMINAL_SHOW_CWD, value);
+  await (await getStore()).save();
+}
+
+export async function setBlockTerminalCompactHeaders(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BLOCK_TERMINAL_COMPACT_HEADERS, value);
+  await (await getStore()).save();
+}
+
+export async function setBlockTerminalHighlightFailed(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BLOCK_TERMINAL_HIGHLIGHT_FAILED, value);
+  await (await getStore()).save();
+}
+
+export async function setBlockTerminalAutoCollapseOnAltScreen(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BLOCK_TERMINAL_AUTO_COLLAPSE_ON_ALT_SCREEN, value);
+  await (await getStore()).save();
+}
+
+export async function setBlockTerminalSshInjectionTimeoutMs(value: number): Promise<void> {
+  await (await getStore()).set(KEY_BLOCK_TERMINAL_SSH_INJECTION_TIMEOUT_MS, value);
+  await (await getStore()).save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -1357,6 +1451,15 @@ export async function onPreferencesChange(
     [KEY_TABS_LOCATION]: "tabsLocation",
     [KEY_ZEN_MODE_SHOW_HEADER]: "zenModeShowHeader",
     [KEY_ZEN_MODE_SHOW_STATUSBAR]: "zenModeShowStatusbar",
+    [KEY_BLOCK_TERMINAL_SCROLLBACK_PERSISTENCE]: "blockTerminalScrollbackPersistence",
+    [KEY_BLOCK_TERMINAL_SHOW_HEADER]: "blockTerminalShowHeader",
+    [KEY_BLOCK_TERMINAL_SHOW_EXIT_CODE]: "blockTerminalShowExitCode",
+    [KEY_BLOCK_TERMINAL_SHOW_EXECUTION_TIME]: "blockTerminalShowExecutionTime",
+    [KEY_BLOCK_TERMINAL_SHOW_CWD]: "blockTerminalShowCwd",
+    [KEY_BLOCK_TERMINAL_COMPACT_HEADERS]: "blockTerminalCompactHeaders",
+    [KEY_BLOCK_TERMINAL_HIGHLIGHT_FAILED]: "blockTerminalHighlightFailed",
+    [KEY_BLOCK_TERMINAL_AUTO_COLLAPSE_ON_ALT_SCREEN]: "blockTerminalAutoCollapseOnAltScreen",
+    [KEY_BLOCK_TERMINAL_SSH_INJECTION_TIMEOUT_MS]: "blockTerminalSshInjectionTimeoutMs",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];

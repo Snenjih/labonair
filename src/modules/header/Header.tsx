@@ -36,6 +36,7 @@ import { UpdaterButton } from "./components/UpdaterButton";
 type Props = {
   onSelect: (id: number) => void;
   onNew: () => void;
+  onNewBlockTerminal: () => void;
   onNewPreview: () => void;
   onNewEditor: () => void;
   onNewSsh: (hostId: string, title: string) => void;
@@ -54,6 +55,7 @@ type Props = {
 export const Header = React.memo(function Header({
   onSelect,
   onNew,
+  onNewBlockTerminal,
   onNewPreview,
   onNewEditor,
   onNewSsh,
@@ -175,6 +177,7 @@ export const Header = React.memo(function Header({
           <TabBar
             onSelect={onSelect}
             onNew={onNew}
+            onNewBlockTerminal={onNewBlockTerminal}
             onNewPreview={onNewPreview}
             onNewEditor={onNewEditor}
             onNewSsh={onNewSsh}

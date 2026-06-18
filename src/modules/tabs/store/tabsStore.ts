@@ -25,6 +25,55 @@ import {
 // Module-level guard — same pattern as usePreferencesStore
 let _defaultTabOpened = false;
 
+// ─── Block decoration registry ────────────────────────────────────────────────
+
+const blockDecorationRegistry = new Map<string, import("@/modules/terminal/block").BlockDecorations>();
+
+export function registerBlockDecorations(
+  sessionId: string,
+  decorations: import("@/modules/terminal/block").BlockDecorations,
+): () => void {
+  blockDecorationRegistry.set(sessionId, decorations);
+  return () => blockDecorationRegistry.delete(sessionId);
+}
+
+export function getActiveBlockDecorations(
+  state: TabsState,
+): import("@/modules/terminal/block").BlockDecorations | null {
+  const tab = state.tabs.find((t) => t.id === state.activeId);
+  if (!tab || tab.kind !== "workspace") return null;
+  return blockDecorationRegistry.get(tab.activePaneId) ?? null;
+}
+
+// ─── Block session registry ──────────────────────────────────────────────────
+// Provides cross-component access to block terminal submit/interrupt/CWD/mode APIs
+
+export type BlockSessionAPI = {
+  submit: (text: string) => void;
+  interrupt: () => void;
+  getCwd: () => string | null;
+  subscribeMode: (cb: () => void) => () => void;
+  getMode: () => import("@/modules/terminal/block").BlockMode;
+};
+
+const blockSessionRegistry = new Map<string, BlockSessionAPI>();
+
+export function registerBlockSession(
+  sessionId: string,
+  api: BlockSessionAPI,
+): () => void {
+  blockSessionRegistry.set(sessionId, api);
+  return () => blockSessionRegistry.delete(sessionId);
+}
+
+export function getActiveBlockSession(
+  state: TabsState,
+): BlockSessionAPI | null {
+  const tab = state.tabs.find((t) => t.id === state.activeId);
+  if (!tab || tab.kind !== "workspace") return null;
+  return blockSessionRegistry.get(tab.activePaneId) ?? null;
+}
+
 // ─── State shape ─────────────────────────────────────────────────────────────
 
 export type TabsState = {
@@ -34,7 +83,8 @@ export type TabsState = {
 
   // Actions
   setActiveId: (id: number) => void;
-  newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newTab: (cwd?: string, initialCommand?: string, sessionId?: string, terminalMode?: "standard" | "block") => number;
+  newBlockTerminalTab: (cwd?: string) => number;
   newSshTab: (hostId: string, title: string, cwd?: string, initialCommand?: string, sessionId?: string) => number;
   newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
   openDefaultTab: () => void;
@@ -75,6 +125,13 @@ export const selectActivePaneId = (s: TabsState): string | null => {
   return tab?.kind === "workspace" ? tab.activePaneId : null;
 };
 
+export const selectIsActiveBlockTerminal = (s: TabsState): boolean => {
+  const tab = s.tabs.find((t) => t.id === s.activeId);
+  if (!tab || tab.kind !== "workspace") return false;
+  const session = tab.sessions[tab.activePaneId];
+  return session?.terminalMode === "block";
+};
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useTabsStore = create<TabsState>((set, get) => ({
@@ -84,7 +141,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   setActiveId: (id) => set({ activeId: id }),
 
-  newTab: (cwd, initialCommand, sessionId) => {
+  newTab: (cwd, initialCommand, sessionId, terminalMode) => {
     const tabId = get()._nextId;
     sessionId = sessionId ?? newSessionId();
     const tab: WorkspaceTab = {
@@ -94,7 +151,24 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       activePaneId: sessionId,
       layout: makeLeaf(sessionId),
       sessions: {
-        [sessionId]: { id: sessionId, kind: "local", title: "shell", cwd, initialCommand },
+        [sessionId]: { id: sessionId, kind: "local", title: "shell", cwd, initialCommand, terminalMode },
+      },
+    };
+    set((s) => ({ tabs: [...s.tabs, tab], activeId: tabId, _nextId: s._nextId + 1 }));
+    return tabId;
+  },
+
+  newBlockTerminalTab: (cwd) => {
+    const tabId = get()._nextId;
+    const sessionId = newSessionId();
+    const tab: WorkspaceTab = {
+      id: tabId,
+      kind: "workspace",
+      title: "shell",
+      activePaneId: sessionId,
+      layout: makeLeaf(sessionId),
+      sessions: {
+        [sessionId]: { id: sessionId, kind: "local", title: "shell", cwd, terminalMode: "block" },
       },
     };
     set((s) => ({ tabs: [...s.tabs, tab], activeId: tabId, _nextId: s._nextId + 1 }));
@@ -134,6 +208,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           cwd,
           initialCommand,
           startupSnippet,
+          terminalMode: host?.terminal_mode as "standard" | "block" | undefined,
         },
       },
     };

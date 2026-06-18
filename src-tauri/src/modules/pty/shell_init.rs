@@ -63,6 +63,7 @@ impl Shell {
 pub fn build_command(
     cwd: Option<String>,
     shell_override: Option<String>,
+    blocks: bool,
 ) -> Result<CommandBuilder, String> {
     let (shell, shell_path) = match shell_override {
         Some(ref p) if !p.trim().is_empty() => {
@@ -82,6 +83,9 @@ pub fn build_command(
     cmd.env("COLORTERM", "truecolor");
     cmd.env("NEXUM_TERMINAL", "1");
     cmd.env("TERM_PROGRAM", "Nexum");
+    if blocks {
+        cmd.env("NEXUM_BLOCKS", "1");
+    }
 
     let resolved_cwd = cwd
         .map(PathBuf::from)

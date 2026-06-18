@@ -1,3 +1,5 @@
+pub mod block_meta;
+pub mod history;
 mod session;
 mod shell_init;
 
@@ -35,9 +37,11 @@ pub fn pty_open(
     rows: u16,
     cwd: Option<String>,
     shell: Option<String>,
+    blocks: Option<bool>,
     on_event: Channel<PtyEvent>,
 ) -> Result<u32, String> {
-    let (session, _) = session::spawn(cols, rows, cwd, shell, on_event).map_err(|e| {
+    let blocks = blocks.unwrap_or(false);
+    let (session, _) = session::spawn(cols, rows, cwd, shell, blocks, on_event).map_err(|e| {
         log::error!("pty_open failed: {e}");
         e
     })?;

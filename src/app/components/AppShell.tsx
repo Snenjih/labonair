@@ -82,6 +82,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     explorerRoot: ctrl.explorerRoot,
     onSelect: actions.setActiveId,
     onNew: tabs.openNewTab,
+    onNewBlockTerminal: tabs.openNewBlockTerminalTab,
     onNewPreview: () => tabs.openPreviewTab(""),
     onNewEditor: () => void actions.openUntitledTab(),
     onNewSsh: actions.newSshTab,
@@ -111,6 +112,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
               <Header
                 onSelect={actions.setActiveId}
                 onNew={tabs.openNewTab}
+                onNewBlockTerminal={tabs.openNewBlockTerminalTab}
                 onNewPreview={() => tabs.openPreviewTab("")}
                 onNewEditor={() => void actions.openUntitledTab()}
                 onNewSsh={actions.newSshTab}

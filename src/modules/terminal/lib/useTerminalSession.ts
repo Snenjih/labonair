@@ -1,5 +1,11 @@
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import {
+  BlockDecorations,
+  saveBlockMeta,
+  loadBlockMeta,
+} from "@/modules/terminal/block";
+import type { BlockMode } from "@/modules/terminal/block";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
@@ -10,9 +16,10 @@ import { SerializeAddon } from "@xterm/addon-serialize";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { registerCwdHandler, registerPromptTracker } from "./osc-handlers";
 import { openPty, type PtySession } from "./pty-bridge";
+import { registerBlockDecorations, registerBlockSession } from "@/modules/tabs";
 
 type Options = {
   container: React.RefObject<HTMLDivElement | null>;
@@ -20,6 +27,7 @@ type Options = {
   sessionId?: string;
   initialCwd?: string;
   initialCommand?: string;
+  terminalMode?: "standard" | "block";
   onSearchReady?: (addon: SearchAddon) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
@@ -43,6 +51,7 @@ export function useTerminalSession({
   sessionId,
   initialCwd,
   initialCommand,
+  terminalMode,
   onSearchReady,
   onExit,
   onCwd,
@@ -63,6 +72,10 @@ export function useTerminalSession({
   const fitRef = useRef<FitAddon | null>(null);
   const serializeRef = useRef<SerializeAddon | null>(null);
   const ptyRef = useRef<PtySession | null>(null);
+  const currentCwdRef = useRef<string>(initialCwd ?? "");
+  const blockDecorationsRef = useRef<BlockDecorations | null>(null);
+  const [blockDecorations, setBlockDecorations] = useState<BlockDecorations | null>(null);
+  const [blockMode, setBlockMode] = useState<BlockMode>("prompt");
 
   // Apply terminal preference changes to the live xterm instance.
   useEffect(() => {
@@ -250,12 +263,73 @@ export function useTerminalSession({
         }
       }
 
-      const prompt = registerPromptTracker(term);
+      // CWD handler always needed
       cleanups.push(
-        registerCwdHandler(term, (cwd) => onCwdRef.current?.(cwd)),
-        prompt.dispose,
+        registerCwdHandler(term, (cwd) => {
+          currentCwdRef.current = cwd;
+          onCwdRef.current?.(cwd);
+        }),
       );
+
+      // Prompt tracker only for standard mode (block mode handles OSC 133 internally)
+      if (terminalMode !== "block") {
+        const prompt = registerPromptTracker(term);
+        cleanups.push(prompt.dispose);
+      }
+
       onSearchReadyRef.current?.(search);
+
+      // Block mode setup
+      if (terminalMode === "block") {
+        const decorations = new BlockDecorations(term, () => currentCwdRef.current, {
+          onMode: (mode) => { if (!disposed) setBlockMode(mode); },
+        });
+        decorations.init();
+        blockDecorationsRef.current = decorations;
+        setBlockDecorations(decorations);
+
+        if (sessionId) {
+          const unregister = registerBlockDecorations(sessionId, decorations);
+          cleanups.push(unregister);
+
+          const unregisterSession = registerBlockSession(sessionId, {
+            submit: (text: string) => {
+              const data = text.includes("\n")
+                ? `\x1b[200~${text}\x1b[201~\r`
+                : `${text}\r`;
+              ptyRef.current?.write(data);
+            },
+            interrupt: () => ptyRef.current?.write("\x03"),
+            getCwd: () => currentCwdRef.current ?? null,
+            subscribeMode: (cb) => decorations.subscribeMode(cb),
+            getMode: () => decorations.mode,
+          });
+          cleanups.push(unregisterSession);
+        }
+
+        if (prefs.blockTerminalScrollbackPersistence === "metadata" && sessionId) {
+          // Await before PTY opens so cursor position is stable when calculating marker offsets
+          const savedBlocks = await loadBlockMeta(sessionId);
+          if (savedBlocks && !disposed) decorations.hydrateFromMeta(savedBlocks);
+
+          let saveTimer: ReturnType<typeof setTimeout> | null = null;
+          const unsubSave = decorations.subscribe(() => {
+            if (saveTimer) clearTimeout(saveTimer);
+            saveTimer = setTimeout(() => {
+              saveTimer = null;
+              void saveBlockMeta(sessionId, decorations.allBlocks());
+            }, 1000);
+          });
+          cleanups.push(() => {
+            if (saveTimer) clearTimeout(saveTimer);
+            unsubSave();
+          });
+        }
+
+        cleanups.push(
+          () => { decorations.dispose(); blockDecorationsRef.current = null; setBlockDecorations(null); },
+        );
+      }
 
       // Per-session decoder so interleaved chunks across tabs don't splice
       // a multi-byte UTF-8 codepoint between unrelated streams.
@@ -291,6 +365,7 @@ export function useTerminalSession({
         },
         initialCwd,
         shellPref || undefined,
+        terminalMode === "block",
       );
       if (disposed) {
         pty.close();
@@ -430,7 +505,18 @@ export function useTerminalSession({
     return scrollback && scrollback > 0 ? addon.serialize({ scrollback }) : addon.serialize();
   }, []);
 
-  return { write, focus, getBuffer, getSelection, clear, applyTheme, serialize };
+  return {
+    write,
+    focus,
+    getBuffer,
+    getSelection,
+    clear,
+    applyTheme,
+    serialize,
+    blockDecorations,
+    blockMode,
+    termRef,
+  };
 }
 
 function stripTrailingPunct(url: string): string {

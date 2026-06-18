@@ -18,6 +18,7 @@ import type { EditorPaneHandle } from "@/modules/editor";
 
 export interface UseShortcutHandlersOptions {
   openNewTab: () => void;
+  openNewBlockTerminalTab: () => void;
   handleClose: (id: number) => void;
   cycleTab: (delta: 1 | -1) => void;
   togglePanelAndFocus: () => void;
@@ -28,11 +29,14 @@ export interface UseShortcutHandlersOptions {
   activeEditorHandle: EditorPaneHandle | null;
   openShortcuts: () => void;
   openFind: () => void;
+  navigatePrevBlock?: () => void;
+  navigateNextBlock?: () => void;
 }
 
 export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
   const {
     openNewTab,
+    openNewBlockTerminalTab,
     handleClose,
     cycleTab,
     togglePanelAndFocus,
@@ -42,6 +46,8 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
     workspacePaneRefs,
     activeEditorHandle,
     openShortcuts,
+    navigatePrevBlock,
+    navigateNextBlock,
   } = opts;
 
   const toggleCommandPalette = useCommandStore((s) => s.toggle);
@@ -56,6 +62,7 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
   const shortcutHandlers = useMemo(() => ({
     "command.palette": () => toggleCommandPalette(),
     "tab.new": openNewTab,
+    "tab.newBlockTerminal": openNewBlockTerminalTab,
     "tab.newPreview": () => openPreviewTab(""),
     "tab.newEditor": () => void openUntitledTab(),
     "tab.close": () => handleClose(useTabsStore.getState().activeId),
@@ -109,11 +116,14 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
       else if (kind === "editor") void setEditorFontSize(DEFAULT_PREFERENCES.editorFontSize);
       else if (kind === "sftp") void setSftpFontSize(DEFAULT_PREFERENCES.sftpFontSize);
     },
+    "block.prev": () => navigatePrevBlock?.(),
+    "block.next": () => navigateNextBlock?.(),
   }), [
     activeEditorHandle,
     cycleTab,
     handleClose,
     openNewTab,
+    openNewBlockTerminalTab,
     openPreviewTab,
     workspacePaneRefs,
     togglePanelAndFocus,
@@ -125,6 +135,8 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
     selectByIndex,
     splitPane,
     closePane,
+    navigatePrevBlock,
+    navigateNextBlock,
   ]);
 
   useGlobalShortcuts(shortcutHandlers);

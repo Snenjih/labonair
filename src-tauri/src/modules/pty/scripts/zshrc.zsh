@@ -38,15 +38,28 @@ if [[ -z "$__NEXUM_HOOKS_LOADED" ]]; then
     local _nexum_ret=$?
     printf '\e]133;D;%s\e\\' "$_nexum_ret"
     printf '\e]7;file://%s%s\e\\' "${HOST}" "$(_nexum_urlencode "$PWD")"
-    # Re-inject prompt-end marker in case a framework rebuilt PS1 (p10k, starship).
-    if [[ "$PS1" != *$'\e]133;B\e\\'* ]]; then
+    if [[ -n "$NEXUM_BLOCKS" ]]; then
+      # Block mode: suppress the visual prompt entirely.
+      # Only the OSC 133 B marker remains — the host-drawn input bar replaces the prompt.
+      # Two blank lines after the first command: upper = end gap (above block divider),
+      # lower = header row. First prompt gets only one blank line (no block above yet).
+      if [[ -n "$_nexum_block_seen" ]]; then
+        PS1=$'\n\n%{\e]133;B\e\\%}'
+      else
+        PS1=$'\n%{\e]133;B\e\\%}'
+      fi
+      RPROMPT=''
+    elif [[ "$PS1" != *$'\e]133;B\e\\'* ]]; then
+      # Re-inject prompt-end marker in case a framework rebuilt PS1 (p10k, starship).
       PS1=$'%{\e]133;B\e\\%}'"$PS1"
     fi
     printf '\e]133;A\e\\'
   }
 
   _nexum_preexec() {
-    printf '\e]133;C\e\\'
+    [[ -n "$NEXUM_BLOCKS" ]] && _nexum_block_seen=1
+    local cmd="${1//[[:cntrl:]]/ }"
+    printf '\e]133;C;%s\e\\' "${cmd[1,256]}"
   }
 
   if (( $+functions[add-zsh-hook] )); then

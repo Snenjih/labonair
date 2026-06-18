@@ -1,10 +1,21 @@
 import type { IMarker, Terminal } from "@xterm/xterm";
 
+export type ShellIntegrationState = {
+  inCommand: boolean;
+};
+
+export function createShellIntegrationState(): ShellIntegrationState {
+  return { inCommand: false };
+}
+
 export function registerCwdHandler(
   term: Terminal,
   onCwd: (cwd: string) => void,
+  state?: ShellIntegrationState,
 ): () => void {
   const d = term.parser.registerOscHandler(7, (data) => {
+    // Reject OSC 7 while a command is running: command output is untrusted.
+    if (state?.inCommand) return true;
     const cwd = parseOsc7(data);
     if (cwd) onCwd(cwd);
     return true;

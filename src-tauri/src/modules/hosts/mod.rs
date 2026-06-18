@@ -24,6 +24,7 @@ pub struct Host {
     pub startup_snippet_id: Option<String>,
     pub startup_snippet_mode: Option<String>,
     pub credential_id: Option<String>,
+    pub terminal_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -172,6 +172,11 @@ type StoreState = {
   dequeueMessage: (sessionId: string) => QueuedMessage | null;
   cancelQueuedMessage: (sessionId: string, id: string) => void;
   clearQueue: (sessionId: string) => void;
+
+  // Block terminal input routing
+  sendTarget: "ai" | "terminal";
+  setSendTarget: (target: "ai" | "terminal") => void;
+  injectCommand: (command: string) => void;
 };
 
 const NOOP_LIVE: Live = {
@@ -588,6 +593,12 @@ export const useChatStore = create<StoreState>((set, get) => ({
       const { [sessionId]: _dropped, ...rest } = s.queues;
       return { queues: rest };
     });
+  },
+
+  sendTarget: "ai",
+  setSendTarget: (target) => set({ sendTarget: target }),
+  injectCommand: (command) => {
+    get().live.injectIntoActivePty(command + "\n");
   },
 
   persistMessages: (id, messages) => {

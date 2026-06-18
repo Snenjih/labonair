@@ -30,6 +30,7 @@ export interface Host {
   startup_snippet_id?: string | null;
   startup_snippet_mode?: "execute" | "inject" | null;
   credential_id?: string;
+  terminal_mode?: "standard" | "block";
 }
 
 export interface Credential {
@@ -101,6 +102,7 @@ export interface CreateHostPayload {
   startup_snippet_id?: string | null;
   startup_snippet_mode?: string;
   credential_id?: string;
+  terminal_mode?: "standard" | "block";
 }
 
 export interface UpdateHostPayload extends Partial<CreateHostPayload> {

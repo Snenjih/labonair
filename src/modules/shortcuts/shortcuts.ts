@@ -9,6 +9,7 @@
 
 export type ShortcutId =
   | "tab.new"
+  | "tab.newBlockTerminal"
   | "tab.newPreview"
   | "tab.newEditor"
   | "tab.close"
@@ -27,7 +28,9 @@ export type ShortcutId =
   | "view.zenMode"
   | "view.zoomIn"
   | "view.zoomOut"
-  | "view.zoomReset";
+  | "view.zoomReset"
+  | "block.prev"
+  | "block.next";
 
 export type ShortcutGroup = "General" | "Tabs" | "Search" | "AI" | "View";
 
@@ -65,7 +68,14 @@ export const SHORTCUTS: Shortcut[] = [
     label: "New tab",
     keys: ["⌘", "T"],
     group: "Tabs",
-    match: (e) => isMod(e) && e.key.toLowerCase() === "t",
+    match: (e) => isMod(e) && !e.shiftKey && e.key.toLowerCase() === "t",
+  },
+  {
+    id: "tab.newBlockTerminal",
+    label: "New block terminal tab",
+    keys: ["⌘", "⇧", "T"],
+    group: "Tabs",
+    match: (e) => isMod(e) && e.shiftKey && e.key.toLowerCase() === "t",
   },
   {
     id: "tab.newPreview",
@@ -186,6 +196,20 @@ export const SHORTCUTS: Shortcut[] = [
     keys: ["⌘", "0"],
     group: "View",
     match: (e) => isMod(e) && e.key === "0",
+  },
+  {
+    id: "block.prev",
+    label: "Previous block",
+    keys: ["⌃", "↑"],
+    group: "Tabs",
+    match: (e) => e.ctrlKey && !e.metaKey && !e.altKey && e.key === "ArrowUp",
+  },
+  {
+    id: "block.next",
+    label: "Next block",
+    keys: ["⌃", "↓"],
+    group: "Tabs",
+    match: (e) => e.ctrlKey && !e.metaKey && !e.altKey && e.key === "ArrowDown",
   },
 ];
 

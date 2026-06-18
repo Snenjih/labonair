@@ -20,6 +20,7 @@ function toSessionDataSnapshot(s: {
   hostId?: string;
   quickConnect?: { username: string; hostAddress: string; port: number };
   initialCommand?: string;
+  terminalMode?: "standard" | "block";
 }): SessionDataSnapshot {
   return {
     id: s.id,
@@ -29,6 +30,7 @@ function toSessionDataSnapshot(s: {
     hostId: s.hostId,
     quickConnect: s.quickConnect,
     initialCommand: s.initialCommand,
+    terminalMode: s.terminalMode,
   };
 }
 

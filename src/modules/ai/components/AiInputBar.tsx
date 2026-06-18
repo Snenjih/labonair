@@ -4,12 +4,15 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { IS_MAC } from "@/lib/platform";
 import { useLocalExplorerStore } from "@/modules/explorer/lib/useLocalExplorerStore";
+import { useChatStore } from "@/modules/ai/store/chatStore";
+import { selectIsActiveBlockTerminal, useTabsStore } from "@/modules/tabs";
 import {
   ArrowUpIcon,
   Cancel01Icon,
   CodeIcon,
   HashtagIcon,
   Key01Icon,
+  SparklesIcon,
   StopCircleIcon,
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
@@ -21,6 +24,7 @@ import { useComposer, type FileAttachment } from "../lib/composer";
 import { SLASH_COMMANDS } from "../lib/slashCommands";
 import type { Directive } from "../lib/directives";
 import { useDirectivesStore } from "../store/directivesStore";
+import { ShellInput } from "@/modules/terminal/block";
 import { AgentSwitcher } from "./AgentSwitcher";
 import { DirectivePickerContent, type PickerItem } from "./DirectivePicker";
 import { FilePickerContent, type FileSearchHit } from "./FilePicker";
@@ -71,6 +75,9 @@ export function AiInputBar() {
   const c = useComposer();
   const directives = useDirectivesStore((s) => s.directives);
   const explorerRoot = useLocalExplorerStore((s) => s.rootPath);
+  const isBlockTerminal = useTabsStore(selectIsActiveBlockTerminal);
+  const sendTarget = useChatStore((s) => s.sendTarget);
+  const setSendTarget = useChatStore((s) => s.setSendTarget);
 
   const [trigger, setTrigger] = useState<DirectiveTrigger | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -255,89 +262,136 @@ export function AiInputBar() {
 
         <Popover open={pickerOpen}>
           <PopoverAnchor asChild>
-            <div className="flex items-start gap-2">
-              <textarea
-                ref={c.textareaRef}
-                value={c.value}
-                onChange={(e) => c.setValue(e.target.value)}
-                onKeyUp={updateTrigger}
-                onClick={updateTrigger}
-                onSelect={updateTrigger}
-                onKeyDown={(e) => {
-                  if (fileTrigger !== null) {
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setFileActiveIndex((i) =>
-                        Math.min(i + 1, Math.max(0, fileHits.length - 1)),
-                      );
-                      return;
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setFileActiveIndex((i) => Math.max(0, i - 1));
-                      return;
-                    }
-                    if (e.key === "Tab" || e.key === "Enter") {
-                      const hit = fileHits[fileActiveIndex];
-                      if (hit) {
+            <div className="flex items-center gap-2">
+              {sendTarget === "terminal" && isBlockTerminal ? (
+                <ShellInput onRestoreFocus={() => { /* noop — focus handled by submit callback */ }} />
+              ) : (
+                <textarea
+                  ref={c.textareaRef}
+                  value={c.value}
+                  onChange={(e) => c.setValue(e.target.value)}
+                  onKeyUp={updateTrigger}
+                  onClick={updateTrigger}
+                  onSelect={updateTrigger}
+                  onKeyDown={(e) => {
+                    if (fileTrigger !== null) {
+                      if (e.key === "ArrowDown") {
                         e.preventDefault();
-                        onPickFile(hit);
+                        setFileActiveIndex((i) =>
+                          Math.min(i + 1, Math.max(0, fileHits.length - 1)),
+                        );
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setFileActiveIndex((i) => Math.max(0, i - 1));
+                        return;
+                      }
+                      if (e.key === "Tab" || e.key === "Enter") {
+                        const hit = fileHits[fileActiveIndex];
+                        if (hit) {
+                          e.preventDefault();
+                          onPickFile(hit);
+                          return;
+                        }
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setFileTrigger(null);
+                        return;
+                      }
+                    } else if (trigger !== null) {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setActiveIndex((i) =>
+                          Math.min(i + 1, Math.max(0, filteredItems.length - 1)),
+                        );
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setActiveIndex((i) => Math.max(0, i - 1));
+                        return;
+                      }
+                      if (e.key === "Tab" || e.key === "Enter") {
+                        if (filteredItems.length > 0) {
+                          e.preventDefault();
+                          pickActive();
+                          return;
+                        }
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setTrigger(null);
                         return;
                       }
                     }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setFileTrigger(null);
-                      return;
-                    }
-                  } else if (trigger !== null) {
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setActiveIndex((i) =>
-                        Math.min(i + 1, Math.max(0, filteredItems.length - 1)),
-                      );
-                      return;
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setActiveIndex((i) => Math.max(0, i - 1));
-                      return;
-                    }
-                    if (e.key === "Tab" || e.key === "Enter") {
-                      if (filteredItems.length > 0) {
+                    if (e.key === "Enter") {
+                      const isModEnter = e.metaKey || e.ctrlKey;
+                      if (c.isBusy) {
                         e.preventDefault();
-                        pickActive();
+                        if (isModEnter && !pickerOpen) c.enqueue();
                         return;
                       }
+                      if (!e.shiftKey) {
+                        e.preventDefault();
+                        c.submit();
+                      }
                     }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setTrigger(null);
-                      return;
-                    }
-                  }
-                  if (e.key === "Enter") {
-                    const isModEnter = e.metaKey || e.ctrlKey;
-                    if (c.isBusy) {
-                      e.preventDefault();
-                      if (isModEnter && !pickerOpen) c.enqueue();
-                      return;
-                    }
-                    if (!e.shiftKey) {
-                      e.preventDefault();
-                      c.submit();
-                    }
-                  }
-                }}
-                placeholder="Ask Nexum anything   ·   @ files   ·   # directives"
-                rows={1}
-                className={cn(
-                  "max-h-40 flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none",
-                  "placeholder:text-muted-foreground/60",
-                )}
-              />
-              <AgentSwitcher />
-              {c.isBusy ? (
+                  }}
+                  placeholder={sendTarget === "terminal" ? "Type a command and press Enter…" : "Ask Nexum anything   ·   @ files   ·   # directives"}
+                  rows={1}
+                  className={cn(
+                    "max-h-40 flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none",
+                    "placeholder:text-muted-foreground/60",
+                  )}
+                />
+              )}
+              {isBlockTerminal && (
+                <div className="flex shrink-0 items-center rounded-md bg-background border border-border/50 p-0.5 gap-0.5">
+                  <button
+                    type="button"
+                    title="Switch to Terminal input"
+                    onClick={() => setSendTarget("terminal")}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors duration-100",
+                      sendTarget === "terminal"
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <HugeiconsIcon icon={TerminalIcon} size={11} strokeWidth={1.75} />
+                    <span>Shell</span>
+                  </button>
+                  <button
+                    type="button"
+                    title="Switch to AI chat"
+                    onClick={() => setSendTarget("ai")}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors duration-100",
+                      sendTarget === "ai"
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <HugeiconsIcon icon={SparklesIcon} size={11} strokeWidth={1.75} />
+                    <span>AI</span>
+                  </button>
+                </div>
+              )}
+              {sendTarget !== "terminal" && <AgentSwitcher />}
+              {sendTarget === "terminal" && isBlockTerminal ? null : sendTarget === "terminal" ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  onClick={c.submit}
+                  disabled={!c.value.trim()}
+                  className="size-7 shrink-0 rounded-md"
+                  title="Run command (Enter)"
+                >
+                  <HugeiconsIcon icon={ArrowUpIcon} size={13} strokeWidth={1.75} />
+                </Button>
+              ) : c.isBusy ? (
                 <Button
                   type="button"
                   size="icon"
