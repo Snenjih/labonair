@@ -261,28 +261,7 @@ export function AiInputBar() {
 
         <Popover open={pickerOpen}>
           <PopoverAnchor asChild>
-            <div className="flex items-start gap-2">
-              {isBlockTerminal && (
-                <button
-                  type="button"
-                  title={sendTarget === "terminal" ? "Switch to AI chat" : "Switch to Terminal input"}
-                  onClick={() => setSendTarget(sendTarget === "ai" ? "terminal" : "ai")}
-                  className={cn(
-                    "flex h-7 shrink-0 items-center gap-1.5 self-end rounded-md px-2 text-[11px] font-medium",
-                    "border transition-colors duration-100",
-                    sendTarget === "terminal"
-                      ? "border-primary/30 bg-primary/10 text-primary"
-                      : "border-border bg-transparent text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <HugeiconsIcon
-                    icon={sendTarget === "terminal" ? TerminalIcon : SparklesIcon}
-                    size={11}
-                    strokeWidth={1.75}
-                  />
-                  <span>{sendTarget === "terminal" ? "Terminal" : "AI"}</span>
-                </button>
-              )}
+            <div className="flex items-center gap-2">
               <textarea
                 ref={c.textareaRef}
                 value={c.value}
@@ -363,6 +342,38 @@ export function AiInputBar() {
                   "placeholder:text-muted-foreground/60",
                 )}
               />
+              {isBlockTerminal && (
+                <div className="flex shrink-0 items-center rounded-md bg-background border border-border/50 p-0.5 gap-0.5">
+                  <button
+                    type="button"
+                    title="Switch to Terminal input"
+                    onClick={() => setSendTarget("terminal")}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors duration-100",
+                      sendTarget === "terminal"
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <HugeiconsIcon icon={TerminalIcon} size={11} strokeWidth={1.75} />
+                    <span>Shell</span>
+                  </button>
+                  <button
+                    type="button"
+                    title="Switch to AI chat"
+                    onClick={() => setSendTarget("ai")}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors duration-100",
+                      sendTarget === "ai"
+                        ? "bg-card text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <HugeiconsIcon icon={SparklesIcon} size={11} strokeWidth={1.75} />
+                    <span>AI</span>
+                  </button>
+                </div>
+              )}
               {sendTarget !== "terminal" && <AgentSwitcher />}
               {sendTarget === "terminal" ? (
                 <Button
