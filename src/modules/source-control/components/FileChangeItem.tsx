@@ -136,7 +136,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            className="group/item flex h-7 cursor-pointer items-center gap-1.5 rounded px-2 transition-colors hover:bg-accent/30"
+            className="group/item flex h-7 cursor-pointer items-center gap-1.5 rounded px-2 transition-colors hover:bg-foreground/6"
             onClick={handleOpenDiff}
             title={file.path}
           >
@@ -172,7 +172,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
               {section === "staged" ? (
                 <button
                   type="button"
-                  className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-foreground/6"
                   onClick={(e) => void handleUnstage(e)}
                   title="Unstage"
                 >
@@ -181,7 +181,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
               ) : (
                 <button
                   type="button"
-                  className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-foreground/6"
                   onClick={(e) => void handleStage(e)}
                   title="Stage"
                 >

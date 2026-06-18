@@ -114,27 +114,27 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
       <div className="border-t border-border/40 pt-1">
         {/* Tags header */}
         <div
-          className="flex h-6 cursor-pointer items-center gap-1 px-2 hover:bg-accent/20"
+          className="flex h-6 cursor-pointer items-center gap-1 px-2 transition-colors hover:bg-foreground/6"
           onClick={() => setCollapsed((c) => !c)}
         >
           <HugeiconsIcon
             icon={collapsed ? ArrowRight01Icon : ArrowDown01Icon}
             size={9}
             strokeWidth={2.5}
-            className="shrink-0 text-muted-foreground/40"
+            className="shrink-0 text-muted-foreground"
           />
           <HugeiconsIcon
             icon={Tag01Icon}
             size={10}
             strokeWidth={2}
-            className="shrink-0 text-muted-foreground/50"
+            className="shrink-0 text-muted-foreground"
           />
-          <span className="flex-1 select-none text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+          <span className="flex-1 select-none text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             Tags ({tags.length})
           </span>
           <button
             type="button"
-            className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-foreground"
+            className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-foreground/6"
             onClick={(e) => {
               e.stopPropagation();
               setShowNewTagForm(true);
@@ -218,19 +218,19 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
               return (
                 <div
                   key={tag}
-                  className="group/tag flex h-[22px] items-center gap-1 rounded px-2 hover:bg-accent/30"
+                  className="group/tag flex h-[22px] items-center gap-1 rounded px-2 transition-colors hover:bg-foreground/6"
                 >
                   <HugeiconsIcon
                     icon={Tag01Icon}
                     size={10}
                     strokeWidth={1.5}
-                    className="shrink-0 text-muted-foreground/40"
+                    className="shrink-0 text-muted-foreground"
                   />
                   <span className="flex-1 truncate text-[11px] text-foreground/80">{tag}</span>
                   <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/tag:opacity-100">
                     <button
                       type="button"
-                      className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6"
                       onClick={() => void handlePushTag(tag)}
                       title="Push tag"
                       disabled={isPushing || isDeleting}
@@ -303,7 +303,7 @@ function BranchRow({ branch, isCurrent, onCheckout, onDelete, isCheckingOut }: B
     <div
       className={cn(
         "group/branch flex h-[22px] cursor-pointer items-center gap-1 rounded px-1.5 transition-colors",
-        isCurrent ? "bg-accent/40" : "hover:bg-accent/30"
+        isCurrent ? "bg-accent/60" : "hover:bg-foreground/6"
       )}
       onClick={() => !isCurrent && onCheckout(branch.name)}
       title={branch.name}
@@ -500,7 +500,7 @@ export function BranchDropdown({
           <button
             type="button"
             onClick={handleOpenNewBranch}
-            className="flex h-7 w-full items-center gap-1.5 border-b border-border/40 px-2.5 text-[11px] text-muted-foreground hover:bg-accent/30 hover:text-foreground"
+            className="flex h-7 w-full items-center gap-1.5 border-b border-border/40 px-2.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6"
           >
             <HugeiconsIcon icon={PlusSignIcon} size={10} strokeWidth={2} />
             New Branch…
@@ -545,16 +545,16 @@ export function BranchDropdown({
                 {filteredRemote.length > 0 && (
                   <div className="border-t border-border/40">
                     <div
-                      className="flex h-6 cursor-pointer items-center gap-1 px-2 hover:bg-accent/20"
+                      className="flex h-6 cursor-pointer items-center gap-1 px-2 transition-colors hover:bg-foreground/6"
                       onClick={() => setRemotesCollapsed((c) => !c)}
                     >
                       <HugeiconsIcon
                         icon={showRemotes && !filter ? ArrowDown01Icon : ArrowRight01Icon}
                         size={9}
                         strokeWidth={2.5}
-                        className="shrink-0 text-muted-foreground/40"
+                        className="shrink-0 text-muted-foreground"
                       />
-                      <span className="flex-1 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/50">
+                      <span className="flex-1 text-[9px] font-medium uppercase tracking-wider text-muted-foreground">
                         Remote ({filteredRemote.length})
                       </span>
                     </div>

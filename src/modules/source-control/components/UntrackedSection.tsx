@@ -29,7 +29,7 @@ export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
 
   return (
     <div className="mb-0.5">
-      <div className="group/hdr flex h-6 items-center gap-1.5 px-3 transition-colors hover:bg-muted/15">
+      <div className="group/hdr flex h-6 items-center gap-1.5 px-3 transition-colors hover:bg-foreground/6">
         <button
           type="button"
           className="flex shrink-0 items-center"
@@ -39,7 +39,7 @@ export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
             icon={collapsed ? ArrowRight01Icon : ArrowDown01Icon}
             size={8}
             strokeWidth={2.5}
-            className="text-muted-foreground/35 transition-colors group-hover/hdr:text-muted-foreground/60"
+            className="text-muted-foreground/60 transition-colors group-hover/hdr:text-muted-foreground"
           />
         </button>
 

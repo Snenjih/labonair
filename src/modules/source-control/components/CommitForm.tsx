@@ -168,7 +168,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
               setError(String(e));
             }
           }}
-          className="flex items-center gap-1 text-muted-foreground/60 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6 disabled:cursor-not-allowed disabled:opacity-40"
           title="Generate commit message with AI"
         >
           {isGenerating ? (
@@ -210,7 +210,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
               <button
                 type="button"
                 disabled={operationInProgress !== null}
-                className="flex w-6 items-center justify-center text-muted-foreground/60 transition-colors hover:bg-primary/20 disabled:cursor-not-allowed"
+                className="flex w-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground hover:bg-primary/20 disabled:cursor-not-allowed"
               >
                 <HugeiconsIcon icon={ArrowDown01Icon} size={9} strokeWidth={2.5} />
               </button>
@@ -281,7 +281,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
         <button
           type="button"
           onClick={onRefresh}
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-accent/30 hover:text-foreground"
+          className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6"
           title="Refresh"
         >
           <HugeiconsIcon icon={Refresh01Icon} size={10} strokeWidth={2} />
@@ -290,7 +290,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
           type="button"
           onClick={handleOpenGraph}
           disabled={!currentBranch}
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted-foreground/40 transition-colors hover:bg-accent/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+          className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6 disabled:cursor-not-allowed disabled:opacity-30"
           title="Open Git Graph"
         >
           <HugeiconsIcon icon={GitForkIcon} size={10} strokeWidth={2} />
