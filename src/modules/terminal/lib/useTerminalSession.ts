@@ -263,14 +263,20 @@ export function useTerminalSession({
         }
       }
 
-      const prompt = registerPromptTracker(term);
+      // CWD handler always needed
       cleanups.push(
         registerCwdHandler(term, (cwd) => {
           currentCwdRef.current = cwd;
           onCwdRef.current?.(cwd);
         }),
-        prompt.dispose,
       );
+
+      // Prompt tracker only for standard mode (block mode handles OSC 133 internally)
+      if (terminalMode !== "block") {
+        const prompt = registerPromptTracker(term);
+        cleanups.push(prompt.dispose);
+      }
+
       onSearchReadyRef.current?.(search);
 
       // Block mode setup
@@ -359,6 +365,7 @@ export function useTerminalSession({
         },
         initialCwd,
         shellPref || undefined,
+        terminalMode === "block",
       );
       if (disposed) {
         pty.close();

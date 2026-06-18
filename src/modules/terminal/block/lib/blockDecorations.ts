@@ -75,7 +75,7 @@ export class BlockDecorations {
 
     const osc133 = this.term.parser.registerOscHandler(133, (data: string) => {
       this.onOsc133(data);
-      return false;
+      return true;
     });
 
     const hEnter = this.term.parser.registerCsiHandler(
