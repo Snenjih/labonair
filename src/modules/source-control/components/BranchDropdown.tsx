@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import {
   AlertDialog,
@@ -462,7 +461,7 @@ export function BranchDropdown({
       <Popover open={open} onOpenChange={onOpenChange}>
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
         <PopoverContent
-          className="w-72 p-0 shadow-lg shadow-black/20"
+          className="flex w-64 max-h-[min(520px,70vh)] flex-col overflow-hidden p-0 shadow-lg shadow-black/20"
           align="start"
           style={{ borderColor: "hsl(var(--border) / 0.8)" }}
         >
@@ -501,21 +500,21 @@ export function BranchDropdown({
             New Branch…
           </button>
 
-          {/* Loading state */}
-          {isBranchLoading && branchList.length === 0 ? (
-            <div className="flex items-center justify-center py-4">
-              <Spinner className="size-4 text-muted-foreground" />
-            </div>
-          ) : (
-            <>
-              {/* Local branches */}
-              <div>
-                <div className="px-2 pb-0.5 pt-1.5">
-                  <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/50">
-                    Local
-                  </span>
-                </div>
-                <ScrollArea className="max-h-48">
+          {/* Scrollable body */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {isBranchLoading && branchList.length === 0 ? (
+              <div className="flex items-center justify-center py-4">
+                <Spinner className="size-4 text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                {/* Local branches */}
+                <div>
+                  <div className="px-2 pb-0.5 pt-1.5">
+                    <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground/50">
+                      Local
+                    </span>
+                  </div>
                   <div className="px-1 pb-1">
                     {filteredLocal.length === 0 ? (
                       <p className="py-1 pl-2 text-[11px] text-muted-foreground/50">
@@ -534,28 +533,26 @@ export function BranchDropdown({
                       ))
                     )}
                   </div>
-                </ScrollArea>
-              </div>
+                </div>
 
-              {/* Remote branches */}
-              {filteredRemote.length > 0 && (
-                <div className="border-t border-border/40">
-                  <div
-                    className="flex h-6 cursor-pointer items-center gap-1 px-2 hover:bg-accent/20"
-                    onClick={() => setTagsCollapsed((c) => !c)}
-                  >
-                    <HugeiconsIcon
-                      icon={showRemotes && !filter ? ArrowDown01Icon : ArrowRight01Icon}
-                      size={9}
-                      strokeWidth={2.5}
-                      className="shrink-0 text-muted-foreground/40"
-                    />
-                    <span className="flex-1 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/50">
-                      Remote ({filteredRemote.length})
-                    </span>
-                  </div>
-                  {(showRemotes || filter) && (
-                    <ScrollArea className="max-h-32">
+                {/* Remote branches */}
+                {filteredRemote.length > 0 && (
+                  <div className="border-t border-border/40">
+                    <div
+                      className="flex h-6 cursor-pointer items-center gap-1 px-2 hover:bg-accent/20"
+                      onClick={() => setTagsCollapsed((c) => !c)}
+                    >
+                      <HugeiconsIcon
+                        icon={showRemotes && !filter ? ArrowDown01Icon : ArrowRight01Icon}
+                        size={9}
+                        strokeWidth={2.5}
+                        className="shrink-0 text-muted-foreground/40"
+                      />
+                      <span className="flex-1 text-[9px] font-medium uppercase tracking-wider text-muted-foreground/50">
+                        Remote ({filteredRemote.length})
+                      </span>
+                    </div>
+                    {(showRemotes || filter) && (
                       <div className="px-1 pb-1">
                         {filteredRemote.map((branch) => (
                           <BranchRow
@@ -568,15 +565,15 @@ export function BranchDropdown({
                           />
                         ))}
                       </div>
-                    </ScrollArea>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                )}
 
-              {/* Tags section */}
-              <TagSection repoRoot={repoRoot} tags={tags} onRefresh={onRefresh} />
-            </>
-          )}
+                {/* Tags section */}
+                <TagSection repoRoot={repoRoot} tags={tags} onRefresh={onRefresh} />
+              </>
+            )}
+          </div>
         </PopoverContent>
       </Popover>
 
