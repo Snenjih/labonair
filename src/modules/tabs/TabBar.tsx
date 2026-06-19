@@ -31,6 +31,7 @@ type Props = {
   onCloseOthers: (id: number) => void;
   onCloseAll: () => void;
   onDuplicate: (id: number) => void;
+  onNewGitGraph?: () => void;
   compact?: boolean;
 };
 
@@ -46,6 +47,7 @@ export function TabBar({
   onCloseOthers,
   onCloseAll,
   onDuplicate,
+  onNewGitGraph,
   compact,
 }: Props) {
   const tabs = useTabsStore((s) => s.tabs);
@@ -192,6 +194,7 @@ export function TabBar({
               onNewSsh={onNewSsh}
               onNewSftp={onNewSftp}
               onOpenHostManager={onOpenHostManager}
+              onNewGitGraph={onNewGitGraph}
             />
           </DropdownMenuContent>
         </DropdownMenu>

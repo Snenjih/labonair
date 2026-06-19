@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { FileExplorer } from "@/modules/explorer";
 import { SnippetsPanel } from "@/modules/snippets";
 import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets";
+import { SourceControlPanel } from "@/modules/source-control";
 import type { SidebarPanel } from "@/modules/statusbar";
 import { SidebarTabList } from "@/modules/tabs";
 
@@ -36,6 +37,9 @@ export interface SidebarContentProps {
   onAttachToAgent: (path: string) => void;
   // Snippet
   onSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
+  // Source control
+  onOpenGitGraph: (repoPath: string, branch: string) => void;
+  onNewGitGraph?: () => void;
 }
 
 export function SidebarContent({
@@ -62,6 +66,8 @@ export function SidebarContent({
   onRevealInTerminal,
   onAttachToAgent,
   onSnippetRun,
+  onOpenGitGraph,
+  onNewGitGraph,
 }: SidebarContentProps) {
   return (
     <ResizablePanel
@@ -93,9 +99,15 @@ export function SidebarContent({
             onCloseOthers={onCloseOthers}
             onCloseAll={onCloseAll}
             onDuplicate={onDuplicate}
+            onNewGitGraph={onNewGitGraph}
           />
         ) : activePanel === "snippets" ? (
           <SnippetsPanel onRun={onSnippetRun} />
+        ) : activePanel === "source-control" ? (
+          <SourceControlPanel
+            rootPath={explorerRoot}
+            onOpenGitGraph={onOpenGitGraph}
+          />
         ) : (
           <FileExplorer
             rootPath={explorerRoot}

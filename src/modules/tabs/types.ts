@@ -93,7 +93,25 @@ export type QuickConnectParams = {
   port: number;
 };
 
-export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab;
+export type GitGraphTab = {
+  id: number;
+  kind: "git-graph";
+  title: string;
+  repositoryPath: string; // locked at open time — never changes
+  initialBranch: string;
+};
+
+export type GitDiffTab = {
+  id: number;
+  kind: "git-diff";
+  title: string;
+  repoRoot: string;
+  filePath: string;
+  staged: boolean;
+  section: "staged" | "unstaged" | "untracked";
+};
+
+export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | GitGraphTab | GitDiffTab;
 
 export type TabPatch = Partial<{
   title: string;

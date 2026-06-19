@@ -14,6 +14,7 @@ import {
   ComputerTerminal02Icon,
   Folder01Icon,
   Folder02Icon,
+  GitBranchIcon,
   GitCompareIcon,
   Globe02Icon,
   Home03Icon,
@@ -40,6 +41,8 @@ export function labelFor(t: Tab): string {
   if (t.kind === "ai-diff") return t.title;
   if (t.kind === "home") return t.title;
   if (t.kind === "sftp") return t.title;
+  if (t.kind === "git-graph") return t.title;
+  if (t.kind === "git-diff") return t.title;
   const wt = t as WorkspaceTab;
   const activeSession = wt.sessions[wt.activePaneId];
   if (activeSession?.kind === "local" && activeSession.cwd) {
@@ -76,6 +79,16 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
       <HugeiconsIcon icon={CloudServerIcon} size={14} strokeWidth={1.75} className="shrink-0" />
     );
   }
+  if (tab.kind === "git-graph") {
+    return (
+      <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} className="shrink-0" />
+    );
+  }
+  if (tab.kind === "git-diff") {
+    return (
+      <HugeiconsIcon icon={GitCompareIcon} size={14} strokeWidth={1.75} className="shrink-0 text-modified" />
+    );
+  }
   if (tab.kind === "workspace") {
     const wt = tab as WorkspaceTab;
     const activeSession = wt.sessions[wt.activePaneId];
@@ -106,6 +119,7 @@ interface NewTabDropdownItemsProps {
   onNewSsh: (hostId: string, title: string) => void;
   onNewSftp: (hostId: string, title: string) => void;
   onOpenHostManager: () => void;
+  onNewGitGraph?: () => void;
 }
 
 export function NewTabDropdownItems({
@@ -115,6 +129,7 @@ export function NewTabDropdownItems({
   onNewSsh,
   onNewSftp,
   onOpenHostManager,
+  onNewGitGraph,
 }: NewTabDropdownItemsProps) {
   const recentHosts = useRecentHosts();
   return (
@@ -134,6 +149,12 @@ export function NewTabDropdownItems({
         <span className="flex-1">Preview</span>
         <span className="text-xs text-muted-foreground">⌘P</span>
       </DropdownMenuItem>
+      {onNewGitGraph && (
+        <DropdownMenuItem onSelect={onNewGitGraph}>
+          <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} />
+          <span className="flex-1">Git Graph</span>
+        </DropdownMenuItem>
+      )}
       <DropdownMenuSeparator />
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>
