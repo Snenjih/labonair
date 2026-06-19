@@ -13,9 +13,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import {
+  Cancel01Icon,
+  PencilEdit02Icon,
+  PlusSignIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTabsStore } from "./store/tabsStore";
 import { TabIconFor, labelFor, NewTabDropdownItems } from "./lib/tabUtils";
 
@@ -31,6 +41,7 @@ type Props = {
   onCloseOthers: (id: number) => void;
   onCloseAll: () => void;
   onDuplicate: (id: number) => void;
+  onRename: (id: number, label: string) => void;
   onNewGitGraph?: () => void;
   compact?: boolean;
 };
@@ -47,14 +58,59 @@ export function TabBar({
   onCloseOthers,
   onCloseAll,
   onDuplicate,
+  onRename,
   onNewGitGraph,
   compact,
 }: Props) {
   const tabs = useTabsStore((s) => s.tabs);
   const activeId = useTabsStore((s) => s.activeId);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
-  // Horizontal wheel scroll without holding shift.
+  // ── Sliding pill ────────────────────────────────────────────────────────────
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
+  const [pillReady, setPillReady] = useState(false);
+
+  const measurePill = useCallback(() => {
+    const el = listRef.current?.querySelector<HTMLElement>('[data-tab-active="true"]');
+    setPill(el ? { left: el.offsetLeft, width: el.offsetWidth } : null);
+  }, []);
+
+  useLayoutEffect(() => {
+    measurePill();
+  }, [measurePill, activeId, tabs]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const ro = new ResizeObserver(measurePill);
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [measurePill]);
+
+  // Suppress slide transition on first paint so pill doesn't animate from origin.
+  useEffect(() => {
+    if (pill && !pillReady) {
+      const id = requestAnimationFrame(() => setPillReady(true));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [pill, pillReady]);
+
+  // ── Tab enter animation ─────────────────────────────────────────────────────
+  // Seed with all current IDs on first render so restored tabs don't animate.
+  const seenRef = useRef<Set<number> | null>(null);
+  const firstRender = seenRef.current === null;
+  let seen = seenRef.current;
+  if (seen === null) {
+    seen = new Set(tabs.map((t) => t.id));
+    seenRef.current = seen;
+  }
+  useEffect(() => {
+    seenRef.current = new Set(tabs.map((t) => t.id));
+  }, [tabs]);
+
+  // ── Wheel scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -68,13 +124,20 @@ export function TabBar({
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  // Keep the active tab visible after selection / open.
+  // Keep active tab visible after selection / open.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const active = el.querySelector<HTMLElement>(`[data-tab-id="${activeId}"]`);
     active?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeId, tabs.length]);
+
+  // Clear editing state if the tab being renamed is closed externally.
+  useEffect(() => {
+    if (editingId !== null && !tabs.find((t) => t.id === editingId)) {
+      setEditingId(null);
+    }
+  }, [tabs, editingId]);
 
   return (
     <div
@@ -87,92 +150,171 @@ export function TabBar({
           value={String(activeId)}
           onValueChange={(v) => onSelect(Number(v))}
         >
-          <TabsList className="h-7 w-max gap-0.5 bg-transparent p-0">
-            {tabs.map((t) => (
-              <ContextMenu key={t.id}>
-                <ContextMenuTrigger asChild>
-                  <TabsTrigger
-                    value={String(t.id)}
+          <TabsList
+            ref={listRef}
+            className="relative h-7 w-max gap-0.5 bg-transparent p-0"
+          >
+            {/* Sliding pill — sits behind all triggers via z-[1] on triggers */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-0 top-1/2 h-7 rounded-md bg-foreground/[0.07] shadow-sm ring-1 ring-inset ring-foreground/[0.05]"
+              style={
+                pill
+                  ? {
+                      width: pill.width,
+                      transform: `translate(${pill.left}px, -50%)`,
+                      transitionProperty: pillReady ? "transform, width" : "none",
+                      transitionDuration: "var(--dur-base)",
+                      transitionTimingFunction: "var(--ease-premium)",
+                    }
+                  : { opacity: 0 }
+              }
+            />
+
+            {tabs.map((t) => {
+              const isActive = t.id === activeId;
+              const isNew = !firstRender && !seen!.has(t.id);
+
+              // Render a non-button cell while renaming so <input> isn't nested
+              // inside <button> (invalid HTML; WebKit blocks focus/selection).
+              if (editingId === t.id && t.kind === "workspace") {
+                return (
+                  <div
+                    key={t.id}
                     data-tab-id={t.id}
-                    onAuxClick={(e) => {
-                      if (
-                        e.button === 1 &&
-                        tabs.length > 1 &&
-                        t.kind !== "home"
-                      ) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onClose(t.id);
-                      }
-                    }}
-                    onMouseDown={(e) => {
-                      if (e.button === 1) e.preventDefault();
-                    }}
                     className={cn(
-                      "group h-7 shrink-0 gap-1.5 rounded-xl text-xs transition-colors justify-between",
-                      t.id === activeId
-                        ? "bg-accent/60 text-primary!"
-                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-                      compact ? "px-1.5!" : "ps-2! pe-1!",
+                      "flex h-7 shrink-0 items-center gap-1.5 rounded-md text-xs bg-foreground/[0.07]",
+                      compact ? "px-1.5" : "px-2",
                     )}
                   >
-                    <span
-                      className={cn(
-                        "flex items-center gap-1.5 truncate",
-                        compact ? "max-w-32" : "max-w-56",
-                      )}
-                    >
-                      <TabIconFor tab={t} active={t.id === activeId} />
-                      <span className="truncate">{labelFor(t)}</span>
-                      {t.kind === "editor" && t.dirty ? (
-                        <span
-                          aria-label="Unsaved changes"
-                          className="size-1.5 shrink-0 rounded-full bg-foreground/70"
-                        />
-                      ) : null}
-                    </span>
-                    {tabs.length > 1 && t.kind !== "home" && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Close tab"
-                        title="Close tab"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onClose(t.id);
-                        }}
-                        className="size-5 shrink-0 rounded opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-60"
-                      >
-                        <HugeiconsIcon
-                          icon={Cancel01Icon}
-                          size={11}
-                          strokeWidth={2}
-                        />
-                      </Button>
-                    )}
-                  </TabsTrigger>
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  {t.kind !== "home" && (
-                    <>
-                      <ContextMenuItem onSelect={() => onClose(t.id)}>
-                        Close Tab
-                      </ContextMenuItem>
-                      <ContextMenuItem onSelect={() => onDuplicate(t.id)}>
-                        Duplicate Tab
-                      </ContextMenuItem>
-                      <ContextMenuSeparator />
-                    </>
+                    <TabIconFor tab={t} active={true} />
+                    <TabRenameInput
+                      initial={labelFor(t)}
+                      onCommit={(value) => {
+                        onRename(t.id, value);
+                        setEditingId(null);
+                      }}
+                      onCancel={() => setEditingId(null)}
+                    />
+                  </div>
+                );
+              }
+
+              const trigger = (
+                <TabsTrigger
+                  value={String(t.id)}
+                  data-tab-id={t.id}
+                  data-tab-active={isActive ? "true" : undefined}
+                  onAuxClick={(e) => {
+                    if (e.button === 1 && tabs.length > 1 && t.kind !== "home") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onClose(t.id);
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    if (e.button === 1) e.preventDefault();
+                  }}
+                  className={cn(
+                    "group relative z-[1] h-7 shrink-0 gap-1.5 rounded-md text-xs",
+                    "bg-transparent data-active:bg-transparent dark:data-active:bg-transparent",
+                    "transition-colors justify-between",
+                    isNew && "nexum-tab-in",
+                    isActive
+                      ? "text-foreground dark:text-foreground"
+                      : "text-muted-foreground hover:text-foreground/80",
+                    compact
+                      ? "px-1.5!"
+                      : tabs.length === 1
+                        ? "px-2!"
+                        : "ps-2! pe-1!",
                   )}
-                  <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>
-                    Close Others
-                  </ContextMenuItem>
-                  <ContextMenuItem onSelect={onCloseAll}>
-                    Close All
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            ))}
+                >
+                  <span
+                    className={cn(
+                      "flex items-center gap-1.5 truncate",
+                      compact ? "max-w-32" : "max-w-80",
+                    )}
+                  >
+                    <TabIconFor tab={t} active={isActive} />
+                    <span className="truncate">{labelFor(t)}</span>
+                    {t.kind === "editor" && t.dirty ? (
+                      <span
+                        aria-label="Unsaved changes"
+                        className="size-1.5 shrink-0 rounded-full bg-foreground/70"
+                      />
+                    ) : null}
+                  </span>
+                  {tabs.length > 1 && t.kind !== "home" && (
+                    <span
+                      role="button"
+                      aria-label="Close tab"
+                      data-no-drag
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onClose(t.id);
+                      }}
+                      className="rounded p-0.5 opacity-0 transition-opacity hover:bg-accent hover:opacity-100 group-hover:opacity-60"
+                    >
+                      <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
+                    </span>
+                  )}
+                </TabsTrigger>
+              );
+
+              // Workspace tabs get a rename-focused context menu.
+              // All other types keep the original menu (duplicate, close others, close all).
+              if (t.kind === "workspace") {
+                return (
+                  <ContextMenu key={t.id}>
+                    <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
+                    <ContextMenuContent
+                      className="min-w-36"
+                      onCloseAutoFocus={(e) => e.preventDefault()}
+                    >
+                      <ContextMenuItem onSelect={() => setEditingId(t.id)}>
+                        <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.75} />
+                        <span className="flex-1">Rename</span>
+                      </ContextMenuItem>
+                      {tabs.length > 1 && (
+                        <>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem onSelect={() => onClose(t.id)}>
+                            <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.75} />
+                            <span className="flex-1">Close</span>
+                          </ContextMenuItem>
+                        </>
+                      )}
+                    </ContextMenuContent>
+                  </ContextMenu>
+                );
+              }
+
+              return (
+                <ContextMenu key={t.id}>
+                  <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
+                  <ContextMenuContent>
+                    {t.kind !== "home" && (
+                      <>
+                        <ContextMenuItem onSelect={() => onClose(t.id)}>
+                          Close Tab
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={() => onDuplicate(t.id)}>
+                          Duplicate Tab
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                      </>
+                    )}
+                    <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>
+                      Close Others
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={onCloseAll}>
+                      Close All
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              );
+            })}
           </TabsList>
         </Tabs>
         <DropdownMenu>
@@ -200,5 +342,58 @@ export function TabBar({
         </DropdownMenu>
       </div>
     </div>
+  );
+}
+
+function TabRenameInput({
+  initial,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const done = useRef(false);
+
+  useEffect(() => {
+    // Delay focus to after context menu restores focus to its trigger on close.
+    const raf = requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.select();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const finish = (fn: () => void) => {
+    if (done.current) return;
+    done.current = true;
+    fn();
+  };
+
+  // explicit=true (Enter pressed) commits even if label is unchanged —
+  // this freezes customTitle so cwd updates no longer override it.
+  const commit = (value: string, explicit: boolean) => {
+    if (!explicit && value.trim() === initial.trim()) finish(onCancel);
+    else finish(() => onCommit(value));
+  };
+
+  return (
+    <input
+      ref={ref}
+      defaultValue={initial}
+      aria-label="Rename tab"
+      className="w-28 min-w-0 rounded-sm bg-background px-1 text-xs text-foreground outline-none ring-1 ring-border focus:ring-ring"
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") commit(e.currentTarget.value, true);
+        else if (e.key === "Escape") finish(onCancel);
+      }}
+      onBlur={(e) => {
+        if (!document.hasFocus()) return;
+        commit(e.currentTarget.value, false);
+      }}
+    />
   );
 }

@@ -28,6 +28,7 @@ export interface SidebarContentProps {
   onCloseOthers: (keepId: number) => void;
   onCloseAll: () => void;
   onDuplicate: (id: number) => void;
+  onRename: (id: number, label: string) => void;
   // Explorer callbacks
   onOpenFile: (path: string) => void;
   onOpenPreview: (url: string) => number;
@@ -59,6 +60,7 @@ export function SidebarContent({
   onCloseOthers,
   onCloseAll,
   onDuplicate,
+  onRename,
   onOpenFile,
   onOpenPreview,
   onPathRenamed,
@@ -99,6 +101,7 @@ export function SidebarContent({
             onCloseOthers={onCloseOthers}
             onCloseAll={onCloseAll}
             onDuplicate={onDuplicate}
+            onRename={onRename}
             onNewGitGraph={onNewGitGraph}
           />
         ) : activePanel === "snippets" ? (
