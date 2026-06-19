@@ -8,6 +8,7 @@ export type SettingCategory =
   | "Command Palette"
   | "File Manager"
   | "AI"
+  | "Agent Fleet"
   | "Directives"
   | "About";
 
@@ -482,6 +483,22 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     ],
   },
 
+  // --- Agent Fleet ---
+  {
+    id: "agentFleetBroadcastAutoEnter",
+    label: "Auto-submit broadcast",
+    description: "Automatically press Enter after broadcasting a command so it executes immediately in all selected terminals.",
+    category: "Agent Fleet",
+    controlType: "Switch",
+  },
+  {
+    id: "agentFleetDefaultPath",
+    label: "Default working directory",
+    description: "Pre-filled project path in the new agent dialog. Leave empty to start blank.",
+    category: "Agent Fleet",
+    controlType: "Input",
+  },
+
   // --- AI ---
   {
     id: "aiEnabled",
@@ -514,6 +531,7 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Command Palette",
   "File Manager",
   "AI",
+  "Agent Fleet",
   "Directives",
   "About",
 ];

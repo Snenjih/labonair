@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import type { AgentTool, FleetAgentConfig } from "@/modules/tabs/types";
 import { useTabsStore } from "@/modules/tabs";
 import { useAgentFleetStore } from "./store/agentFleetStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 type Props = {
   open: boolean;
@@ -40,9 +41,11 @@ export function AgentLaunchDialog({
   activeFleetTabId,
   defaultCwd,
 }: Props) {
+  const fleetDefaultPath = usePreferencesStore((s) => s.agentFleetDefaultPath);
+
   const [selectedTool, setSelectedTool] = useState<AgentTool>("claude");
   const [label, setLabel] = useState("");
-  const [cwd, setCwd] = useState(defaultCwd ?? "");
+  const [cwd, setCwd] = useState(defaultCwd ?? fleetDefaultPath);
   const [extraFlags, setExtraFlags] = useState("");
   const [customCommand, setCustomCommand] = useState("");
 
@@ -55,10 +58,10 @@ export function AgentLaunchDialog({
     }
   }, [open]);
 
-  // Update cwd when defaultCwd changes
+  // Update cwd when defaultCwd or the settings default path changes
   useEffect(() => {
-    setCwd(defaultCwd ?? "");
-  }, [defaultCwd]);
+    setCwd(defaultCwd ?? fleetDefaultPath);
+  }, [defaultCwd, fleetDefaultPath]);
 
   // Auto-label when tool changes
   useEffect(() => {

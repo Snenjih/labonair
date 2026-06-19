@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import type { FleetAgentConfig } from "@/modules/tabs/types";
 import type { FleetSession } from "./store/agentFleetStore";
 import type { TerminalPaneHandle } from "@/modules/terminal";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 type Props = {
   configs: FleetAgentConfig[];
@@ -21,10 +22,11 @@ export function BroadcastBar({ configs, sessions, terminalRefs, inputRef }: Prop
       ),
   );
   const [input, setInput] = useState("");
+  const autoEnter = usePreferencesStore((s) => s.agentFleetBroadcastAutoEnter);
 
   const broadcast = () => {
     if (!input.trim()) return;
-    const text = input.endsWith("\n") ? input : input + "\n";
+    const text = autoEnter ? (input.endsWith("\n") ? input : input + "\n") : input;
     for (const configId of selected) {
       const session = sessions[configId];
       if (!session || session.status === "exited") continue;
