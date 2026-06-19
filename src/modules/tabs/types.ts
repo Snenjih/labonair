@@ -105,6 +105,10 @@ export type AgentFleetTab = {
   viewMode: "grid" | "focus";
   focusedAgentId: string | null;
   agents: FleetAgentConfig[];
+  panelSizes?: {
+    rowSizes: number[];
+    colSizes: number[][];
+  };
 };
 
 export type QuickConnectParams = {

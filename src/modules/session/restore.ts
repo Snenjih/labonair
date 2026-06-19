@@ -3,8 +3,10 @@ import { useNotificationStore } from "@/modules/notifications/store/useNotificat
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { PaneLeaf, PaneNode, PaneSplit } from "@/modules/tabs";
+import type { FleetAgentConfig } from "@/modules/tabs/types";
 import { loadSnapshot } from "./store";
 import type {
+  AgentFleetTabSnapshot,
   RestoreResult,
   SessionSnapshot,
   SftpTabSnapshot,
@@ -23,6 +25,11 @@ export interface TabActions {
   newSftpTab: (hostId: string, title: string) => number;
   splitPane: (tabId: number, direction: "horizontal" | "vertical") => void;
   setActivePaneId: (tabId: number, paneId: string) => void;
+  newAgentFleetTab: (cwd?: string) => number;
+  addFleetAgent: (tabId: number, config: FleetAgentConfig) => void;
+  updateFleetViewMode: (tabId: number, mode: "grid" | "focus") => void;
+  setFocusedAgent: (tabId: number, configId: string | null) => void;
+  updateFleetPanelSizes: (tabId: number, rowSizes: number[], colSizes: number[][]) => void;
 }
 
 function collectLeaves(node: PaneNode): PaneLeaf[] {
@@ -108,6 +115,23 @@ async function reconstructPaneTree(
   await reconstructPaneTree(root, split.children[1], tabId, actions, sessions, _currentActiveId);
 }
 
+function restoreFleetTab(snap: AgentFleetTabSnapshot, actions: TabActions): number {
+  const tabId = actions.newAgentFleetTab();
+  for (const config of snap.agents) {
+    actions.addFleetAgent(tabId, config);
+  }
+  if (snap.viewMode !== "grid") {
+    actions.updateFleetViewMode(tabId, snap.viewMode);
+  }
+  if (snap.focusedAgentId) {
+    actions.setFocusedAgent(tabId, snap.focusedAgentId);
+  }
+  if (snap.panelSizes) {
+    actions.updateFleetPanelSizes(tabId, snap.panelSizes.rowSizes, snap.panelSizes.colSizes);
+  }
+  return tabId;
+}
+
 async function restoreSftpTab(
   snap: SftpTabSnapshot,
   actions: TabActions,
@@ -168,6 +192,10 @@ async function restoreTab(
 
     case "sftp": {
       return restoreSftpTab(snap, actions, failedTabs);
+    }
+
+    case "agent-fleet": {
+      return restoreFleetTab(snap, actions);
     }
   }
 }

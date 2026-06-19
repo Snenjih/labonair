@@ -62,6 +62,7 @@ export type TabsState = {
   updateFleetViewMode: (tabId: number, mode: "grid" | "focus") => void;
   setFocusedAgent: (tabId: number, configId: string | null) => void;
   updateFleetTabTitle: (tabId: number, title: string) => void;
+  updateFleetPanelSizes: (tabId: number, rowSizes: number[], colSizes: number[][]) => void;
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
   setActivePaneId: (tabId: number, paneId: string) => void;
@@ -404,6 +405,16 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) =>
         t.kind === "agent-fleet" && t.id === tabId ? { ...t, title } : t,
+      ),
+    }));
+  },
+
+  updateFleetPanelSizes: (tabId, rowSizes, colSizes) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.kind === "agent-fleet" && t.id === tabId
+          ? { ...t, panelSizes: { rowSizes, colSizes } }
+          : t,
       ),
     }));
   },

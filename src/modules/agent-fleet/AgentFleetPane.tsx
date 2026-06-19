@@ -1,4 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Group, Panel, Separator } from "react-resizable-panels";
+import type { Layout } from "react-resizable-panels";
 import { cn } from "@/lib/utils";
 import type { AgentFleetTab } from "@/modules/tabs/types";
 import { useTabsStore } from "@/modules/tabs";
@@ -9,8 +11,6 @@ import { AgentLaunchDialog } from "./AgentLaunchDialog";
 import { BroadcastBar } from "./BroadcastBar";
 import type { TerminalPaneHandle } from "@/modules/terminal";
 
-// Stable empty fallback — prevents useSyncExternalStore from seeing a new {} reference
-// every render when no sessions exist for this tab, which would cause an infinite update loop.
 const EMPTY_SESSIONS: Record<string, FleetSession> = {};
 
 type Props = {
@@ -18,49 +18,33 @@ type Props = {
   visible: boolean;
 };
 
+function computeGridDims(n: number): { cols: number; rows: number } {
+  if (n <= 1) return { cols: 1, rows: 1 };
+  if (n === 2) return { cols: 2, rows: 1 };
+  if (n <= 4) return { cols: 2, rows: 2 };
+  if (n <= 6) return { cols: 3, rows: 2 };
+  const cols = Math.ceil(Math.sqrt(n));
+  return { cols, rows: Math.ceil(n / cols) };
+}
+
+function equalSize(count: number): number {
+  return 100 / count;
+}
+
+function rowPanelId(tabId: number, rowIdx: number): string {
+  return `fleet-${tabId}-row-${rowIdx}`;
+}
+
+function agentPanelId(tabId: number, configId: string): string {
+  return `fleet-${tabId}-agent-${configId}`;
+}
+
 export function AgentFleetPane({ tab, visible }: Props) {
   const [launchDialogOpen, setLaunchDialogOpen] = useState(false);
-  const slotRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [slotRects, setSlotRects] = useState<
-    Map<string, { x: number; y: number; w: number; h: number }>
-  >(new Map());
   const terminalRefs = useRef<Map<string, TerminalPaneHandle>>(new Map());
-  const containerRef = useRef<HTMLDivElement>(null);
   const broadcastBarRef = useRef<HTMLInputElement>(null);
 
-  // Reactive session data
   const sessions = useAgentFleetStore((s) => s.sessions[tab.id] ?? EMPTY_SESSIONS);
-
-  const updateRects = () => {
-    const container = containerRef.current;
-    if (!container) return;
-    const containerRect = container.getBoundingClientRect();
-    const scrollTop = container.scrollTop;
-    const next = new Map<string, { x: number; y: number; w: number; h: number }>();
-    for (const [configId, slotEl] of slotRefs.current) {
-      const r = slotEl.getBoundingClientRect();
-      next.set(configId, {
-        x: r.left - containerRect.left,
-        y: r.top - containerRect.top + scrollTop,
-        w: r.width,
-        h: r.height,
-      });
-    }
-    setSlotRects(next);
-  };
-
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const ro = new ResizeObserver(updateRects);
-    ro.observe(container);
-    for (const slotEl of slotRefs.current.values()) {
-      ro.observe(slotEl);
-    }
-    updateRects();
-    return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab.agents]);
 
   // Launch agents that have no session yet
   useEffect(() => {
@@ -102,17 +86,102 @@ export function AgentFleetPane({ tab, visible }: Props) {
     return () => window.removeEventListener("nexum:fleet-action", handler);
   }, []);
 
+  const { cols, rows } = computeGridDims(tab.agents.length);
+
+  const agentRows = Array.from({ length: rows }, (_, r) =>
+    tab.agents.slice(r * cols, (r + 1) * cols),
+  );
+
+  // Build defaultLayout for the vertical (rows) group
+  function buildRowLayout(): Layout {
+    const stored = tab.panelSizes?.rowSizes;
+    const layout: Layout = {};
+    for (let r = 0; r < rows; r++) {
+      const id = rowPanelId(tab.id, r);
+      layout[id] = stored?.length === rows ? (stored[r] ?? equalSize(rows)) : equalSize(rows);
+    }
+    return layout;
+  }
+
+  // Build defaultLayout for a horizontal (cols) group in a row
+  function buildColLayout(rowIdx: number, rowAgents: typeof agentRows[0]): Layout {
+    const stored = tab.panelSizes?.colSizes[rowIdx];
+    const layout: Layout = {};
+    rowAgents.forEach((config, colIdx) => {
+      const id = agentPanelId(tab.id, config.id);
+      layout[id] = stored?.length === rowAgents.length
+        ? (stored[colIdx] ?? equalSize(rowAgents.length))
+        : equalSize(rowAgents.length);
+    });
+    return layout;
+  }
+
+  function handleRowLayoutChanged(layout: Layout) {
+    const rowSizes = agentRows.map((_, r) => layout[rowPanelId(tab.id, r)] ?? equalSize(rows));
+    const existing = (
+      useTabsStore.getState().tabs.find((t) => t.id === tab.id) as AgentFleetTab | undefined
+    )?.panelSizes;
+    useTabsStore.getState().updateFleetPanelSizes(tab.id, rowSizes, existing?.colSizes ?? []);
+  }
+
+  function handleColLayoutChanged(rowIdx: number, rowAgents: typeof agentRows[0], layout: Layout) {
+    const colSizes = rowAgents.map((config) =>
+      layout[agentPanelId(tab.id, config.id)] ?? equalSize(rowAgents.length),
+    );
+    const existing = (
+      useTabsStore.getState().tabs.find((t) => t.id === tab.id) as AgentFleetTab | undefined
+    )?.panelSizes;
+    const newColSizes = [...(existing?.colSizes ?? [])];
+    newColSizes[rowIdx] = colSizes;
+    useTabsStore.getState().updateFleetPanelSizes(
+      tab.id,
+      existing?.rowSizes ?? Array<number>(rows).fill(equalSize(rows)),
+      newColSizes,
+    );
+  }
+
+  function makeAgentHandlers(config: (typeof tab.agents)[0]) {
+    return {
+      onFocus: () => {
+        useTabsStore.getState().updateFleetViewMode(tab.id, "focus");
+        useTabsStore.getState().setFocusedAgent(tab.id, config.id);
+      },
+      onKill: () => {
+        terminalRefs.current.get(config.id)?.write("\x03");
+        setTimeout(() => terminalRefs.current.get(config.id)?.write("exit\n"), 100);
+      },
+      onRestart: () => {
+        useAgentFleetStore
+          .getState()
+          .restartAgent(tab.id, config.id, config.command, config.cwd);
+      },
+      onClose: () => {
+        const ref = terminalRefs.current.get(config.id);
+        if (ref) {
+          ref.write("\x03");
+          setTimeout(() => ref.write("exit\n"), 100);
+        }
+        setTimeout(() => {
+          useAgentFleetStore.getState().removeSession(tab.id, config.id);
+          useTabsStore.getState().removeFleetAgent(tab.id, config.id);
+          terminalRefs.current.delete(config.id);
+        }, 200);
+      },
+      registerRef: (ref: TerminalPaneHandle | null) => {
+        if (ref) terminalRefs.current.set(config.id, ref);
+        else terminalRefs.current.delete(config.id);
+      },
+    };
+  }
+
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border/50 px-3">
         <span className="text-xs font-medium text-foreground">Agent Fleet</span>
         <div className="ml-auto flex items-center gap-1">
-          {/* View Mode Toggle */}
           <button
-            onClick={() =>
-              useTabsStore.getState().updateFleetViewMode(tab.id, "grid")
-            }
+            onClick={() => useTabsStore.getState().updateFleetViewMode(tab.id, "grid")}
             className={cn(
               "rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
               tab.viewMode === "grid" && "bg-accent text-foreground",
@@ -121,9 +190,7 @@ export function AgentFleetPane({ tab, visible }: Props) {
             Grid
           </button>
           <button
-            onClick={() =>
-              useTabsStore.getState().updateFleetViewMode(tab.id, "focus")
-            }
+            onClick={() => useTabsStore.getState().updateFleetViewMode(tab.id, "focus")}
             className={cn(
               "rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
               tab.viewMode === "focus" && "bg-accent text-foreground",
@@ -142,7 +209,6 @@ export function AgentFleetPane({ tab, visible }: Props) {
 
       {/* Content Area */}
       {tab.agents.length === 0 ? (
-        /* Empty State */
         <div className="flex flex-1 flex-col items-center justify-center gap-3">
           <p className="text-sm text-muted-foreground">No agents running</p>
           <button
@@ -152,121 +218,32 @@ export function AgentFleetPane({ tab, visible }: Props) {
             Launch your first agent
           </button>
         </div>
-      ) : (
-        /* Grid/Focus Content — relative container with TWO LAYERS */
-        <div
-          ref={containerRef}
-          className={cn(
-            "relative min-h-0 flex-1",
-            tab.agents.length > 4 && "overflow-y-auto",
-          )}
-        >
-          {/* SLOT LAYER (z-0): CSS Grid with invisible slot bodies */}
-          <div
-            className="pointer-events-none w-full"
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                tab.viewMode === "focus" ? "1fr" : "repeat(2, 1fr)",
-              gridAutoRows:
-                tab.viewMode === "focus" ? "100%" : "minmax(200px, 1fr)",
-              height: tab.viewMode === "focus" ? "100%" : undefined,
-            }}
-          >
-            {tab.agents.map((config) => {
-              const isFocused =
-                tab.viewMode === "focus" &&
-                (tab.focusedAgentId ?? tab.agents[0]?.id) === config.id;
-              if (tab.viewMode === "focus" && !isFocused) return null;
-              return (
-                <div
-                  key={config.id}
-                  ref={(el) => {
-                    if (el) slotRefs.current.set(config.id, el);
-                    else slotRefs.current.delete(config.id);
-                  }}
-                  className="border-b border-r border-border/30"
-                  style={{ minHeight: 200 }}
+      ) : tab.viewMode === "focus" ? (
+        /* Focus Mode — single agent full-screen */
+        <div className="relative min-h-0 flex-1">
+          {tab.agents.map((config) => {
+            const session = sessions[config.id];
+            const focusedId = tab.focusedAgentId ?? tab.agents[0]?.id;
+            const isFocused = focusedId === config.id;
+            const handlers = makeAgentHandlers(config);
+            return (
+              <div
+                key={session?.ptyId ?? config.id}
+                className={cn("absolute inset-0", !isFocused && "hidden")}
+              >
+                <AgentCard
+                  tabId={tab.id}
+                  config={config}
+                  session={session}
+                  isVisible={visible && isFocused}
+                  {...handlers}
                 />
-              );
-            })}
-          </div>
-
-          {/* TERMINAL LAYER (z-10): Flat absolute AgentCards */}
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{ zIndex: 1 }}
-          >
-            {tab.agents.map((config) => {
-              const session = sessions[config.id];
-              const focusedId = tab.focusedAgentId ?? tab.agents[0]?.id;
-              const isVisible =
-                visible &&
-                (tab.viewMode === "grid" ||
-                  (tab.viewMode === "focus" && focusedId === config.id));
-              const slotRect = slotRects.get(config.id) ?? null;
-              return (
-                <div
-                  key={session?.ptyId ?? config.id}
-                  className="pointer-events-auto"
-                >
-                  <AgentCard
-                    tabId={tab.id}
-                    config={config}
-                    session={session}
-                    isVisible={isVisible}
-                    slotRect={slotRect}
-                    onFocus={() => {
-                      useTabsStore
-                        .getState()
-                        .updateFleetViewMode(tab.id, "focus");
-                      useTabsStore
-                        .getState()
-                        .setFocusedAgent(tab.id, config.id);
-                    }}
-                    onKill={() => {
-                      terminalRefs.current.get(config.id)?.write("\x03");
-                      setTimeout(
-                        () =>
-                          terminalRefs.current.get(config.id)?.write("exit\n"),
-                        100,
-                      );
-                    }}
-                    onRestart={() => {
-                      const store = useAgentFleetStore.getState();
-                      store.restartAgent(
-                        tab.id,
-                        config.id,
-                        config.command,
-                        config.cwd,
-                      );
-                    }}
-                    onClose={() => {
-                      // Kill the process first, then clean up state
-                      const ref = terminalRefs.current.get(config.id);
-                      if (ref) {
-                        ref.write("\x03");
-                        setTimeout(() => ref.write("exit\n"), 100);
-                      }
-                      setTimeout(() => {
-                        useAgentFleetStore.getState().removeSession(tab.id, config.id);
-                        useTabsStore.getState().removeFleetAgent(tab.id, config.id);
-                        terminalRefs.current.delete(config.id);
-                        slotRefs.current.delete(config.id);
-                      }, 200);
-                    }}
-                    registerRef={(ref) => {
-                      if (ref) terminalRefs.current.set(config.id, ref);
-                      else terminalRefs.current.delete(config.id);
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
 
           {/* Focus Mode Chip Switcher */}
-          {tab.viewMode === "focus" && tab.agents.length > 1 && (
+          {tab.agents.length > 1 && (
             <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center gap-1 border-t border-border/50 bg-card/90 px-2 py-1 backdrop-blur">
               {tab.agents.map((config) => {
                 const session = sessions[config.id];
@@ -303,6 +280,71 @@ export function AgentFleetPane({ tab, visible }: Props) {
               })}
             </div>
           )}
+        </div>
+      ) : (
+        /* Grid Mode — resizable panel grid */
+        <div className="min-h-0 flex-1">
+          <Group
+            orientation="vertical"
+            className="flex h-full w-full flex-col"
+            defaultLayout={buildRowLayout()}
+            onLayoutChanged={handleRowLayoutChanged}
+          >
+            {agentRows.map((rowAgents, rowIdx) => (
+              <>
+                {rowIdx > 0 && (
+                  <Separator
+                    key={`row-sep-${rowIdx}`}
+                    className="h-1 w-full shrink-0 cursor-row-resize bg-border/40 transition-colors hover:bg-border"
+                  />
+                )}
+                <Panel
+                  key={rowPanelId(tab.id, rowIdx)}
+                  id={rowPanelId(tab.id, rowIdx)}
+                  defaultSize={equalSize(rows)}
+                  minSize={5}
+                >
+                  <Group
+                    orientation="horizontal"
+                    className="flex h-full w-full"
+                    defaultLayout={buildColLayout(rowIdx, rowAgents)}
+                    onLayoutChanged={(layout) =>
+                      handleColLayoutChanged(rowIdx, rowAgents, layout)
+                    }
+                  >
+                    {rowAgents.map((config, colIdx) => {
+                      const session = sessions[config.id];
+                      const handlers = makeAgentHandlers(config);
+                      return (
+                        <>
+                          {colIdx > 0 && (
+                            <Separator
+                              key={`col-sep-${config.id}`}
+                              className="w-1 shrink-0 cursor-col-resize bg-border/40 transition-colors hover:bg-border"
+                            />
+                          )}
+                          <Panel
+                            key={agentPanelId(tab.id, config.id)}
+                            id={agentPanelId(tab.id, config.id)}
+                            defaultSize={equalSize(rowAgents.length)}
+                            minSize={10}
+                          >
+                            <AgentCard
+                              tabId={tab.id}
+                              config={config}
+                              session={session}
+                              isVisible={visible}
+                              {...handlers}
+                            />
+                          </Panel>
+                        </>
+                      );
+                    })}
+                  </Group>
+                </Panel>
+              </>
+            ))}
+          </Group>
         </div>
       )}
 

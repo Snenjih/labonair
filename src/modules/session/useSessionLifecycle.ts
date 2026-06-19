@@ -51,6 +51,11 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
       newSftpTab: actions.newSftpTab,
       splitPane: actions.splitPane,
       setActivePaneId: actions.setActivePaneId,
+      newAgentFleetTab: actions.newAgentFleetTab,
+      addFleetAgent: actions.addFleetAgent,
+      updateFleetViewMode: actions.updateFleetViewMode,
+      setFocusedAgent: actions.setFocusedAgent,
+      updateFleetPanelSizes: actions.updateFleetPanelSizes,
     }).then((result) => {
       if (!alive) return;
       if (!result || result.restoredCount === 0) actions.openDefaultTab();

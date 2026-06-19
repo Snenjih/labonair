@@ -8,14 +8,11 @@ import { useAgentFleetStore } from "./store/agentFleetStore";
 import type { TerminalPaneHandle } from "@/modules/terminal";
 import { TerminalPane } from "@/modules/terminal/TerminalPane";
 
-type Rect = { x: number; y: number; w: number; h: number };
-
 type AgentCardProps = {
   tabId: number;
   config: FleetAgentConfig;
   session: FleetSession | undefined;
   isVisible: boolean;
-  slotRect: Rect | null;
   onFocus: () => void;
   onKill: () => void;
   onRestart: () => void;
@@ -41,7 +38,7 @@ function StatusDot({ status }: { status: DisplayStatus }) {
 
 export const AgentCard = forwardRef<TerminalPaneHandle, AgentCardProps>(
   function AgentCard(
-    { tabId, config, session, isVisible, slotRect, onFocus, onKill, onRestart, onClose, registerRef },
+    { tabId, config, session, isVisible, onFocus, onKill, onRestart, onClose, registerRef },
     _ref,
   ) {
     const [displayStatus, setDisplayStatus] = useState<DisplayStatus>("starting");
@@ -69,73 +66,53 @@ export const AgentCard = forwardRef<TerminalPaneHandle, AgentCardProps>(
       config.command + (config.extraFlags ? " " + config.extraFlags : "");
 
     return (
-      <>
-        {/* Header — absolute, always in slot area */}
-        {slotRect && (
-          <div
-            style={{
-              position: "absolute",
-              left: slotRect.x,
-              top: slotRect.y,
-              width: slotRect.w,
-              height: 32,
-              zIndex: 20,
-            }}
-            className="flex items-center gap-1.5 border-b border-border/50 bg-card px-2"
-          >
-            <StatusDot status={displayStatus} />
-            <span className="truncate text-xs font-medium">{config.label}</span>
-            <span className="shrink-0 rounded bg-accent/60 px-1 py-0.5 text-[10px] text-muted-foreground">
-              {config.tool}
-            </span>
-            <div className="ml-auto flex items-center gap-1">
+      <div className="flex h-full flex-col overflow-hidden border-border/30">
+        {/* Header */}
+        <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-border/50 bg-card px-2">
+          <StatusDot status={displayStatus} />
+          <span className="truncate text-xs font-medium">{config.label}</span>
+          <span className="shrink-0 rounded bg-accent/60 px-1 py-0.5 text-[10px] text-muted-foreground">
+            {config.tool}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              onClick={onFocus}
+              title="Focus"
+              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <HugeiconsIcon icon={ArrowExpand01Icon} size={11} strokeWidth={1.75} />
+            </button>
+            {session?.status === "exited" ? (
               <button
-                onClick={onFocus}
-                title="Focus"
+                onClick={onRestart}
+                title="Restart"
                 className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
-                <HugeiconsIcon icon={ArrowExpand01Icon} size={11} strokeWidth={1.75} />
+                <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.75} />
               </button>
-              {session?.status === "exited" ? (
-                <button
-                  onClick={onRestart}
-                  title="Restart"
-                  className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.75} />
-                </button>
-              ) : (
-                <button
-                  onClick={onKill}
-                  title="Kill process"
-                  disabled={!session}
-                  className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive disabled:opacity-40"
-                >
-                  <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={1.75} />
-                </button>
-              )}
+            ) : (
               <button
-                onClick={onClose}
-                title="Remove agent"
-                className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+                onClick={onKill}
+                title="Kill process"
+                disabled={!session}
+                className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive disabled:opacity-40"
               >
-                <HugeiconsIcon icon={Delete02Icon} size={11} strokeWidth={1.75} />
+                <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={1.75} />
               </button>
-            </div>
+            )}
+            <button
+              onClick={onClose}
+              title="Remove agent"
+              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+            >
+              <HugeiconsIcon icon={Delete02Icon} size={11} strokeWidth={1.75} />
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* Terminal Pane */}
-        {session && slotRect && (
-          <div
-            style={{
-              position: "absolute",
-              left: slotRect.x,
-              top: slotRect.y + 32,
-              width: slotRect.w,
-              height: slotRect.h - 32,
-            }}
-          >
+        {/* Terminal */}
+        {session ? (
+          <div className="min-h-0 flex-1">
             <TerminalPane
               tabId={session.ptyId}
               visible={isVisible}
@@ -149,20 +126,8 @@ export const AgentCard = forwardRef<TerminalPaneHandle, AgentCardProps>(
               ref={(h) => registerRef(h)}
             />
           </div>
-        )}
-
-        {/* Not started state */}
-        {!session && slotRect && (
-          <div
-            style={{
-              position: "absolute",
-              left: slotRect.x,
-              top: slotRect.y + 32,
-              width: slotRect.w,
-              height: slotRect.h - 32,
-            }}
-            className="flex items-center justify-center"
-          >
+        ) : (
+          <div className="flex flex-1 items-center justify-center">
             <button
               onClick={onRestart}
               className="text-xs text-muted-foreground underline hover:text-foreground"
@@ -171,7 +136,7 @@ export const AgentCard = forwardRef<TerminalPaneHandle, AgentCardProps>(
             </button>
           </div>
         )}
-      </>
+      </div>
     );
   },
 );

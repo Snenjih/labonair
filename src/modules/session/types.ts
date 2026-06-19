@@ -1,4 +1,5 @@
 import type { PaneNode } from "@/modules/tabs";
+import type { FleetAgentConfig } from "@/modules/tabs/types";
 
 export const SESSION_SNAPSHOT_VERSION = 1;
 
@@ -14,7 +15,8 @@ export type TabSnapshot =
   | EditorTabSnapshot
   | PreviewTabSnapshot
   | HomeTabSnapshot
-  | SftpTabSnapshot;
+  | SftpTabSnapshot
+  | AgentFleetTabSnapshot;
 
 export interface WorkspaceTabSnapshot {
   kind: "workspace";
@@ -59,6 +61,15 @@ export interface SftpTabSnapshot {
   hostId: string;
   remotePath?: string;
   localPath?: string;
+}
+
+export interface AgentFleetTabSnapshot {
+  kind: "agent-fleet";
+  title: string;
+  viewMode: "grid" | "focus";
+  focusedAgentId: string | null;
+  agents: FleetAgentConfig[];
+  panelSizes?: { rowSizes: number[]; colSizes: number[][] };
 }
 
 export interface RestoreResult {
