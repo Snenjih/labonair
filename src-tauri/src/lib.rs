@@ -626,6 +626,7 @@ pub fn run() {
             git::git_get_remote_url,
             git::git_add_to_gitignore,
             git::git_add_to_exclude,
+            modules::claude_auth::ai_claude_credentials_read,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

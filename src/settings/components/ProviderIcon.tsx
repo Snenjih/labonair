@@ -18,6 +18,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 const ICON_BY_PROVIDER = {
   openai: ChatGptIcon,
   anthropic: ClaudeIcon,
+  "anthropic-subscription": ClaudeIcon,
   google: GoogleGeminiIcon,
   xai: Grok02Icon,
   cerebras: AiChipIcon,

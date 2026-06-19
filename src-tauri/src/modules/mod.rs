@@ -1,3 +1,4 @@
+pub mod claude_auth;
 pub mod credentials;
 pub mod errors;
 #[cfg(target_os = "macos")]
