@@ -51,6 +51,7 @@ type Props = {
   onOpenHostManager: () => void;
   onOpenThemes: () => void;
   onNewGitGraph?: () => void;
+  onNewAgentFleet?: () => void;
 };
 
 export const Header = React.memo(function Header({
@@ -71,6 +72,7 @@ export const Header = React.memo(function Header({
   onOpenHostManager,
   onOpenThemes,
   onNewGitGraph,
+  onNewAgentFleet,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
@@ -190,6 +192,7 @@ export const Header = React.memo(function Header({
             onDuplicate={onDuplicate}
             onRename={onRename}
             onNewGitGraph={onNewGitGraph}
+            onNewAgentFleet={onNewAgentFleet}
             compact={false}
           />
         )}

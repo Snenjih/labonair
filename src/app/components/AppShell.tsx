@@ -81,6 +81,11 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     tabs.openGitGraphTab(path, currentBranch);
   };
 
+  const onNewAgentFleet = () => {
+    const id = useTabsStore.getState().newAgentFleetTab();
+    useTabsStore.getState().setActiveId(id);
+  };
+
   const sidebarPassthrough = {
     sidebarRef: sidebar.sidebarRef,
     activePanel: sidebar.activePanel,
@@ -108,6 +113,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onSnippetRun: tabs.handleSnippetRun,
     onOpenGitGraph: tabs.openGitGraphTab,
     onNewGitGraph,
+    onNewAgentFleet,
   };
 
   const shell = (
@@ -136,6 +142,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onOpenHostManager={tabs.onOpenHostManager}
                 onOpenThemes={() => useCommandStore.getState().openToPage("themes")}
                 onNewGitGraph={onNewGitGraph}
+                onNewAgentFleet={onNewAgentFleet}
               />
             )}
 

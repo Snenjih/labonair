@@ -36,6 +36,7 @@ type Props = {
   onDuplicate: (id: number) => void;
   onRename: (id: number, label: string) => void;
   onNewGitGraph?: () => void;
+  onNewAgentFleet?: () => void;
 };
 
 export function SidebarTabList({
@@ -52,6 +53,7 @@ export function SidebarTabList({
   onDuplicate,
   onRename,
   onNewGitGraph,
+  onNewAgentFleet,
 }: Props) {
   const tabs = useTabsStore((s) => s.tabs);
   const activeId = useTabsStore((s) => s.activeId);
@@ -233,6 +235,7 @@ export function SidebarTabList({
               onNewSftp={onNewSftp}
               onOpenHostManager={onOpenHostManager}
               onNewGitGraph={onNewGitGraph}
+              onNewAgentFleet={onNewAgentFleet}
             />
           </DropdownMenuContent>
         </DropdownMenu>

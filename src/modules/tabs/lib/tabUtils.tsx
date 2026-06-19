@@ -125,6 +125,7 @@ interface NewTabDropdownItemsProps {
   onNewSftp: (hostId: string, title: string) => void;
   onOpenHostManager: () => void;
   onNewGitGraph?: () => void;
+  onNewAgentFleet?: () => void;
 }
 
 export function NewTabDropdownItems({
@@ -135,6 +136,7 @@ export function NewTabDropdownItems({
   onNewSftp,
   onOpenHostManager,
   onNewGitGraph,
+  onNewAgentFleet,
 }: NewTabDropdownItemsProps) {
   const recentHosts = useRecentHosts();
   return (
@@ -158,6 +160,12 @@ export function NewTabDropdownItems({
         <DropdownMenuItem onSelect={onNewGitGraph}>
           <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} />
           <span className="flex-1">Git Graph</span>
+        </DropdownMenuItem>
+      )}
+      {onNewAgentFleet && (
+        <DropdownMenuItem onSelect={onNewAgentFleet}>
+          <HugeiconsIcon icon={ComputerTerminal02Icon} size={14} strokeWidth={1.75} />
+          <span className="flex-1">Agent Fleet</span>
         </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />
