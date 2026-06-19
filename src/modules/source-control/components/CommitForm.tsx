@@ -168,7 +168,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
               setError(String(e));
             }
           }}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-[26px] items-center gap-1 rounded px-2 text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6 disabled:cursor-not-allowed disabled:opacity-40"
           title="Generate commit message with AI"
         >
           {isGenerating ? (
@@ -176,7 +176,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
           ) : (
             <HugeiconsIcon icon={SparklesIcon} size={12} strokeWidth={2} />
           )}
-          <span className="text-[10px]">Generate</span>
+          <span className="text-[11px]">Generate</span>
         </button>
 
         {/* Commit split button */}
@@ -185,14 +185,14 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
             "flex h-[26px] shrink-0 items-stretch overflow-hidden rounded border text-[11px] transition-all",
             canCommit
               ? "border-primary/50 bg-primary/10"
-              : "border-border/40 opacity-50"
+              : "border-muted-foreground/20 opacity-50"
           )}
         >
           <button
             type="button"
             onClick={() => void handleCommit()}
             disabled={!canCommit}
-            className="flex items-center gap-1.5 px-2.5 font-medium text-foreground/90 transition-colors hover:bg-primary/20 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 border-r border-muted-foreground/20 px-2.5 font-medium text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6 disabled:cursor-not-allowed"
             title="Commit staged changes (⌘↵)"
           >
             {operationInProgress === "commit" ? (
@@ -203,14 +203,12 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
             Commit Tracked
           </button>
 
-          <div className="w-px self-stretch bg-border/40" />
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
                 disabled={operationInProgress !== null}
-                className="flex w-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground hover:bg-primary/20 disabled:cursor-not-allowed"
+                className="flex w-6 items-center justify-center text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6 disabled:cursor-not-allowed"
               >
                 <HugeiconsIcon icon={ArrowDown01Icon} size={9} strokeWidth={2.5} />
               </button>
