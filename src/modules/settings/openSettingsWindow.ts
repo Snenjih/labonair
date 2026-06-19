@@ -13,6 +13,7 @@ export type SettingsTab =
   | "ai"
   | "directives"
   | "security"
+  | "agent-fleet"
   | "about";
 
 export async function openSettingsWindow(tab?: SettingsTab): Promise<void> {

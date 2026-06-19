@@ -480,6 +480,7 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_close,
+            pty::pty_check_tool,
             fs::tree::list_subdirs,
             fs::tree::fs_read_dir,
             fs::tree::fs_resolve_path,

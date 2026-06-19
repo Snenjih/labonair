@@ -12,7 +12,9 @@ import {
   collectLeafIds,
   basename,
   titleFromUrl,
+  type AgentFleetTab,
   type AiDiffStatus,
+  type FleetAgentConfig,
   type GitDiffTab,
   type PaneDirection,
   type PaneNode,
@@ -55,6 +57,13 @@ export type TabsState = {
   selectByIndex: (idx: number) => void;
   newSftpTab: (hostId: string, title: string) => number;
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
+  newAgentFleetTab: (cwd?: string) => number;
+  addFleetAgent: (tabId: number, config: FleetAgentConfig) => void;
+  removeFleetAgent: (tabId: number, configId: string) => void;
+  updateFleetViewMode: (tabId: number, mode: "grid" | "focus") => void;
+  setFocusedAgent: (tabId: number, configId: string | null) => void;
+  updateFleetTabTitle: (tabId: number, title: string) => void;
+  updateFleetPanelSizes: (tabId: number, rowSizes: number[], colSizes: number[][]) => void;
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
   openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
@@ -361,6 +370,78 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     set((s) => ({
       tabs: s.tabs.map((t) =>
         t.kind === "sftp" && t.id === tabId ? { ...t, remotePath, localPath } : t,
+      ),
+    }));
+  },
+
+  newAgentFleetTab: (_cwd?) => {
+    const tabId = get()._nextId;
+    const tab: AgentFleetTab = {
+      id: tabId,
+      kind: "agent-fleet",
+      title: "Fleet",
+      viewMode: "grid",
+      focusedAgentId: null,
+      agents: [],
+    };
+    set((s) => ({ tabs: [...s.tabs, tab], activeId: tabId, _nextId: s._nextId + 1 }));
+    return tabId;
+  },
+
+  addFleetAgent: (tabId, config) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.kind === "agent-fleet" && t.id === tabId
+          ? { ...t, agents: [...t.agents, config] }
+          : t,
+      ),
+    }));
+  },
+
+  removeFleetAgent: (tabId, configId) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) => {
+        if (t.kind !== "agent-fleet" || t.id !== tabId) return t;
+        const agents = t.agents.filter((a) => a.id !== configId);
+        const focusedAgentId =
+          t.focusedAgentId === configId
+            ? (agents[0]?.id ?? null)
+            : t.focusedAgentId;
+        return { ...t, agents, focusedAgentId };
+      }),
+    }));
+  },
+
+  updateFleetViewMode: (tabId, mode) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.kind === "agent-fleet" && t.id === tabId ? { ...t, viewMode: mode } : t,
+      ),
+    }));
+  },
+
+  setFocusedAgent: (tabId, configId) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.kind === "agent-fleet" && t.id === tabId ? { ...t, focusedAgentId: configId } : t,
+      ),
+    }));
+  },
+
+  updateFleetTabTitle: (tabId, title) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.kind === "agent-fleet" && t.id === tabId ? { ...t, title } : t,
+      ),
+    }));
+  },
+
+  updateFleetPanelSizes: (tabId, rowSizes, colSizes) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.kind === "agent-fleet" && t.id === tabId
+          ? { ...t, panelSizes: { rowSizes, colSizes } }
+          : t,
       ),
     }));
   },

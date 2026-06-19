@@ -39,6 +39,7 @@ export function labelFor(t: Tab): string {
   if (t.kind === "ai-diff") return t.title;
   if (t.kind === "home") return t.title;
   if (t.kind === "sftp") return t.title;
+  if (t.kind === "agent-fleet") return t.title;
   if (t.kind === "git-graph") return t.title;
   if (t.kind === "git-diff") return t.title;
   const wt = t as WorkspaceTab;
@@ -76,6 +77,11 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
   if (tab.kind === "sftp") {
     return (
       <HugeiconsIcon icon={CloudServerIcon} size={14} strokeWidth={1.75} className="shrink-0" />
+    );
+  }
+  if (tab.kind === "agent-fleet") {
+    return (
+      <HugeiconsIcon icon={ComputerTerminal02Icon} size={14} strokeWidth={1.75} className="shrink-0" />
     );
   }
   if (tab.kind === "git-graph") {
@@ -119,6 +125,7 @@ interface NewTabDropdownItemsProps {
   onNewSftp: (hostId: string, title: string) => void;
   onOpenHostManager: () => void;
   onNewGitGraph?: () => void;
+  onNewAgentFleet?: () => void;
 }
 
 export function NewTabDropdownItems({
@@ -129,6 +136,7 @@ export function NewTabDropdownItems({
   onNewSftp,
   onOpenHostManager,
   onNewGitGraph,
+  onNewAgentFleet,
 }: NewTabDropdownItemsProps) {
   const recentHosts = useRecentHosts();
   return (
@@ -152,6 +160,12 @@ export function NewTabDropdownItems({
         <DropdownMenuItem onSelect={onNewGitGraph}>
           <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} />
           <span className="flex-1">Git Graph</span>
+        </DropdownMenuItem>
+      )}
+      {onNewAgentFleet && (
+        <DropdownMenuItem onSelect={onNewAgentFleet}>
+          <HugeiconsIcon icon={ComputerTerminal02Icon} size={14} strokeWidth={1.75} />
+          <span className="flex-1">Agent Fleet</span>
         </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />

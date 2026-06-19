@@ -88,6 +88,30 @@ export type SftpTab = {
   localPath?: string;
 };
 
+export type AgentTool = "claude" | "codex" | "open-code" | "aider" | "custom";
+
+export type FleetAgentConfig = {
+  id: string;
+  tool: AgentTool;
+  label: string;
+  command: string;
+  cwd: string;
+  extraFlags: string;
+};
+
+export type AgentFleetTab = {
+  id: number;
+  kind: "agent-fleet";
+  title: string;
+  viewMode: "grid" | "focus";
+  focusedAgentId: string | null;
+  agents: FleetAgentConfig[];
+  panelSizes?: {
+    rowSizes: number[];
+    colSizes: number[][];
+  };
+};
+
 export type QuickConnectParams = {
   username: string;
   hostAddress: string;
@@ -112,7 +136,7 @@ export type GitDiffTab = {
   section: "staged" | "unstaged" | "untracked";
 };
 
-export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | GitGraphTab | GitDiffTab;
+export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | AgentFleetTab | GitGraphTab | GitDiffTab;
 
 export type TabPatch = Partial<{
   title: string;

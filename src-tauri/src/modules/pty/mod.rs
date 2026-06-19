@@ -123,3 +123,17 @@ pub fn pty_close(state: tauri::State<PtyState>, id: u32) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[tauri::command]
+pub fn pty_check_tool(tool: String) -> Result<bool, String> {
+    if tool.is_empty() || tool.contains('/') || tool.contains(' ') {
+        return Err("invalid tool name".to_string());
+    }
+    let ok = std::process::Command::new("which")
+        .arg(&tool)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map_err(|e| e.to_string())?;
+    Ok(ok.success())
+}

@@ -16,6 +16,9 @@ export type {
   QuickConnectParams,
   SftpTab,
   HomeTab,
+  AgentTool,
+  FleetAgentConfig,
+  AgentFleetTab,
   GitGraphTab,
   GitDiffTab,
 } from "./types";

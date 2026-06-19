@@ -43,6 +43,7 @@ type Props = {
   onDuplicate: (id: number) => void;
   onRename: (id: number, label: string) => void;
   onNewGitGraph?: () => void;
+  onNewAgentFleet?: () => void;
   compact?: boolean;
 };
 
@@ -60,6 +61,7 @@ export function TabBar({
   onDuplicate,
   onRename,
   onNewGitGraph,
+  onNewAgentFleet,
   compact,
 }: Props) {
   const tabs = useTabsStore((s) => s.tabs);
@@ -337,6 +339,7 @@ export function TabBar({
               onNewSftp={onNewSftp}
               onOpenHostManager={onOpenHostManager}
               onNewGitGraph={onNewGitGraph}
+              onNewAgentFleet={onNewAgentFleet}
             />
           </DropdownMenuContent>
         </DropdownMenu>

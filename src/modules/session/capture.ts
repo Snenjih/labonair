@@ -1,6 +1,7 @@
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import {
   SESSION_SNAPSHOT_VERSION,
+  type AgentFleetTabSnapshot,
   type EditorTabSnapshot,
   type HomeTabSnapshot,
   type PreviewTabSnapshot,
@@ -77,6 +78,16 @@ export function captureSnapshot(): SessionSnapshot {
         hostId: tab.hostId,
         remotePath: tab.remotePath,
         localPath: tab.localPath,
+      };
+      snapshots.push(snap);
+    } else if (tab.kind === "agent-fleet") {
+      const snap: AgentFleetTabSnapshot = {
+        kind: "agent-fleet",
+        title: tab.title,
+        viewMode: tab.viewMode,
+        focusedAgentId: tab.focusedAgentId,
+        agents: structuredClone(tab.agents),
+        panelSizes: tab.panelSizes ? structuredClone(tab.panelSizes) : undefined,
       };
       snapshots.push(snap);
     }

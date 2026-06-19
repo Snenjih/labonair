@@ -189,6 +189,10 @@ export type Preferences = {
   sshAutoReconnect: boolean;
   sshAutoReconnectDelay: number;
   sshAutoReconnectMaxAttempts: number;
+
+  // --- Agent Fleet ---
+  agentFleetBroadcastAutoEnter: boolean;
+  agentFleetDefaultPath: string;
 };
 
 const KEY_THEME = "theme";
@@ -310,6 +314,9 @@ const KEY_ZEN_MODE_SHOW_STATUSBAR = "zenModeShowStatusbar";
 const KEY_SSH_AUTO_RECONNECT = "sshAutoReconnect";
 const KEY_SSH_AUTO_RECONNECT_DELAY = "sshAutoReconnectDelay";
 const KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS = "sshAutoReconnectMaxAttempts";
+
+const KEY_AGENT_FLEET_BROADCAST_AUTO_ENTER = "agentFleetBroadcastAutoEnter";
+const KEY_AGENT_FLEET_DEFAULT_PATH = "agentFleetDefaultPath";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -439,6 +446,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sshAutoReconnect: false,
   sshAutoReconnectDelay: 5,
   sshAutoReconnectMaxAttempts: 3,
+
+  agentFleetBroadcastAutoEnter: true,
+  agentFleetDefaultPath: "",
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -766,6 +776,11 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_SSH_AUTO_RECONNECT_DELAY) ?? DEFAULT_PREFERENCES.sshAutoReconnectDelay,
     sshAutoReconnectMaxAttempts:
       get<number>(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS) ?? DEFAULT_PREFERENCES.sshAutoReconnectMaxAttempts,
+
+    agentFleetBroadcastAutoEnter:
+      get<boolean>(KEY_AGENT_FLEET_BROADCAST_AUTO_ENTER) ?? DEFAULT_PREFERENCES.agentFleetBroadcastAutoEnter,
+    agentFleetDefaultPath:
+      get<string>(KEY_AGENT_FLEET_DEFAULT_PATH) ?? DEFAULT_PREFERENCES.agentFleetDefaultPath,
   };
 }
 
@@ -1364,6 +1379,16 @@ export async function setTabsLocation(value: "titlebar" | "sidebar"): Promise<vo
   await (await getStore()).save();
 }
 
+export async function setAgentFleetBroadcastAutoEnter(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_AGENT_FLEET_BROADCAST_AUTO_ENTER, value);
+  await (await getStore()).save();
+}
+
+export async function setAgentFleetDefaultPath(value: string): Promise<void> {
+  await (await getStore()).set(KEY_AGENT_FLEET_DEFAULT_PATH, value);
+  await (await getStore()).save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -1488,6 +1513,8 @@ export async function onPreferencesChange(
     [KEY_SSH_AUTO_RECONNECT]: "sshAutoReconnect",
     [KEY_SSH_AUTO_RECONNECT_DELAY]: "sshAutoReconnectDelay",
     [KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS]: "sshAutoReconnectMaxAttempts",
+    [KEY_AGENT_FLEET_BROADCAST_AUTO_ENTER]: "agentFleetBroadcastAutoEnter",
+    [KEY_AGENT_FLEET_DEFAULT_PATH]: "agentFleetDefaultPath",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];

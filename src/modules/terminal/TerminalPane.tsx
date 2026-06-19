@@ -37,6 +37,7 @@ type Props = {
   onExit?: (tabId: string, code: number) => void;
   onCwd?: (tabId: string, cwd: string) => void;
   onDetectedLocalUrl?: (tabId: string, url: string) => void;
+  onActivity?: () => void;
 };
 
 export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
@@ -50,6 +51,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       onExit,
       onCwd,
       onDetectedLocalUrl,
+      onActivity,
     },
     ref,
   ) {
@@ -65,6 +67,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
       onExit: (c) => onExit?.(tabId, c),
       onCwd: (c) => onCwd?.(tabId, c),
       onDetectedLocalUrl: (u) => onDetectedLocalUrl?.(tabId, u),
+      onActivity,
     });
 
     useEffect(() => {

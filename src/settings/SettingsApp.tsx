@@ -20,6 +20,7 @@ import {
   SourceCodeIcon,
   TerminalIcon,
   Search01Icon,
+  Grid02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { emit } from "@tauri-apps/api/event";
@@ -28,6 +29,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getStoragePaths } from "@/lib/paths";
 import * as store from "@/modules/settings/store";
 import type { PrefKey } from "@/modules/settings/store";
+import { AgentFleetSection } from "./sections/AgentFleetSection";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { CommandPaletteSection } from "./sections/CommandPaletteSection";
@@ -66,6 +68,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
   { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
+  { id: "agent-fleet", category: "Agent Fleet", label: "Agent Fleet", icon: Grid02Icon },
 ];
 
 const VALID_TABS = SIDEBAR_ITEMS.map((s) => s.id);
@@ -210,6 +213,7 @@ export function SettingsApp() {
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
                 {active === "ai" && <AiSection />}
+                {active === "agent-fleet" && <AgentFleetSection />}
               </>
             )}
           </div>
@@ -245,6 +249,8 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "aiEnabled": void store.setAiEnabled(value as boolean); break;
     case "showEditPrediction": void store.setShowEditPrediction(value as boolean); break;
     case "autocompleteEnabled": void store.setAutocompleteEnabled(value as boolean); break;
+    case "agentFleetBroadcastAutoEnter": void store.setAgentFleetBroadcastAutoEnter(value as boolean); break;
+    case "agentFleetDefaultPath": void store.setAgentFleetDefaultPath(value as string); break;
   }
 }
 
