@@ -61,6 +61,7 @@ export type Preferences = {
   ollamaChatModelId: string;
   vimMode: boolean;
   defaultStartupTab: "terminal" | "host-manager";
+  startupTerminalCount: 1 | 2 | 3;
   sessionRestore: boolean;
   sessionScrollbackLines: number;
 
@@ -72,6 +73,10 @@ export type Preferences = {
   backgroundImage: string;
   backgroundOpacity: number;
   backgroundBlur: number;
+  backgroundTintColor: string;
+  backgroundTintOpacity: number;
+  appCornerRadius: number;
+  appDensity: "compact" | "default" | "relaxed";
 
   // --- Terminal ---
   terminalShell: string;
@@ -132,6 +137,8 @@ export type Preferences = {
 
   // --- Sidebar ---
   sidebarPosition: "left" | "right";
+  sidebarOpen: boolean;
+  sidebarActivePanel: "explorer" | "snippets" | "tabs";
   // --- Security ---
   credentialEncryption: boolean;
   // --- Updates ---
@@ -177,6 +184,11 @@ export type Preferences = {
   // --- Zen Mode ---
   zenModeShowHeader: boolean;
   zenModeShowStatusbar: boolean;
+
+  // --- SSH ---
+  sshAutoReconnect: boolean;
+  sshAutoReconnectDelay: number;
+  sshAutoReconnectMaxAttempts: number;
 };
 
 const KEY_THEME = "theme";
@@ -208,6 +220,11 @@ const KEY_APP_LINE_HEIGHT = "appLineHeight";
 const KEY_BG_IMAGE = "backgroundImage";
 const KEY_BG_OPACITY = "backgroundOpacity";
 const KEY_BG_BLUR = "backgroundBlur";
+const KEY_BG_TINT_COLOR = "backgroundTintColor";
+const KEY_BG_TINT_OPACITY = "backgroundTintOpacity";
+const KEY_APP_CORNER_RADIUS = "appCornerRadius";
+const KEY_APP_DENSITY = "appDensity";
+const KEY_STARTUP_TERMINAL_COUNT = "startupTerminalCount";
 
 const KEY_TERMINAL_SHELL = "terminalShell";
 const KEY_TERMINAL_DEFAULT_PATH = "terminalDefaultPath";
@@ -262,6 +279,8 @@ const KEY_COMMAND_PALETTE_SEARCH_MODE = "commandPaletteSearchMode";
 const KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY = "commandPaletteCloseOnOverlayClick";
 
 const KEY_SIDEBAR_POSITION = "sidebarPosition";
+const KEY_SIDEBAR_OPEN = "sidebarOpen";
+const KEY_SIDEBAR_ACTIVE_PANEL = "sidebarActivePanel";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
@@ -288,6 +307,9 @@ const KEY_TITLEBAR_ICONS_POSITION = "titlebarsIconsPosition";
 const KEY_TABS_LOCATION = "tabsLocation";
 const KEY_ZEN_MODE_SHOW_HEADER = "zenModeShowHeader";
 const KEY_ZEN_MODE_SHOW_STATUSBAR = "zenModeShowStatusbar";
+const KEY_SSH_AUTO_RECONNECT = "sshAutoReconnect";
+const KEY_SSH_AUTO_RECONNECT_DELAY = "sshAutoReconnectDelay";
+const KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS = "sshAutoReconnectMaxAttempts";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -309,6 +331,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   ollamaChatModelId: "",
   vimMode: false,
   defaultStartupTab: "host-manager",
+  startupTerminalCount: 1,
   sessionRestore: false,
   sessionScrollbackLines: 1000,
 
@@ -319,6 +342,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   backgroundImage: "",
   backgroundOpacity: 30,
   backgroundBlur: 0,
+  backgroundTintColor: "#000000",
+  backgroundTintOpacity: 0,
+  appCornerRadius: 5,
+  appDensity: "default",
 
   terminalShell: "",
   terminalDefaultPath: "",
@@ -374,6 +401,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   commandPaletteCloseOnOverlayClick: true,
 
   sidebarPosition: "left",
+  sidebarOpen: true,
+  sidebarActivePanel: "explorer",
   credentialEncryption: false,
   checkForUpdates: true,
 
@@ -406,6 +435,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
   zenModeShowHeader: true,
   zenModeShowStatusbar: true,
+
+  sshAutoReconnect: false,
+  sshAutoReconnectDelay: 5,
+  sshAutoReconnectMaxAttempts: 3,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -469,6 +502,10 @@ export async function loadPreferences(): Promise<Preferences> {
     defaultStartupTab:
       get<"terminal" | "host-manager">(KEY_DEFAULT_STARTUP_TAB) ??
       DEFAULT_PREFERENCES.defaultStartupTab,
+    startupTerminalCount: Math.min(
+      3,
+      Math.max(1, get<number>(KEY_STARTUP_TERMINAL_COUNT) ?? 1),
+    ) as 1 | 2 | 3,
     sessionRestore:
       get<boolean>(KEY_SESSION_RESTORE) ?? DEFAULT_PREFERENCES.sessionRestore,
     sessionScrollbackLines:
@@ -487,6 +524,20 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_BG_OPACITY) ?? DEFAULT_PREFERENCES.backgroundOpacity,
     backgroundBlur:
       get<number>(KEY_BG_BLUR) ?? DEFAULT_PREFERENCES.backgroundBlur,
+    backgroundTintColor:
+      get<string>(KEY_BG_TINT_COLOR) ?? DEFAULT_PREFERENCES.backgroundTintColor,
+    backgroundTintOpacity: Math.min(
+      100,
+      Math.max(0, get<number>(KEY_BG_TINT_OPACITY) ?? 0),
+    ),
+    appCornerRadius: Math.min(
+      20,
+      Math.max(0, get<number>(KEY_APP_CORNER_RADIUS) ?? 5),
+    ),
+    appDensity: ((): "compact" | "default" | "relaxed" => {
+      const v = get<string>(KEY_APP_DENSITY);
+      return v === "compact" || v === "relaxed" ? v : "default";
+    })(),
 
     terminalShell:
       get<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
@@ -644,6 +695,15 @@ export async function loadPreferences(): Promise<Preferences> {
     sidebarPosition:
       get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
       DEFAULT_PREFERENCES.sidebarPosition,
+    sidebarOpen: get<boolean>(KEY_SIDEBAR_OPEN) ?? DEFAULT_PREFERENCES.sidebarOpen,
+    sidebarActivePanel: (() => {
+      const raw = get<string>(KEY_SIDEBAR_ACTIVE_PANEL);
+      return (["explorer", "snippets", "tabs"] as const).includes(
+        raw as "explorer" | "snippets" | "tabs",
+      )
+        ? (raw as "explorer" | "snippets" | "tabs")
+        : DEFAULT_PREFERENCES.sidebarActivePanel;
+    })(),
     credentialEncryption:
       get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
     checkForUpdates:
@@ -699,6 +759,13 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_ZEN_MODE_SHOW_HEADER) ?? DEFAULT_PREFERENCES.zenModeShowHeader,
     zenModeShowStatusbar:
       get<boolean>(KEY_ZEN_MODE_SHOW_STATUSBAR) ?? DEFAULT_PREFERENCES.zenModeShowStatusbar,
+
+    sshAutoReconnect:
+      get<boolean>(KEY_SSH_AUTO_RECONNECT) ?? DEFAULT_PREFERENCES.sshAutoReconnect,
+    sshAutoReconnectDelay:
+      get<number>(KEY_SSH_AUTO_RECONNECT_DELAY) ?? DEFAULT_PREFERENCES.sshAutoReconnectDelay,
+    sshAutoReconnectMaxAttempts:
+      get<number>(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS) ?? DEFAULT_PREFERENCES.sshAutoReconnectMaxAttempts,
   };
 }
 
@@ -846,6 +913,33 @@ export async function setBackgroundBlur(value: number): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setBackgroundTintColor(value: string): Promise<void> {
+  await (await getStore()).set(KEY_BG_TINT_COLOR, value);
+  await (await getStore()).save();
+}
+
+export async function setBackgroundTintOpacity(value: number): Promise<void> {
+  await (await getStore()).set(KEY_BG_TINT_OPACITY, Math.min(100, Math.max(0, value)));
+  await (await getStore()).save();
+}
+
+export async function setAppCornerRadius(value: number): Promise<void> {
+  await (await getStore()).set(KEY_APP_CORNER_RADIUS, Math.min(20, Math.max(0, value)));
+  await (await getStore()).save();
+}
+
+export async function setAppDensity(
+  value: "compact" | "default" | "relaxed",
+): Promise<void> {
+  await (await getStore()).set(KEY_APP_DENSITY, value);
+  await (await getStore()).save();
+}
+
+export async function setStartupTerminalCount(value: 1 | 2 | 3): Promise<void> {
+  await (await getStore()).set(KEY_STARTUP_TERMINAL_COUNT, value);
+  await (await getStore()).save();
+}
+
 export async function setTerminalCursorBlink(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_CURSOR_BLINK, value);
   await (await getStore()).save();
@@ -923,6 +1017,21 @@ export async function setZenModeShowHeader(value: boolean): Promise<void> {
 
 export async function setZenModeShowStatusbar(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_ZEN_MODE_SHOW_STATUSBAR, value);
+  await (await getStore()).save();
+}
+
+export async function setSshAutoReconnect(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_SSH_AUTO_RECONNECT, value);
+  await (await getStore()).save();
+}
+
+export async function setSshAutoReconnectDelay(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SSH_AUTO_RECONNECT_DELAY, value);
+  await (await getStore()).save();
+}
+
+export async function setSshAutoReconnectMaxAttempts(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS, value);
   await (await getStore()).save();
 }
 
@@ -1064,6 +1173,18 @@ export async function setSidebarPosition(
   value: "left" | "right",
 ): Promise<void> {
   await (await getStore()).set(KEY_SIDEBAR_POSITION, value);
+  await (await getStore()).save();
+}
+
+export async function setSidebarOpen(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_OPEN, value);
+  await (await getStore()).save();
+}
+
+export async function setSidebarActivePanel(
+  value: "explorer" | "snippets" | "tabs",
+): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_ACTIVE_PANEL, value);
   await (await getStore()).save();
 }
 
@@ -1269,6 +1390,7 @@ export async function onPreferencesChange(
     [KEY_OLLAMA_CHAT_MODEL_ID]: "ollamaChatModelId",
     [KEY_VIM_MODE]: "vimMode",
     [KEY_DEFAULT_STARTUP_TAB]: "defaultStartupTab",
+    [KEY_STARTUP_TERMINAL_COUNT]: "startupTerminalCount",
     [KEY_SESSION_RESTORE]: "sessionRestore",
     [KEY_SESSION_SCROLLBACK_LINES]: "sessionScrollbackLines",
 
@@ -1279,6 +1401,10 @@ export async function onPreferencesChange(
     [KEY_BG_IMAGE]: "backgroundImage",
     [KEY_BG_OPACITY]: "backgroundOpacity",
     [KEY_BG_BLUR]: "backgroundBlur",
+    [KEY_BG_TINT_COLOR]: "backgroundTintColor",
+    [KEY_BG_TINT_OPACITY]: "backgroundTintOpacity",
+    [KEY_APP_CORNER_RADIUS]: "appCornerRadius",
+    [KEY_APP_DENSITY]: "appDensity",
 
     [KEY_TERMINAL_SHELL]: "terminalShell",
     [KEY_TERMINAL_DEFAULT_PATH]: "terminalDefaultPath",
@@ -1332,6 +1458,8 @@ export async function onPreferencesChange(
     [KEY_COMMAND_PALETTE_SEARCH_MODE]: "commandPaletteSearchMode",
     [KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY]: "commandPaletteCloseOnOverlayClick",
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
+    [KEY_SIDEBAR_OPEN]: "sidebarOpen",
+    [KEY_SIDEBAR_ACTIVE_PANEL]: "sidebarActivePanel",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_HOST_PING_INTERVAL]: "hostPingInterval",
@@ -1357,6 +1485,9 @@ export async function onPreferencesChange(
     [KEY_TABS_LOCATION]: "tabsLocation",
     [KEY_ZEN_MODE_SHOW_HEADER]: "zenModeShowHeader",
     [KEY_ZEN_MODE_SHOW_STATUSBAR]: "zenModeShowStatusbar",
+    [KEY_SSH_AUTO_RECONNECT]: "sshAutoReconnect",
+    [KEY_SSH_AUTO_RECONNECT_DELAY]: "sshAutoReconnectDelay",
+    [KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS]: "sshAutoReconnectMaxAttempts",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];

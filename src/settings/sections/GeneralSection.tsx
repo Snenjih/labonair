@@ -18,6 +18,7 @@ import {
   setRestoreWindowState,
   setSessionRestore,
   setSessionScrollbackLines,
+  setStartupTerminalCount,
   setVimMode,
   setReduceMotion,
   setNewTabInheritsCwd,
@@ -100,6 +101,7 @@ export function GeneralSection() {
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
+  const startupTerminalCount = usePreferencesStore((s) => s.startupTerminalCount);
   const hostPingInterval = usePreferencesStore((s) => s.hostPingInterval);
   const credentialEncryption = usePreferencesStore((s) => s.credentialEncryption);
   const reduceMotion = usePreferencesStore((s) => s.reduceMotion);
@@ -186,7 +188,7 @@ export function GeneralSection() {
   const buildString = build ? `${build} · v${version || "—"}` : `v${version || "—"}`;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--ui-section-gap)]">
       <SectionHeader
         title="General"
         description="Editor, startup, and security."
@@ -355,6 +357,28 @@ export function GeneralSection() {
               </SelectContent>
             </Select>
           </SettingRow>
+          {defaultStartupTab === "terminal" && (
+            <SettingRow
+              title="Startup terminal count"
+              description="How many terminal tabs to open on launch. Takes effect on next launch."
+            >
+              <Select
+                value={String(startupTerminalCount)}
+                onValueChange={(v) =>
+                  void setStartupTerminalCount(Number(v) as 1 | 2 | 3)
+                }
+              >
+                <SelectTrigger className="h-7 w-20 text-[11.5px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 tab</SelectItem>
+                  <SelectItem value="2">2 tabs</SelectItem>
+                  <SelectItem value="3">3 tabs</SelectItem>
+                </SelectContent>
+              </Select>
+            </SettingRow>
+          )}
         </div>
       </div>
 

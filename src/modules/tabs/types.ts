@@ -34,6 +34,7 @@ export type WorkspaceTab = {
   id: number;
   kind: "workspace";
   title: string;
+  customTitle?: string;
   activePaneId: string;
   layout: PaneNode;
   sessions: Record<string, TerminalSessionData>;
@@ -117,7 +118,25 @@ export type QuickConnectParams = {
   port: number;
 };
 
-export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | AgentFleetTab;
+export type GitGraphTab = {
+  id: number;
+  kind: "git-graph";
+  title: string;
+  repositoryPath: string; // locked at open time — never changes
+  initialBranch: string;
+};
+
+export type GitDiffTab = {
+  id: number;
+  kind: "git-diff";
+  title: string;
+  repoRoot: string;
+  filePath: string;
+  staged: boolean;
+  section: "staged" | "unstaged" | "untracked";
+};
+
+export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | AgentFleetTab | GitGraphTab | GitDiffTab;
 
 export type TabPatch = Partial<{
   title: string;

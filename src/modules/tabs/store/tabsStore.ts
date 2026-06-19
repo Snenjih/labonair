@@ -15,6 +15,7 @@ import {
   type AgentFleetTab,
   type AiDiffStatus,
   type FleetAgentConfig,
+  type GitDiffTab,
   type PaneDirection,
   type PaneNode,
   type PaneSplit,
@@ -65,6 +66,9 @@ export type TabsState = {
   updateFleetPanelSizes: (tabId: number, rowSizes: number[], colSizes: number[][]) => void;
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
+  openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
+  openGitDiffTab: (repoRoot: string, filePath: string, staged: boolean, section: "staged" | "unstaged" | "untracked") => number;
+  renameTab: (id: number, label: string) => void;
   setActivePaneId: (tabId: number, paneId: string) => void;
   updatePaneSessionCwd: (tabId: number, sessionId: string, cwd: string) => void;
   splitPane: (tabId: number, direction: PaneDirection) => void;
@@ -176,21 +180,34 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   openDefaultTab: () => {
     if (_defaultTabOpened) return;
     _defaultTabOpened = true;
-    const defaultStartupTab = usePreferencesStore.getState().defaultStartupTab;
+    const prefs = usePreferencesStore.getState();
+    const defaultStartupTab = prefs.defaultStartupTab;
+    const startupTerminalCount = Math.min(3, Math.max(1, prefs.startupTerminalCount ?? 1));
     const homeId = get()._nextId;
     const homeTab = { id: homeId, kind: "home" as const, title: "Home" };
     if (defaultStartupTab === "terminal") {
-      const termId = homeId + 1;
-      const sessionId = newSessionId();
-      const termTab: WorkspaceTab = {
-        id: termId,
-        kind: "workspace",
-        title: "shell",
-        activePaneId: sessionId,
-        layout: makeLeaf(sessionId),
-        sessions: { [sessionId]: { id: sessionId, kind: "local", title: "shell" } },
-      };
-      set((s) => ({ tabs: [homeTab, termTab], activeId: termId, _nextId: s._nextId + 2 }));
+      const newTabs: (typeof homeTab | WorkspaceTab)[] = [homeTab];
+      let nextId = homeId + 1;
+      let lastTermId = homeId;
+      for (let i = 0; i < startupTerminalCount; i++) {
+        const sessionId = newSessionId();
+        const termTab: WorkspaceTab = {
+          id: nextId,
+          kind: "workspace",
+          title: "shell",
+          activePaneId: sessionId,
+          layout: makeLeaf(sessionId),
+          sessions: { [sessionId]: { id: sessionId, kind: "local", title: "shell" } },
+        };
+        newTabs.push(termTab);
+        lastTermId = nextId;
+        nextId++;
+      }
+      set((s) => ({
+        tabs: newTabs,
+        activeId: lastTermId,
+        _nextId: s._nextId + 1 + startupTerminalCount,
+      }));
     } else {
       set((s) => ({
         tabs: [homeTab],
@@ -279,6 +296,16 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       _nextId: s._nextId + 1,
     }));
     return id;
+  },
+
+  renameTab: (id, label) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === id && t.kind === "workspace"
+          ? { ...t, customTitle: label.trim() || undefined }
+          : t,
+      ),
+    }));
   },
 
   closeTab: (id) => {
@@ -515,6 +542,66 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       activeId: id,
       _nextId: s._nextId + 1,
     }));
+  },
+
+  openGitGraphTab: (repositoryPath, initialBranch) => {
+    const existing = get().tabs.find(
+      (t) =>
+        t.kind === "git-graph" &&
+        t.repositoryPath === repositoryPath &&
+        t.initialBranch === initialBranch,
+    );
+    if (existing) {
+      set({ activeId: existing.id });
+      return existing.id;
+    }
+    const id = get()._nextId;
+    set((s) => ({
+      tabs: [
+        {
+          id,
+          kind: "git-graph" as const,
+          title: `Git Graph · ${initialBranch}`,
+          repositoryPath,
+          initialBranch,
+        },
+        ...s.tabs,
+      ],
+      activeId: id,
+      _nextId: s._nextId + 1,
+    }));
+    return id;
+  },
+
+  openGitDiffTab: (repoRoot, filePath, staged, section) => {
+    const existing = get().tabs.find(
+      (t) =>
+        t.kind === "git-diff" &&
+        t.repoRoot === repoRoot &&
+        t.filePath === filePath &&
+        t.staged === staged,
+    );
+    if (existing) {
+      set({ activeId: existing.id });
+      return existing.id;
+    }
+    const id = get()._nextId;
+    const fileName = filePath.split("/").pop() ?? filePath;
+    const tab: GitDiffTab = {
+      id,
+      kind: "git-diff",
+      title: fileName,
+      repoRoot,
+      filePath,
+      staged,
+      section,
+    };
+    set((s) => ({
+      tabs: [...s.tabs, tab],
+      activeId: id,
+      _nextId: s._nextId + 1,
+    }));
+    return id;
   },
 
   setActivePaneId: (tabId, paneId) => {

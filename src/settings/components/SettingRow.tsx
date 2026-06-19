@@ -17,19 +17,19 @@ type Props = {
 
 const hintStyles: Record<HintVariant, { bar: string; text: string; dot: string }> = {
   local: {
-    bar: "border-l-2 border-sky-500/40 bg-sky-500/5",
-    text: "text-sky-400/75",
-    dot: "bg-sky-400/60",
+    bar: "border-l-2 border-info/40 bg-info/5",
+    text: "text-info/75",
+    dot: "bg-info/60",
   },
   info: {
-    bar: "border-l-2 border-blue-500/40 bg-blue-500/5",
-    text: "text-blue-400/75",
-    dot: "bg-blue-400/60",
+    bar: "border-l-2 border-info/40 bg-info/5",
+    text: "text-info/75",
+    dot: "bg-info/60",
   },
   warning: {
-    bar: "border-l-2 border-amber-500/40 bg-amber-500/5",
-    text: "text-amber-400/75",
-    dot: "bg-amber-400/60",
+    bar: "border-l-2 border-warning/40 bg-warning/5",
+    text: "text-warning/75",
+    dot: "bg-warning/60",
   },
 };
 
@@ -43,7 +43,7 @@ export function SettingRow({ title, description, hint, children, className }: Pr
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-4 px-3 py-2.5">
+      <div className="flex items-start justify-between gap-4 px-3 py-[var(--ui-row-py)]">
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-[12.5px] font-medium">{title}</span>
           {description ? (

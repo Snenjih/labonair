@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { AiInputBar } from "@/modules/ai";
 import { AiInputBarConnect } from "@/modules/ai/components/AiInputBar";
-import { AiDiffStack, EditorStack } from "@/modules/editor";
+import { AiDiffStack, EditorStack, GitDiffStack } from "@/modules/editor";
 import type { EditorPaneHandle } from "@/modules/editor";
 import { HomeDashboard } from "@/modules/hosts";
 import { PreviewStack } from "@/modules/preview";
@@ -11,6 +11,7 @@ import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { SftpStack } from "@/modules/sftp/SftpStack";
 import { AgentFleetStack } from "@/modules/agent-fleet/AgentFleetStack";
+import { GitGraphStack } from "@/modules/git-graph";
 import { useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import { WorkspaceStack } from "@/modules/terminal/WorkspaceStack";
 import type { WorkspacePaneHandle, TerminalPaneHandle } from "@/modules/terminal";
@@ -37,6 +38,7 @@ export interface WorkspaceAreaProps {
   panelOpen: boolean;
   aiEnabled: boolean;
   hasComposer: boolean;
+  onOpenGitGraphFile?: (path: string) => void;
 }
 
 export const WorkspaceArea = React.memo(function WorkspaceArea({
@@ -61,12 +63,15 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
   panelOpen,
   aiEnabled,
   hasComposer,
+  onOpenGitGraphFile,
 }: WorkspaceAreaProps) {
   const activeTabKind = useTabsStore(selectActiveTabKind);
   const isEditorTab = activeTabKind === "editor";
   const isPreviewTab = activeTabKind === "preview";
   const isAiDiffTab = activeTabKind === "ai-diff";
   const isHomeTab = activeTabKind === "home";
+  const isGitGraphTab = activeTabKind === "git-graph";
+  const isGitDiffTab = activeTabKind === "git-diff";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -133,6 +138,24 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           onPathsChange={onSftpPathsChange}
         />
         <AgentFleetStack />
+        <div
+          className={cn(
+            "absolute inset-0",
+            isGitGraphTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
+          )}
+          aria-hidden={!isGitGraphTab}
+        >
+          <GitGraphStack onOpenFile={onOpenGitGraphFile} />
+        </div>
+        <div
+          className={cn(
+            "absolute inset-0 px-3 pt-2 pb-2",
+            isGitDiffTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
+          )}
+          aria-hidden={!isGitDiffTab}
+        >
+          <GitDiffStack />
+        </div>
       </div>
 
       {keysLoaded ? (

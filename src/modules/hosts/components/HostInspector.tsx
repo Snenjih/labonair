@@ -56,6 +56,7 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
         group_id: current.group_id,
         tags: current.tags,
         password: password || undefined,
+        notes: current.notes,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
@@ -219,6 +220,19 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
             </div>
           </section>
         )}
+
+        {/* Notes */}
+        <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes / Runbook</p>
+          <textarea
+            placeholder="Configuration notes, credentials hints, runbook steps…"
+            value={current.notes ?? ""}
+            onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
+            onBlur={handleBlur}
+            rows={4}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[80px] max-h-[300px]"
+          />
+        </section>
 
         {/* Delete */}
         <AlertDialog>

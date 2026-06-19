@@ -1,11 +1,15 @@
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  setAppCornerRadius,
+  setAppDensity,
   setAppFontFamily,
   setAppFontSize,
   setAppLineHeight,
   setBackgroundBlur,
   setBackgroundImage,
   setBackgroundOpacity,
+  setBackgroundTintColor,
+  setBackgroundTintOpacity,
   setSidebarPosition,
   setTabsLocation,
   setTitlebarsIconsPosition,
@@ -90,6 +94,10 @@ export function AppearanceSection() {
   const backgroundImage = usePreferencesStore((s) => s.backgroundImage);
   const backgroundOpacity = usePreferencesStore((s) => s.backgroundOpacity);
   const backgroundBlur = usePreferencesStore((s) => s.backgroundBlur);
+  const backgroundTintColor = usePreferencesStore((s) => s.backgroundTintColor);
+  const backgroundTintOpacity = usePreferencesStore((s) => s.backgroundTintOpacity);
+  const appCornerRadius = usePreferencesStore((s) => s.appCornerRadius);
+  const appDensity = usePreferencesStore((s) => s.appDensity);
 
   const addNotification = useNotificationStore((s) => s.addNotification);
 
@@ -208,7 +216,7 @@ export function AppearanceSection() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-[var(--ui-section-gap)]">
       <SectionHeader
         title="Appearance"
         description="Color theme, background, typography, and layout."
@@ -414,8 +422,71 @@ export function AppearanceSection() {
               suffix="px"
               onChange={(v) => void setBackgroundBlur(v)}
             />
+            <SliderControl
+              label="Color tint"
+              description="Overlay color blended on top of the background image"
+              value={backgroundTintOpacity}
+              min={0}
+              max={100}
+              step={5}
+              suffix="%"
+              onChange={(v) => void setBackgroundTintOpacity(v)}
+            />
+            {backgroundTintOpacity > 0 && (
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[12px] font-medium">Tint color</span>
+                  <span className="text-[10px] text-muted-foreground">Pick the overlay color</span>
+                </div>
+                <input
+                  type="color"
+                  value={backgroundTintColor}
+                  onChange={(e) => void setBackgroundTintColor(e.target.value)}
+                  className="h-7 w-12 cursor-pointer rounded border border-border/60 bg-transparent p-0.5"
+                />
+              </div>
+            )}
           </div>
         )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Interface</Label>
+        <div className="flex flex-col gap-4 rounded-lg border border-border/50 bg-card/40 px-4 py-3.5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[12px] font-medium">Density</span>
+              <span className="text-[10px] text-muted-foreground">Vertical spacing of UI elements</span>
+            </div>
+            <div className="flex gap-1">
+              {(["compact", "default", "relaxed"] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => void setAppDensity(d)}
+                  className={cn(
+                    "h-7 rounded-md border px-3 text-[11px] capitalize transition-colors",
+                    appDensity === d
+                      ? "border-border bg-accent text-foreground"
+                      : "border-border/40 bg-transparent text-muted-foreground hover:bg-accent/50",
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+          <SliderControl
+            label="Corner radius"
+            description="Border radius for buttons, cards, and inputs"
+            value={appCornerRadius}
+            min={0}
+            max={20}
+            step={1}
+            suffix="px"
+            onChange={(v) => void setAppCornerRadius(v)}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">

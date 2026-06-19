@@ -44,11 +44,13 @@ type Props = {
   onCloseOthers: (id: number) => void;
   onCloseAll: () => void;
   onDuplicate: (id: number) => void;
+  onRename: (id: number, label: string) => void;
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
   onOpenKeybindings: () => void;
   onOpenHostManager: () => void;
   onOpenThemes: () => void;
+  onNewGitGraph?: () => void;
 };
 
 export const Header = React.memo(function Header({
@@ -62,11 +64,13 @@ export const Header = React.memo(function Header({
   onCloseOthers,
   onCloseAll,
   onDuplicate,
+  onRename,
   onOpenShortcuts,
   onOpenSettings,
   onOpenKeybindings,
   onOpenHostManager,
   onOpenThemes,
+  onNewGitGraph,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
@@ -184,6 +188,8 @@ export const Header = React.memo(function Header({
             onCloseOthers={onCloseOthers}
             onCloseAll={onCloseAll}
             onDuplicate={onDuplicate}
+            onRename={onRename}
+            onNewGitGraph={onNewGitGraph}
             compact={false}
           />
         )}

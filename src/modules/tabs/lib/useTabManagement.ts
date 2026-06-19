@@ -52,6 +52,7 @@ export interface TabManagementReturn {
   handleCloseOthers: (keepId: number) => void;
   handleCloseAll: () => void;
   handleDuplicateTab: (id: number) => void;
+  handleRenameTab: (id: number, label: string) => void;
   cycleTab: (delta: 1 | -1) => void;
   openNewTab: () => void;
   openPreviewTab: (url: string) => number;
@@ -71,6 +72,7 @@ export interface TabManagementReturn {
   handleSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
   execSnippet: ReturnType<typeof useSnippetExec>["execSnippet"];
   captureActiveSelection: () => string | null;
+  openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
 }
 
 export function useTabManagement({
@@ -87,6 +89,7 @@ export function useTabManagement({
     updateTab,
     setActiveId,
     newSshTab,
+    openGitGraphTab,
   } = useTabsStore.getState();
 
   // ── Reactive subscriptions ────────────────────────────────────────────────
@@ -210,6 +213,10 @@ export function useTabManagement({
     const { tabs } = useTabsStore.getState();
     tabs.forEach((t) => handleClose(t.id));
   }, [handleClose]);
+
+  const handleRenameTab = useCallback((id: number, label: string) => {
+    useTabsStore.getState().renameTab(id, label);
+  }, []);
 
   const handleDuplicateTab = useCallback((id: number) => {
     const { tabs } = useTabsStore.getState();
@@ -380,6 +387,7 @@ export function useTabManagement({
     handleCloseOthers,
     handleCloseAll,
     handleDuplicateTab,
+    handleRenameTab,
     cycleTab,
     openNewTab,
     openPreviewTab,
@@ -399,5 +407,6 @@ export function useTabManagement({
     handleSnippetRun,
     execSnippet,
     captureActiveSelection,
+    openGitGraphTab,
   };
 }

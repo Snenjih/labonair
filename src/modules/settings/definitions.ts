@@ -63,6 +63,39 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
       { value: "terminal", label: "Local Terminal" },
     ],
   },
+  {
+    id: "startupTerminalCount",
+    label: "Startup terminal count",
+    description: "How many terminal tabs to open on launch (when default tab is terminal).",
+    category: "General",
+    controlType: "Select",
+    options: [
+      { value: "1", label: "1 tab" },
+      { value: "2", label: "2 tabs" },
+      { value: "3", label: "3 tabs" },
+    ],
+  },
+
+  // --- Appearance ---
+  {
+    id: "appCornerRadius",
+    label: "Corner radius",
+    description: "Border radius for buttons, cards, and inputs (0–20 px).",
+    category: "Appearance",
+    controlType: "NumberInput",
+  },
+  {
+    id: "appDensity",
+    label: "Density",
+    description: "Adjust the vertical spacing of UI elements.",
+    category: "Appearance",
+    controlType: "Select",
+    options: [
+      { value: "compact", label: "Compact" },
+      { value: "default", label: "Default" },
+      { value: "relaxed", label: "Relaxed" },
+    ],
+  },
 
   // --- Command Palette ---
   {
@@ -269,6 +302,27 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "terminalScrollback",
     label: "Scrollback buffer",
     description: "Number of lines kept in the terminal history.",
+    category: "Terminal",
+    controlType: "NumberInput",
+  },
+  {
+    id: "sshAutoReconnect",
+    label: "Auto-reconnect SSH sessions",
+    description: "Automatically retry when an SSH connection is lost unexpectedly.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "sshAutoReconnectDelay",
+    label: "Reconnect delay (s)",
+    description: "Seconds to wait before the first reconnect attempt (1–30).",
+    category: "Terminal",
+    controlType: "NumberInput",
+  },
+  {
+    id: "sshAutoReconnectMaxAttempts",
+    label: "Max reconnect attempts",
+    description: "Give up after this many failed attempts (1–10).",
     category: "Terminal",
     controlType: "NumberInput",
   },

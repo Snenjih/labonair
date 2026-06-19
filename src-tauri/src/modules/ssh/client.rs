@@ -44,12 +44,12 @@ pub async fn ssh_connect(
 ) -> Result<(), NexumError> {
     // Step 1: Fetch host from SQLite (fast, sync — do before spawn_blocking)
     log_step!(app, session_id, "Reading host configuration…");
-    let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh, credential_id) = {
+    let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh, credential_id, jump_host_id) = {
         let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare(
                 "SELECT host_address, port, username, auth_method, private_key_path, \
-                 keep_alive_interval, keep_alive_tries, default_path_ssh, credential_id \
+                 keep_alive_interval, keep_alive_tries, default_path_ssh, credential_id, jump_host_id \
                  FROM hosts WHERE id = ?1",
             )?;
         stmt.query_row(rusqlite::params![host_id], |row| {
@@ -63,6 +63,7 @@ pub async fn ssh_connect(
                 row.get::<_, Option<i64>>(6)?,
                 row.get::<_, Option<String>>(7)?,
                 row.get::<_, Option<String>>(8)?,
+                row.get::<_, Option<String>>(9)?,
             ))
         })?
     };
@@ -113,6 +114,84 @@ pub async fn ssh_connect(
         passphrase
     };
 
+    // Step 3: Resolve jump host fields (if any).
+    let (
+        jump_host_address,
+        jump_port,
+        jump_username,
+        jump_auth_method,
+        jump_private_key_path,
+        jump_password,
+        jump_keep_alive_interval,
+    ) = if let Some(ref jid) = jump_host_id {
+        log_step!(app, session_id, "Resolving jump host…");
+        let (jh_addr, jh_port, jh_user, jh_auth, jh_key, jh_kai, jh_cred_id): (
+            String, i64, String, String, Option<String>, Option<i64>, Option<String>,
+        ) = {
+            let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+            conn.query_row(
+                "SELECT host_address, port, username, auth_method, private_key_path, \
+                 keep_alive_interval, credential_id FROM hosts WHERE id = ?1",
+                rusqlite::params![jid],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                        row.get(6)?,
+                    ))
+                },
+            )
+            .map_err(|_| NexumError::Internal(format!("Jump host '{}' not found", jid)))?
+        };
+
+        // Resolve credential for jump host if needed
+        let (jh_auth, jh_key) = if let Some(ref jcid) = jh_cred_id {
+            let (cred_type, cred_key_path): (String, Option<String>) = {
+                let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+                conn.query_row(
+                    "SELECT cred_type, key_path FROM credentials WHERE id=?1",
+                    rusqlite::params![jcid],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .map_err(|_| NexumError::Internal(format!("Jump host credential '{}' not found", jcid)))?
+            };
+            (cred_type, cred_key_path)
+        } else {
+            (jh_auth, jh_key)
+        };
+
+        // Fetch jump host password from keyring
+        let jh_pw: Option<String> = if jh_auth == "password" {
+            if let Some(ref jcid) = jh_cred_id {
+                crate::modules::secrets::get_password(&app, &secrets, "nexum-cred", jcid)
+                    .ok()
+                    .flatten()
+            } else {
+                crate::modules::secrets::get_password(&app, &secrets, "nexum-app", jid)
+                    .ok()
+                    .flatten()
+            }
+        } else {
+            None
+        };
+
+        (
+            Some(jh_addr),
+            Some(jh_port),
+            Some(jh_user),
+            Some(jh_auth),
+            jh_key,
+            jh_pw,
+            jh_kai,
+        )
+    } else {
+        (None, None, None, None, None, None, None)
+    };
+
     // All blocking I/O (TCP, SSH, SFTP) runs on a dedicated thread so the
     // Tokio runtime and the UI stay responsive during the connection.
     let state_inner = state.inner().clone();
@@ -128,6 +207,8 @@ pub async fn ssh_connect(
             host_address, port, username, auth_method,
             private_key_path, keep_alive_interval, keep_alive_tries,
             default_path_ssh, password, cols, rows,
+            jump_host_address, jump_port, jump_username, jump_auth_method,
+            jump_private_key_path, jump_password, jump_keep_alive_interval,
             state_inner, trust_inner, app_clone,
         )
     })
@@ -211,6 +292,14 @@ pub async fn ssh_connect_quick(
             Some(password),
             cols,
             rows,
+            // No jump host for quick connect
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             state_inner,
             trust_inner,
             app_clone,
@@ -310,14 +399,12 @@ fn wait_for_trust(session_id: &str, trust_state: &super::TrustState) -> Result<b
     Ok(trusted)
 }
 
-/// Performs TCP connect → SSH handshake → host-key check → authentication.
-/// Returns the fully authenticated, blocking-mode `ssh2::Session`.
-/// Emits `ssh_connect_log`, `known_hosts_warning`, `auth_required`, and
-/// `passphrase_required` events exactly as the original connection flow.
-/// Used by both `ssh_connect_blocking` (PTY) and `sftp_connect_blocking` (SFTP).
+/// Like `establish_authenticated_session` but accepts an already-connected
+/// TcpStream (e.g. the local end of a jump-host bridge).
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn establish_authenticated_session(
+pub(crate) fn establish_authenticated_session_from_stream(
     session_id: &str,
+    tcp: std::net::TcpStream,
     host_address: &str,
     port: i64,
     username: &str,
@@ -331,11 +418,6 @@ pub(crate) fn establish_authenticated_session(
     app: &tauri::AppHandle,
 ) -> Result<ssh2::Session, String> {
     let _ = keep_alive_tries;
-
-    // TCP connect
-    log_step!(app, session_id, format!("TCP connecting to {}:{}…", host_address, port));
-    let tcp = tcp_connect(host_address, port)
-        .map_err(|e| format!("TCP connect to {}:{} failed: {}", host_address, port, e))?;
     log_step!(app, session_id, "TCP connection established.");
 
     // SSH handshake
@@ -479,6 +561,35 @@ pub(crate) fn establish_authenticated_session(
     Ok(session)
 }
 
+/// Performs TCP connect → SSH handshake → host-key check → authentication.
+/// Returns the fully authenticated, blocking-mode `ssh2::Session`.
+/// Thin wrapper around `establish_authenticated_session_from_stream` that
+/// first opens the TCP connection. Used by SFTP connect.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn establish_authenticated_session(
+    session_id: &str,
+    host_address: &str,
+    port: i64,
+    username: &str,
+    auth_method: &str,
+    private_key_path: Option<&str>,
+    keep_alive_interval: Option<i64>,
+    keep_alive_tries: Option<i64>,
+    password: Option<&str>,
+    passphrase: Option<&str>,
+    trust_state: &super::TrustState,
+    app: &tauri::AppHandle,
+) -> Result<ssh2::Session, String> {
+    log_step!(app, session_id, format!("TCP connecting to {}:{}…", host_address, port));
+    let tcp = tcp_connect(host_address, port)
+        .map_err(|e| format!("TCP connect to {}:{} failed: {}", host_address, port, e))?;
+    establish_authenticated_session_from_stream(
+        session_id, tcp, host_address, port, username, auth_method,
+        private_key_path, keep_alive_interval, keep_alive_tries,
+        password, passphrase, trust_state, app,
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 fn ssh_connect_blocking(
     session_id: String,
@@ -495,12 +606,60 @@ fn ssh_connect_blocking(
     password: Option<String>,
     initial_cols: u32,
     initial_rows: u32,
+    // Jump host params (all None when no jump host is configured)
+    jump_host_address: Option<String>,
+    jump_port: Option<i64>,
+    jump_username: Option<String>,
+    jump_auth_method: Option<String>,
+    jump_private_key_path: Option<String>,
+    jump_password: Option<String>,
+    jump_keep_alive_interval: Option<i64>,
     state: super::SshState,
     trust_state: super::TrustState,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let session = establish_authenticated_session(
+    // Establish TCP stream — either direct or via a jump host tunnel.
+    let (tcp, jump_bridge) = if let (
+        Some(ref jh_addr),
+        Some(jh_port_val),
+        Some(ref jh_user),
+        Some(ref jh_auth),
+    ) = (
+        &jump_host_address,
+        jump_port,
+        &jump_username,
+        &jump_auth_method,
+    ) {
+        // Circular reference guard
+        if jh_addr.as_str() == host_address.as_str() && jh_port_val == port {
+            return Err("Jump host cannot be the same as the target host".to_string());
+        }
+        let (stream, handle) = connect_via_jump(
+            &session_id,
+            jh_addr,
+            jh_port_val,
+            jh_user,
+            jh_auth,
+            jump_private_key_path.as_deref(),
+            jump_password.as_deref(),
+            jump_keep_alive_interval,
+            &host_address,
+            port,
+            &trust_state,
+            &app,
+        )?;
+        (stream, Some(handle))
+    } else {
+        (
+            tcp_connect(&host_address, port)
+                .map_err(|e| format!("TCP connect to {}:{} failed: {}", host_address, port, e))?,
+            None,
+        )
+    };
+
+    let session = establish_authenticated_session_from_stream(
         &session_id,
+        tcp,
         &host_address,
         port,
         &username,
@@ -540,6 +699,7 @@ fn ssh_connect_blocking(
                 session: session_arc,
                 channel: Some(channel),
                 shutdown,
+                _jump_bridge: jump_bridge,
             },
         );
     }
@@ -555,6 +715,226 @@ fn ssh_connect_blocking(
     .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+/// Bridges a local TCP socket to an ssh2::Channel (for jump-host tunnels).
+/// Runs on a dedicated thread; exits when either side closes.
+fn bridge_loop(
+    bridge_stream: std::net::TcpStream,
+    mut channel: ssh2::Channel,
+    _jump_session: ssh2::Session,
+) {
+    use std::io::{ErrorKind, Read, Write};
+    bridge_stream.set_nonblocking(true).ok();
+    let mut buf_b2c = [0u8; 65536];
+    let mut buf_c2b = [0u8; 65536];
+    let mut bridge_r = match bridge_stream.try_clone() {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    let mut bridge_w = bridge_stream;
+    loop {
+        // bridge → channel
+        match bridge_r.read(&mut buf_b2c) {
+            Ok(0) => break,
+            Ok(n) => {
+                if channel.write_all(&buf_b2c[..n]).is_err() {
+                    break;
+                }
+                let _ = channel.flush();
+            }
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {}
+            Err(_) => break,
+        }
+        // channel → bridge
+        match channel.read(&mut buf_c2b) {
+            Ok(0) if channel.eof() => break,
+            Ok(n) => {
+                if bridge_w.write_all(&buf_c2b[..n]).is_err() {
+                    break;
+                }
+            }
+            Err(e) if e.kind() == ErrorKind::WouldBlock => {}
+            Err(_) => break,
+        }
+        std::thread::sleep(std::time::Duration::from_micros(50));
+    }
+}
+
+/// Connects to a jump host, authenticates, opens a direct-tcpip channel to the
+/// target, and starts a bridge thread. Returns a local TcpStream connected to
+/// that bridge (which the main SSH session should use instead of a direct TCP
+/// connection) plus the bridge thread handle.
+#[allow(clippy::too_many_arguments)]
+fn connect_via_jump(
+    session_id: &str,
+    jump_host_address: &str,
+    jump_port: i64,
+    jump_username: &str,
+    jump_auth_method: &str,
+    jump_private_key_path: Option<&str>,
+    jump_password: Option<&str>,
+    jump_keep_alive_interval: Option<i64>,
+    target_host: &str,
+    target_port: i64,
+    trust_state: &super::TrustState,
+    app: &tauri::AppHandle,
+) -> Result<(std::net::TcpStream, std::thread::JoinHandle<()>), String> {
+    log_step!(
+        app,
+        session_id,
+        format!("Connecting to jump host {}:{}…", jump_host_address, jump_port)
+    );
+    let jump_tcp = tcp_connect(jump_host_address, jump_port)
+        .map_err(|e| format!("Jump host TCP connect failed: {}", e))?;
+    let mut jump_session = ssh2::Session::new().map_err(|e| e.to_string())?;
+    jump_session.set_blocking(true);
+    jump_session.set_timeout(15_000);
+    let effective_interval = jump_keep_alive_interval.unwrap_or(25i64);
+    jump_session.set_tcp_stream(jump_tcp);
+    jump_session
+        .handshake()
+        .map_err(|e| format!("Jump host SSH handshake failed: {}", e))?;
+    jump_session.set_keepalive(false, effective_interval as u32);
+
+    // Host-key verification for jump host (use "{session_id}_jump" as the trust key)
+    let jump_session_id = format!("{}_jump", session_id);
+    let (host_key, key_type) = jump_session
+        .host_key()
+        .ok_or("jump host: no host key")?;
+    let fingerprint = jump_session
+        .host_key_hash(ssh2::HashType::Md5)
+        .map(|h| {
+            h.iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<Vec<_>>()
+                .join(":")
+        })
+        .unwrap_or_else(|| "unknown".to_string());
+    let known_hosts_path = dirs::home_dir().map(|h| h.join(".ssh").join("known_hosts"));
+    let known_host_check_name = if jump_port == 22 {
+        jump_host_address.to_string()
+    } else {
+        format!("[{}]:{}", jump_host_address, jump_port)
+    };
+    let known_host_status = if let Some(ref path) = known_hosts_path {
+        let mut kh = jump_session.known_hosts().map_err(|e| e.to_string())?;
+        if path.exists() {
+            let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH);
+        }
+        let result = kh.check(&known_host_check_name, host_key);
+        if matches!(result, ssh2::CheckResult::NotFound) && jump_port != 22 {
+            kh.check(jump_host_address, host_key)
+        } else {
+            result
+        }
+    } else {
+        ssh2::CheckResult::NotFound
+    };
+    match known_host_status {
+        ssh2::CheckResult::Match => {
+            log_step!(app, session_id, "Jump host fingerprint verified ✓");
+        }
+        _ => {
+            let is_mismatch = matches!(known_host_status, ssh2::CheckResult::Mismatch);
+            app.emit(
+                "known_hosts_warning",
+                serde_json::json!({
+                    "session_id": jump_session_id,
+                    "fingerprint": fingerprint,
+                    "host": jump_host_address,
+                    "is_mismatch": is_mismatch,
+                }),
+            )
+            .map_err(|e| e.to_string())?;
+            if !wait_for_trust(&jump_session_id, trust_state)? {
+                return Err("Jump host: user rejected host".to_string());
+            }
+            if let Some(ref path) = known_hosts_path {
+                if is_mismatch {
+                    drop_known_host_entry(path, &known_host_check_name);
+                    drop_known_host_entry(path, jump_host_address);
+                }
+                let mut kh = jump_session.known_hosts().map_err(|e| e.to_string())?;
+                if path.exists() {
+                    let _ = kh.read_file(path, ssh2::KnownHostFileKind::OpenSSH);
+                }
+                let _ = kh.add(
+                    &known_host_check_name,
+                    host_key,
+                    "",
+                    ssh2::KnownHostKeyFormat::from(key_type),
+                );
+                let _ = kh.write_file(path, ssh2::KnownHostFileKind::OpenSSH);
+            }
+        }
+    }
+
+    // Authenticate jump host
+    log_step!(app, session_id, "Authenticating jump host…");
+    let jump_authed = if jump_auth_method == "key" {
+        let key_path = jump_private_key_path
+            .map(std::path::Path::new)
+            .ok_or("jump host: private_key_path not set for key auth")?;
+        let agent_ok = try_agent_auth(&jump_session, jump_username, &jump_session_id, app);
+        if agent_ok {
+            true
+        } else {
+            jump_session
+                .userauth_pubkey_file(jump_username, None, key_path, None)
+                .map(|_| true)
+                .unwrap_or(false)
+        }
+    } else {
+        let pw = jump_password.unwrap_or("");
+        jump_session.userauth_password(jump_username, pw).is_ok()
+    };
+    if !jump_authed || !jump_session.authenticated() {
+        return Err(format!(
+            "Jump host authentication failed for {}@{}:{}",
+            jump_username, jump_host_address, jump_port
+        ));
+    }
+    log_step!(
+        app,
+        session_id,
+        format!(
+            "Jump host authenticated. Opening tunnel to {}:{}…",
+            target_host, target_port
+        )
+    );
+
+    // Open direct-tcpip channel to target through jump
+    let channel = jump_session
+        .channel_direct_tcpip(target_host, target_port as u16, None)
+        .map_err(|e| {
+            format!(
+                "Jump host: failed to open tunnel to {}:{}: {}",
+                target_host, target_port, e
+            )
+        })?;
+
+    // Switch to non-blocking for bridge loop
+    jump_session.set_blocking(false);
+
+    // Create local loopback bridge
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")
+        .map_err(|e| format!("Jump bridge: failed to bind: {}", e))?;
+    let local_port = listener
+        .local_addr()
+        .map_err(|e| e.to_string())?
+        .port();
+    let local_stream = std::net::TcpStream::connect(("127.0.0.1", local_port))
+        .map_err(|e| format!("Jump bridge: connect failed: {}", e))?;
+    let (bridge_stream, _) = listener.accept().map_err(|e| e.to_string())?;
+
+    log_step!(app, session_id, "Jump tunnel established ✓");
+
+    let handle = std::thread::spawn(move || {
+        bridge_loop(bridge_stream, channel, jump_session);
+    });
+
+    Ok((local_stream, handle))
 }
 
 /// Opens a TCP connection to host:port with a 10-second timeout.

@@ -1,7 +1,7 @@
 {
   "name": "nexum",
   "private": true,
-  "version": "1.6.6",
+  "version": "1.8.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -132,9 +132,5 @@
     "vite-plugin-inspect": "^11.4.1",
     "vitest": "^4.1.0"
   },
-  "pnpm": {
-    "overrides": {
-      "shiki": "^4.0.2"
-    }
-  }
+  "packageManager": "pnpm@11.1.3"
 }
