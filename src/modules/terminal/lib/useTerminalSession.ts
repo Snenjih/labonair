@@ -241,13 +241,29 @@ export function useTerminalSession({
       }
 
       if (prefs.terminalUseWebGL) {
-        try {
-          const webgl = new WebglAddon();
-          webgl.onContextLoss(() => webgl.dispose());
-          term.loadAddon(webgl);
-        } catch (e) {
-          console.warn("WebGL renderer unavailable:", e);
-        }
+        let webglRetryTimer: ReturnType<typeof setTimeout> | null = null;
+        const attachWebGL = () => {
+          if (disposed) return;
+          try {
+            const webgl = new WebglAddon();
+            webgl.onContextLoss(() => {
+              webgl.dispose();
+              // GPU context was lost (driver hiccup, resource pressure from TUI
+              // apps doing full-screen redraws). xterm.js falls back to its DOM
+              // renderer automatically after dispose(); we re-attach WebGL after
+              // 1 s so the terminal returns to GPU rendering. The disposed check
+              // prevents a retry from firing after the tab is closed.
+              webglRetryTimer = setTimeout(attachWebGL, 1000);
+            });
+            term.loadAddon(webgl);
+          } catch (e) {
+            console.warn("WebGL renderer unavailable:", e);
+          }
+        };
+        attachWebGL();
+        cleanups.push(() => {
+          if (webglRetryTimer) clearTimeout(webglRetryTimer);
+        });
       }
 
       const prompt = registerPromptTracker(term);
