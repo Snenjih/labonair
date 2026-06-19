@@ -1,0 +1,57 @@
+---
+title: "Diff Viewer"
+description: "Inspect file and section diffs with unified and side-by-side views, whitespace control, and conflict highlighting."
+---
+
+# Diff Viewer
+
+Clicking any file in the Source Control panel opens the diff viewer below (or beside, depending on your panel layout). The viewer shows a standard unified diff with syntax coloring.
+
+## Color Coding
+
+| Color | Meaning |
+|-------|---------|
+| Green background | Added line (`+`) |
+| Red background | Removed line (`-`) |
+| Blue text | Hunk header (`@@`) |
+| Muted background | File header lines (`diff --git`, `index`, `---`, `+++`) |
+
+## Viewing Modes
+
+### Unified (default)
+
+All changes shown in a single column. Added and removed lines are interleaved as they appear in the hunk.
+
+### Side-by-Side
+
+Click the **split-view** icon in the diff toolbar. The left pane shows the old version of the file; the right pane shows the new version. Lines are paired by hunk — unchanged context lines appear on both sides.
+
+## Whitespace
+
+Toggle the **whitespace** filter button to hide or show whitespace-only changes. When enabled, the viewer passes `--ignore-all-space` to `git diff`, which is useful for reviewing reformatted code.
+
+## Section Diffs
+
+Clicking a **section header** (Staged Changes / Changes / Untracked Files) in the file list opens a combined diff for all files in that section. The toolbar label shows the section name and file count.
+
+The **All Changes** button at the top of the file list combines staged and unstaged diffs into a single view.
+
+## Commit Diffs
+
+When a commit is selected in the [Git Graph](./git-graph), clicking **View Changes** opens the commit's full diff in the viewer. The toolbar shows the short commit hash.
+
+## Conflict Highlighting
+
+When a file has merge conflicts, the viewer renders conflict markers with distinct coloring:
+
+| Marker | Color |
+|--------|-------|
+| `<<<<<<< HEAD` | Purple — start of our changes |
+| `=======` | Separator |
+| `>>>>>>> branch` | Orange — end of their changes |
+
+Lines between markers are tinted to match, making it easy to identify the conflict region at a glance.
+
+## Closing the Diff
+
+Click the **×** button in the diff toolbar or click the same file again to collapse the viewer.
