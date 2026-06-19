@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { Cancel01Icon, Refresh01Icon, ArrowExpand01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, Refresh01Icon, ArrowExpand01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { FleetAgentConfig } from "@/modules/tabs/types";
 import type { FleetSession } from "./store/agentFleetStore";
@@ -19,6 +19,7 @@ type AgentCardProps = {
   onFocus: () => void;
   onKill: () => void;
   onRestart: () => void;
+  onClose: () => void;
   registerRef: (ref: TerminalPaneHandle | null) => void;
 };
 
@@ -40,7 +41,7 @@ function StatusDot({ status }: { status: DisplayStatus }) {
 
 export const AgentCard = forwardRef<TerminalPaneHandle, AgentCardProps>(
   function AgentCard(
-    { tabId, config, session, isVisible, slotRect, onFocus, onKill, onRestart, registerRef },
+    { tabId, config, session, isVisible, slotRect, onFocus, onKill, onRestart, onClose, registerRef },
     _ref,
   ) {
     const [displayStatus, setDisplayStatus] = useState<DisplayStatus>("starting");
@@ -106,13 +107,20 @@ export const AgentCard = forwardRef<TerminalPaneHandle, AgentCardProps>(
               ) : (
                 <button
                   onClick={onKill}
-                  title="Kill"
+                  title="Kill process"
                   disabled={!session}
                   className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive disabled:opacity-40"
                 >
                   <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={1.75} />
                 </button>
               )}
+              <button
+                onClick={onClose}
+                title="Remove agent"
+                className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+              >
+                <HugeiconsIcon icon={Delete02Icon} size={11} strokeWidth={1.75} />
+              </button>
             </div>
           </div>
         )}

@@ -241,6 +241,20 @@ export function AgentFleetPane({ tab, visible }: Props) {
                         config.cwd,
                       );
                     }}
+                    onClose={() => {
+                      // Kill the process first, then clean up state
+                      const ref = terminalRefs.current.get(config.id);
+                      if (ref) {
+                        ref.write("\x03");
+                        setTimeout(() => ref.write("exit\n"), 100);
+                      }
+                      setTimeout(() => {
+                        useAgentFleetStore.getState().removeSession(tab.id, config.id);
+                        useTabsStore.getState().removeFleetAgent(tab.id, config.id);
+                        terminalRefs.current.delete(config.id);
+                        slotRefs.current.delete(config.id);
+                      }, 200);
+                    }}
                     registerRef={(ref) => {
                       if (ref) terminalRefs.current.set(config.id, ref);
                       else terminalRefs.current.delete(config.id);

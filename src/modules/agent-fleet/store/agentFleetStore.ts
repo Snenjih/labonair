@@ -20,6 +20,7 @@ type AgentFleetState = {
   launchAgent: (tabId: number, configId: string, command: string, cwd: string) => string;
   restartAgent: (tabId: number, configId: string, command: string, cwd: string) => string;
   killAgent: (tabId: number, configId: string) => void;
+  removeSession: (tabId: number, configId: string) => void;
   recordActivity: (tabId: number, configId: string) => void;
   setStatus: (tabId: number, configId: string, status: FleetSession["status"], exitCode?: number) => void;
   detectTools: () => Promise<void>;
@@ -81,6 +82,15 @@ export const useAgentFleetStore = create<AgentFleetState>((set) => ({
           },
         },
       };
+    });
+  },
+
+  removeSession: (tabId, configId) => {
+    set((s) => {
+      const tabSessions = s.sessions[tabId];
+      if (!tabSessions) return s;
+      const { [configId]: _, ...rest } = tabSessions;
+      return { sessions: { ...s.sessions, [tabId]: rest } };
     });
   },
 
