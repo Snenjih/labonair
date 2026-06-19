@@ -123,18 +123,18 @@ function InlineDiff({
       {oldLines.map((line, i) => (
         <div
           key={`r${i}`}
-          className="border-l-2 border-red-500/50 bg-red-500/8 px-2 py-px leading-relaxed text-red-800 dark:text-red-300"
+          className="border-l-2 border-error/50 bg-error/8 px-2 py-px leading-relaxed text-error"
         >
-          <span className="mr-2 select-none text-red-500/60">−</span>
+          <span className="mr-2 select-none text-error/60">−</span>
           {line}
         </div>
       ))}
       {newLines.map((line, i) => (
         <div
           key={`a${i}`}
-          className="border-l-2 border-emerald-500/50 bg-emerald-500/8 px-2 py-px leading-relaxed text-emerald-800 dark:text-emerald-300"
+          className="border-l-2 border-success/50 bg-success/8 px-2 py-px leading-relaxed text-success"
         >
-          <span className="mr-2 select-none text-emerald-500/60">+</span>
+          <span className="mr-2 select-none text-success/60">+</span>
           {line}
         </div>
       ))}

@@ -1,5 +1,6 @@
 import { memo, type ReactElement } from "react";
 import type { GraphEdge, LayoutCommit } from "../types";
+import { laneColor } from "../lib/laneColors";
 
 export const LANE_WIDTH = 14;
 export const RAIL_PADDING_X = 8;
@@ -7,23 +8,6 @@ export const MAX_VISIBLE_LANES = 6;
 
 const STRAIGHT_WIDTH = 1.5;
 const CURVE_WIDTH = 1.5;
-
-// SVG stroke attributes require color strings, not CSS class names.
-// These rgb values match Tailwind's color palette for light/dark compatibility.
-const LANE_STROKE_COLORS = [
-  "rgb(96, 165, 250)",   // blue-400
-  "rgb(192, 132, 252)",  // purple-400
-  "rgb(52, 211, 153)",   // emerald-400
-  "rgb(251, 191, 36)",   // amber-400
-  "rgb(244, 114, 182)",  // pink-400
-  "rgb(34, 211, 238)",   // cyan-400
-  "rgb(251, 146, 60)",   // orange-400
-  "rgb(163, 230, 53)",   // lime-400
-] as const;
-
-function laneColor(colorIndex: number): string {
-  return LANE_STROKE_COLORS[colorIndex % LANE_STROKE_COLORS.length];
-}
 
 function laneX(lane: number): number {
   return RAIL_PADDING_X + lane * LANE_WIDTH;

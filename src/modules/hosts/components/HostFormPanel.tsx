@@ -347,7 +347,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   form.pin_to_top ? "bg-primary" : "bg-muted"
                 }`}
               >
-                <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-primary-foreground shadow transition-transform ${
                   form.pin_to_top ? "translate-x-4" : "translate-x-0"
                 }`} />
               </button>

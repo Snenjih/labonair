@@ -178,9 +178,9 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
           icon={GitBranchIcon}
           size={12}
           strokeWidth={2}
-          className="mr-1.5 shrink-0 text-muted-foreground/50"
+          className="mr-1.5 shrink-0 text-muted-foreground"
         />
-        <span className="shrink-0 text-[11px] font-medium text-muted-foreground/60">
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
           {repoName}
         </span>
         <span className="mx-1 shrink-0 text-[11px] text-muted-foreground/30">/</span>
@@ -202,7 +202,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
 
         {/* Behind indicator */}
         {behind > 0 && (
-          <span className="mr-2 shrink-0 rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-medium tabular-nums text-red-500">
+          <span className="mr-2 shrink-0 rounded-full bg-error/15 px-1.5 py-0.5 text-[9px] font-medium tabular-nums text-error">
             ↓{behind}
           </span>
         )}
@@ -260,7 +260,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setShowForcePushConfirm(true)}
-                  className="text-xs text-orange-500 focus:text-orange-500"
+                  className="text-xs text-warning focus:text-warning"
                 >
                   Force Push
                 </DropdownMenuItem>
@@ -275,9 +275,9 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
         <div
           className={cn(
             "border-t border-border/40 px-3 py-1.5 text-[10px] font-medium",
-            mergeInProgress && "bg-orange-500/10 text-orange-400",
-            rebaseInProgress && "bg-orange-500/10 text-orange-400",
-            cherryPickInProgress && "bg-yellow-500/10 text-yellow-400"
+            mergeInProgress && "bg-warning/10 text-warning",
+            rebaseInProgress && "bg-warning/10 text-warning",
+            cherryPickInProgress && "bg-warning/10 text-warning"
           )}
         >
           {mergeInProgress && "Merge in progress — resolve conflicts, then commit or Abort"}
@@ -288,12 +288,12 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
 
       {/* Remote op error */}
       {error && (
-        <div className="flex items-start gap-2 border-t border-red-500/20 bg-red-500/10 px-2.5 py-1.5">
-          <p className="flex-1 text-[10px] text-red-400">{error}</p>
+        <div className="flex items-start gap-2 border-t border-error/20 bg-error/10 px-2.5 py-1.5">
+          <p className="flex-1 text-[10px] text-error">{error}</p>
           <button
             type="button"
             onClick={() => setError(null)}
-            className="mt-0.5 shrink-0 text-red-400/60 hover:text-red-400"
+            className="mt-0.5 shrink-0 text-error/60 hover:text-error"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2} />
           </button>
@@ -302,19 +302,19 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
 
       {/* No upstream prompt */}
       {showSetUpstreamPrompt && (
-        <div className="flex items-center gap-1.5 border-t border-blue-500/30 bg-blue-500/10 px-2.5 py-1.5">
-          <p className="flex-1 text-[10px] text-blue-400">No upstream — push & set tracking?</p>
+        <div className="flex items-center gap-1.5 border-t border-info/30 bg-info/10 px-2.5 py-1.5">
+          <p className="flex-1 text-[10px] text-info">No upstream — push & set tracking?</p>
           <button
             type="button"
             onClick={() => void handleSetUpstream()}
-            className="h-5 shrink-0 rounded border border-blue-500/40 px-2 text-[10px] text-blue-400 hover:bg-blue-500/20"
+            className="h-5 shrink-0 rounded border border-info/40 px-2 text-[10px] text-info hover:bg-info/20"
           >
             Set upstream & push
           </button>
           <button
             type="button"
             onClick={() => setShowSetUpstreamPrompt(false)}
-            className="text-blue-400/60 hover:text-blue-400"
+            className="text-info/60 hover:text-info"
           >
             <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2} />
           </button>

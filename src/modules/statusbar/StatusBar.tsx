@@ -88,8 +88,8 @@ export const StatusBar = React.memo(function StatusBar({
               className={cn(
                 "flex h-5 w-5 items-center justify-center rounded transition-colors",
                 activePanel === panel
-                  ? "bg-primary/20 text-primary"
-                  : "text-muted-foreground/60 hover:bg-primary/10 hover:text-primary/80"
+                  ? "bg-primary/20 text-foreground dark:text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
             >
               <HugeiconsIcon icon={icon} size={12} strokeWidth={1.75} />
@@ -103,8 +103,8 @@ export const StatusBar = React.memo(function StatusBar({
               className={cn(
                 "flex h-5 w-5 items-center justify-center rounded transition-colors",
                 activePanel === "tabs"
-                  ? "bg-primary/20 text-primary"
-                  : "text-muted-foreground/60 hover:bg-primary/10 hover:text-primary/80"
+                  ? "bg-primary/20 text-foreground dark:text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
             >
               <HugeiconsIcon icon={LayoutTopIcon} size={12} strokeWidth={1.75} />
@@ -120,7 +120,7 @@ export const StatusBar = React.memo(function StatusBar({
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         {filePath && showCursorPosition && (
-          <span className="tabular-nums text-muted-foreground/60">
+          <span className="tabular-nums text-muted-foreground">
             Ln {cursorLine}, Col {cursorCol}
           </span>
         )}
