@@ -3,10 +3,15 @@ import { cn } from "@/lib/utils";
 import type { AgentFleetTab } from "@/modules/tabs/types";
 import { useTabsStore } from "@/modules/tabs";
 import { useAgentFleetStore } from "./store/agentFleetStore";
+import type { FleetSession } from "./store/agentFleetStore";
 import { AgentCard } from "./AgentCard";
 import { AgentLaunchDialog } from "./AgentLaunchDialog";
 import { BroadcastBar } from "./BroadcastBar";
 import type { TerminalPaneHandle } from "@/modules/terminal";
+
+// Stable empty fallback — prevents useSyncExternalStore from seeing a new {} reference
+// every render when no sessions exist for this tab, which would cause an infinite update loop.
+const EMPTY_SESSIONS: Record<string, FleetSession> = {};
 
 type Props = {
   tab: AgentFleetTab;
@@ -24,7 +29,7 @@ export function AgentFleetPane({ tab, visible }: Props) {
   const broadcastBarRef = useRef<HTMLInputElement>(null);
 
   // Reactive session data
-  const sessions = useAgentFleetStore((s) => s.sessions[tab.id] ?? {});
+  const sessions = useAgentFleetStore((s) => s.sessions[tab.id] ?? EMPTY_SESSIONS);
 
   const updateRects = () => {
     const container = containerRef.current;
@@ -76,12 +81,11 @@ export function AgentFleetPane({ tab, visible }: Props) {
       const running = Object.values(storeSessions).filter(
         (s) => s.status !== "exited",
       ).length;
-      useTabsStore
-        .getState()
-        .updateFleetTabTitle(
-          tab.id,
-          total > 0 ? `Fleet (${running}/${total})` : "Fleet",
-        );
+      const newTitle = total > 0 ? `Fleet (${running}/${total})` : "Fleet";
+      const current = useTabsStore.getState().tabs.find((t) => t.id === tab.id);
+      if (current && current.title !== newTitle) {
+        useTabsStore.getState().updateFleetTabTitle(tab.id, newTitle);
+      }
     };
     update();
     return useAgentFleetStore.subscribe(update);
