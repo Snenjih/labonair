@@ -28,7 +28,7 @@ export function BroadcastBar({ configs, sessions, terminalRefs, inputRef }: Prop
     for (const configId of selected) {
       const session = sessions[configId];
       if (!session || session.status === "exited") continue;
-      terminalRefs.get(session.ptyId)?.write(text);
+      terminalRefs.get(configId)?.write(text);
     }
     setInput("");
   };
