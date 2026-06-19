@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Group, Panel, Separator } from "react-resizable-panels";
-import type { Layout } from "react-resizable-panels";
 import { cn } from "@/lib/utils";
 import type { AgentFleetTab } from "@/modules/tabs/types";
 import { useTabsStore } from "@/modules/tabs";
@@ -25,18 +23,6 @@ function computeGridDims(n: number): { cols: number; rows: number } {
   if (n <= 6) return { cols: 3, rows: 2 };
   const cols = Math.ceil(Math.sqrt(n));
   return { cols, rows: Math.ceil(n / cols) };
-}
-
-function equalSize(count: number): number {
-  return 100 / count;
-}
-
-function rowPanelId(tabId: number, rowIdx: number): string {
-  return `fleet-${tabId}-row-${rowIdx}`;
-}
-
-function agentPanelId(tabId: number, configId: string): string {
-  return `fleet-${tabId}-agent-${configId}`;
 }
 
 export function AgentFleetPane({ tab, visible }: Props) {
@@ -87,58 +73,6 @@ export function AgentFleetPane({ tab, visible }: Props) {
   }, []);
 
   const { cols, rows } = computeGridDims(tab.agents.length);
-
-  const agentRows = Array.from({ length: rows }, (_, r) =>
-    tab.agents.slice(r * cols, (r + 1) * cols),
-  );
-
-  // Build defaultLayout for the vertical (rows) group
-  function buildRowLayout(): Layout {
-    const stored = tab.panelSizes?.rowSizes;
-    const layout: Layout = {};
-    for (let r = 0; r < rows; r++) {
-      const id = rowPanelId(tab.id, r);
-      layout[id] = stored?.length === rows ? (stored[r] ?? equalSize(rows)) : equalSize(rows);
-    }
-    return layout;
-  }
-
-  // Build defaultLayout for a horizontal (cols) group in a row
-  function buildColLayout(rowIdx: number, rowAgents: typeof agentRows[0]): Layout {
-    const stored = tab.panelSizes?.colSizes[rowIdx];
-    const layout: Layout = {};
-    rowAgents.forEach((config, colIdx) => {
-      const id = agentPanelId(tab.id, config.id);
-      layout[id] = stored?.length === rowAgents.length
-        ? (stored[colIdx] ?? equalSize(rowAgents.length))
-        : equalSize(rowAgents.length);
-    });
-    return layout;
-  }
-
-  function handleRowLayoutChanged(layout: Layout) {
-    const rowSizes = agentRows.map((_, r) => layout[rowPanelId(tab.id, r)] ?? equalSize(rows));
-    const existing = (
-      useTabsStore.getState().tabs.find((t) => t.id === tab.id) as AgentFleetTab | undefined
-    )?.panelSizes;
-    useTabsStore.getState().updateFleetPanelSizes(tab.id, rowSizes, existing?.colSizes ?? []);
-  }
-
-  function handleColLayoutChanged(rowIdx: number, rowAgents: typeof agentRows[0], layout: Layout) {
-    const colSizes = rowAgents.map((config) =>
-      layout[agentPanelId(tab.id, config.id)] ?? equalSize(rowAgents.length),
-    );
-    const existing = (
-      useTabsStore.getState().tabs.find((t) => t.id === tab.id) as AgentFleetTab | undefined
-    )?.panelSizes;
-    const newColSizes = [...(existing?.colSizes ?? [])];
-    newColSizes[rowIdx] = colSizes;
-    useTabsStore.getState().updateFleetPanelSizes(
-      tab.id,
-      existing?.rowSizes ?? Array<number>(rows).fill(equalSize(rows)),
-      newColSizes,
-    );
-  }
 
   function makeAgentHandlers(config: (typeof tab.agents)[0]) {
     return {
@@ -218,43 +152,82 @@ export function AgentFleetPane({ tab, visible }: Props) {
             Launch your first agent
           </button>
         </div>
-      ) : tab.viewMode === "focus" ? (
-        /* Focus Mode — single agent full-screen */
+      ) : (
+        /*
+         * Single stable layer — AgentCards are NEVER unmounted when switching
+         * between grid and focus mode. Only CSS changes; the PTY keeps running.
+         *
+         * Grid mode:  CSS grid, equal cell sizes.
+         * Focus mode: absolute inset-0 for all cards; non-focused ones are
+         *             invisible + pointer-events-none so the PTY stays alive.
+         */
         <div className="relative min-h-0 flex-1">
-          {tab.agents.map((config) => {
-            const session = sessions[config.id];
-            const focusedId = tab.focusedAgentId ?? tab.agents[0]?.id;
-            const isFocused = focusedId === config.id;
-            const handlers = makeAgentHandlers(config);
-            return (
-              <div
-                key={session?.ptyId ?? config.id}
-                className={cn("absolute inset-0", !isFocused && "hidden")}
-              >
-                <AgentCard
-                  tabId={tab.id}
-                  config={config}
-                  session={session}
-                  isVisible={visible && isFocused}
-                  {...handlers}
-                />
-              </div>
-            );
-          })}
+          <div
+            className={cn(
+              "h-full w-full",
+              tab.viewMode === "grid" ? "relative" : "absolute inset-0",
+            )}
+            style={
+              tab.viewMode === "grid"
+                ? {
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                    gridTemplateRows: `repeat(${rows}, 1fr)`,
+                  }
+                : undefined
+            }
+          >
+            {tab.agents.map((config, index) => {
+              const session = sessions[config.id];
+              const focusedId = tab.focusedAgentId ?? tab.agents[0]?.id;
+              const isFocused = config.id === focusedId;
+              const handlers = makeAgentHandlers(config);
 
-          {/* Focus Mode Chip Switcher */}
-          {tab.agents.length > 1 && (
+              const col = index % cols;
+              const row = Math.floor(index / cols);
+
+              const isFocusMode = tab.viewMode === "focus";
+              const hidden = isFocusMode && !isFocused;
+
+              return (
+                <div
+                  key={config.id}
+                  className={cn(
+                    isFocusMode ? "absolute inset-0" : "relative overflow-hidden border-r border-b border-border/20",
+                    hidden && "invisible pointer-events-none",
+                  )}
+                  style={
+                    isFocusMode
+                      ? undefined
+                      : {
+                          gridColumn: col + 1,
+                          gridRow: row + 1,
+                        }
+                  }
+                >
+                  <AgentCard
+                    tabId={tab.id}
+                    config={config}
+                    session={session}
+                    isVisible={visible && !hidden}
+                    {...handlers}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Focus mode chip switcher */}
+          {tab.viewMode === "focus" && tab.agents.length > 1 && (
             <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center gap-1 border-t border-border/50 bg-card/90 px-2 py-1 backdrop-blur">
               {tab.agents.map((config) => {
                 const session = sessions[config.id];
                 const focusedId = tab.focusedAgentId ?? tab.agents[0]?.id;
-                const isFocused = focusedId === config.id;
+                const isFocused = config.id === focusedId;
                 return (
                   <button
                     key={config.id}
-                    onClick={() =>
-                      useTabsStore.getState().setFocusedAgent(tab.id, config.id)
-                    }
+                    onClick={() => useTabsStore.getState().setFocusedAgent(tab.id, config.id)}
                     className={cn(
                       "flex items-center gap-1 rounded px-2 py-0.5 text-xs",
                       isFocused
@@ -280,71 +253,6 @@ export function AgentFleetPane({ tab, visible }: Props) {
               })}
             </div>
           )}
-        </div>
-      ) : (
-        /* Grid Mode — resizable panel grid */
-        <div className="min-h-0 flex-1">
-          <Group
-            orientation="vertical"
-            className="flex h-full w-full flex-col"
-            defaultLayout={buildRowLayout()}
-            onLayoutChanged={handleRowLayoutChanged}
-          >
-            {agentRows.map((rowAgents, rowIdx) => (
-              <>
-                {rowIdx > 0 && (
-                  <Separator
-                    key={`row-sep-${rowIdx}`}
-                    className="h-1 w-full shrink-0 cursor-row-resize bg-border/40 transition-colors hover:bg-border"
-                  />
-                )}
-                <Panel
-                  key={rowPanelId(tab.id, rowIdx)}
-                  id={rowPanelId(tab.id, rowIdx)}
-                  defaultSize={equalSize(rows)}
-                  minSize={5}
-                >
-                  <Group
-                    orientation="horizontal"
-                    className="flex h-full w-full"
-                    defaultLayout={buildColLayout(rowIdx, rowAgents)}
-                    onLayoutChanged={(layout) =>
-                      handleColLayoutChanged(rowIdx, rowAgents, layout)
-                    }
-                  >
-                    {rowAgents.map((config, colIdx) => {
-                      const session = sessions[config.id];
-                      const handlers = makeAgentHandlers(config);
-                      return (
-                        <>
-                          {colIdx > 0 && (
-                            <Separator
-                              key={`col-sep-${config.id}`}
-                              className="w-1 shrink-0 cursor-col-resize bg-border/40 transition-colors hover:bg-border"
-                            />
-                          )}
-                          <Panel
-                            key={agentPanelId(tab.id, config.id)}
-                            id={agentPanelId(tab.id, config.id)}
-                            defaultSize={equalSize(rowAgents.length)}
-                            minSize={10}
-                          >
-                            <AgentCard
-                              tabId={tab.id}
-                              config={config}
-                              session={session}
-                              isVisible={visible}
-                              {...handlers}
-                            />
-                          </Panel>
-                        </>
-                      );
-                    })}
-                  </Group>
-                </Panel>
-              </>
-            ))}
-          </Group>
         </div>
       )}
 
