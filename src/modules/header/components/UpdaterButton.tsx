@@ -1,9 +1,11 @@
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useUpdaterStore } from "@/modules/updater/updaterStore";
+import { Download01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 export function UpdaterButton() {
   const status = useUpdaterStore((s) => s.status);
-  const install = useUpdaterStore((s) => s.install);
+  const openDialog = useUpdaterStore((s) => s.openDialog);
 
   if (
     status.kind === "idle" ||
@@ -16,15 +18,30 @@ export function UpdaterButton() {
 
   if (status.kind === "available") {
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-6 shrink-0 gap-1.5 border-success/40 px-2 text-[11px] text-success hover:border-success/60 hover:bg-success/10 hover:text-success"
-        onClick={() => void install()}
+      <button
+        onClick={openDialog}
+        title="Update available — click to install"
+        className={cn(
+          "group flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5",
+          "border border-success/30 bg-success/8 text-success",
+          "text-[11px] font-medium leading-none",
+          "transition-all duration-150",
+          "hover:border-success/50 hover:bg-success/15 hover:shadow-[0_0_0_2px_color-mix(in_srgb,var(--success)_12%,transparent)]",
+          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success/50",
+        )}
       >
-        <span className="size-1.5 shrink-0 rounded-full bg-success" />
-        Update and restart
-      </Button>
+        <span className="relative flex size-1.5 shrink-0">
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-60" />
+          <span className="relative inline-flex size-1.5 rounded-full bg-success" />
+        </span>
+        <HugeiconsIcon
+          icon={Download01Icon}
+          size={11}
+          strokeWidth={2}
+          className="shrink-0 opacity-80 group-hover:opacity-100"
+        />
+        <span>Update available</span>
+      </button>
     );
   }
 
@@ -33,27 +50,42 @@ export function UpdaterButton() {
       status.contentLength && status.contentLength > 0
         ? Math.round((status.downloaded / status.contentLength) * 100)
         : null;
+
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        disabled
-        className="h-6 shrink-0 px-2 text-[11px]"
+      <div
+        className={cn(
+          "flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5",
+          "border border-border/50 bg-muted/50 text-muted-foreground",
+          "text-[11px] font-medium leading-none",
+        )}
       >
-        {pct !== null ? `Downloading… ${pct}%` : "Downloading…"}
-      </Button>
+        <HugeiconsIcon
+          icon={Download01Icon}
+          size={11}
+          strokeWidth={2}
+          className="shrink-0 animate-bounce"
+        />
+        <span>{pct !== null ? `Downloading ${pct}%` : "Downloading…"}</span>
+      </div>
     );
   }
 
   // status.kind === "ready"
   return (
-    <Button
-      size="sm"
-      variant="outline"
-      disabled
-      className="h-6 shrink-0 px-2 text-[11px]"
+    <button
+      onClick={openDialog}
+      title="Update ready — click to restart"
+      className={cn(
+        "flex h-6 shrink-0 items-center gap-1.5 rounded-full px-2.5",
+        "border border-primary/30 bg-primary/8 text-primary",
+        "text-[11px] font-medium leading-none",
+        "transition-all duration-150",
+        "hover:border-primary/50 hover:bg-primary/15",
+        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
+      )}
     >
-      Restarting…
-    </Button>
+      <span className="size-1.5 shrink-0 rounded-full bg-primary" />
+      <span>Restart to update</span>
+    </button>
   );
 }
