@@ -488,6 +488,18 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           const text = t.getSelection();
           if (text) void navigator.clipboard.writeText(text).catch(() => undefined);
         });
+
+        // On macOS in WKWebView, Cmd+C triggers the native Copy menu command which
+        // copies DOM selection (empty for canvas-based xterm). Intercept the `copy`
+        // event and write xterm's internal selection instead.
+        const onCopy = (e: ClipboardEvent) => {
+          const text = t.getSelection();
+          if (!text) return;
+          e.clipboardData?.setData("text/plain", text);
+          e.preventDefault();
+        };
+        document.addEventListener("copy", onCopy, { capture: true });
+        cleanups.push(() => document.removeEventListener("copy", onCopy, { capture: true }));
         term = t;
         termRef.current = t;
         t.onBell(() => {
