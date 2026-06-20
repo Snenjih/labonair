@@ -12,6 +12,7 @@ import { useAiSessionCommands } from "./hooks/useAiSessionCommands";
 import { useTerminalCommands } from "./hooks/useTerminalCommands";
 import { useSftpCommands } from "./hooks/useSftpCommands";
 import { useEditorCommands } from "./hooks/useEditorCommands";
+import { useSourceControlCommands } from "./hooks/useSourceControlCommands";
 
 type Registry = Record<string, CommandPage>;
 
@@ -33,6 +34,7 @@ export function useCommandRegistry(
   const terminalPage = useTerminalCommands(cb);
   const { rootActions: sftpActionRoots } = useSftpCommands(activeTabId);
   const { rootActions: editorRootActions, outlinePage } = useEditorCommands(cb);
+  const { rootActions: scRootActions, branchPage } = useSourceControlCommands(cb);
 
   return useMemo(() => {
     const filterByContext = (actions: CommandAction[]): CommandAction[] => {
@@ -54,6 +56,7 @@ export function useCommandRegistry(
       ...filterByContext(aiRootActions),
       ...filterByContext(settingsRootActions),
       ...filterByContext(editorRootActions),
+      ...scRootActions,
     ];
 
     const rootPage: CommandPage = {
@@ -74,6 +77,7 @@ export function useCommandRegistry(
       snippets: snippetsPage,
       "ai-sessions": aiSessionsPage,
       outline: outlinePage,
+      "git-branches": branchPage,
     };
   }, [
     systemPage,
@@ -98,5 +102,7 @@ export function useCommandRegistry(
     activeContext,
     editorRootActions,
     outlinePage,
+    scRootActions,
+    branchPage,
   ]);
 }

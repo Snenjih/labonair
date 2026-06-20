@@ -477,6 +477,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const id = get()._nextId;
     set((s) => ({
       tabs: [
+        ...s.tabs,
         {
           id,
           kind: "git-graph" as const,
@@ -484,7 +485,6 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           repositoryPath,
           initialBranch,
         },
-        ...s.tabs,
       ],
       activeId: id,
       _nextId: s._nextId + 1,

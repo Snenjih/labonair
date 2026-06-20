@@ -65,4 +65,7 @@ export type RegistryCallbacks = {
   // Editor
   jumpToEditorPosition: (pos: number) => void;
   formatEditorDocument: () => void;
+  // Source Control
+  openGitGraph: () => void;
+  focusSourceControl: () => void;
 };

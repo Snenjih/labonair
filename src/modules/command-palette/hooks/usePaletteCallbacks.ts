@@ -15,6 +15,7 @@ import type { SidebarPanel } from "@/modules/statusbar";
 import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets";
 import type { TerminalPaneHandle } from "@/modules/terminal";
 import type { EditorPaneHandle } from "@/modules/editor";
+import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
 
 export interface UsePaletteCallbacksOptions {
   openNewTab: () => void;
@@ -171,6 +172,16 @@ export function usePaletteCallbacks({
       formatEditorDocument: () => {
         const { activeId: aid } = useTabsStore.getState();
         editorRefs.current.get(aid)?.format();
+      },
+      openGitGraph: () => {
+        const { openGitGraphTab } = useTabsStore.getState();
+        const { repoRoot, currentBranch } = useSourceControlStore.getState();
+        const path = repoRoot ?? "";
+        openGitGraphTab(path, currentBranch || "HEAD");
+      },
+      focusSourceControl: () => {
+        setActivePanel("source-control");
+        sidebarRef.current?.expand();
       },
     };
   }, [

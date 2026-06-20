@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Refresh01Icon } from "@hugeicons/core-free-icons";
+import { Refresh01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   AlertDialog,
@@ -49,6 +49,41 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+function NoRepoState({ path }: { path: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 px-4 py-16 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border/40 bg-muted/30">
+        <HugeiconsIcon
+          icon={GitBranchIcon}
+          size={22}
+          strokeWidth={1.5}
+          className="text-muted-foreground/40"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <p className="text-xs font-medium text-muted-foreground">No Repository</p>
+        <p className="text-[11px] text-muted-foreground/50">
+          {path
+            ? "The selected folder is not a Git repository."
+            : "Open a folder containing a Git repository to view the graph."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function isNoRepoError(error: string): boolean {
+  const lower = error.toLowerCase();
+  return (
+    lower.includes("not a git repo") ||
+    lower.includes("not a git repository") ||
+    lower.includes("does not have any commits") ||
+    lower.includes("no such file or directory") ||
+    lower.includes("repository not found") ||
+    (lower.includes("fatal") && lower.includes("git"))
+  );
+}
+
 function RefreshAge({ date }: { date: Date }) {
   const [, forceUpdate] = useState(0);
 
@@ -76,6 +111,13 @@ interface Props {
 }
 
 export function GitGraphPane({ tab }: Props) {
+  if (!tab.repositoryPath) {
+    return <NoRepoState path="" />;
+  }
+  return <GitGraphPaneContent tab={tab} />;
+}
+
+function GitGraphPaneContent({ tab }: Props) {
   const { commits, isLoading, error, hasMore, loadMore, reload, lastRefreshedAt } = useGitGraph(tab.repositoryPath);
   const [selectedCommit, setSelectedCommit] = useState<LayoutCommit | null>(null);
   const [commitDiffHash, setCommitDiffHash] = useState<string | null>(null);
@@ -137,6 +179,9 @@ export function GitGraphPane({ tab }: Props) {
   }
 
   if (error) {
+    if (isNoRepoError(error)) {
+      return <NoRepoState path={tab.repositoryPath} />;
+    }
     return <ErrorState error={error} />;
   }
 
