@@ -3,7 +3,6 @@ export const KEYRING_SERVICE = "nexum-ai";
 export type ProviderId =
   | "openai"
   | "anthropic"
-  | "anthropic-subscription"
   | "google"
   | "xai"
   | "cerebras"
@@ -24,13 +23,6 @@ export type ProviderInfo = {
   consoleUrl: string;
 };
 
-/** Credentials result from the local Claude CLI read command. */
-export type ClaudeCredentials = {
-  access_token: string;
-  expires_at_ms: number | null;
-  source: "claude-code" | "ant-cli";
-};
-
 export const PROVIDERS: readonly ProviderInfo[] = [
   {
     id: "openai",
@@ -45,13 +37,6 @@ export const PROVIDERS: readonly ProviderInfo[] = [
     keyringAccount: "anthropic-api-key",
     keyPrefix: "sk-ant-",
     consoleUrl: "https://console.anthropic.com/settings/keys",
-  },
-  {
-    id: "anthropic-subscription",
-    label: "Claude Subscription",
-    keyringAccount: "",
-    keyPrefix: null,
-    consoleUrl: "",
   },
   {
     id: "google",
@@ -154,8 +139,6 @@ export type ModelInfo = {
   description?: string;
   capabilities?: ModelCapabilities;
   tags?: readonly ModelTag[];
-  /** Actual model ID sent to the API. Overrides `id` when present (used for subscription models). */
-  apiModelId?: string;
 };
 
 export const MODELS = [
@@ -206,34 +189,6 @@ export const MODELS = [
     provider: "anthropic",
     label: "Claude Opus 4.7",
     hint: "Best",
-    capabilities: { intelligence: 5, speed: 2, cost: 1 },
-    tags: ["reasoning", "tools", "coding"] as const,
-  },
-  // Anthropic (Claude Subscription — OAuth via local Claude CLI)
-  {
-    id: "claude-sub-haiku-4-5",
-    apiModelId: "claude-haiku-4-5",
-    provider: "anthropic-subscription",
-    label: "Claude Haiku 4.5",
-    hint: "Fast · subscription",
-    capabilities: { intelligence: 3, speed: 5, cost: 5 },
-    tags: ["tools"] as const,
-  },
-  {
-    id: "claude-sub-sonnet-4-6",
-    apiModelId: "claude-sonnet-4-6",
-    provider: "anthropic-subscription",
-    label: "Claude Sonnet 4.6",
-    hint: "Balanced · subscription",
-    capabilities: { intelligence: 4, speed: 3, cost: 3 },
-    tags: ["tools", "coding"] as const,
-  },
-  {
-    id: "claude-sub-opus-4-7",
-    apiModelId: "claude-opus-4-7",
-    provider: "anthropic-subscription",
-    label: "Claude Opus 4.7",
-    hint: "Best · subscription",
     capabilities: { intelligence: 5, speed: 2, cost: 1 },
     tags: ["reasoning", "tools", "coding"] as const,
   },
@@ -380,9 +335,6 @@ export const MODEL_CONTEXT_LIMITS: Record<string, number> = {
   "claude-haiku-4-5": 200_000,
   "claude-sonnet-4-6": 200_000,
   "claude-opus-4-7": 200_000,
-  "claude-sub-haiku-4-5": 200_000,
-  "claude-sub-sonnet-4-6": 200_000,
-  "claude-sub-opus-4-7": 200_000,
   "gemini-3.1-pro": 1_000_000,
   "gemini-3-flash": 1_000_000,
   "grok-4.20-reasoning": 2_000_000,
@@ -453,8 +405,8 @@ export function estimateCost(
   );
 }
 
-/** Providers that do not require an API key (e.g. local servers or OAuth providers). */
-export const KEYLESS_PROVIDERS: readonly ProviderId[] = ["lmstudio", "mlx", "ollama", "anthropic-subscription"] as const;
+/** Providers that do not require an API key (e.g. local servers). */
+export const KEYLESS_PROVIDERS: readonly ProviderId[] = ["lmstudio", "mlx", "ollama"] as const;
 
 export function providerNeedsKey(id: ProviderId): boolean {
   return !KEYLESS_PROVIDERS.includes(id);
@@ -491,7 +443,7 @@ export const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434/v1";
 
 /** Provider IDs that belong to the "cloud" group in the Add Provider dropdown. */
 export const CLOUD_PROVIDER_IDS: readonly ProviderId[] = [
-  "openai", "anthropic", "anthropic-subscription", "google", "xai", "cerebras", "groq", "deepseek", "mistral", "openrouter",
+  "openai", "anthropic", "google", "xai", "cerebras", "groq", "deepseek", "mistral", "openrouter",
 ] as const;
 
 /** Provider IDs that belong to the "local & custom" group. */
@@ -511,7 +463,6 @@ export function getProviderDefaultBaseUrl(id: ProviderId): string {
 
 /** Short descriptions shown on provider cards. */
 export const PROVIDER_DESCRIPTIONS: Partial<Record<ProviderId, string>> = {
-  "anthropic-subscription": "Use Claude models via your Claude subscription — no API key needed. Reads the OAuth token from your local Claude CLI installation.",
   openrouter: "Any model on OpenRouter — type its full provider/model id.",
   "openai-compatible": "Any OpenAI-compatible endpoint — vLLM, Z.AI, Fireworks, etc.",
   lmstudio: "Run GGUF models via LM Studio's HTTP server (Developer tab → enable).",

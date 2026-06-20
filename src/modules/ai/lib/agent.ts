@@ -127,26 +127,12 @@ export type BuildModelOptions = {
 // `sendMessages` call. Keyed on the full identity that affects the result.
 const modelCache = new Map<string, LanguageModel>();
 
-async function buildWithSubscriptionAuth(resolvedModelId: string): Promise<LanguageModel> {
-  const { invoke: tauriInvoke } = await import("@tauri-apps/api/core");
-  type ClaudeCreds = { access_token: string; source: string };
-  const creds = await tauriInvoke<ClaudeCreds>("ai_claude_credentials_read");
-  const { createAnthropic } = await import("@ai-sdk/anthropic");
-  return createAnthropic({
-    authToken: creds.access_token,
-    headers: { "anthropic-beta": "oauth-2025-04-20" },
-  })(resolvedModelId);
-}
-
 export async function buildLanguageModel(
   provider: ProviderId,
   keys: ProviderKeys,
   resolvedModelId: string,
   options: BuildModelOptions = {},
 ): Promise<LanguageModel> {
-  if (provider === "anthropic-subscription") {
-    return buildWithSubscriptionAuth(resolvedModelId);
-  }
   if (providerNeedsKey(provider) && provider !== "openai-compatible" && !keys[provider]) {
     throw new Error(
       `No API key configured for ${provider}. Open Settings → AI to add one.`,
@@ -266,9 +252,6 @@ export async function buildLanguageModelFromInstance(
   resolvedModelId: string,
 ): Promise<LanguageModel> {
   const { providerId } = instance;
-  if (providerId === "anthropic-subscription") {
-    return buildWithSubscriptionAuth(resolvedModelId);
-  }
   const baseURL = instance.baseUrl;
   const cacheKey = [providerId, instance.id, key ?? "", resolvedModelId, baseURL ?? ""].join(" ");
   const hit = modelCache.get(cacheKey);
@@ -369,7 +352,7 @@ function buildModel(
     const instance = resolveInstance(m.provider, instanceId, instances);
     if (instance) {
       const key = providerNeedsKey(m.provider) ? (instanceKeys[instance.id] ?? null) : null;
-      let resolvedModelId: string = m.apiModelId ?? m.id;
+      let resolvedModelId: string = m.id;
       if (m.provider === "lmstudio" || m.provider === "mlx" || m.provider === "ollama" || m.provider === "openai-compatible") {
         if (!instance.localModelId?.trim()) {
           throw new Error(`No model ID configured for ${instance.name}. Open Settings → AI → Providers.`);
@@ -390,8 +373,7 @@ function buildModelLegacy(
   extras: BuildModelExtras = {},
 ): Promise<LanguageModel> {
   const m = getModel(modelId);
-  // Use apiModelId when set (e.g. subscription models map to base Claude model IDs)
-  let resolvedModelId = m.apiModelId ?? m.id;
+  let resolvedModelId = m.id;
   if (m.provider === "lmstudio") {
     if (!extras.lmstudioChatModelId?.trim()) {
       throw new Error("No LM Studio model ID configured. Open Settings → AI → Providers.");

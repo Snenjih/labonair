@@ -45,7 +45,6 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 const PROVIDER_ICON: Record<ProviderId, typeof ChatGptIcon> = {
   openai: ChatGptIcon,
   anthropic: ClaudeIcon,
-  "anthropic-subscription": ClaudeIcon,
   google: GoogleGeminiIcon,
   xai: Grok02Icon,
   cerebras: AiChipIcon,

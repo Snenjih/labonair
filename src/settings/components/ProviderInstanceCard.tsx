@@ -43,8 +43,7 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
 
   const providerInfo = PROVIDERS.find((p) => p.id === instance.providerId);
   const needsKey = providerNeedsKey(instance.providerId);
-  const isSubscription = instance.providerId === "anthropic-subscription";
-  const isLocal = !needsKey && instance.providerId !== "openrouter" && !isSubscription;
+  const isLocal = !needsKey && instance.providerId !== "openrouter";
   const docsUrl = PROVIDER_DOCS_URLS[instance.providerId] ?? providerInfo?.consoleUrl ?? "";
   const description = PROVIDER_DESCRIPTIONS[instance.providerId];
   const showNameField = sameProviderCount > 1 || instance.providerId === "openai-compatible";
@@ -56,10 +55,6 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<"ok" | "fail" | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Claude Subscription status
-  const [subscriptionStatus, setSubscriptionStatus] = useState<"checking" | "connected" | "disconnected" | null>(null);
-  const [subscriptionSource, setSubscriptionSource] = useState<string | null>(null);
 
   // Local config drafts
   const [baseUrl, setBaseUrl] = useState(instance.baseUrl ?? "");
@@ -73,20 +68,6 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
       void getInstanceKey(instance.id).then(setCurrentKey);
     }
   }, [instance.id, needsKey]);
-
-  useEffect(() => {
-    if (!isSubscription) return;
-    setSubscriptionStatus("checking");
-    invoke<{ access_token: string; source: string }>("ai_claude_credentials_read")
-      .then((creds) => {
-        setSubscriptionStatus("connected");
-        setSubscriptionSource(creds.source === "claude-code" ? "Claude Code CLI" : "Anthropic CLI (ant)");
-      })
-      .catch(() => {
-        setSubscriptionStatus("disconnected");
-        setSubscriptionSource(null);
-      });
-  }, [isSubscription]);
 
   const handleSaveKey = async () => {
     const trimmed = keyDraft.trim();
@@ -361,27 +342,6 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
             {saving ? <Spinner className="mr-1 size-3" /> : null}
             Save
           </Button>
-        </div>
-      )}
-
-      {/* Claude Subscription status */}
-      {isSubscription && (
-        <div className="flex items-center gap-2">
-          <span
-            className={`h-2 w-2 rounded-full flex-shrink-0 ${
-              subscriptionStatus === "connected"
-                ? "bg-green-500"
-                : subscriptionStatus === "disconnected"
-                  ? "bg-destructive"
-                  : "bg-muted-foreground animate-pulse"
-            }`}
-          />
-          <span className="text-[11.5px] text-muted-foreground">
-            {subscriptionStatus === "checking" && "Checking credentials…"}
-            {subscriptionStatus === "connected" && `Connected via ${subscriptionSource}`}
-            {subscriptionStatus === "disconnected" &&
-              "Not connected — run `claude login` or `ant auth login`"}
-          </span>
         </div>
       )}
 

@@ -1,40 +1,6 @@
 # Handshake — Session State
 
-## Last Session: 2026-06-19 (Anthropic Claude Subscription Provider)
-
-### What Was Done
-Added a new `"anthropic-subscription"` AI provider that authenticates via the locally installed Claude CLI (OAuth) instead of an API key.
-
-**Rust** (`src-tauri/src/modules/claude_auth.rs` — new):
-- `ai_claude_credentials_read` command: reads `~/.claude/.credentials.json` (Claude Code) or `~/.config/anthropic/credentials/default.json` (ant CLI)
-- Registered in `modules/mod.rs` and `lib.rs`
-
-**Frontend** (`src/modules/ai/`):
-- `config.ts`: new `"anthropic-subscription"` ProviderId, 3 subscription models (`claude-sub-haiku/sonnet/opus`), `apiModelId` field on ModelInfo, updated KEYLESS_PROVIDERS + CLOUD_PROVIDER_IDS
-- `lib/keyring.ts`: added `"anthropic-subscription": null` to EMPTY_PROVIDER_KEYS
-- `lib/agent.ts`: `buildWithSubscriptionAuth()` helper that invokes Tauri command and creates `createAnthropic({ authToken, headers: { "anthropic-beta": "oauth-2025-04-20" } })`. Both `buildLanguageModel` and `buildLanguageModelFromInstance` exit early for this provider.
-- `components/ModelPicker.tsx`: icon map updated
-- `settings/components/ProviderIcon.tsx`: icon map updated
-- `settings/components/ProviderInstanceCard.tsx`: special UI for subscription (live connection status pill instead of API key input)
-
-**Verification**: `cargo check` ✅ · `tsc --noEmit` ✅
-
-### Current State
-- Branch: `main`
-- All changes uncommitted (staged, ready to commit)
-- `cargo check` ✅ · `tsc --noEmit` ✅
-
-### What's Next
-- Commit changes
-- Test manually: add "Claude Subscription" provider in Settings → AI, verify connection status shows correctly, try chatting with a subscription model
-- Edge case: what happens when the OAuth token is expired (user hasn't run `claude` recently) — should show clear error message
-
-### Blockers
-- None
-
----
-
-## Previous Session: 2026-06-18 (Source Control System — Full Audit Fix Pass)
+## Last Session: 2026-06-18 (Source Control System — Full Audit Fix Pass)
 
 ### What Was Done
 Comprehensive audit of the source control system found 25 issues. All 25 fixed across 6 sequential subagents + 1 notification agent. `cargo check` ✅ · `tsc --noEmit` ✅
