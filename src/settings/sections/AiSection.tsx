@@ -27,6 +27,7 @@ import { AGENT_ICONS } from "@/modules/ai/components/AgentSwitcher";
 import {
   AUTOCOMPLETE_PROVIDERS,
   DEFAULT_AUTOCOMPLETE_MODEL,
+  DEFAULT_MODEL_ID,
   MODELS,
   PROVIDERS,
   getModel,
@@ -195,7 +196,14 @@ function DefaultsContent() {
   const instanceKeys = useProvidersStore((s) => s.instanceKeys);
   const instances = useProvidersStore((s) => s.instances);
 
-  const defaultModelInfo = getModel(defaultModel);
+  // Guard against stale model IDs left over from reverted features
+  const isValidModel = MODELS.some((m) => m.id === (defaultModel as string));
+  const safeModel: ModelId = isValidModel ? defaultModel : DEFAULT_MODEL_ID;
+  const defaultModelInfo = getModel(safeModel);
+
+  useEffect(() => {
+    if (!isValidModel) void setDefaultModel(DEFAULT_MODEL_ID);
+  }, [isValidModel]);
 
   // Determine if a provider has at least one configured instance with a key
   const providerHasKey = (id: ProviderId): boolean => {
@@ -275,7 +283,7 @@ function DefaultsContent() {
                       onSelect={() => isEnabled && void setDefaultModel(m.id as ModelId)}
                       className={cn(
                         "flex items-center justify-between gap-2 text-[12px]",
-                        m.id === defaultModel && "bg-accent/50",
+                        m.id === safeModel && "bg-accent/50",
                       )}
                     >
                       <span className="flex flex-col">
@@ -341,9 +349,12 @@ function DefaultsContent() {
 /* ── Providers ───────────────────────────────────────────────────── */
 
 function ProvidersContent() {
-  const instances = useProvidersStore((s) => s.instances);
+  const allInstances = useProvidersStore((s) => s.instances);
   const hydrated = useProvidersStore((s) => s.hydrated);
   const add = useProvidersStore((s) => s.add);
+
+  const knownProviderIds = new Set(PROVIDERS.map((p) => p.id));
+  const instances = allInstances.filter((i) => knownProviderIds.has(i.providerId));
 
   return (
     <div className="flex flex-col gap-4">
