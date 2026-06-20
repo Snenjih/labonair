@@ -12,6 +12,7 @@ use tauri::ipc::Channel;
 use super::shell_init;
 
 const FLUSH_INTERVAL: Duration = Duration::from_millis(8);
+const FAST_FLUSH_INTERVAL: Duration = Duration::from_millis(1);
 const READ_BUF: usize = 16 * 1024;
 // Cap on buffered-but-not-yet-flushed bytes. On overflow we discard the
 // entire pending buffer and emit an SGR-reset + notice in its place.
@@ -122,30 +123,38 @@ pub fn spawn(
     let done_f = done.clone();
     thread::Builder::new()
         .name("nexum-pty-flusher".into())
-        .spawn(move || loop {
-            thread::sleep(FLUSH_INTERVAL);
-            let chunk = {
-                let mut g = pending_f.lock().unwrap();
-                if g.is_empty() {
-                    if done_f.load(Ordering::Acquire) {
-                        break;
+        .spawn(move || {
+            // Sleep shorter after a successful flush so high-throughput output
+            // is visible sooner. Back off to the idle interval when the buffer
+            // is empty to avoid unnecessary wakeups.
+            let mut had_data = false;
+            loop {
+                thread::sleep(if had_data { FAST_FLUSH_INTERVAL } else { FLUSH_INTERVAL });
+                let chunk = {
+                    let mut g = pending_f.lock().unwrap();
+                    if g.is_empty() {
+                        had_data = false;
+                        if done_f.load(Ordering::Acquire) {
+                            break;
+                        }
+                        continue;
                     }
-                    continue;
+                    std::mem::take(&mut *g)
+                };
+                had_data = true;
+                // NOTE on base64: Tauri v2 `Channel<T>` serializes via JSON;
+                // `Vec<u8>` would become a JSON int array (~3× worse than base64).
+                // A raw-bytes path via `InvokeResponseBody::Raw` exists but the
+                // data+exit multiplex through one channel is awkward. Base64's 33%
+                // overhead is trivial on local IPC — revisit if profiling says
+                // otherwise.
+                let event = PtyEvent::Data {
+                    data: B64.encode(&chunk),
+                };
+                if let Err(e) = on_event_flush.send(event) {
+                    log::debug!("pty flusher exiting, channel closed: {e}");
+                    break;
                 }
-                std::mem::take(&mut *g)
-            };
-            // NOTE on base64: Tauri v2 `Channel<T>` serializes via JSON;
-            // `Vec<u8>` would become a JSON int array (~3× worse than base64).
-            // A raw-bytes path via `InvokeResponseBody::Raw` exists but the
-            // data+exit multiplex through one channel is awkward. Base64's 33%
-            // overhead is trivial on local IPC — revisit if profiling says
-            // otherwise.
-            let event = PtyEvent::Data {
-                data: B64.encode(&chunk),
-            };
-            if let Err(e) = on_event_flush.send(event) {
-                log::debug!("pty flusher exiting, channel closed: {e}");
-                break;
             }
         })
         .expect("spawn pty flusher thread");

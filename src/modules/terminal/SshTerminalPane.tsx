@@ -46,6 +46,14 @@ const FONT_WEIGHT_MAP: Record<string, string | number> = {
   bold: "bold",
 };
 
+let _bellAudioCtx: AudioContext | null = null;
+function getBellAudioContext(): AudioContext {
+  if (!_bellAudioCtx || _bellAudioCtx.state === "closed") {
+    _bellAudioCtx = new AudioContext();
+  }
+  return _bellAudioCtx;
+}
+
 const ANSI_RE = /\x1B\[[0-9;]*[mGKHFJA-Za-z]|\x1B\][^\x07]*\x07|\x1B[@-_][0-?]*[ -/]*[@-~]/g;
 const SUDO_PROMPT_RE = /\[sudo\] password for [^:]+:|sudo password:/i;
 const TAIL_MAX = 300;
@@ -384,27 +392,30 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         }
 
         if (session.hostId) {
-          const stripped = stripAnsi(data);
-          outputTailRef.current = (outputTailRef.current + stripped).slice(-TAIL_MAX);
+          const capturedData = data;
+          setTimeout(() => {
+            const stripped = stripAnsi(capturedData);
+            outputTailRef.current = (outputTailRef.current + stripped).slice(-TAIL_MAX);
 
-          if (SUDO_PROMPT_RE.test(outputTailRef.current)) {
-            if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
-            sudoDebounceRef.current = setTimeout(async () => {
-              sudoDebounceRef.current = null;
-              if (sudoPopupRef.current) return;
-              try {
-                const pw = await invoke<string | null>("get_sudo_password", { hostId: session.hostId });
-                if (!pw) return;
-                sudoPasswordRef.current = pw;
-                const pos = term && containerRef.current
-                  ? getCursorPixelPos(term, containerRef.current)
-                  : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-                showSudoPopup(pos);
-              } catch {
-                // keychain unavailable — silent no-op
-              }
-            }, 300);
-          }
+            if (SUDO_PROMPT_RE.test(outputTailRef.current)) {
+              if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
+              sudoDebounceRef.current = setTimeout(async () => {
+                sudoDebounceRef.current = null;
+                if (sudoPopupRef.current) return;
+                try {
+                  const pw = await invoke<string | null>("get_sudo_password", { hostId: session.hostId });
+                  if (!pw) return;
+                  sudoPasswordRef.current = pw;
+                  const pos = term && containerRef.current
+                    ? getCursorPixelPos(term, containerRef.current)
+                    : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+                  showSudoPopup(pos);
+                } catch {
+                  // keychain unavailable — silent no-op
+                }
+              }, 300);
+            }
+          }, 0);
         }
       }).then((unlisten) => cleanups.push(unlisten));
 
@@ -482,7 +493,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         t.onBell(() => {
           if (!usePreferencesStore.getState().terminalBell) return;
           try {
-            const ctx = new AudioContext();
+            const ctx = getBellAudioContext();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
@@ -492,7 +503,6 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
             osc.start(ctx.currentTime);
             osc.stop(ctx.currentTime + 0.15);
-            osc.onended = () => ctx.close();
           } catch { /* ignore AudioContext errors */ }
         });
 

@@ -4,6 +4,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tauri::Emitter;
 
+const SSH_BATCH_BYTES: usize = 16 * 1024;
+const SSH_BATCH_MS: Duration = Duration::from_millis(4);
+
 #[tauri::command]
 pub fn ssh_pty_write(
     session_id: String,
@@ -91,6 +94,12 @@ pub fn open_shell_channel(
         // (e.g. Latin-1 bytes, binary) are replaced with U+FFFD via flush_carry.
         let mut carry: Vec<u8> = Vec::new();
 
+        // Output accumulator: batch small reads into fewer IPC events.
+        // Flushed when the buffer reaches SSH_BATCH_BYTES or SSH_BATCH_MS elapses,
+        // whichever comes first.
+        let mut pending_output = String::new();
+        let mut last_flush = Instant::now();
+
         loop {
             if shutdown_clone.load(Ordering::Relaxed) {
                 break; // clean shutdown via ssh_disconnect
@@ -115,7 +124,7 @@ pub fn open_shell_channel(
                     break;
                 }
 
-                let mut buf = [0u8; 4096];
+                let mut buf = [0u8; 32768];
                 match ch.read(&mut buf) {
                     Ok(0) => None,
                     Ok(n) => {
@@ -132,14 +141,19 @@ pub fn open_shell_channel(
             };
 
             if let Some(output) = data {
-                let _ = app_clone.emit(
-                    "ssh_pty_output",
-                    serde_json::json!({
-                        "session_id": session_id_clone,
-                        "data": output
-                    }),
-                );
+                pending_output.push_str(&output);
+                let should_flush = pending_output.len() >= SSH_BATCH_BYTES
+                    || last_flush.elapsed() >= SSH_BATCH_MS;
+                if should_flush {
+                    emit_ssh_output(&app_clone, &session_id_clone, std::mem::take(&mut pending_output));
+                    last_flush = Instant::now();
+                }
             } else {
+                // WouldBlock / idle — flush pending output if the timer elapsed.
+                if !pending_output.is_empty() && last_flush.elapsed() >= SSH_BATCH_MS {
+                    emit_ssh_output(&app_clone, &session_id_clone, std::mem::take(&mut pending_output));
+                    last_flush = Instant::now();
+                }
                 if last_keepalive.elapsed() >= ka_interval {
                     let session_arc_opt = {
                         match state.0.lock() {
@@ -173,6 +187,12 @@ pub fn open_shell_channel(
                 }
                 std::thread::sleep(Duration::from_millis(5));
             }
+        }
+
+        // Flush any remaining buffered output before the disconnect event so no
+        // bytes are lost when the connection closes mid-stream.
+        if !pending_output.is_empty() {
+            emit_ssh_output(&app_clone, &session_id_clone, pending_output);
         }
 
         // Emit disconnect event only for unexpected exits.
@@ -238,6 +258,13 @@ fn flush_carry(carry: &mut Vec<u8>) -> Option<String> {
         }
     }
     if out.is_empty() { None } else { Some(out) }
+}
+
+fn emit_ssh_output(app: &tauri::AppHandle, session_id: &str, data: String) {
+    let _ = app.emit(
+        "ssh_pty_output",
+        serde_json::json!({ "session_id": session_id, "data": data }),
+    );
 }
 
 fn humanize_disconnect_reason(raw: &str) -> String {

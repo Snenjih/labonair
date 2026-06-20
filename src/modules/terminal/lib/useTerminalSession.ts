@@ -37,6 +37,14 @@ const FONT_WEIGHT_MAP: Record<string, string | number> = {
   bold: "bold",
 };
 
+let _bellAudioCtx: AudioContext | null = null;
+function getBellAudioContext(): AudioContext {
+  if (!_bellAudioCtx || _bellAudioCtx.state === "closed") {
+    _bellAudioCtx = new AudioContext();
+  }
+  return _bellAudioCtx;
+}
+
 export function useTerminalSession({
   container,
   visible,
@@ -193,7 +201,7 @@ export function useTerminalSession({
       term.onBell(() => {
         if (!usePreferencesStore.getState().terminalBell) return;
         try {
-          const ctx = new AudioContext();
+          const ctx = getBellAudioContext();
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.connect(gain);
@@ -203,7 +211,6 @@ export function useTerminalSession({
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
           osc.start(ctx.currentTime);
           osc.stop(ctx.currentTime + 0.15);
-          osc.onended = () => ctx.close();
         } catch { /* ignore AudioContext errors */ }
       });
 
