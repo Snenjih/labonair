@@ -66,7 +66,6 @@ import {
   setAiMaxAgentSteps,
   setAiTerminalContextLines,
   setAiTemperature,
-  setAiModelPickerOnlyConfigured,
 } from "@/modules/settings/store";
 import {
   Add01Icon,
@@ -391,7 +390,6 @@ function ProvidersContent() {
 function GeneralContent() {
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   const aiWarnDestructiveCommands = usePreferencesStore((s) => s.aiWarnDestructiveCommands);
-  const onlyConfigured = usePreferencesStore((s) => s.aiModelPickerOnlyConfigured);
   return (
     <div className="flex flex-col gap-4">
       <SettingRow
@@ -410,15 +408,6 @@ function GeneralContent() {
         <Switch
           checked={aiWarnDestructiveCommands}
           onCheckedChange={(v) => void setAiWarnDestructiveCommands(v)}
-        />
-      </SettingRow>
-      <SettingRow
-        title="Show only configured providers"
-        description="Hide models from providers without an API key in the model picker."
-      >
-        <Switch
-          checked={onlyConfigured}
-          onCheckedChange={(v) => void setAiModelPickerOnlyConfigured(v)}
         />
       </SettingRow>
     </div>

@@ -156,7 +156,6 @@ export type Preferences = {
   aiTerminalContextLines: number;
   aiTemperature: number;
   aiWarnDestructiveCommands: boolean;
-  aiModelPickerOnlyConfigured: boolean;
 
   // --- Terminal (input / scrolling) ---
   terminalCopyOnSelect: boolean;
@@ -302,7 +301,6 @@ const KEY_AI_MAX_AGENT_STEPS = "aiMaxAgentSteps";
 const KEY_AI_TERMINAL_CONTEXT_LINES = "aiTerminalContextLines";
 const KEY_AI_TEMPERATURE = "aiTemperature";
 const KEY_AI_WARN_DESTRUCTIVE = "aiWarnDestructiveCommands";
-const KEY_AI_MODEL_PICKER_ONLY_CONFIGURED = "aiModelPickerOnlyConfigured";
 const KEY_TERMINAL_COPY_ON_SELECT = "terminalCopyOnSelect";
 const KEY_TERMINAL_RIGHT_CLICK_PASTES = "terminalRightClickPastes";
 const KEY_TERMINAL_WORD_SEPARATOR = "terminalWordSeparator";
@@ -432,7 +430,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   aiTerminalContextLines: 300,
   aiTemperature: 0.7,
   aiWarnDestructiveCommands: true,
-  aiModelPickerOnlyConfigured: false,
 
   terminalCopyOnSelect: false,
   terminalRightClickPastes: false,
@@ -752,8 +749,6 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_AI_TEMPERATURE) ?? DEFAULT_PREFERENCES.aiTemperature,
     aiWarnDestructiveCommands:
       get<boolean>(KEY_AI_WARN_DESTRUCTIVE) ?? DEFAULT_PREFERENCES.aiWarnDestructiveCommands,
-    aiModelPickerOnlyConfigured:
-      get<boolean>(KEY_AI_MODEL_PICKER_ONLY_CONFIGURED) ?? DEFAULT_PREFERENCES.aiModelPickerOnlyConfigured,
     terminalCopyOnSelect:
       get<boolean>(KEY_TERMINAL_COPY_ON_SELECT) ?? DEFAULT_PREFERENCES.terminalCopyOnSelect,
     terminalRightClickPastes:
@@ -1282,11 +1277,6 @@ export async function setAiWarnDestructiveCommands(value: boolean): Promise<void
   await (await getStore()).save();
 }
 
-export async function setAiModelPickerOnlyConfigured(value: boolean): Promise<void> {
-  await (await getStore()).set(KEY_AI_MODEL_PICKER_ONLY_CONFIGURED, value);
-  await (await getStore()).save();
-}
-
 export async function setTerminalCopyOnSelect(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_COPY_ON_SELECT, value);
   await (await getStore()).save();
@@ -1545,7 +1535,6 @@ export async function onPreferencesChange(
     [KEY_AI_TERMINAL_CONTEXT_LINES]: "aiTerminalContextLines",
     [KEY_AI_TEMPERATURE]: "aiTemperature",
     [KEY_AI_WARN_DESTRUCTIVE]: "aiWarnDestructiveCommands",
-    [KEY_AI_MODEL_PICKER_ONLY_CONFIGURED]: "aiModelPickerOnlyConfigured",
     [KEY_TERMINAL_COPY_ON_SELECT]: "terminalCopyOnSelect",
     [KEY_TERMINAL_RIGHT_CLICK_PASTES]: "terminalRightClickPastes",
     [KEY_TERMINAL_WORD_SEPARATOR]: "terminalWordSeparator",

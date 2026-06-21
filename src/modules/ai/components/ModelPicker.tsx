@@ -21,7 +21,9 @@ import {
   GoogleGeminiIcon,
   GridViewIcon,
   Grok02Icon,
+  Loading03Icon,
   MistralIcon,
+  RefreshIcon,
   Search01Icon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -32,15 +34,15 @@ import {
   MODELS,
   PROVIDERS,
   providerNeedsKey,
+  type DynamicModelInfo,
   type ModelId,
   type ModelInfo,
   type ProviderId,
-  getModel,
 } from "../config";
 import { useChatStore } from "../store/chatStore";
 import { useProvidersStore } from "../store/providersStore";
+import { useModelCacheStore } from "../store/modelCacheStore";
 import { makeModelRef, parseModelRef } from "../lib/modelRef";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 
 const PROVIDER_ICON: Record<ProviderId, typeof ChatGptIcon> = {
   openai: ChatGptIcon,
@@ -132,12 +134,14 @@ function ProviderButton({
   label,
   onClick,
   hasKey,
+  loading,
 }: {
   icon: typeof GridViewIcon;
   active: boolean;
   label: string;
   onClick: () => void;
   hasKey: boolean;
+  loading?: boolean;
 }) {
   return (
     <button
@@ -159,7 +163,12 @@ function ProviderButton({
         />
       )}
       <HugeiconsIcon icon={icon} size={14} strokeWidth={1.5} />
-      {!hasKey && (
+      {loading && (
+        <span className="absolute bottom-0.5 right-0.5 size-2 rounded-full bg-background flex items-center justify-center">
+          <HugeiconsIcon icon={Loading03Icon} size={8} strokeWidth={2} className="animate-spin text-muted-foreground/60" />
+        </span>
+      )}
+      {!loading && !hasKey && (
         <span className="absolute bottom-1 right-1 size-1.5 rounded-full bg-warning/80 ring-1 ring-card" />
       )}
     </button>
@@ -176,7 +185,7 @@ function ModelRow({
   onSelect,
   onToggleFavorite,
 }: {
-  model: ModelInfo;
+  model: ModelInfo & { instanceId?: string | null; instanceName?: string | null };
   index: number;
   selected: boolean;
   hasKey: boolean;
@@ -272,17 +281,45 @@ function ModelRow({
   );
 }
 
-function resolveInstanceLabel(m: ModelInfo, inst: { name: string; providerId: string }): string {
-  if (m.provider !== "openai-compatible") return m.label;
-  const isDefault = inst.name === inst.providerId || /^[a-z-]+\d+$/.test(inst.name);
-  return isDefault ? m.label : inst.name;
+function SkeletonRow() {
+  return (
+    <div className="flex items-center gap-2 px-2 py-[7px] animate-pulse">
+      <div className="w-4 h-3 rounded bg-muted/40 shrink-0" />
+      <div className="w-3 h-3 rounded bg-muted/40 shrink-0" />
+      <div className="flex-1 h-3 rounded bg-muted/40" />
+      <div className="w-12 h-3 rounded bg-muted/30 shrink-0" />
+    </div>
+  );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+function ErrorRow({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2">
+      <span className="flex-1 text-[11px] text-destructive/70 truncate" title={message}>
+        {message}
+      </span>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="text-[10.5px] text-muted-foreground/60 hover:text-foreground underline-offset-2 hover:underline shrink-0 transition-colors"
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
+
+// ── Types ──────────────────────────────────────────────────────────────────────
 
 type Tab = "all" | "favorites" | "recent";
 
-type ExpandedModel = ModelInfo & { instanceId: string | null; instanceName: string | null };
+type ExpandedModel = ModelInfo & {
+  instanceId: string | null;
+  instanceName: string | null;
+  isDynamic?: boolean;
+};
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export function ModelPicker() {
   const selected = useChatStore((s) => s.selectedModelId);
@@ -295,7 +332,7 @@ export function ModelPicker() {
   const instances = useProvidersStore((s) => s.instances);
   const instanceKeys = useProvidersStore((s) => s.instanceKeys);
 
-  const onlyConfigured = usePreferencesStore((s) => s.aiModelPickerOnlyConfigured);
+  const modelCache = useModelCacheStore();
 
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -304,29 +341,44 @@ export function ModelPicker() {
 
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Determine if a provider has any configured instance with a key
+  // ── Provider key checks ──────────────────────────────────────────────────────
+
   const providerHasKeyFn = (providerId: ProviderId): boolean => {
     if (!providerNeedsKey(providerId)) return true;
-    // Check new instance system first
     const provInstances = instances.filter((i) => i.providerId === providerId);
     if (provInstances.length > 0) return provInstances.some((i) => !!instanceKeys[i.id]);
-    // Fallback to old apiKeys
     return !!apiKeys[providerId];
   };
 
+  // ── Selected model display ───────────────────────────────────────────────────
+
   const { modelDefId: selectedModelDefId, instanceId: selectedInstanceId } = parseModelRef(selected);
-  const current = getModel(selectedModelDefId as ModelId);
-  const hasKey = providerHasKeyFn(current.provider);
+
+  const selectedDynamic = useMemo<DynamicModelInfo | null>(() => {
+    if (!selectedInstanceId) return null;
+    const cached = modelCache.getModelsForInstance(selectedInstanceId);
+    return cached.find((m) => m.id === selectedModelDefId) ?? null;
+  }, [selectedModelDefId, selectedInstanceId, modelCache]);
+
+  const selectedStatic = useMemo<ModelInfo | null>(() => {
+    return (MODELS as readonly ModelInfo[]).find((m) => m.id === selectedModelDefId) ?? null;
+  }, [selectedModelDefId]);
+
+  const currentModel: ModelInfo | null = selectedDynamic ?? selectedStatic;
+  const currentProvider = (currentModel?.provider ?? null) as ProviderId | null;
+  const hasKey = currentProvider ? providerHasKeyFn(currentProvider) : false;
 
   const triggerLabel = useMemo(() => {
-    if (current.provider !== "openai-compatible") return current.label;
-    const inst =
-      instances.find((i) => i.id === selectedInstanceId) ??
+    if (!currentModel) return selectedModelDefId || "Select model";
+    if (currentModel.provider !== "openai-compatible") return currentModel.label;
+    const inst = instances.find((i) => i.id === selectedInstanceId) ??
       instances.find((i) => i.providerId === "openai-compatible");
-    if (!inst) return current.label;
+    if (!inst) return currentModel.label;
     const isDefault = inst.name === inst.providerId || /^[a-z-]+\d+$/.test(inst.name);
-    return isDefault ? current.label : inst.name;
-  }, [current, selectedInstanceId, instances]);
+    return isDefault ? currentModel.label : inst.name;
+  }, [currentModel, selectedModelDefId, selectedInstanceId, instances]);
+
+  // ── Keyboard / focus ─────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (open) {
@@ -339,40 +391,70 @@ export function ModelPicker() {
     }
   }, [open]);
 
-  const providersWithModels = useMemo(
-    () => PROVIDERS.filter((p) => {
-      const hasModels = MODELS.some((m) => m.provider === p.id);
-      if (!hasModels) return false;
-      if (onlyConfigured && !providerHasKeyFn(p.id)) return false;
-      return true;
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onlyConfigured, apiKeys, instances, instanceKeys],
-  );
+  // ── Providers that have instances (always "only configured") ──────────────────
 
-  // Expand models to include per-instance entries when multiple instances exist.
-  const expandedModels = useMemo<ExpandedModel[]>(() => {
-    const out: ExpandedModel[] = [];
-    for (const m of MODELS as readonly ModelInfo[]) {
-      const provInstances = instances.filter((i) => i.providerId === m.provider);
-      if (provInstances.length > 1) {
-        for (const inst of provInstances) {
-          const label = resolveInstanceLabel(m, inst);
-          out.push({ ...m, label, instanceId: inst.id, instanceName: inst.name });
-        }
-      } else {
-        const inst = provInstances[0];
-        const label = inst ? resolveInstanceLabel(m, inst) : m.label;
-        out.push({ ...m, label, instanceId: inst?.id ?? null, instanceName: null });
+  const configuredProviders = useMemo(() => {
+    const seen = new Set<ProviderId>();
+    const out: typeof PROVIDERS[number][] = [];
+    for (const inst of instances) {
+      if (!seen.has(inst.providerId)) {
+        seen.add(inst.providerId);
+        const info = PROVIDERS.find((p) => p.id === inst.providerId);
+        if (info) out.push(info);
       }
     }
     return out;
   }, [instances]);
 
+  // ── Build model list from cache (dynamic) or static fallback ─────────────────
+
+  const expandedModels = useMemo<ExpandedModel[]>(() => {
+    if (instances.length === 0) return [];
+
+    const out: ExpandedModel[] = [];
+
+    for (const inst of instances) {
+      const cached = modelCache.getModelsForInstance(inst.id);
+      const isLoading = modelCache.isLoading(inst.id);
+
+      if (cached.length > 0) {
+        // Use fetched models
+        const sameProviderInstances = instances.filter((i) => i.providerId === inst.providerId);
+        const showInstanceName = sameProviderInstances.length > 1;
+        for (const m of cached) {
+          out.push({
+            ...m,
+            instanceId: inst.id,
+            instanceName: showInstanceName ? inst.name : null,
+            isDynamic: true,
+          });
+        }
+      } else if (!isLoading) {
+        // No cache yet and not loading — use static fallback for this provider
+        const staticModels = (MODELS as readonly ModelInfo[]).filter(
+          (m) => m.provider === inst.providerId,
+        );
+        const sameProviderInstances = instances.filter((i) => i.providerId === inst.providerId);
+        const showInstanceName = sameProviderInstances.length > 1;
+        for (const m of staticModels) {
+          out.push({
+            ...m,
+            instanceId: inst.id,
+            instanceName: showInstanceName ? inst.name : null,
+            isDynamic: false,
+          });
+        }
+      }
+      // If loading: no rows added here — skeleton rows are rendered separately
+    }
+
+    return out;
+  }, [instances, modelCache]);
+
+  // ── Filter models ─────────────────────────────────────────────────────────────
+
   const filtered = useMemo<ExpandedModel[]>(() => {
-    let list = onlyConfigured
-      ? expandedModels.filter((m) => providerHasKeyFn(m.provider as ProviderId))
-      : expandedModels;
+    let list = expandedModels;
 
     if (tab === "favorites") {
       list = list.filter((m) => favorites.includes(m.id));
@@ -403,8 +485,20 @@ export function ModelPicker() {
     }
 
     return list;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, activeProvider, search, favorites, recents, onlyConfigured, apiKeys, expandedModels, instances, instanceKeys]);
+  }, [tab, activeProvider, search, favorites, recents, expandedModels]);
+
+  // ── Check if any visible provider is loading ──────────────────────────────────
+
+  const loadingInstances = useMemo(() => {
+    return instances.filter((inst) => {
+      if (activeProvider && inst.providerId !== activeProvider) return false;
+      return modelCache.isLoading(inst.id);
+    });
+  }, [instances, activeProvider, modelCache]);
+
+  const isRefreshing = modelCache.isAnyLoading();
+
+  // ── Actions ───────────────────────────────────────────────────────────────────
 
   const onPick = (m: ExpandedModel) => {
     if (!providerHasKeyFn(m.provider as ProviderId)) {
@@ -416,6 +510,22 @@ export function ModelPicker() {
     setSelected(ref as ModelId);
     setOpen(false);
   };
+
+  const handleRefresh = () => {
+    for (const inst of instances) {
+      modelCache.invalidate(inst.id);
+    }
+    void modelCache.fetchAllConfigured(instances, instanceKeys);
+  };
+
+  const handleRetryInstance = (instanceId: string) => {
+    const inst = instances.find((i) => i.id === instanceId);
+    if (!inst) return;
+    modelCache.invalidate(instanceId);
+    void modelCache.fetchForInstance(inst, instanceKeys[instanceId] ?? null);
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -447,7 +557,7 @@ export function ModelPicker() {
         className="w-[460px] p-0 overflow-hidden flex flex-col"
         style={{ maxHeight: "min(540px, calc(100vh - 80px))" }}
       >
-        {/* Search */}
+        {/* Search + refresh */}
         <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
           <HugeiconsIcon
             icon={Search01Icon}
@@ -483,6 +593,19 @@ export function ModelPicker() {
               </motion.button>
             )}
           </AnimatePresence>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            title="Refresh model list"
+            className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+          >
+            <HugeiconsIcon
+              icon={isRefreshing ? Loading03Icon : RefreshIcon}
+              size={12}
+              strokeWidth={1.75}
+              className={cn(isRefreshing && "animate-spin")}
+            />
+          </button>
         </div>
 
         {/* Tabs */}
@@ -522,69 +645,122 @@ export function ModelPicker() {
               label="All providers"
               onClick={() => setActiveProvider(null)}
               hasKey
+              loading={isRefreshing && activeProvider === null}
             />
             <div className="mx-2 my-0.5 h-px bg-border/50" />
-            {providersWithModels.map((p) => (
-              <ProviderButton
-                key={p.id}
-                icon={PROVIDER_ICON[p.id]}
-                active={activeProvider === p.id}
-                label={p.label}
-                onClick={() =>
-                  setActiveProvider(activeProvider === p.id ? null : p.id)
-                }
-                hasKey={providerHasKeyFn(p.id)}
-              />
-            ))}
+            {configuredProviders.map((p) => {
+              const provInstances = instances.filter((i) => i.providerId === p.id);
+              const isProviderLoading = provInstances.some((i) => modelCache.isLoading(i.id));
+              return (
+                <ProviderButton
+                  key={p.id}
+                  icon={PROVIDER_ICON[p.id]}
+                  active={activeProvider === p.id}
+                  label={p.label}
+                  onClick={() =>
+                    setActiveProvider(activeProvider === p.id ? null : p.id)
+                  }
+                  hasKey={providerHasKeyFn(p.id)}
+                  loading={isProviderLoading}
+                />
+              );
+            })}
           </div>
 
           {/* Model List */}
           <div className="flex-1 overflow-y-auto py-1">
-            {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full gap-2">
-                <span className="text-[12px] text-muted-foreground/60">No models found</span>
-                {tab !== "all" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTab("all");
-                      setActiveProvider(null);
-                    }}
-                    className="text-[11px] text-muted-foreground/40 hover:text-muted-foreground underline-offset-2 hover:underline transition-colors"
-                  >
-                    Show all models
-                  </button>
-                )}
+            {instances.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-2 px-4 text-center">
+                <span className="text-[12px] text-muted-foreground/60">No providers configured</span>
+                <button
+                  type="button"
+                  onClick={() => { void openSettingsWindow("ai"); setOpen(false); }}
+                  className="text-[11px] text-muted-foreground/40 hover:text-muted-foreground underline-offset-2 hover:underline transition-colors"
+                >
+                  Add a provider in Settings
+                </button>
               </div>
             ) : (
-              filtered.map((m, i) => {
-                const ref = makeModelRef(m.id, m.instanceId ?? undefined);
-                const isSelected = selected === ref || (m.instanceName === null && selected === m.id);
-                return (
-                  <div key={`${m.id}-${m.instanceId ?? "single"}`}>
-                    {m.instanceName && (
-                      <div className="px-3 pb-0.5 pt-2 first:pt-1">
-                        <span className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[9.5px] text-muted-foreground">
-                          {m.instanceName}
-                        </span>
-                      </div>
-                    )}
-                    <ModelRow
-                      model={m}
-                      index={i}
-                      selected={isSelected}
-                      hasKey={m.instanceId ? !!instanceKeys[m.instanceId] : providerHasKeyFn(m.provider as ProviderId)}
-                      isFavorite={favorites.includes(m.id)}
-                      providerIcon={PROVIDER_ICON[m.provider as ProviderId] ?? ComputerIcon}
-                      onSelect={() => onPick(m)}
-                      onToggleFavorite={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(m.id);
-                      }}
+              <>
+                {/* Error rows per loading-failed instance */}
+                {instances
+                  .filter((inst) => {
+                    if (activeProvider && inst.providerId !== activeProvider) return false;
+                    return modelCache.getError(inst.id) !== null;
+                  })
+                  .map((inst) => (
+                    <ErrorRow
+                      key={inst.id}
+                      message={`${inst.name}: ${modelCache.getError(inst.id)}`}
+                      onRetry={() => handleRetryInstance(inst.id)}
                     />
+                  ))}
+
+                {/* Skeleton rows for loading instances */}
+                {loadingInstances.map((inst) => (
+                  <div key={inst.id}>
+                    <SkeletonRow />
+                    <SkeletonRow />
+                    <SkeletonRow />
                   </div>
-                );
-              })
+                ))}
+
+                {/* Model rows */}
+                {filtered.length === 0 && loadingInstances.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-2">
+                    <span className="text-[12px] text-muted-foreground/60">No models found</span>
+                    {tab !== "all" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTab("all");
+                          setActiveProvider(null);
+                        }}
+                        className="text-[11px] text-muted-foreground/40 hover:text-muted-foreground underline-offset-2 hover:underline transition-colors"
+                      >
+                        Show all models
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  filtered.map((m, i) => {
+                    const ref = makeModelRef(m.id, m.instanceId ?? undefined);
+                    const isSelected =
+                      selected === ref ||
+                      (m.instanceName === null && selected === m.id);
+                    return (
+                      <div key={`${m.id}-${m.instanceId ?? "single"}`}>
+                        {m.instanceName && (
+                          <div className="px-3 pb-0.5 pt-2 first:pt-1">
+                            <span className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[9.5px] text-muted-foreground">
+                              {m.instanceName}
+                            </span>
+                          </div>
+                        )}
+                        <ModelRow
+                          model={m}
+                          index={i}
+                          selected={isSelected}
+                          hasKey={
+                            m.instanceId
+                              ? !!instanceKeys[m.instanceId]
+                              : providerHasKeyFn(m.provider as ProviderId)
+                          }
+                          isFavorite={favorites.includes(m.id)}
+                          providerIcon={
+                            PROVIDER_ICON[m.provider as ProviderId] ?? ComputerIcon
+                          }
+                          onSelect={() => onPick(m)}
+                          onToggleFavorite={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(m.id);
+                          }}
+                        />
+                      </div>
+                    );
+                  })
+                )}
+              </>
             )}
           </div>
         </div>

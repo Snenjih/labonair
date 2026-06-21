@@ -141,6 +141,12 @@ export type ModelInfo = {
   tags?: readonly ModelTag[];
 };
 
+/** A model fetched live from a provider's API, bound to a specific instance. */
+export type DynamicModelInfo = ModelInfo & {
+  instanceId: string;
+  source: "api";
+};
+
 export const MODELS = [
   // OpenAI
   {
