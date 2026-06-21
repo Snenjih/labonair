@@ -16,6 +16,11 @@ import {
   setZenModeShowHeader,
   setZenModeShowStatusbar,
 } from "@/modules/settings/store";
+import {
+  STATUSBAR_ITEM_REGISTRY,
+  STATUSBAR_ITEM_SETTERS,
+  type StatusBarItemDescriptor,
+} from "@/modules/statusbar/lib/statusBarItems";
 import type { ThemePref } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import { SectionHeader } from "../components/SectionHeader";
@@ -565,6 +570,11 @@ export function AppearanceSection() {
             onCheckedChange={(v) => void setZenModeShowStatusbar(v)}
           />
         </SettingRow>
+        <div className="h-px bg-border/40" />
+        <span className="text-[11px] font-medium text-muted-foreground">Status Bar Items</span>
+        {STATUSBAR_ITEM_REGISTRY.map((item) => (
+          <StatusBarItemRow key={item.id} descriptor={item} />
+        ))}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -646,6 +656,18 @@ function SelectedBadge() {
         />
       </svg>
     </div>
+  );
+}
+
+function StatusBarItemRow({ descriptor }: { descriptor: StatusBarItemDescriptor }) {
+  const enabled = usePreferencesStore((s) => s[descriptor.prefKey] as boolean);
+  return (
+    <SettingRow title={descriptor.label} description={descriptor.description}>
+      <Switch
+        checked={enabled}
+        onCheckedChange={(v) => void STATUSBAR_ITEM_SETTERS[descriptor.id](v)}
+      />
+    </SettingRow>
   );
 }
 

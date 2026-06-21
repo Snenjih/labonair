@@ -191,6 +191,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
               <StatusBar
                 home={ctrl.home}
                 onCd={tabs.sendCd}
+                onCdInNewTab={tabs.cdInNewTab}
                 onOpenMini={ctrl.openMini}
                 hasComposer={prefs.aiEnabled && ctrl.hasComposer}
                 detectedPreviewUrl={ctrl.detectedPreviewUrl}
