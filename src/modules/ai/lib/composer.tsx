@@ -214,6 +214,13 @@ export function AiComposerProvider({ children }: ProviderProps) {
       // Open the AI panel & focus the input so the user sees the chip.
       useChatStore.getState().focusInput();
     } catch (e) {
+      // Directories can't be read as files — attach as a ref instead so the agent
+      // can call list_directory on it.
+      const msg = String(e);
+      if (msg.includes("Is a directory") || msg.includes("os error 21")) {
+        addFileRef(path);
+        return;
+      }
       handleApiError(e, "Failed to attach file", "Attachment");
     }
   };
