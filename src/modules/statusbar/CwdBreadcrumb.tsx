@@ -2,11 +2,19 @@ import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
+  BreadcrumbLink,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,13 +30,15 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
-import { segmentsFromCwd } from "./lib/pathUtils";
+import { relativePath, segmentsFromCwd } from "./lib/pathUtils";
+import type { Segment } from "./lib/pathUtils";
 
 type Props = {
   cwd: string | null;
   filePath?: string | null;
   home: string | null;
   onCd: (path: string) => void;
+  onCdInNewTab?: (path: string) => void;
 };
 
 function dirname(path: string): string {
@@ -42,7 +52,7 @@ function basename(path: string): string {
   return i === -1 ? path : path.slice(i + 1);
 }
 
-export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
+export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props) {
   // File mode: dir segments navigate; filename is the terminal leaf.
   if (filePath) {
     const dir = dirname(filePath);
@@ -54,25 +64,14 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
       <Breadcrumb>
         <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
           {first ? (
-            <BreadcrumbSegment
-              label={first.label}
-              isHome={first.isHome}
-              onClick={() => onCd(first.fullPath)}
-            />
+            <SegmentWithContextMenu seg={first} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
           ) : null}
           {middle.length > 0 ? (
-            <CollapsedSegments segments={middle} onCd={onCd} />
+            <CollapsedSegments segments={middle} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
           ) : null}
           {middle.map((s) => (
-            <span
-              key={s.fullPath}
-              className="contents max-md:hidden"
-            >
-              <BreadcrumbSegment
-                label={s.label}
-                isHome={s.isHome}
-                onClick={() => onCd(s.fullPath)}
-              />
+            <span key={s.fullPath} className="contents max-md:hidden">
+              <SegmentWithContextMenu seg={s} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
             </span>
           ))}
           <BreadcrumbItem>
@@ -99,29 +98,22 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
     <Breadcrumb>
       <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
         {firstParent ? (
-          <BreadcrumbSegment
-            label={firstParent.label}
-            isHome={firstParent.isHome}
-            onClick={() => onCd(firstParent.fullPath)}
-          />
+          <SegmentWithContextMenu seg={firstParent} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
         ) : null}
         {middleParents.length > 0 ? (
-          <CollapsedSegments segments={middleParents} onCd={onCd} />
+          <CollapsedSegments segments={middleParents} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
         ) : null}
         {middleParents.map((s) => (
           <span key={s.fullPath} className="contents max-md:hidden">
-            <BreadcrumbSegment
-              label={s.label}
-              isHome={s.isHome}
-              onClick={() => onCd(s.fullPath)}
-            />
+            <SegmentWithContextMenu seg={s} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
           </span>
         ))}
         <BreadcrumbItem>
-          <CurrentSegmentDropdown
-            label={current.label}
-            path={current.fullPath}
+          <CurrentSegmentWithContextMenu
+            seg={current}
+            cwd={cwd}
             onCd={onCd}
+            onCdInNewTab={onCdInNewTab}
           />
         </BreadcrumbItem>
       </BreadcrumbList>
@@ -129,42 +121,100 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd }: Props) {
   );
 }
 
-function BreadcrumbSegment({
-  label,
-  isHome,
-  onClick,
-}: {
-  label: string;
-  isHome: boolean;
-  onClick: () => void;
-}) {
+type SegmentMenuProps = {
+  seg: Segment;
+  cwd: string | null;
+  onCd: (path: string) => void;
+  onCdInNewTab?: (path: string) => void;
+};
+
+function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuProps) {
+  const displayName = seg.isHome ? "Home" : seg.label;
+  const rel = cwd ? relativePath(cwd, seg.fullPath) : seg.fullPath;
+  return (
+    <ContextMenuContent className="w-56">
+      <ContextMenuLabel className="text-[11px]">{displayName}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      <ContextMenuItem
+        className="text-[12px]"
+        onSelect={() => void navigator.clipboard.writeText(seg.fullPath)}
+      >
+        Copy absolute path
+      </ContextMenuItem>
+      <ContextMenuItem
+        className="text-[12px]"
+        onSelect={() => void navigator.clipboard.writeText(rel)}
+      >
+        Copy relative path
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem
+        className="text-[12px]"
+        onSelect={() => onCd(seg.fullPath)}
+      >
+        Open in current terminal
+      </ContextMenuItem>
+      {onCdInNewTab && (
+        <ContextMenuItem
+          className="text-[12px]"
+          onSelect={() => onCdInNewTab(seg.fullPath)}
+        >
+          Open in new terminal
+        </ContextMenuItem>
+      )}
+      <ContextMenuSeparator />
+      <ContextMenuItem
+        className="text-[12px]"
+        onSelect={() =>
+          window.dispatchEvent(
+            new CustomEvent<string>("nexum:ai-attach-file", { detail: seg.fullPath })
+          )
+        }
+      >
+        Reference in AI chat
+      </ContextMenuItem>
+    </ContextMenuContent>
+  );
+}
+
+function SegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuProps) {
   return (
     <>
-      <BreadcrumbItem>
-        <BreadcrumbLink asChild>
-          <button
-            type="button"
-            onClick={onClick}
-            className="cursor-pointer"
-          >
-            <Badge
-              variant="outline"
-              className="gap-1 rounded-full text-muted-foreground hover:text-foreground"
-            >
-              {isHome ? (
-                <HugeiconsIcon
-                  icon={Home03Icon}
-                  className="size-3"
-                  strokeWidth={1.75}
-                />
-              ) : null}
-              {isHome ? "Home" : label}
-            </Badge>
-          </button>
-        </BreadcrumbLink>
-      </BreadcrumbItem>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <button type="button" onClick={() => onCd(seg.fullPath)} className="cursor-pointer">
+                <Badge
+                  variant="outline"
+                  className="gap-1 rounded-full text-muted-foreground hover:text-foreground"
+                >
+                  {seg.isHome ? (
+                    <HugeiconsIcon icon={Home03Icon} className="size-3" strokeWidth={1.75} />
+                  ) : null}
+                  {seg.isHome ? "Home" : seg.label}
+                </Badge>
+              </button>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+        </ContextMenuTrigger>
+        <SegmentContextMenuContent seg={seg} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+      </ContextMenu>
       <BreadcrumbSeparator className="[&>svg]:size-3" />
     </>
+  );
+}
+
+function CurrentSegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuProps) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <span>
+          <CurrentSegmentDropdown label={seg.label} path={seg.fullPath} onCd={onCd} />
+        </span>
+      </ContextMenuTrigger>
+      <SegmentContextMenuContent seg={seg} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+    </ContextMenu>
   );
 }
 
@@ -202,28 +252,18 @@ function CurrentSegmentDropdown({
         <BreadcrumbPage className="flex cursor-pointer items-center gap-1 rounded-md px-1 py-0.5 text-foreground hover:bg-accent">
           {label === "~" ? (
             <>
-              <HugeiconsIcon
-                icon={Home03Icon}
-                className="size-3"
-                strokeWidth={1.75}
-              />
+              <HugeiconsIcon icon={Home03Icon} className="size-3" strokeWidth={1.75} />
               Home
             </>
           ) : (
             label
           )}
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            className="size-3 opacity-70"
-            strokeWidth={2}
-          />
+          <HugeiconsIcon icon={ArrowDown01Icon} className="size-3 opacity-70" strokeWidth={2} />
         </BreadcrumbPage>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
         {children === null ? (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">
-            Loading…
-          </div>
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">Loading…</div>
         ) : children.length === 0 ? (
           <div className="px-2 py-1.5 text-xs text-muted-foreground">
             {error ?? "No subfolders"}
@@ -232,9 +272,7 @@ function CurrentSegmentDropdown({
           children.map((name) => (
             <DropdownMenuItem
               key={name}
-              onSelect={() =>
-                onCd(path === "/" ? `/${name}` : `${path}/${name}`)
-              }
+              onSelect={() => onCd(path === "/" ? `/${name}` : `${path}/${name}`)}
             >
               <HugeiconsIcon
                 icon={Folder01Icon}
@@ -252,10 +290,14 @@ function CurrentSegmentDropdown({
 
 function CollapsedSegments({
   segments,
+  cwd,
   onCd,
+  onCdInNewTab,
 }: {
-  segments: { fullPath: string; label: string; isHome: boolean }[];
+  segments: Segment[];
+  cwd: string | null;
   onCd: (p: string) => void;
+  onCdInNewTab?: (p: string) => void;
 }) {
   return (
     <span className="contents md:hidden">
@@ -267,26 +309,24 @@ function CollapsedSegments({
               title="Show hidden folders"
               className="flex items-center rounded-md px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
             >
-              <HugeiconsIcon
-                icon={MoreHorizontalIcon}
-                className="size-3"
-                strokeWidth={1.75}
-              />
+              <HugeiconsIcon icon={MoreHorizontalIcon} className="size-3" strokeWidth={1.75} />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-44">
             {segments.map((s) => (
-              <DropdownMenuItem
-                key={s.fullPath}
-                onSelect={() => onCd(s.fullPath)}
-              >
-                <HugeiconsIcon
-                  icon={s.isHome ? Home03Icon : Folder01Icon}
-                  className="size-3.5 text-muted-foreground"
-                  strokeWidth={1.75}
-                />
-                <span className="truncate">{s.isHome ? "Home" : s.label}</span>
-              </DropdownMenuItem>
+              <ContextMenu key={s.fullPath}>
+                <ContextMenuTrigger asChild>
+                  <DropdownMenuItem onSelect={() => onCd(s.fullPath)}>
+                    <HugeiconsIcon
+                      icon={s.isHome ? Home03Icon : Folder01Icon}
+                      className="size-3.5 text-muted-foreground"
+                      strokeWidth={1.75}
+                    />
+                    <span className="truncate">{s.isHome ? "Home" : s.label}</span>
+                  </DropdownMenuItem>
+                </ContextMenuTrigger>
+                <SegmentContextMenuContent seg={s} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+              </ContextMenu>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>

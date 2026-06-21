@@ -40,6 +40,7 @@ export type SidebarPanel = "explorer" | "snippets" | "source-control" | "hosts" 
 type Props = {
   home: string | null;
   onCd: (path: string) => void;
+  onCdInNewTab?: (path: string) => void;
   onOpenMini: () => void;
   /** Only rendered when the AI panel is open and a key is loaded. */
   hasComposer: boolean;
@@ -51,15 +52,16 @@ type Props = {
   onPanelToggle?: (panel: SidebarPanel) => void;
 };
 
-const PANEL_BUTTONS: Array<{ panel: SidebarPanel; icon: typeof FolderTreeIcon; title: string }> = [
-  { panel: "explorer", icon: FolderTreeIcon, title: "Explorer (Cmd+B)" },
-  { panel: "snippets", icon: FlashIcon, title: "Snippets" },
-  { panel: "source-control", icon: GitBranchIcon, title: "Source Control" },
+const PANEL_BUTTONS: Array<{ panel: SidebarPanel; icon: typeof FolderTreeIcon; title: string; prefKey: "statusBarShowExplorerButton" | "statusBarShowSnippetsButton" | "statusBarShowSourceControlButton" }> = [
+  { panel: "explorer",       icon: FolderTreeIcon,  title: "Explorer (Cmd+B)",  prefKey: "statusBarShowExplorerButton" },
+  { panel: "snippets",       icon: FlashIcon,        title: "Snippets",          prefKey: "statusBarShowSnippetsButton" },
+  { panel: "source-control", icon: GitBranchIcon,    title: "Source Control",    prefKey: "statusBarShowSourceControlButton" },
 ];
 
 export const StatusBar = React.memo(function StatusBar({
   home,
   onCd,
+  onCdInNewTab,
   onOpenMini,
   hasComposer,
   detectedPreviewUrl,
@@ -72,12 +74,19 @@ export const StatusBar = React.memo(function StatusBar({
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   const showCursorPosition = usePreferencesStore((s) => s.editorShowCursorPosition);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
-  const showPanelButtons = usePreferencesStore((s) => s.statusBarShowPanelButtons);
+  const showExplorerButton = usePreferencesStore((s) => s.statusBarShowExplorerButton);
+  const showSnippetsButton = usePreferencesStore((s) => s.statusBarShowSnippetsButton);
+  const showSourceControlButton = usePreferencesStore((s) => s.statusBarShowSourceControlButton);
+  const showTabsButton = usePreferencesStore((s) => s.statusBarShowTabsButton);
   const showCwdBreadcrumb = usePreferencesStore((s) => s.statusBarShowCwdBreadcrumb);
   const showPreviewUrl = usePreferencesStore((s) => s.statusBarShowPreviewUrl);
   const showAiControls = usePreferencesStore((s) => s.statusBarShowAiControls);
   const cursorLine = useEditorCursorStore((s) => s.line);
   const cursorCol = useEditorCursorStore((s) => s.col);
+
+  const panelButtonVisibility = { statusBarShowExplorerButton: showExplorerButton, statusBarShowSnippetsButton: showSnippetsButton, statusBarShowSourceControlButton: showSourceControlButton };
+  const showTabsBtn = tabsLocation === "sidebar" && showTabsButton;
+  const anyPanelButtonVisible = showExplorerButton || showSnippetsButton || showSourceControlButton || showTabsBtn;
 
   const cwd = useTabsStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId);
@@ -99,25 +108,27 @@ export const StatusBar = React.memo(function StatusBar({
         <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-status-bar px-3 text-[11px]">
           <div className="flex min-w-0 flex-1 items-center gap-1 truncate">
             {/* Panel switcher buttons */}
-            {showPanelButtons && (
+            {anyPanelButtonVisible && (
               <div className="flex shrink-0 items-center gap-0.5">
-                {PANEL_BUTTONS.map(({ panel, icon, title }) => (
-                  <button
-                    key={panel}
-                    type="button"
-                    title={title}
-                    onClick={() => onPanelToggle?.(panel)}
-                    className={cn(
-                      "flex h-5 w-5 items-center justify-center rounded transition-colors",
-                      activePanel === panel
-                        ? "bg-primary/20 text-primary"
-                        : "text-muted-foreground/60 hover:bg-primary/10 hover:text-primary/80"
-                    )}
-                  >
-                    <HugeiconsIcon icon={icon} size={12} strokeWidth={1.75} />
-                  </button>
-                ))}
-                {tabsLocation === "sidebar" && (
+                {PANEL_BUTTONS.map(({ panel, icon, title, prefKey }) =>
+                  panelButtonVisibility[prefKey] ? (
+                    <button
+                      key={panel}
+                      type="button"
+                      title={title}
+                      onClick={() => onPanelToggle?.(panel)}
+                      className={cn(
+                        "flex h-5 w-5 items-center justify-center rounded transition-colors",
+                        activePanel === panel
+                          ? "bg-primary/20 text-primary"
+                          : "text-muted-foreground/60 hover:bg-primary/10 hover:text-primary/80"
+                      )}
+                    >
+                      <HugeiconsIcon icon={icon} size={12} strokeWidth={1.75} />
+                    </button>
+                  ) : null
+                )}
+                {showTabsBtn && (
                   <button
                     type="button"
                     title="Tabs"
@@ -137,9 +148,9 @@ export const StatusBar = React.memo(function StatusBar({
             {/* Divider + Path breadcrumb */}
             {showCwdBreadcrumb && (
               <>
-                <div className="mx-1 h-3.5 w-px shrink-0 bg-border/60" />
+                {anyPanelButtonVisible && <div className="mx-1 h-3.5 w-px shrink-0 bg-border/60" />}
                 <div className="min-w-0 truncate">
-                  <CwdBreadcrumb cwd={cwd} filePath={filePath} home={home} onCd={onCd} />
+                  <CwdBreadcrumb cwd={cwd} filePath={filePath} home={home} onCd={onCd} onCdInNewTab={onCdInNewTab} />
                 </div>
               </>
             )}
@@ -182,9 +193,10 @@ export const StatusBar = React.memo(function StatusBar({
         <ContextMenuLabel className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
           Status Bar Items
         </ContextMenuLabel>
-        {STATUSBAR_ITEM_REGISTRY.map((item) => (
-          <StatusBarMenuCheckboxItem key={item.id} descriptor={item} />
-        ))}
+        {STATUSBAR_ITEM_REGISTRY.map((item) => {
+          if (item.id === "tabsButton" && tabsLocation !== "sidebar") return null;
+          return <StatusBarMenuCheckboxItem key={item.id} descriptor={item} />;
+        })}
         <ContextMenuSeparator />
         <ContextMenuItem
           className="text-[12px]"

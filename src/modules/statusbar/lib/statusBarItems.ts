@@ -3,12 +3,18 @@ import {
   setEditorShowCursorPosition,
   setStatusBarShowAiControls,
   setStatusBarShowCwdBreadcrumb,
-  setStatusBarShowPanelButtons,
+  setStatusBarShowExplorerButton,
+  setStatusBarShowSnippetsButton,
+  setStatusBarShowSourceControlButton,
+  setStatusBarShowTabsButton,
   setStatusBarShowPreviewUrl,
 } from "@/modules/settings/store";
 
 export type StatusBarItemId =
-  | "panelButtons"
+  | "explorerButton"
+  | "snippetsButton"
+  | "sourceControlButton"
+  | "tabsButton"
   | "cwdBreadcrumb"
   | "cursorPosition"
   | "previewUrl"
@@ -23,10 +29,28 @@ export type StatusBarItemDescriptor = {
 
 export const STATUSBAR_ITEM_REGISTRY: StatusBarItemDescriptor[] = [
   {
-    id: "panelButtons",
-    label: "Panel Buttons",
-    description: "Explorer, Snippets, and Source Control panel toggles",
-    prefKey: "statusBarShowPanelButtons",
+    id: "explorerButton",
+    label: "Explorer",
+    description: "Explorer panel toggle button",
+    prefKey: "statusBarShowExplorerButton",
+  },
+  {
+    id: "snippetsButton",
+    label: "Snippets",
+    description: "Snippets panel toggle button",
+    prefKey: "statusBarShowSnippetsButton",
+  },
+  {
+    id: "sourceControlButton",
+    label: "Source Control",
+    description: "Source Control panel toggle button",
+    prefKey: "statusBarShowSourceControlButton",
+  },
+  {
+    id: "tabsButton",
+    label: "Tabs Panel",
+    description: "Tabs panel toggle button (sidebar mode only)",
+    prefKey: "statusBarShowTabsButton",
   },
   {
     id: "cwdBreadcrumb",
@@ -55,9 +79,12 @@ export const STATUSBAR_ITEM_REGISTRY: StatusBarItemDescriptor[] = [
 ];
 
 export const STATUSBAR_ITEM_SETTERS: Record<StatusBarItemId, (v: boolean) => Promise<void>> = {
-  panelButtons:   setStatusBarShowPanelButtons,
-  cwdBreadcrumb:  setStatusBarShowCwdBreadcrumb,
-  cursorPosition: setEditorShowCursorPosition,
-  previewUrl:     setStatusBarShowPreviewUrl,
-  aiControls:     setStatusBarShowAiControls,
+  explorerButton:      setStatusBarShowExplorerButton,
+  snippetsButton:      setStatusBarShowSnippetsButton,
+  sourceControlButton: setStatusBarShowSourceControlButton,
+  tabsButton:          setStatusBarShowTabsButton,
+  cwdBreadcrumb:       setStatusBarShowCwdBreadcrumb,
+  cursorPosition:      setEditorShowCursorPosition,
+  previewUrl:          setStatusBarShowPreviewUrl,
+  aiControls:          setStatusBarShowAiControls,
 };

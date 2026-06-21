@@ -186,7 +186,10 @@ export type Preferences = {
   zenModeShowStatusbar: boolean;
 
   // --- Status Bar ---
-  statusBarShowPanelButtons: boolean;
+  statusBarShowExplorerButton: boolean;
+  statusBarShowSnippetsButton: boolean;
+  statusBarShowSourceControlButton: boolean;
+  statusBarShowTabsButton: boolean;
   statusBarShowCwdBreadcrumb: boolean;
   statusBarShowPreviewUrl: boolean;
   statusBarShowAiControls: boolean;
@@ -316,7 +319,10 @@ const KEY_ZEN_MODE_SHOW_STATUSBAR = "zenModeShowStatusbar";
 const KEY_SSH_AUTO_RECONNECT = "sshAutoReconnect";
 const KEY_SSH_AUTO_RECONNECT_DELAY = "sshAutoReconnectDelay";
 const KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS = "sshAutoReconnectMaxAttempts";
-const KEY_STATUSBAR_SHOW_PANEL_BUTTONS = "statusBarShowPanelButtons";
+const KEY_STATUSBAR_SHOW_EXPLORER_BUTTON = "statusBarShowExplorerButton";
+const KEY_STATUSBAR_SHOW_SNIPPETS_BUTTON = "statusBarShowSnippetsButton";
+const KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON = "statusBarShowSourceControlButton";
+const KEY_STATUSBAR_SHOW_TABS_BUTTON = "statusBarShowTabsButton";
 const KEY_STATUSBAR_SHOW_CWD_BREADCRUMB = "statusBarShowCwdBreadcrumb";
 const KEY_STATUSBAR_SHOW_PREVIEW_URL = "statusBarShowPreviewUrl";
 const KEY_STATUSBAR_SHOW_AI_CONTROLS = "statusBarShowAiControls";
@@ -446,7 +452,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   zenModeShowHeader: true,
   zenModeShowStatusbar: true,
 
-  statusBarShowPanelButtons: true,
+  statusBarShowExplorerButton: true,
+  statusBarShowSnippetsButton: true,
+  statusBarShowSourceControlButton: true,
+  statusBarShowTabsButton: true,
   statusBarShowCwdBreadcrumb: true,
   statusBarShowPreviewUrl: true,
   statusBarShowAiControls: true,
@@ -782,8 +791,14 @@ export async function loadPreferences(): Promise<Preferences> {
     sshAutoReconnectMaxAttempts:
       get<number>(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS) ?? DEFAULT_PREFERENCES.sshAutoReconnectMaxAttempts,
 
-    statusBarShowPanelButtons:
-      get<boolean>(KEY_STATUSBAR_SHOW_PANEL_BUTTONS) ?? DEFAULT_PREFERENCES.statusBarShowPanelButtons,
+    statusBarShowExplorerButton:
+      get<boolean>(KEY_STATUSBAR_SHOW_EXPLORER_BUTTON) ?? DEFAULT_PREFERENCES.statusBarShowExplorerButton,
+    statusBarShowSnippetsButton:
+      get<boolean>(KEY_STATUSBAR_SHOW_SNIPPETS_BUTTON) ?? DEFAULT_PREFERENCES.statusBarShowSnippetsButton,
+    statusBarShowSourceControlButton:
+      get<boolean>(KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON) ?? DEFAULT_PREFERENCES.statusBarShowSourceControlButton,
+    statusBarShowTabsButton:
+      get<boolean>(KEY_STATUSBAR_SHOW_TABS_BUTTON) ?? DEFAULT_PREFERENCES.statusBarShowTabsButton,
     statusBarShowCwdBreadcrumb:
       get<boolean>(KEY_STATUSBAR_SHOW_CWD_BREADCRUMB) ?? DEFAULT_PREFERENCES.statusBarShowCwdBreadcrumb,
     statusBarShowPreviewUrl:
@@ -1388,8 +1403,23 @@ export async function setTabsLocation(value: "titlebar" | "sidebar"): Promise<vo
   await (await getStore()).save();
 }
 
-export async function setStatusBarShowPanelButtons(value: boolean): Promise<void> {
-  await (await getStore()).set(KEY_STATUSBAR_SHOW_PANEL_BUTTONS, value);
+export async function setStatusBarShowExplorerButton(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_STATUSBAR_SHOW_EXPLORER_BUTTON, value);
+  await (await getStore()).save();
+}
+
+export async function setStatusBarShowSnippetsButton(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_STATUSBAR_SHOW_SNIPPETS_BUTTON, value);
+  await (await getStore()).save();
+}
+
+export async function setStatusBarShowSourceControlButton(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON, value);
+  await (await getStore()).save();
+}
+
+export async function setStatusBarShowTabsButton(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_STATUSBAR_SHOW_TABS_BUTTON, value);
   await (await getStore()).save();
 }
 
@@ -1532,7 +1562,10 @@ export async function onPreferencesChange(
     [KEY_SSH_AUTO_RECONNECT]: "sshAutoReconnect",
     [KEY_SSH_AUTO_RECONNECT_DELAY]: "sshAutoReconnectDelay",
     [KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS]: "sshAutoReconnectMaxAttempts",
-    [KEY_STATUSBAR_SHOW_PANEL_BUTTONS]: "statusBarShowPanelButtons",
+    [KEY_STATUSBAR_SHOW_EXPLORER_BUTTON]: "statusBarShowExplorerButton",
+    [KEY_STATUSBAR_SHOW_SNIPPETS_BUTTON]: "statusBarShowSnippetsButton",
+    [KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON]: "statusBarShowSourceControlButton",
+    [KEY_STATUSBAR_SHOW_TABS_BUTTON]: "statusBarShowTabsButton",
     [KEY_STATUSBAR_SHOW_CWD_BREADCRUMB]: "statusBarShowCwdBreadcrumb",
     [KEY_STATUSBAR_SHOW_PREVIEW_URL]: "statusBarShowPreviewUrl",
     [KEY_STATUSBAR_SHOW_AI_CONTROLS]: "statusBarShowAiControls",

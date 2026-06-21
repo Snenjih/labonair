@@ -1,3 +1,13 @@
+export function relativePath(from: string, to: string): string {
+  const fromParts = from.split("/").filter(Boolean);
+  const toParts = to.split("/").filter(Boolean);
+  let i = 0;
+  while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) i++;
+  const ups = fromParts.length - i;
+  const downs = toParts.slice(i);
+  return [...Array(ups).fill(".."), ...downs].join("/") || ".";
+}
+
 export type Segment = {
   label: string;
   fullPath: string;
