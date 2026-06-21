@@ -1,0 +1,39 @@
+---
+title: "Stash"
+description: "Save and restore work in progress with the integrated stash manager."
+---
+
+# Stash
+
+The **Stash** section appears below the file lists in the Source Control panel. It lets you save uncommitted changes to a named stack, switch context, and restore those changes later.
+
+## Creating a Stash
+
+Click **Stash Changes** (the stash push button in the Stash header). Optionally enter a short description — this becomes the stash message shown in the list. Leave blank to let git generate a default name.
+
+The stash captures all tracked modified and staged files. **Untracked files are not stashed by default** — stage them first or use the stash options if needed.
+
+## Viewing Stashes
+
+Each stash entry in the list shows:
+
+- The stash index (e.g., `stash@{0}`)
+- The message or auto-generated description
+- The branch it was created from
+
+## Restoring a Stash
+
+| Action | Behavior |
+|--------|----------|
+| **Apply** | Restores the stash contents but keeps the stash in the list |
+| **Pop** | Restores and removes the stash from the list (equivalent to `git stash pop`) |
+
+If applying a stash causes conflicts with your current working tree, Nexum shows an inline error: **"Conflicts after stash apply — resolve before proceeding."** The conflicting files appear in the Changes section with conflict markers.
+
+## Dropping a Stash
+
+Click the **Delete** icon next to a stash entry. A confirmation dialog appears because this cannot be undone.
+
+## Stash Stack Order
+
+Stashes are a LIFO (last-in, first-out) stack. The most recently created stash is `stash@{0}`. Applying or popping a stash by index is safe even if the stack has gaps.

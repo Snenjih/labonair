@@ -1,0 +1,39 @@
+---
+title: "Source Control Overview"
+description: "Nexum's built-in git integration — stage, commit, diff, branch, stash, and visualize history without leaving the app."
+---
+
+# Source Control Overview
+
+Nexum ships with a full git client built into the sidebar. You can stage files, write commit messages, push and pull, manage branches and tags, stash work in progress, and browse your commit history as an interactive graph — all without switching to a separate tool.
+
+## How It Works
+
+The Source Control panel talks to the `git` binary already installed on your machine via Tauri's process API. There are no additional git libraries or daemons — if `git` works in your terminal, it works here too.
+
+The panel auto-refreshes every 2 seconds when visible and pauses when the tab is hidden to avoid unnecessary background work.
+
+## Opening the Panel
+
+Click the **Source Control** icon in the left sidebar (or use the command palette). The panel becomes active for whichever folder is currently open as your workspace root.
+
+If the workspace root is not inside a git repository, the panel shows an empty state prompting you to initialize one.
+
+## Feature Areas
+
+| Area | What it does |
+|------|-------------|
+| [Branch Bar](./branch-bar) | Shows the current branch, ahead/behind counts, and opens branch management |
+| [File Changes](./staging-and-committing) | Three sections — Staged, Changes, Untracked — with per-file actions |
+| [Diff Viewer](./diff-viewer) | Inline unified diff with syntax coloring and side-by-side toggle |
+| [Commit Form](./staging-and-committing) | Message editor with char counter, Amend, Push/Pull/Fetch, AI message |
+| [Stash](./stash) | Save and restore work in progress without committing |
+| [Git Graph](./git-graph) | Visual DAG of the commit history with context menu actions |
+
+## Keyboard Shortcuts
+
+| Action | Shortcut |
+|--------|----------|
+| Toggle Source Control panel | `Cmd+Shift+G` |
+| Stage all changes | `Cmd+Shift+A` (inside panel) |
+| Commit (focus commit field) | `Cmd+Enter` |

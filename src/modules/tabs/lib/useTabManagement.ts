@@ -51,6 +51,7 @@ export interface TabManagementReturn {
   handleCloseOthers: (keepId: number) => void;
   handleCloseAll: () => void;
   handleDuplicateTab: (id: number) => void;
+  handleRenameTab: (id: number, label: string) => void;
   cycleTab: (delta: 1 | -1) => void;
   openNewTab: () => void;
   openPreviewTab: (url: string) => number;
@@ -197,6 +198,10 @@ export function useTabManagement({
     const { tabs } = useTabsStore.getState();
     tabs.forEach((t) => handleClose(t.id));
   }, [handleClose]);
+
+  const handleRenameTab = useCallback((id: number, label: string) => {
+    useTabsStore.getState().renameTab(id, label);
+  }, []);
 
   const handleDuplicateTab = useCallback((id: number) => {
     const { tabs } = useTabsStore.getState();
@@ -367,6 +372,7 @@ export function useTabManagement({
     handleCloseOthers,
     handleCloseAll,
     handleDuplicateTab,
+    handleRenameTab,
     cycleTab,
     openNewTab,
     openPreviewTab,

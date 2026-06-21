@@ -38,13 +38,13 @@ function basename(path: string): string {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  M: "bg-yellow-500/20 text-yellow-500",
-  A: "bg-green-500/20 text-green-500",
-  D: "bg-red-500/20 text-red-500",
-  R: "bg-blue-500/20 text-blue-400",
-  C: "bg-blue-500/20 text-blue-400",
-  U: "bg-orange-500/20 text-orange-400",
-  "?": "bg-muted/80 text-muted-foreground/60",
+  M: "bg-warning/20 text-warning",
+  A: "bg-success/20 text-success",
+  D: "bg-error/20 text-error",
+  R: "bg-info/20 text-info",
+  C: "bg-info/20 text-info",
+  U: "bg-warning/20 text-warning",
+  "?": "bg-muted/80 text-muted-foreground",
 };
 
 export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps) {
@@ -159,10 +159,10 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
             {stat && (stat.added > 0 || stat.removed > 0) && (
               <span className="flex shrink-0 items-center gap-1 text-[10px] tabular-nums">
                 {stat.added > 0 && (
-                  <span className="font-medium text-green-500">+{stat.added}</span>
+                  <span className="font-medium text-success">+{stat.added}</span>
                 )}
                 {stat.removed > 0 && (
-                  <span className="font-medium text-red-500">−{stat.removed}</span>
+                  <span className="font-medium text-error">−{stat.removed}</span>
                 )}
               </span>
             )}

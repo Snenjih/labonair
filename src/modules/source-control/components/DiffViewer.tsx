@@ -83,15 +83,15 @@ function DiffLine({ line, isInOurs, isInTheirs }: DiffLineProps) {
           !isInOurs &&
           !isInTheirs &&
           isAdd &&
-          "bg-green-500/10 text-green-500",
+          "bg-success/10 text-success",
         !isConflictOurs &&
           !isConflictSep &&
           !isConflictTheirs &&
           !isInOurs &&
           !isInTheirs &&
           isDel &&
-          "bg-red-500/10 text-red-500",
-        isHunk && "bg-blue-400/5 text-blue-400/80 text-xs",
+          "bg-error/10 text-error",
+        isHunk && "bg-info/5 text-info/80 text-xs",
         !isAdd &&
           !isDel &&
           !isHunk &&

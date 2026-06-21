@@ -147,10 +147,10 @@ function DiffSideRow({ side, row }: DiffSideRowProps) {
     <div
       className={cn(
         "flex min-h-[20px] items-start font-mono text-[11px] leading-5 whitespace-pre",
-        isHunk && "bg-blue-400/5 text-blue-400/80 text-xs",
+        isHunk && "bg-info/5 text-info/80 text-xs",
         isFileMeta && "bg-muted/40 text-muted-foreground text-[10px]",
-        isDeletion && !isEmpty && "bg-red-500/10 text-red-500",
-        isAddition && !isEmpty && "bg-green-500/10 text-green-500",
+        isDeletion && !isEmpty && "bg-error/10 text-error",
+        isAddition && !isEmpty && "bg-success/10 text-success",
         isEmpty && !isFileMeta && !isHunk && "bg-muted/5",
       )}
     >

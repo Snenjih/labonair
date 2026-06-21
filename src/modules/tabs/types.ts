@@ -34,6 +34,7 @@ export type WorkspaceTab = {
   id: number;
   kind: "workspace";
   title: string;
+  customTitle?: string;
   activePaneId: string;
   layout: PaneNode;
   sessions: Record<string, TerminalSessionData>;

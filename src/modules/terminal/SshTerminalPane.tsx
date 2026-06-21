@@ -46,6 +46,14 @@ const FONT_WEIGHT_MAP: Record<string, string | number> = {
   bold: "bold",
 };
 
+let _bellAudioCtx: AudioContext | null = null;
+function getBellAudioContext(): AudioContext {
+  if (!_bellAudioCtx || _bellAudioCtx.state === "closed") {
+    _bellAudioCtx = new AudioContext();
+  }
+  return _bellAudioCtx;
+}
+
 const ANSI_RE = /\x1B\[[0-9;]*[mGKHFJA-Za-z]|\x1B\][^\x07]*\x07|\x1B[@-_][0-?]*[ -/]*[@-~]/g;
 const SUDO_PROMPT_RE = /\[sudo\] password for [^:]+:|sudo password:/i;
 const TAIL_MAX = 300;
@@ -489,12 +497,24 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           const text = t.getSelection();
           if (text) void navigator.clipboard.writeText(text).catch(() => undefined);
         });
+
+        // On macOS in WKWebView, Cmd+C triggers the native Copy menu command which
+        // copies DOM selection (empty for canvas-based xterm). Intercept the `copy`
+        // event and write xterm's internal selection instead.
+        const onCopy = (e: ClipboardEvent) => {
+          const text = t.getSelection();
+          if (!text) return;
+          e.clipboardData?.setData("text/plain", text);
+          e.preventDefault();
+        };
+        document.addEventListener("copy", onCopy, { capture: true });
+        cleanups.push(() => document.removeEventListener("copy", onCopy, { capture: true }));
         term = t;
         termRef.current = t;
         t.onBell(() => {
           if (!usePreferencesStore.getState().terminalBell) return;
           try {
-            const ctx = new AudioContext();
+            const ctx = getBellAudioContext();
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
@@ -504,7 +524,6 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
             osc.start(ctx.currentTime);
             osc.stop(ctx.currentTime + 0.15);
-            osc.onended = () => ctx.close();
           } catch { /* ignore AudioContext errors */ }
         });
 

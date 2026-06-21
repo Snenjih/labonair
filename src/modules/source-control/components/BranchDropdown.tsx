@@ -150,12 +150,12 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
           <div className="pb-1">
             {/* Error */}
             {tagError && (
-              <div className="mx-2 mb-1 flex items-center gap-1.5 rounded border border-red-500/30 bg-red-500/10 px-2 py-1">
-                <p className="flex-1 text-[10px] text-red-400">{tagError}</p>
+              <div className="mx-2 mb-1 flex items-center gap-1.5 rounded border border-error/30 bg-error/10 px-2 py-1">
+                <p className="flex-1 text-[10px] text-error">{tagError}</p>
                 <button
                   type="button"
                   onClick={() => setTagError(null)}
-                  className="text-red-400/60 hover:text-red-400"
+                  className="text-error/60 hover:text-error"
                 >
                   <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2} />
                 </button>
@@ -243,7 +243,7 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
                     </button>
                     <button
                       type="button"
-                      className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-red-500/20 hover:text-red-500"
+                      className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-error/20 hover:text-error"
                       onClick={() => setDeleteTagName(tag)}
                       title="Delete tag"
                       disabled={isPushing || isDeleting}
@@ -315,7 +315,7 @@ function BranchRow({ branch, isCurrent, onCheckout, onDelete, isCheckingOut }: B
             icon={Tick02Icon}
             size={10}
             strokeWidth={2.5}
-            className="text-green-500"
+            className="text-success"
           />
         )}
       </span>
@@ -331,12 +331,12 @@ function BranchRow({ branch, isCurrent, onCheckout, onDelete, isCheckingOut }: B
 
       {/* Ahead/behind indicators */}
       {branch.ahead > 0 && (
-        <span className="shrink-0 rounded-full bg-green-500/15 px-1 py-0.5 text-[9px] font-medium tabular-nums text-green-500">
+        <span className="shrink-0 rounded-full bg-success/15 px-1 py-0.5 text-[9px] font-medium tabular-nums text-success">
           ↑{branch.ahead}
         </span>
       )}
       {branch.behind > 0 && (
-        <span className="shrink-0 rounded-full bg-red-500/15 px-1 py-0.5 text-[9px] font-medium tabular-nums text-red-500">
+        <span className="shrink-0 rounded-full bg-error/15 px-1 py-0.5 text-[9px] font-medium tabular-nums text-error">
           ↓{branch.behind}
         </span>
       )}
@@ -354,7 +354,7 @@ function BranchRow({ branch, isCurrent, onCheckout, onDelete, isCheckingOut }: B
             "flex h-4 w-4 shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover/branch:opacity-100",
             isCurrent
               ? "cursor-not-allowed text-muted-foreground/30"
-              : "text-muted-foreground hover:bg-red-500/20 hover:text-red-500"
+              : "text-muted-foreground hover:bg-error/20 hover:text-error"
           )}
           onClick={(e) => {
             e.stopPropagation();
@@ -484,12 +484,12 @@ export function BranchDropdown({
 
           {/* Checkout error */}
           {checkoutError && (
-            <div className="flex items-start gap-1.5 border-b border-red-500/20 bg-red-500/10 px-2 py-1.5">
-              <p className="flex-1 text-[10px] text-red-400">{checkoutError}</p>
+            <div className="flex items-start gap-1.5 border-b border-error/20 bg-error/10 px-2 py-1.5">
+              <p className="flex-1 text-[10px] text-error">{checkoutError}</p>
               <button
                 type="button"
                 onClick={() => setCheckoutError(null)}
-                className="mt-0.5 text-red-400/60 hover:text-red-400"
+                className="mt-0.5 text-error/60 hover:text-error"
               >
                 <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2} />
               </button>

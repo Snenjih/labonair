@@ -37,6 +37,14 @@ const FONT_WEIGHT_MAP: Record<string, string | number> = {
   bold: "bold",
 };
 
+let _bellAudioCtx: AudioContext | null = null;
+function getBellAudioContext(): AudioContext {
+  if (!_bellAudioCtx || _bellAudioCtx.state === "closed") {
+    _bellAudioCtx = new AudioContext();
+  }
+  return _bellAudioCtx;
+}
+
 export function useTerminalSession({
   container,
   visible,
@@ -190,10 +198,22 @@ export function useTerminalSession({
         const text = term.getSelection();
         if (text) void navigator.clipboard.writeText(text).catch(() => undefined);
       });
+
+      // On macOS in WKWebView, Cmd+C triggers the native Copy menu command which
+      // copies DOM selection (empty for canvas-based xterm). Intercept the `copy`
+      // event and write xterm's internal selection instead.
+      const onCopy = (e: ClipboardEvent) => {
+        const text = term.getSelection();
+        if (!text) return;
+        e.clipboardData?.setData("text/plain", text);
+        e.preventDefault();
+      };
+      document.addEventListener("copy", onCopy, { capture: true });
+      cleanups.push(() => document.removeEventListener("copy", onCopy, { capture: true }));
       term.onBell(() => {
         if (!usePreferencesStore.getState().terminalBell) return;
         try {
-          const ctx = new AudioContext();
+          const ctx = getBellAudioContext();
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.connect(gain);
@@ -203,7 +223,6 @@ export function useTerminalSession({
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
           osc.start(ctx.currentTime);
           osc.stop(ctx.currentTime + 0.15);
-          osc.onended = () => ctx.close();
         } catch { /* ignore AudioContext errors */ }
       });
 

@@ -98,6 +98,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onCloseOthers: tabs.handleCloseOthers,
     onCloseAll: tabs.handleCloseAll,
     onDuplicate: tabs.handleDuplicateTab,
+    onRename: tabs.handleRenameTab,
     onOpenFile: tabs.handleOpenFile,
     onOpenPreview: tabs.openPreviewTab,
     onPathRenamed: tabs.handlePathRenamed,
@@ -128,6 +129,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onCloseOthers={tabs.handleCloseOthers}
                 onCloseAll={tabs.handleCloseAll}
                 onDuplicate={tabs.handleDuplicateTab}
+                onRename={tabs.handleRenameTab}
                 onOpenShortcuts={() => ctrl.setShortcutsOpen(true)}
                 onOpenSettings={() => void openSettingsWindow()}
                 onOpenKeybindings={() => void openSettingsWindow("shortcuts")}
@@ -189,6 +191,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
               <StatusBar
                 home={ctrl.home}
                 onCd={tabs.sendCd}
+                onCdInNewTab={tabs.cdInNewTab}
                 onOpenMini={ctrl.openMini}
                 hasComposer={prefs.aiEnabled && ctrl.hasComposer}
                 detectedPreviewUrl={ctrl.detectedPreviewUrl}

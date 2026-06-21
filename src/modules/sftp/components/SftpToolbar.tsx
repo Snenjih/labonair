@@ -152,7 +152,7 @@ export function SftpToolbar({
           className={cn(
             "shrink-0 transition-colors duration-75",
             searchVisible
-              ? "text-primary bg-primary/10 hover:bg-primary/20"
+              ? "text-foreground dark:text-primary bg-primary/10 hover:bg-primary/20"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -175,7 +175,7 @@ export function SftpToolbar({
               className={cn(
                 "shrink-0 transition-colors duration-75",
                 bookmarks.length > 0
-                  ? "text-primary hover:bg-primary/10"
+                  ? "text-foreground dark:text-primary hover:bg-primary/10"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -209,7 +209,7 @@ export function SftpToolbar({
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <div className="px-3 py-1 text-[10px] text-muted-foreground/60">
+                <div className="px-3 py-1 text-[10px] text-muted-foreground">
                   Right-click a folder to add bookmarks
                 </div>
               </>
@@ -242,7 +242,7 @@ export function SftpToolbar({
           className={cn(
             "shrink-0 transition-colors duration-75",
             showHidden
-              ? "text-primary bg-primary/10 hover:bg-primary/20"
+              ? "text-foreground dark:text-primary bg-primary/10 hover:bg-primary/20"
               : "text-muted-foreground hover:text-foreground",
           )}
         >
