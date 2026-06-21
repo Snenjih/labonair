@@ -15,6 +15,7 @@ import {
   setInstanceKey,
 } from "../lib/keyring";
 import { autoName, renameForDuplicates } from "../lib/modelRef";
+import { useModelCacheStore } from "./modelCacheStore";
 
 const PROVIDERS_KEY = "ai.providerInstances";
 const PROVIDERS_CHANGED_EVENT = "nexum://ai-providers-changed";
@@ -158,6 +159,9 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
 
     const keys = await loadInstanceKeys(instances);
     set({ instances, instanceKeys: keys, hydrated: true });
+
+    const mc = useModelCacheStore.getState();
+    void mc.hydrate().then(() => mc.fetchAllConfigured(instances, keys));
   },
 
   reload: async () => {
@@ -179,6 +183,8 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
     await persist(updated);
     set({ instances: updated });
     await emit(PROVIDERS_CHANGED_EVENT);
+    const keys = get().instanceKeys;
+    void useModelCacheStore.getState().fetchAllConfigured(updated, keys);
     return newInst;
   },
 
@@ -188,6 +194,10 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
     await persist(updated);
     set({ instances: updated });
     await emit(PROVIDERS_CHANGED_EVENT);
+    // Invalidate and re-fetch this instance in case baseUrl/key changed
+    useModelCacheStore.getState().invalidate(id);
+    const keys = get().instanceKeys;
+    void useModelCacheStore.getState().fetchAllConfigured(updated, keys);
   },
 
   remove: async (id) => {
