@@ -1,0 +1,49 @@
+---
+title: "Branch Management"
+description: "Checkout, create, rename, and delete branches and tags directly from the Source Control panel."
+---
+
+# Branch Management
+
+The **Branch Bar** sits at the top of the Source Control panel. It shows the current branch name and — when the remote tracking branch is available — how many commits your local branch is ahead or behind the remote.
+
+## Switching Branches
+
+Click the branch name to open the branch picker. It lists all local branches; the current one is marked with a checkmark. Click any branch to check it out immediately.
+
+If the working tree has uncommitted changes, git will refuse to check out and an error is shown inline.
+
+## Creating a Branch
+
+1. Open the branch picker by clicking the branch name.
+2. Click **New branch**.
+3. Enter a name. Optionally change the starting point (defaults to `HEAD`).
+4. Choose whether to check out the new branch immediately.
+
+Branch names are validated client-side: spaces are rejected, and the name must start with a letter or digit.
+
+## Renaming a Branch
+
+In the branch picker, hover a branch and click the **...** overflow menu → **Rename**. This runs `git branch -m <old> <new>` locally; it does not rename the remote tracking branch automatically.
+
+## Deleting a Branch
+
+Hover a branch → **...** → **Delete**. A confirmation dialog appears. If the branch has commits not merged into the current branch, the dialog warns you and requires explicitly enabling force-delete.
+
+> **You cannot delete the currently checked-out branch.** Switch away first.
+
+## Tags
+
+Tags are shown in a collapsed section at the bottom of the branch picker. Expand to see lightweight and annotated tags.
+
+- **Create tag** — enter a name and an optional message (annotated tag). You can specify a target hash; defaults to `HEAD`.
+- **Delete tag** — removes the tag locally only.
+- **Push tag** — pushes a specific tag to the remote.
+
+## Ahead / Behind Indicator
+
+When your local branch tracks a remote branch, the Branch Bar shows `↑ N` (commits to push) and/or `↓ N` (commits to pull). These counts come from `git status --porcelain=v2 --branch` and update on every refresh cycle.
+
+## In-Progress Operations
+
+When a merge, rebase, or cherry-pick is in progress, the Branch Bar shows a warning badge. The **Abort** action in the Commit Form dropdown becomes active.

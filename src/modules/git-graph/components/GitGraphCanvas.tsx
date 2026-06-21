@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import type { LayoutCommit } from "../types";
 import { GraphRail, MAX_VISIBLE_LANES, railWidth } from "./GraphRail";
 import { parseGithubUserId, getAvatarUrl, getCached, setCached } from "../lib/avatarCache";
+import { laneColor, getAvatarColor } from "../lib/laneColors";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -14,35 +15,6 @@ import {
 
 const ROW_HEIGHT = 32;
 const TABLE_HEADER_HEIGHT = 26;
-
-// Color values for lane-colored ref pills (must match GraphRail's LANE_STROKE_COLORS).
-const LANE_PILL_COLORS = [
-  "rgb(96, 165, 250)",   // blue-400
-  "rgb(192, 132, 252)",  // purple-400
-  "rgb(52, 211, 153)",   // emerald-400
-  "rgb(251, 191, 36)",   // amber-400
-  "rgb(244, 114, 182)",  // pink-400
-  "rgb(34, 211, 238)",   // cyan-400
-  "rgb(251, 146, 60)",   // orange-400
-  "rgb(163, 230, 53)",   // lime-400
-] as const;
-
-function laneColor(colorIndex: number): string {
-  return LANE_PILL_COLORS[colorIndex % LANE_PILL_COLORS.length];
-}
-
-const AVATAR_COLORS = [
-  "#60a5fa", "#a78bfa", "#34d399", "#fb923c",
-  "#f472b6", "#22d3ee", "#fbbf24", "#818cf8",
-];
-
-function getAvatarColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) & 0xffff;
-  }
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-}
 
 function AuthorAvatar({ name, email }: { name: string; email: string }) {
   const userId = parseGithubUserId(email);
@@ -139,7 +111,7 @@ export function GitGraphCanvas({
     <div className="flex h-full min-h-0 flex-col">
       {/* Column headers */}
       <div
-        className="grid shrink-0 items-center gap-3 border-b border-border/40 bg-card/55 pr-3 text-[9.5px] font-semibold uppercase tracking-[0.13em] text-muted-foreground/60"
+        className="grid shrink-0 items-center gap-3 border-b border-border/40 bg-card/55 pr-3 text-[9.5px] font-semibold uppercase tracking-[0.13em] text-muted-foreground"
         style={{ height: TABLE_HEADER_HEIGHT, gridTemplateColumns: gridTemplate }}
       >
         <div />
@@ -197,7 +169,7 @@ export function GitGraphCanvas({
                       </div>
 
                       {/* SHA */}
-                      <span className="pl-px font-mono text-[10.5px] tabular-nums text-muted-foreground/75">
+                      <span className="pl-px font-mono text-[10.5px] tabular-nums text-muted-foreground">
                         {commit.shortHash}
                       </span>
 
@@ -247,7 +219,7 @@ export function GitGraphCanvas({
                       </span>
 
                       {/* Date */}
-                      <span className="text-right font-mono text-[10.5px] tabular-nums text-muted-foreground/70">
+                      <span className="text-right font-mono text-[10.5px] tabular-nums text-muted-foreground">
                         {formatDate(commit.timestamp)}
                       </span>
 
@@ -255,19 +227,19 @@ export function GitGraphCanvas({
                       <span className="flex min-w-0 items-center justify-end gap-1.5 font-mono text-[10px] tabular-nums">
                         {commit.filesChanged > 0 ? (
                           <>
-                            <span className="text-muted-foreground/60">{commit.filesChanged}</span>
-                            <span className="size-[3px] shrink-0 rounded-full bg-muted-foreground/30" />
+                            <span className="text-muted-foreground">{commit.filesChanged}</span>
+                            <span className="size-[3px] shrink-0 rounded-full bg-muted-foreground/50" />
                           </>
                         ) : null}
                         {commit.insertions > 0 || commit.deletions > 0 ? (
                           <>
                             {commit.insertions > 0 && (
-                              <span className="font-semibold text-emerald-500/90">
+                              <span className="font-semibold text-success">
                                 +{commit.insertions}
                               </span>
                             )}
                             {commit.deletions > 0 && (
-                              <span className="font-semibold text-rose-500/90">
+                              <span className="font-semibold text-error">
                                 −{commit.deletions}
                               </span>
                             )}

@@ -1,0 +1,73 @@
+---
+title: "Staging & Committing"
+description: "Stage individual files or entire sections, write commit messages, amend, push, pull, and fetch."
+---
+
+# Staging & Committing
+
+The main body of the Source Control panel shows three collapsible sections:
+
+| Section | Contents |
+|---------|----------|
+| **Staged Changes** | Files added to the index (ready to commit) |
+| **Changes** | Modified tracked files not yet staged |
+| **Untracked Files** | New files git has not seen before |
+
+## Staging Files
+
+- **Stage a single file** — click the **+** icon on the file row, or right-click → **Stage**.
+- **Stage an entire section** — click **Stage All** in the section header.
+- **Stage all changes at once** — click the **All Changes** button at the top of the list.
+
+## Unstaging Files
+
+- **Unstage a single file** — click the **−** icon on a staged file row.
+- **Unstage all** — click **Unstage All** in the Staged Changes header.
+
+## Discarding Changes
+
+Right-click an unstaged file → **Discard Changes**. A confirmation dialog appears because this operation is destructive and cannot be undone (it runs `git checkout -- <file>`).
+
+Untracked files can be discarded the same way; the underlying command removes the file from disk.
+
+## Commit Message
+
+The text field at the bottom of the panel is the commit message editor.
+
+- The first line is the **subject line**. A color indicator shows length:
+  - Green → 1–50 characters (ideal)
+  - Yellow → 51–72 characters (acceptable)
+  - Red → 73+ characters (too long)
+- Separate the subject from the body with a blank line.
+- Previously used messages are accessible via the **Clock** icon (recent messages history, up to 10 entries).
+
+### AI-Generated Message
+
+Click the **Sparkle** icon to ask the configured AI provider to generate a commit message from the current diff. The feature requires an API key to be set in AI Settings. Keyless local providers (Ollama, LM Studio, MLX) are also supported.
+
+## Commit
+
+Click **Commit** (or press `Cmd+Enter` inside the message field) to create a commit from all staged files. The staged area must be non-empty and the message must be non-blank.
+
+### Amend
+
+Open the **...** dropdown next to the Commit button and choose **Amend**. This rewrites the most recent commit with the current staged files and message. Use with care if the commit has already been pushed.
+
+## Push, Pull, Fetch
+
+The dropdown next to Commit exposes:
+
+| Action | What it does |
+|--------|-------------|
+| **Push** | `git push` — uploads local commits to the remote |
+| **Force Push (with lease)** | `git push --force-with-lease` — safer force push; aborts if the remote has commits you haven't seen |
+| **Set Upstream & Push** | First push for a new branch; sets the tracking relationship |
+| **Pull** | `git pull` on the current branch |
+| **Fetch** | `git fetch` — updates remote-tracking refs without merging |
+| **Abort** | `git merge --abort` / `git rebase --abort` / `git cherry-pick --abort` depending on what is in progress |
+
+Progress output from long-running operations (push, pull, fetch) is shown inline below the commit form.
+
+## Merge Conflicts
+
+When conflicts are detected, a warning banner appears at the top of the panel. Conflicting files appear in the Changes section with a `UU` (unmerged) indicator. Resolve conflicts in the editor, then stage and commit as normal.

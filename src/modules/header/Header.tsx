@@ -44,6 +44,7 @@ type Props = {
   onCloseOthers: (id: number) => void;
   onCloseAll: () => void;
   onDuplicate: (id: number) => void;
+  onRename: (id: number, label: string) => void;
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
   onOpenKeybindings: () => void;
@@ -63,6 +64,7 @@ export const Header = React.memo(function Header({
   onCloseOthers,
   onCloseAll,
   onDuplicate,
+  onRename,
   onOpenShortcuts,
   onOpenSettings,
   onOpenKeybindings,
@@ -186,6 +188,7 @@ export const Header = React.memo(function Header({
             onCloseOthers={onCloseOthers}
             onCloseAll={onCloseAll}
             onDuplicate={onDuplicate}
+            onRename={onRename}
             onNewGitGraph={onNewGitGraph}
             compact={false}
           />

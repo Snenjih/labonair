@@ -59,6 +59,7 @@ export type TabsState = {
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
   openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
   openGitDiffTab: (repoRoot: string, filePath: string, staged: boolean, section: "staged" | "unstaged" | "untracked") => number;
+  renameTab: (id: number, label: string) => void;
   setActivePaneId: (tabId: number, paneId: string) => void;
   updatePaneSessionCwd: (tabId: number, sessionId: string, cwd: string) => void;
   splitPane: (tabId: number, direction: PaneDirection) => void;
@@ -286,6 +287,16 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       _nextId: s._nextId + 1,
     }));
     return id;
+  },
+
+  renameTab: (id, label) => {
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === id && t.kind === "workspace"
+          ? { ...t, customTitle: label.trim() || undefined }
+          : t,
+      ),
+    }));
   },
 
   closeTab: (id) => {

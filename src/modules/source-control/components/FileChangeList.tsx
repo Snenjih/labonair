@@ -122,10 +122,10 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
           {(sectionStats.added > 0 || sectionStats.removed > 0) && (
             <span className="flex items-center gap-1 text-[9px] tabular-nums">
               {sectionStats.added > 0 && (
-                <span className="font-medium text-green-500">+{sectionStats.added}</span>
+                <span className="font-medium text-success">+{sectionStats.added}</span>
               )}
               {sectionStats.removed > 0 && (
-                <span className="font-medium text-red-500">−{sectionStats.removed}</span>
+                <span className="font-medium text-error">−{sectionStats.removed}</span>
               )}
             </span>
           )}

@@ -251,8 +251,8 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
                       className={cn(
                         "flex flex-1 items-center justify-center gap-1.5 rounded border py-1.5 text-[11px] font-medium transition-all",
                         form.target === t
-                          ? "border-primary/60 bg-primary/10 text-primary"
-                          : "border-border/40 bg-background/60 text-muted-foreground/60 hover:border-border/70 hover:text-foreground"
+                          ? "border-primary/60 bg-primary/10 text-foreground dark:text-primary"
+                          : "border-border/40 bg-background/60 text-muted-foreground hover:border-border/70 hover:text-foreground"
                       )}
                     >
                       <HugeiconsIcon
@@ -301,8 +301,8 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
                       className={cn(
                         "flex flex-1 flex-col items-center gap-1 rounded border px-1 py-1.5 transition-all",
                         form.defaultExecMode === value
-                          ? "border-primary/60 bg-primary/10 text-primary"
-                          : "border-border/40 bg-background/60 text-muted-foreground/50 hover:border-border/70 hover:text-foreground"
+                          ? "border-primary/60 bg-primary/10 text-foreground dark:text-primary"
+                          : "border-border/40 bg-background/60 text-muted-foreground hover:border-border/70 hover:text-foreground"
                       )}
                     >
                       <HugeiconsIcon icon={icon} size={12} strokeWidth={1.5} />

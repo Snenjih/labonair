@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { fileIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import {
@@ -9,7 +8,6 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Cancel01Icon,
   CloudServerIcon,
   ComputerTerminal02Icon,
   Folder01Icon,
@@ -44,6 +42,7 @@ export function labelFor(t: Tab): string {
   if (t.kind === "git-graph") return t.title;
   if (t.kind === "git-diff") return t.title;
   const wt = t as WorkspaceTab;
+  if (wt.customTitle) return wt.customTitle;
   const activeSession = wt.sessions[wt.activePaneId];
   if (activeSession?.kind === "local" && activeSession.cwd) {
     const parts = activeSession.cwd.split("/").filter(Boolean);
@@ -209,31 +208,5 @@ export function NewTabDropdownItems({
         </DropdownMenuSubContent>
       </DropdownMenuSub>
     </>
-  );
-}
-
-// --- Tab close button ---
-
-interface TabCloseButtonProps {
-  show: boolean;
-  onClose: () => void;
-}
-
-export function TabCloseButton({ show, onClose }: TabCloseButtonProps) {
-  if (!show) return null;
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label="Close tab"
-      title="Close tab"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
-      className="size-5 shrink-0 rounded opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-60"
-    >
-      <HugeiconsIcon icon={Cancel01Icon} size={11} strokeWidth={2} />
-    </Button>
   );
 }

@@ -16,6 +16,9 @@ export type UpdaterStatus =
 
 interface UpdaterState {
   status: UpdaterStatus;
+  dialogOpen: boolean;
+  openDialog: () => void;
+  closeDialog: () => void;
   runCheck: (options?: { manual?: boolean }) => Promise<void>;
   install: () => Promise<void>;
   dismiss: () => void;
@@ -23,6 +26,10 @@ interface UpdaterState {
 
 export const useUpdaterStore = create<UpdaterState>((set, get) => ({
   status: { kind: "idle" },
+  dialogOpen: false,
+
+  openDialog: () => set({ dialogOpen: true }),
+  closeDialog: () => set({ dialogOpen: false }),
 
   runCheck: async ({ manual } = {}) => {
     const current = get().status.kind;
@@ -38,7 +45,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
       const update = await check();
       localStorage.setItem(LAST_CHECK_KEY, String(Date.now()));
       if (update) {
-        set({ status: { kind: "available", update } });
+        set({ status: { kind: "available", update }, dialogOpen: true });
       } else {
         set({ status: { kind: "uptodate" } });
       }
@@ -73,6 +80,6 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
   },
 
   dismiss: () => {
-    set({ status: { kind: "idle" } });
+    set({ dialogOpen: false });
   },
 }));

@@ -82,8 +82,6 @@ jobs:
         run: rustup target add ${{ matrix.rust-target }}
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:

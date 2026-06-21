@@ -1,0 +1,58 @@
+---
+title: "Git Graph"
+description: "Visualize your repository's commit history as an interactive DAG with branch lanes, context menu actions, and commit diffs."
+---
+
+# Git Graph
+
+The **Git Graph** opens as a new tab when you click **Open Git Graph** in the Branch Bar. It renders your repository's commit history as a directed acyclic graph (DAG) — each commit is a node, branch lines show parent relationships, and lanes separate parallel lines of work.
+
+## Opening the Graph
+
+Click the graph icon in the Branch Bar, or use the command palette → **Open Git Graph**. The graph locks to the repository path at the time it is opened; it does not follow workspace root changes.
+
+The initial load fetches the 500 most recent commits. Click **Load more** at the bottom to fetch 200 additional commits at a time.
+
+## Reading the Graph
+
+| Element | Meaning |
+|---------|---------|
+| Colored dot | A commit node; color corresponds to the branch lane |
+| Curved bezier line | Parent–child relationship between commits |
+| Lane (vertical column) | A parallel line of development; lanes are reused when a branch closes |
+| Branch label tag | The branch or tag HEAD currently points at |
+
+Commits are sorted by author date, newest at the top. The graph algorithm assigns lanes greedily and recycles a lane as soon as the branch it represents is fully rendered.
+
+## Commit Details
+
+Click any commit row to open the **Commit Detail Panel** (slides in from the right):
+
+- Full commit message (subject + body)
+- Author name, email, and date
+- Parent hashes (clickable to jump to parent)
+- List of changed files
+
+Click a file in the changed-files list to open the **Commit Diff Panel**, which shows the full unified diff for that commit.
+
+## Context Menu Actions
+
+Right-click any commit to access:
+
+| Action | What it does |
+|--------|-------------|
+| **View Changes** | Opens the commit diff panel |
+| **Checkout commit** | Detaches HEAD to this commit (`git checkout <hash>`) |
+| **Create branch here** | Creates and checks out a new branch starting at this commit |
+| **Cherry-pick** | Applies this commit's changes onto the current branch |
+| **Copy hash** | Copies the full SHA-1 to the clipboard |
+
+## Performance
+
+The graph uses `@tanstack/react-virtual` for row virtualization — only visible rows are rendered in the DOM regardless of total commit count. Repositories with thousands of commits remain smooth to scroll.
+
+## Limitations
+
+- The graph does not auto-refresh after opening. Close and reopen the tab to see new commits.
+- Rebases and force-pushes from other sources are only reflected after reopening the tab.
+- The "all branches" view is always on; there is no filter to show a single branch's history in the current version.

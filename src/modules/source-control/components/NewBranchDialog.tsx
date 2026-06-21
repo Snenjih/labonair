@@ -103,11 +103,11 @@ export function NewBranchDialog({
               placeholder="feature/my-branch"
               className={cn(
                 "h-7 text-[12px]",
-                nameError && "ring-2 ring-red-500/50 border-red-500/50"
+                nameError && "ring-2 ring-error/50 border-error/50"
               )}
             />
             {nameError && (
-              <p className="text-[10px] text-red-400">Branch name is required.</p>
+              <p className="text-[10px] text-error">Branch name is required.</p>
             )}
           </div>
 
@@ -137,12 +137,12 @@ export function NewBranchDialog({
 
           {/* Error */}
           {error && (
-            <div className="flex items-start gap-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5">
-              <p className="flex-1 text-[10px] text-red-400">{error}</p>
+            <div className="flex items-start gap-2 rounded border border-error/30 bg-error/10 px-2 py-1.5">
+              <p className="flex-1 text-[10px] text-error">{error}</p>
               <button
                 type="button"
                 onClick={() => setError(null)}
-                className="mt-0.5 shrink-0 text-red-400/60 hover:text-red-400"
+                className="mt-0.5 shrink-0 text-error/60 hover:text-error"
               >
                 <HugeiconsIcon icon={Cancel01Icon} size={10} strokeWidth={2} />
               </button>

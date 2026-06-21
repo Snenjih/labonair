@@ -147,6 +147,15 @@ export const useProvidersStore = create<ProvidersState>((set, get) => ({
       }
     }
 
+    // Remove instances whose provider no longer exists (e.g., from reverted features)
+    const knownIds = new Set(PROVIDERS.map((p) => p.id));
+    const cleaned = instances.filter((i) => knownIds.has(i.providerId));
+    if (cleaned.length !== instances.length) {
+      await store.set(PROVIDERS_KEY, cleaned);
+      await store.save();
+      instances = cleaned;
+    }
+
     const keys = await loadInstanceKeys(instances);
     set({ instances, instanceKeys: keys, hydrated: true });
   },

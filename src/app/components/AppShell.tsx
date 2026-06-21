@@ -98,6 +98,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onCloseOthers: tabs.handleCloseOthers,
     onCloseAll: tabs.handleCloseAll,
     onDuplicate: tabs.handleDuplicateTab,
+    onRename: tabs.handleRenameTab,
     onOpenFile: tabs.handleOpenFile,
     onOpenPreview: tabs.openPreviewTab,
     onPathRenamed: tabs.handlePathRenamed,
@@ -128,6 +129,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onCloseOthers={tabs.handleCloseOthers}
                 onCloseAll={tabs.handleCloseAll}
                 onDuplicate={tabs.handleDuplicateTab}
+                onRename={tabs.handleRenameTab}
                 onOpenShortcuts={() => ctrl.setShortcutsOpen(true)}
                 onOpenSettings={() => void openSettingsWindow()}
                 onOpenKeybindings={() => void openSettingsWindow("shortcuts")}

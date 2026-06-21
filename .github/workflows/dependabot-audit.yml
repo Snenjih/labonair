@@ -46,7 +46,7 @@ jobs:
         run: cargo audit 2>&1 | tee ../cargo-audit.txt || echo "CARGO_AUDIT_FAILED=true" >> "$GITHUB_ENV"
 
       - name: Post audit summary as PR comment
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v9
         with:
           script: |
