@@ -30,10 +30,10 @@ function DiffLine({ line, isInOurs, isInTheirs }: { line: string; isInOurs: bool
     <div
       className={cn(
         "font-mono text-[11px] leading-5 px-2 whitespace-pre",
-        isAdd && !isInOurs && !isInTheirs && "bg-green-500/10 text-green-500",
-        isDel && !isInOurs && !isInTheirs && "bg-red-500/10 text-red-500",
-        isHunk && "bg-blue-400/5 text-blue-400/80 text-xs",
-        isFileHeader && "bg-muted/40 text-muted-foreground/70 text-[10px]",
+        isAdd && !isInOurs && !isInTheirs && "bg-success/10 text-success",
+        isDel && !isInOurs && !isInTheirs && "bg-error/10 text-error",
+        isHunk && "bg-info/5 text-info/80 text-xs",
+        isFileHeader && "bg-muted/40 text-muted-foreground text-[10px]",
         isOurMarker && "bg-purple-500/15 text-purple-400 font-bold border-l-2 border-purple-500",
         isTheirMarker && "bg-orange-500/15 text-orange-400 font-bold border-l-2 border-orange-500",
         isSep && "bg-border/50 text-muted-foreground",
@@ -179,7 +179,7 @@ export function CommitDiffPanel({ hash, repositoryPath, onClose }: CommitDiffPan
       ) : (
         <ScrollArea ref={scrollRef} className="min-h-0 flex-1">
           {isTruncated && (
-            <div className="border-b border-yellow-500/30 bg-yellow-500/10 px-2 py-1.5 text-[10px] text-yellow-500">
+            <div className="border-b border-warning/30 bg-warning/10 px-2 py-1.5 text-[10px] text-warning">
               Diff is too large — showing a truncated version.
             </div>
           )}

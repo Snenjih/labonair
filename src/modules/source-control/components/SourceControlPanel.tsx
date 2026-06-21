@@ -58,17 +58,17 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
         {(totalAdded > 0 || totalRemoved > 0) && (
           <span className="flex items-center gap-1.5 text-[10px] tabular-nums">
             {totalAdded > 0 && (
-              <span className="font-semibold text-green-500">+{totalAdded}</span>
+              <span className="font-semibold text-success">+{totalAdded}</span>
             )}
             {totalRemoved > 0 && (
-              <span className="font-semibold text-red-500">−{totalRemoved}</span>
+              <span className="font-semibold text-error">−{totalRemoved}</span>
             )}
           </span>
         )}
       </div>
 
       {status?.hasConflicts && (
-        <div className="mx-3 my-1 rounded border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-[10px] text-orange-400">
+        <div className="mx-3 my-1 rounded border border-warning/30 bg-warning/10 px-2 py-1 text-[10px] text-warning">
           Merge conflicts detected — resolve before committing.
         </div>
       )}

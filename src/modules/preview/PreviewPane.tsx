@@ -90,7 +90,7 @@ export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
         <div
           className={
             url && !isImage
-              ? "relative min-h-0 flex-1 bg-white"
+              ? "relative min-h-0 flex-1 bg-background"
               : "relative min-h-0 flex-1 bg-background"
           }
         >

@@ -160,7 +160,7 @@ export function GitGraphPane({ tab }: Props) {
               onClick={reload}
               disabled={isLoading}
               title="Refresh git graph"
-              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-accent hover:text-foreground disabled:opacity-40"
+              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
             >
               <HugeiconsIcon icon={Refresh01Icon} size={11} strokeWidth={1.75} />
             </button>
@@ -169,7 +169,7 @@ export function GitGraphPane({ tab }: Props) {
 
         {/* Error banner */}
         {actionError && (
-          <div className="mx-2 mb-1 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[10px] text-red-400">
+          <div className="mx-2 mb-1 rounded border border-error/30 bg-error/10 px-2 py-1.5 text-[10px] text-error">
             {actionError}
             <button
               type="button"

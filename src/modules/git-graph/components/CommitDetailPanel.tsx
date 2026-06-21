@@ -7,6 +7,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { git } from "@/modules/source-control/lib/gitInvoke";
 import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
 import { getAvatarUrl, getCached, setCached } from "../lib/avatarCache";
+import { getAvatarColor } from "../lib/laneColors";
 import { cn } from "@/lib/utils";
 import type { LayoutCommit } from "../types";
 
@@ -128,10 +129,10 @@ function TreeNodeRow({
         </span>
         <div className="flex shrink-0 items-center gap-1 font-mono text-[9.5px]">
           {node.added > 0 && (
-            <span className="text-emerald-400">+{node.added}</span>
+            <span className="text-success">+{node.added}</span>
           )}
           {node.removed > 0 && (
-            <span className="text-rose-400">-{node.removed}</span>
+            <span className="text-error">-{node.removed}</span>
           )}
         </div>
       </div>
@@ -209,16 +210,10 @@ function InitialsAvatar({ name }: { name: string }) {
     parts.length === 1
       ? parts[0][0].toUpperCase()
       : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  const palette = [
-    "#60a5fa", "#a78bfa", "#34d399", "#fb923c",
-    "#f472b6", "#22d3ee", "#fbbf24", "#818cf8",
-  ];
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
   return (
     <div
       className="flex size-full items-center justify-center text-[20px] font-bold text-background"
-      style={{ backgroundColor: palette[h % palette.length] }}
+      style={{ backgroundColor: getAvatarColor(name) }}
     >
       {initials}
     </div>
@@ -436,10 +431,10 @@ export function CommitDetailPanel({
           </span>
           <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
             {totalAdded > 0 && (
-              <span className="text-emerald-400">+{totalAdded}</span>
+              <span className="text-success">+{totalAdded}</span>
             )}
             {totalRemoved > 0 && (
-              <span className="text-rose-400">−{totalRemoved}</span>
+              <span className="text-error">−{totalRemoved}</span>
             )}
           </div>
         </div>
