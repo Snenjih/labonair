@@ -50,6 +50,10 @@ echo "🦀 Updating src-tauri/Cargo.toml..."
 sed -i.bak "s/version = \"${CURRENT_VERSION}\"/version = \"${NEW_VERSION}\"/" src-tauri/Cargo.toml
 rm src-tauri/Cargo.toml.bak
 
+# Sync Cargo.lock to the new version
+echo "🔒 Updating src-tauri/Cargo.lock..."
+(cd src-tauri && cargo update --package nexum 2>/dev/null)
+
 # Update src-tauri/tauri.conf.json
 echo "🎛️  Updating src-tauri/tauri.conf.json..."
 sed -i.bak "s/\"version\": \"${CURRENT_VERSION}\"/\"version\": \"${NEW_VERSION}\"/" src-tauri/tauri.conf.json
@@ -60,18 +64,19 @@ echo ""
 echo "Files updated:"
 echo "  - package.json"
 echo "  - src-tauri/Cargo.toml"
+echo "  - src-tauri/Cargo.lock"
 echo "  - src-tauri/tauri.conf.json"
 echo ""
 if [ "$AUTO_CONFIRM" = true ]; then
   echo -e "${YELLOW}Auto-committing changes...${NC}"
-  git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+  git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
   git commit -m "chore: bump version to ${NEW_VERSION}"
   git tag "v${NEW_VERSION}"
   git push origin main --tags
   echo -e "${GREEN}🚀 Committed, tagged and pushed v${NEW_VERSION}${NC}"
 else
   echo -e "${YELLOW}Next steps:${NC}"
-  echo "  git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json"
+  echo "  git add package.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json"
   echo "  git commit -m \"chore: bump version to ${NEW_VERSION}\""
   echo "  git tag v${NEW_VERSION}"
   echo "  git push origin main --tags"
