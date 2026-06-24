@@ -170,6 +170,7 @@ const RenderedMessage = memo(function RenderedMessage({
         <div className="flex flex-col gap-3">
           {message.parts.map((part, i) => (
             <RenderedPart
+              // biome-ignore lint/suspicious/noArrayIndexKey: AI SDK parts have no stable id
               key={`${message.id}-${i}`}
               part={part as AnyPart}
               onApproval={onApproval}

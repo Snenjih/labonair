@@ -28,6 +28,8 @@ export class ErrorBoundary extends React.Component<{ children: ReactNode }, Stat
               viewBox="0 0 24 24"
               stroke="currentColor"
               strokeWidth={1.5}
+              role="img"
+              aria-label="Error"
             >
               <path
                 strokeLinecap="round"

@@ -297,7 +297,7 @@ export function ThemeMarketplace() {
                   r.author.toLowerCase().includes(q),
               )
               .map((r) => {
-                const meta = installedThemes.find((t) => t.id === r.id)!;
+                const meta = installedThemes.find((t) => t.id === r.id);
                 return (
                   <ThemeCard key={r.id} kind="community" remote={r} installedMeta={meta} />
                 );

@@ -122,6 +122,7 @@ function InlineDiff({
     <div className="overflow-hidden rounded-md border border-border/40 font-mono text-[10.5px]">
       {oldLines.map((line, i) => (
         <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: static diff lines, never reorder
           key={`r${i}`}
           className="border-l-2 border-error/50 bg-error/8 px-2 py-px leading-relaxed text-error"
         >
@@ -131,6 +132,7 @@ function InlineDiff({
       ))}
       {newLines.map((line, i) => (
         <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: static diff lines, never reorder
           key={`a${i}`}
           className="border-l-2 border-success/50 bg-success/8 px-2 py-px leading-relaxed text-success"
         >
@@ -224,6 +226,7 @@ function PreviewBlock({
           <div className="space-y-2">
             {edits.map((e, i) => (
               <InlineDiff
+                // biome-ignore lint/suspicious/noArrayIndexKey: edits have no stable id
                 key={i}
                 oldLines={e.old_string?.split("\n") ?? []}
                 newLines={e.new_string?.split("\n") ?? []}

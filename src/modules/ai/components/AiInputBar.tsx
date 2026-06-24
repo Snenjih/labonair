@@ -104,7 +104,7 @@ export function AiInputBar() {
 
   useEffect(() => {
     if (fileDebounceRef.current) clearTimeout(fileDebounceRef.current);
-    if (!fileTrigger || !fileTrigger.query) {
+    if (!fileTrigger?.query) {
       setFileHits([]);
       setFileLoading(false);
       return;

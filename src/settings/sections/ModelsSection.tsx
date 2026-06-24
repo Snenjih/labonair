@@ -262,7 +262,7 @@ function LmStudioChatBlock() {
     if (testStatus === "testing") return;
     setTestStatus("testing");
     try {
-      const res = await fetch(urlDraft.replace(/\/$/, "") + "/models", {
+      const res = await fetch(`${urlDraft.replace(/\/$/, "")}/models`, {
         method: "GET",
       });
       setTestStatus(res.ok ? "ok" : "fail");
@@ -392,8 +392,8 @@ function OpenAICompatibleBlock({
     try {
       const headers: Record<string, string> = {};
       const key = keyDraft.trim() || currentApiKey;
-      if (key) headers["Authorization"] = `Bearer ${key}`;
-      const res = await fetch(urlDraft.replace(/\/$/, "") + "/models", {
+      if (key) headers.Authorization = `Bearer ${key}`;
+      const res = await fetch(`${urlDraft.replace(/\/$/, "")}/models`, {
         method: "GET",
         headers,
       });
@@ -542,7 +542,7 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
   const testLmStudio = async () => {
     setTestStatus("testing");
     try {
-      const res = await fetch(urlDraft.replace(/\/$/, "") + "/models", {
+      const res = await fetch(`${urlDraft.replace(/\/$/, "")}/models`, {
         method: "GET",
       });
       setTestStatus(res.ok ? "ok" : "fail");
