@@ -9,6 +9,7 @@ export type DirEntry = {
   kind: "file" | "dir" | "symlink";
   size: number;
   mtime: number;
+  is_ignored?: boolean;
 };
 
 export type PendingCreate = {
