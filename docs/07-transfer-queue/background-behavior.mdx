@@ -1,6 +1,6 @@
 ---
 title: "Background Behavior"
-description: "How Nexum's transfer worker runs independently of the UI, when transfers stop, and what happens to the queue on app quit."
+description: "How Labonair's transfer worker runs independently of the UI, when transfers stop, and what happens to the queue on app quit."
 ---
 
 # Background Behavior
@@ -34,7 +34,7 @@ A transfer stops under the following conditions:
 
 ## Queue Persistence
 
-The Transfer Queue is **not persisted to disk**. If Nexum is quit while transfers are active or pending, the queue is lost entirely. On next launch, the queue starts empty.
+The Transfer Queue is **not persisted to disk**. If Labonair is quit while transfers are active or pending, the queue is lost entirely. On next launch, the queue starts empty.
 
 There is no automatic resume functionality. Transfers that were interrupted by an app quit must be re-initiated manually.
 
@@ -61,5 +61,5 @@ You can safely close the SFTP tab once you have started a large transfer. The tr
 :::
 
 :::warning
-Do not quit Nexum while critical transfers are in progress. The queue is not persisted and there is no resume functionality — any interrupted transfer must be restarted from the beginning.
+Do not quit Labonair while critical transfers are in progress. The queue is not persisted and there is no resume functionality — any interrupted transfer must be restarted from the beginning.
 :::

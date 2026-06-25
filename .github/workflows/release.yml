@@ -35,7 +35,7 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          name: "Nexum ${{ github.ref_name }}"
+          name: "Labonair ${{ github.ref_name }}"
           body: |
             ## Changelog
             ${{ steps.changelog.outputs.CHANGELOG }}
@@ -104,7 +104,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "Nexum ${{ github.ref_name }}"
+          releaseName: "Labonair ${{ github.ref_name }}"
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
@@ -125,17 +125,17 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
 
           gh release download "v${VERSION}" \
-            --repo Snenjih/nexum \
-            --pattern "Nexum_${VERSION}_aarch64.dmg" \
+            --repo Snenjih/labonair \
+            --pattern "Labonair_${VERSION}_aarch64.dmg" \
             --dir /tmp/
-          SHA256_AARCH64=$(sha256sum /tmp/Nexum_${VERSION}_aarch64.dmg | cut -d' ' -f1)
+          SHA256_AARCH64=$(sha256sum /tmp/Labonair_${VERSION}_aarch64.dmg | cut -d' ' -f1)
           echo "SHA256_AARCH64=$SHA256_AARCH64" >> $GITHUB_OUTPUT
 
           gh release download "v${VERSION}" \
-            --repo Snenjih/nexum \
-            --pattern "Nexum_${VERSION}_x64.dmg" \
+            --repo Snenjih/labonair \
+            --pattern "Labonair_${VERSION}_x64.dmg" \
             --dir /tmp/
-          SHA256_X86_64=$(sha256sum /tmp/Nexum_${VERSION}_x64.dmg | cut -d' ' -f1)
+          SHA256_X86_64=$(sha256sum /tmp/Labonair_${VERSION}_x64.dmg | cut -d' ' -f1)
           echo "SHA256_X86_64=$SHA256_X86_64" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -144,8 +144,8 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.TAP_GITHUB_TOKEN }}
-          repository: Snenjih/homebrew-nexum
-          event-type: nexum-release
+          repository: Snenjih/homebrew-labonair
+          event-type: labonair-release
           client-payload: >-
             {"version": "${{ steps.version.outputs.VERSION }}",
              "sha256_aarch64": "${{ steps.sha.outputs.SHA256_AARCH64 }}",

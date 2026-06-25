@@ -1,17 +1,17 @@
 ---
 title: "Remote File Editing"
-description: "Edit files on remote servers seamlessly using Nexum's SFTP-backed temp-file sync workflow."
+description: "Edit files on remote servers seamlessly using Labonair's SFTP-backed temp-file sync workflow."
 ---
 
 # Remote File Editing
 
-Nexum lets you edit files on remote servers as naturally as local files. The underlying mechanism downloads the file to a temp location, opens it in the editor, and uploads changes back on save — all transparent to you.
+Labonair lets you edit files on remote servers as naturally as local files. The underlying mechanism downloads the file to a temp location, opens it in the editor, and uploads changes back on save — all transparent to you.
 
 ## Triggering a remote edit
 
-In an active SFTP tab, right-click any file in the file listing and choose **Edit**. Nexum calls the `prepare_remote_edit` Rust command, which:
+In an active SFTP tab, right-click any file in the file listing and choose **Edit**. Labonair calls the `prepare_remote_edit` Rust command, which:
 
-1. Creates a unique temp path: `/tmp/nexum_edits/<uuid>_<filename>`.
+1. Creates a unique temp path: `/tmp/labonair_edits/<uuid>_<filename>`.
 2. Downloads the file content from the remote host over the active SFTP connection.
 3. Opens the temp file in a new editor tab.
 
@@ -19,7 +19,7 @@ The tab label shows the original filename. A cloud icon (⬆) in the tab indicat
 
 ## Saving changes
 
-Press `Cmd+S` at any time. Nexum:
+Press `Cmd+S` at any time. Labonair:
 
 1. Writes the current editor content to the local temp file.
 2. Calls `save_remote_edit` via IPC, passing the temp path and the original remote path.
@@ -30,16 +30,16 @@ There is no manual "upload" step — saving is uploading.
 
 ## What happens if the session drops
 
-If the SFTP connection disconnects while a remote editor tab is open, the next `Cmd+S` will show a warning notification. Your changes are **not lost** — they remain in the temp file at `/tmp/nexum_edits/`. Once you re-establish the SFTP connection to the same host, saving will succeed.
+If the SFTP connection disconnects while a remote editor tab is open, the next `Cmd+S` will show a warning notification. Your changes are **not lost** — they remain in the temp file at `/tmp/labonair_edits/`. Once you re-establish the SFTP connection to the same host, saving will succeed.
 
 ## Temp file cleanup
 
-Nexum cleans up temp files in two situations:
+Labonair cleans up temp files in two situations:
 
 - When you close the remote editor tab.
 - When the application quits (graceful exit).
 
-Temp files are not cleaned up on crash. If you need to recover content after a crash, check `/tmp/nexum_edits/` manually.
+Temp files are not cleaned up on crash. If you need to recover content after a crash, check `/tmp/labonair_edits/` manually.
 
 ## Limitations
 
@@ -47,7 +47,7 @@ Temp files are not cleaned up on crash. If you need to recover content after a c
 |---|---|
 | Requires active SFTP session | Remote edit is only available in an open SFTP tab |
 | Files > 5 MB | A warning is shown before download; you can proceed or cancel |
-| Concurrent edits | If the same remote file is edited by another user simultaneously, Nexum does not detect conflicts — last write wins |
+| Concurrent edits | If the same remote file is edited by another user simultaneously, Labonair does not detect conflicts — last write wins |
 
 :::tip
 For large remote config files, consider opening a terminal SSH session alongside the editor tab. You can run `tail -f /var/log/app.log` in the terminal while editing the config in the editor — both tabs stay live simultaneously.

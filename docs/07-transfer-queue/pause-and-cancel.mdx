@@ -20,7 +20,7 @@ Cancellation is near-instant. There is no confirmation prompt — the transfer s
 
 ## What Happens to Partial Files
 
-When a transfer is cancelled mid-way, the partially written file is **left in place** at the destination. Nexum does not automatically clean up incomplete files.
+When a transfer is cancelled mid-way, the partially written file is **left in place** at the destination. Labonair does not automatically clean up incomplete files.
 
 Behavior by scenario:
 
@@ -30,7 +30,7 @@ Behavior by scenario:
 | Download cancelled | A partial file exists in the local destination directory |
 | Folder transfer cancelled | Files transferred before cancellation remain; the folder structure may be partially created |
 
-You will need to manually delete any partial files if they are not wanted. Nexum does not track which files were written during a cancelled transfer.
+You will need to manually delete any partial files if they are not wanted. Labonair does not track which files were written during a cancelled transfer.
 
 :::warning
 If you cancel an upload that was overwriting an existing remote file, the destination file may be in an inconsistent state (truncated or partially overwritten). Always verify critical files after a cancelled overwrite transfer.
@@ -40,7 +40,7 @@ If you cancel an upload that was overwriting an existing remote file, the destin
 
 Pause is not yet implemented. The Cancel button is the only way to stop an in-progress transfer. Pause/Resume is planned for a future release.
 
-If you need to temporarily free up bandwidth, cancel the transfer and re-initiate it later. Nexum does not support resuming partial transfers — the transfer restarts from the beginning.
+If you need to temporarily free up bandwidth, cancel the transfer and re-initiate it later. Labonair does not support resuming partial transfers — the transfer restarts from the beginning.
 
 ## Cancelling Multiple Transfers
 

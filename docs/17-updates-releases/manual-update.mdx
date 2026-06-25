@@ -1,6 +1,6 @@
 ---
 title: "Manual Update"
-description: "How to manually update or downgrade Nexum when the auto-updater is unavailable."
+description: "How to manually update or downgrade Labonair when the auto-updater is unavailable."
 ---
 
 # Manual Update
@@ -13,24 +13,24 @@ If the auto-updater doesn't trigger (for example, if automatic update checks are
 2. In the Settings sidebar, click **About**.
 3. Click the **"Check for Updates"** button.
 
-Nexum will query the GitHub Releases endpoint immediately. If an update is found, the same "Update Available" dialog used by the auto-updater will appear, and you can proceed with the download and install from there.
+Labonair will query the GitHub Releases endpoint immediately. If an update is found, the same "Update Available" dialog used by the auto-updater will appear, and you can proceed with the download and install from there.
 
 ## Downloading and Installing Manually
 
-If you cannot use the in-app updater at all (managed device, air-gapped environment, or a known issue with the updater), you can update Nexum by reinstalling from a fresh download:
+If you cannot use the in-app updater at all (managed device, air-gapped environment, or a known issue with the updater), you can update Labonair by reinstalling from a fresh download:
 
-1. Go to the [Nexum GitHub Releases page](https://github.com/nexum-app/nexum/releases).
+1. Go to the [Labonair GitHub Releases page](https://github.com/labonair-app/labonair/releases).
 2. Find the latest release and download the appropriate `.dmg`:
-   - **`Nexum_x.y.z_aarch64.dmg`** — Apple Silicon (M1/M2/M3/M4)
-   - **`Nexum_x.y.z_x86_64.dmg`** — Intel Mac
+   - **`Labonair_x.y.z_aarch64.dmg`** — Apple Silicon (M1/M2/M3/M4)
+   - **`Labonair_x.y.z_x86_64.dmg`** — Intel Mac
 3. Open the `.dmg` file.
-4. Drag **Nexum.app** into your **Applications** folder.
+4. Drag **Labonair.app** into your **Applications** folder.
 5. When prompted by Finder, confirm **"Replace"** to overwrite the existing installation.
 
 You do not need to uninstall the previous version first. The drag-and-replace operation is sufficient.
 
 :::tip
-Your hosts, settings, themes, API keys, and AI sessions are stored outside the app bundle — in `~/Library/Application Support/com.nexum.app/` and in the macOS Keychain. Replacing the `.app` bundle does not touch any of this data.
+Your hosts, settings, themes, API keys, and AI sessions are stored outside the app bundle — in `~/Library/Application Support/com.labonair.app/` and in the macOS Keychain. Replacing the `.app` bundle does not touch any of this data.
 :::
 
 ## Verifying the Installed Version
@@ -39,13 +39,13 @@ After updating, confirm the version by opening **Settings** (`Cmd+,`) → **Abou
 
 ## Downgrading to an Older Version
 
-Nexum does not enforce a minimum version restriction in settings, so downgrading is possible by installing an older `.dmg`:
+Labonair does not enforce a minimum version restriction in settings, so downgrading is possible by installing an older `.dmg`:
 
-1. Go to the [GitHub Releases page](https://github.com/nexum-app/nexum/releases).
+1. Go to the [GitHub Releases page](https://github.com/labonair-app/labonair/releases).
 2. Scroll to the desired older release or use the search filter.
 3. Download the `.dmg` for that version.
 4. Install it the same way as a manual update (drag and replace).
 
 :::warning
-Downgrading is generally safe for settings and host data, but use caution if the newer version migrated the database schema. A schema migration cannot always be reversed cleanly. If you downgraded and experience issues with hosts or settings loading, back up `~/Library/Application Support/com.nexum.app/` before proceeding and consult the release notes for migration notes.
+Downgrading is generally safe for settings and host data, but use caution if the newer version migrated the database schema. A schema migration cannot always be reversed cleanly. If you downgraded and experience issues with hosts or settings loading, back up `~/Library/Application Support/com.labonair.app/` before proceeding and consult the release notes for migration notes.
 :::

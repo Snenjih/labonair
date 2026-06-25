@@ -1,11 +1,11 @@
 ---
 title: "Local Terminal Overview"
-description: "A guide to Nexum's built-in local terminal emulator, powered by xterm.js and portable-pty."
+description: "A guide to Labonair's built-in local terminal emulator, powered by xterm.js and portable-pty."
 ---
 
 # Local Terminal Overview
 
-Nexum includes a high-performance local terminal emulator that runs your system shell in a native pseudo-terminal (PTY). It is not a wrapper around Terminal.app or iTerm2 — it is a fully self-contained terminal engine built into Nexum.
+Labonair includes a high-performance local terminal emulator that runs your system shell in a native pseudo-terminal (PTY). It is not a wrapper around Terminal.app or iTerm2 — it is a fully self-contained terminal engine built into Labonair.
 
 ## Technology stack
 
@@ -16,13 +16,13 @@ The terminal is built on two components:
 
 ## Workspace tabs
 
-Local terminals are displayed as **Workspace tabs** in the Nexum tab bar. Internally, the tab type is `terminal`. Each workspace tab can contain one or more terminal panes in a split layout, all sharing the same tab.
+Local terminals are displayed as **Workspace tabs** in the Labonair tab bar. Internally, the tab type is `terminal`. Each workspace tab can contain one or more terminal panes in a split layout, all sharing the same tab.
 
 You can have as many workspace tabs open simultaneously as you need. Each tab runs its own independent shell session.
 
 ## Shell support
 
-Nexum launches whatever shell your macOS user account is configured to use — typically **zsh** (the macOS default since Catalina), but **bash** and **fish** are also supported. Shell integration scripts are injected automatically for zsh and bash to enable CWD tracking and other features.
+Labonair launches whatever shell your macOS user account is configured to use — typically **zsh** (the macOS default since Catalina), but **bash** and **fish** are also supported. Shell integration scripts are injected automatically for zsh and bash to enable CWD tracking and other features.
 
 ## Appearance
 
@@ -31,7 +31,7 @@ The local terminal shares all visual settings with SSH terminal tabs:
 - Font family, size, weight, line height, and letter spacing
 - Cursor style (block, underline, bar) and blink
 - Scrollback buffer size
-- Color scheme (driven by Nexum's theme engine)
+- Color scheme (driven by Labonair's theme engine)
 
 Changes to any of these settings in **Settings → Terminal** apply immediately to all open terminal tabs — local and SSH alike.
 

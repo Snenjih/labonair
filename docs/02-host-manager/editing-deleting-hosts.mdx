@@ -33,7 +33,7 @@ Navigate between tabs freely — unsaved changes persist across tab switches wit
 Click **Save** at the bottom of the form. Host metadata (name, hostname, port, etc.) is written to SQLite immediately. If you changed a password or passphrase, the corresponding entry in the macOS Keychain is updated using the host's UUID as the lookup key — the old credential is replaced, not duplicated.
 
 :::tip
-You can change the auth method for an existing host at any time. If you switch from Password to SSH Key, Nexum removes the old Keychain password entry and stores the key passphrase (if any) instead.
+You can change the auth method for an existing host at any time. If you switch from Password to SSH Key, Labonair removes the old Keychain password entry and stores the key passphrase (if any) instead.
 :::
 
 ## Deleting a Host
@@ -44,7 +44,7 @@ To delete a host:
 2. A confirmation dialog appears listing the host's display name and hostname.
 3. Click **Delete** to confirm.
 
-Deletion is permanent and cannot be undone. Nexum automatically removes the host's Keychain entry (password or passphrase) at the same time, so no orphaned credentials are left behind.
+Deletion is permanent and cannot be undone. Labonair automatically removes the host's Keychain entry (password or passphrase) at the same time, so no orphaned credentials are left behind.
 
 :::warning
 There is no undo for host deletion. If you accidentally delete a host, you will need to recreate it manually. Consider using **Duplicate** first if you are restructuring your host list and want a safety copy.

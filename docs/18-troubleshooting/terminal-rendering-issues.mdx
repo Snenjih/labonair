@@ -1,11 +1,11 @@
 ---
 title: "Terminal Rendering Issues"
-description: "Fix visual glitches, blank screens, and rendering problems in Nexum's terminal emulator."
+description: "Fix visual glitches, blank screens, and rendering problems in Labonair's terminal emulator."
 ---
 
 # Terminal Rendering Issues
 
-Nexum uses xterm.js with a WebGL addon for hardware-accelerated terminal rendering. Most rendering issues are caused by the WebGL layer, font encoding, or layout measurement edge cases.
+Labonair uses xterm.js with a WebGL addon for hardware-accelerated terminal rendering. Most rendering issues are caused by the WebGL layer, font encoding, or layout measurement edge cases.
 
 ## Blank or Black Terminal
 
@@ -13,9 +13,9 @@ The terminal pane appears completely black after opening a new tab or SSH sessio
 
 **Cause:** The WebGL renderer failed to initialize, typically because the GPU context was unavailable or WebGL is disabled.
 
-**Resolution:** Nexum automatically falls back to the canvas 2D renderer when WebGL initialization fails. If the terminal is still blank after the fallback:
+**Resolution:** Labonair automatically falls back to the canvas 2D renderer when WebGL initialization fails. If the terminal is still blank after the fallback:
 1. Close and reopen the terminal tab
-2. If still blank, restart Nexum entirely
+2. If still blank, restart Labonair entirely
 3. If the issue persists across restarts, disable the WebGL addon in Settings → Terminal
 
 ## Garbled or Corrupted Characters
@@ -37,13 +37,13 @@ Long lines overflow horizontally instead of wrapping, or wrap at the wrong colum
 
 **Cause:** A window resize event failed to send the updated PTY dimensions (rows/columns) to the shell.
 
-**Resolution:** Close and reopen the terminal tab. This forces a fresh PTY allocation with the correct current size. You can also trigger a re-fit by resizing the Nexum window slightly.
+**Resolution:** Close and reopen the terminal tab. This forces a fresh PTY allocation with the correct current size. You can also trigger a re-fit by resizing the Labonair window slightly.
 
 ## Colors Look Wrong
 
 Terminal colors do not match what you see in other terminal emulators, or ANSI colors appear washed out or incorrect.
 
-**Cause:** A theme color mapping issue — the active Nexum theme may override ANSI palette colors in an unexpected way.
+**Cause:** A theme color mapping issue — the active Labonair theme may override ANSI palette colors in an unexpected way.
 
 **Resolution:** Switch to a different theme (Command Palette → "Switch Theme...") and check whether the colors normalize. If a specific theme causes the issue, report it as a theme color mapping bug.
 

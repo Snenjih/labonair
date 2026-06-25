@@ -7,12 +7,12 @@ body:
       value: |
         SSH connection problems have many causes. The fields below help us narrow it down quickly.
 
-        **Tip:** Launch Nexum from a terminal (`/Applications/Nexum.app/Contents/MacOS/Nexum`) to see raw stderr output from the Rust SSH layer.
+        **Tip:** Launch Labonair from a terminal (`/Applications/Labonair.app/Contents/MacOS/Labonair`) to see raw stderr output from the Rust SSH layer.
 
   - type: input
     id: version
     attributes:
-      label: Nexum version
+      label: Labonair version
       placeholder: "1.0.0"
     validations:
       required: true
@@ -84,7 +84,7 @@ body:
     id: description
     attributes:
       label: What happens?
-      description: Describe the exact failure — error message shown in Nexum, loading screen text, or any other visible feedback.
+      description: Describe the exact failure — error message shown in Labonair, loading screen text, or any other visible feedback.
     validations:
       required: true
 
@@ -110,7 +110,7 @@ body:
     id: logs
     attributes:
       label: Logs / stderr output
-      description: Paste any output from stderr or the Nexum DevTools console (⌘⌥I).
+      description: Paste any output from stderr or the Labonair DevTools console (⌘⌥I).
 
   - type: checkboxes
     id: checks

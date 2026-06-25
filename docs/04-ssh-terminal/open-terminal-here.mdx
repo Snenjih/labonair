@@ -13,7 +13,7 @@ When you are browsing a remote server's filesystem in the SFTP pane, you often n
 2. Navigate to the remote directory you want to work in.
 3. Click the **terminal icon** in the SFTP toolbar (remote pane header).
 
-A new SSH Terminal tab opens immediately. Once the session is established, Nexum automatically runs:
+A new SSH Terminal tab opens immediately. Once the session is established, Labonair automatically runs:
 
 ```bash
 cd /path/to/current/remote/directory
@@ -23,7 +23,7 @@ The command is injected right after the shell prompt appears, so by the time you
 
 ## No re-authentication
 
-The new SSH terminal session uses the same host credentials as the existing SFTP session. Nexum retrieves the credentials from the macOS Keychain as usual — you will not be asked to log in again.
+The new SSH terminal session uses the same host credentials as the existing SFTP session. Labonair retrieves the credentials from the macOS Keychain as usual — you will not be asked to log in again.
 
 :::tip
 This works even when the SFTP session uses public-key authentication. The SSH terminal session performs its own independent key negotiation using the same stored key, so the experience is seamless.

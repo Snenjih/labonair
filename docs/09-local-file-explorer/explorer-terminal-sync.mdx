@@ -5,13 +5,13 @@ description: "How the Local File Explorer stays in sync with the active terminal
 
 # Explorer & Terminal Sync
 
-One of Nexum's core usability decisions is that the file explorer is not a static view rooted at your home directory. It follows your terminal as you work, always showing the filesystem context that is relevant to what you are doing.
+One of Labonair's core usability decisions is that the file explorer is not a static view rooted at your home directory. It follows your terminal as you work, always showing the filesystem context that is relevant to what you are doing.
 
 ## How the sync works
 
 The sync pipeline has three layers:
 
-1. **Shell integration** — Nexum injects a small init script into each terminal session (zsh or bash). This script hooks into the shell's `precmd` or `chpwd` mechanism and emits an **OSC escape sequence** whenever the CWD changes. This happens automatically after every `cd` command or any command that changes the working directory.
+1. **Shell integration** — Labonair injects a small init script into each terminal session (zsh or bash). This script hooks into the shell's `precmd` or `chpwd` mechanism and emits an **OSC escape sequence** whenever the CWD changes. This happens automatically after every `cd` command or any command that changes the working directory.
 
 2. **OSC handler** — The `osc-handlers.ts` module in the frontend parses incoming PTY output for these OSC sequences. When a CWD update sequence is detected, it updates the corresponding tab's CWD field in the Zustand tabs store.
 

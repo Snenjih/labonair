@@ -1,6 +1,6 @@
 # src/app — Architecture Context
 
-This directory is the top-level wiring layer of the Nexum app. It owns no feature logic — it only composes modules.
+This directory is the top-level wiring layer of the Labonair app. It owns no feature logic — it only composes modules.
 
 ## File Overview
 

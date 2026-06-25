@@ -1,11 +1,11 @@
 ---
 title: "Connection Lifecycle"
-description: "Step-by-step walkthrough of how an SSH session is established, kept alive, and torn down in Nexum."
+description: "Step-by-step walkthrough of how an SSH session is established, kept alive, and torn down in Labonair."
 ---
 
 # Connection Lifecycle
 
-Every SSH session in Nexum goes through a well-defined lifecycle. Understanding each phase helps you diagnose authentication issues, interpret security prompts, and know what to expect when a connection drops.
+Every SSH session in Labonair goes through a well-defined lifecycle. Understanding each phase helps you diagnose authentication issues, interpret security prompts, and know what to expect when a connection drops.
 
 ## 1. Connecting
 
@@ -14,20 +14,20 @@ When you open an SSH session, the terminal area is replaced by an **SSH Loading 
 - The host's display name
 - An animated progress indicator
 
-No data is sent to the server yet — Nexum is establishing the TCP connection.
+No data is sent to the server yet — Labonair is establishing the TCP connection.
 
 ## 2. Authentication
 
-Once the TCP connection is up, Nexum attempts authentication in this order:
+Once the TCP connection is up, Labonair attempts authentication in this order:
 
-1. **Keychain lookup** — Nexum fetches the saved password or passphrase from the macOS Keychain automatically. If valid credentials are found, authentication proceeds without any prompt.
+1. **Keychain lookup** — Labonair fetches the saved password or passphrase from the macOS Keychain automatically. If valid credentials are found, authentication proceeds without any prompt.
 2. **Public-key auth** — key pairs in `~/.ssh/` are tried if configured for the host.
 3. **Inline auth prompt** — if credentials are missing, expired, or rejected, an inline prompt appears inside the tab asking for a password or passphrase.
 4. **Keyboard-interactive / 2FA** — multi-step challenges (such as TOTP codes) surface as additional inline prompts. Each challenge appears as a separate input field with the server's prompt message.
 
 ## 3. Known-hosts check
 
-After the TCP handshake, the server presents its host key. Nexum verifies it against `~/.ssh/known_hosts`:
+After the TCP handshake, the server presents its host key. Labonair verifies it against `~/.ssh/known_hosts`:
 
 - **Match** — verification passes silently; authentication continues.
 - **New host** — a dialog asks you to confirm and optionally trust the fingerprint.

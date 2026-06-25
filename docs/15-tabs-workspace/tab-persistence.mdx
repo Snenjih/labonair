@@ -1,15 +1,15 @@
 ---
 title: "Tab Persistence (SSH/SFTP)"
-description: "How Nexum keeps SSH and SFTP sessions alive in the background when you switch away from a tab."
+description: "How Labonair keeps SSH and SFTP sessions alive in the background when you switch away from a tab."
 ---
 
 # Tab Persistence (SSH/SFTP)
 
-One of Nexum's most important behaviors is that **switching away from a tab does not end its session**. SSH connections, active terminal processes, and SFTP transfers all continue running in the background while you are looking at a different tab.
+One of Labonair's most important behaviors is that **switching away from a tab does not end its session**. SSH connections, active terminal processes, and SFTP transfers all continue running in the background while you are looking at a different tab.
 
 ## How It Works
 
-Nexum renders all open tabs simultaneously in the DOM — they are never unmounted when you switch away. Instead, inactive tabs are hidden using CSS:
+Labonair renders all open tabs simultaneously in the DOM — they are never unmounted when you switch away. Instead, inactive tabs are hidden using CSS:
 
 ```css
 visibility: hidden;
@@ -53,4 +53,4 @@ Unmounting and remounting terminal tabs on every switch would require:
 2. Buffering all missed PTY output server-side and replaying it (complex, lossy).
 3. Re-establishing the PTY attachment and resync state.
 
-The hidden-tab approach is simpler, faster, and lossless. The only trade-off is memory: each open tab holds its DOM, WebGL surface, and output buffer in RAM. Nexum uses `@tanstack/react-virtual` for SFTP file lists and bounded terminal scrollback (configurable in Settings) to keep per-tab memory usage practical even with many tabs open.
+The hidden-tab approach is simpler, faster, and lossless. The only trade-off is memory: each open tab holds its DOM, WebGL surface, and output buffer in RAM. Labonair uses `@tanstack/react-virtual` for SFTP file lists and bounded terminal scrollback (configurable in Settings) to keep per-tab memory usage practical even with many tabs open.

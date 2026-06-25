@@ -1,17 +1,17 @@
 ---
 title: "Performance Issues"
-description: "Diagnose and resolve slowness, high CPU usage, and memory growth in Nexum."
+description: "Diagnose and resolve slowness, high CPU usage, and memory growth in Labonair."
 ---
 
 # Performance Issues
 
-Nexum is designed to be lightweight, but certain usage patterns can cause performance degradation. This page covers the most common scenarios and how to address them.
+Labonair is designed to be lightweight, but certain usage patterns can cause performance degradation. This page covers the most common scenarios and how to address them.
 
 ## SFTP Directory Listing Is Slow
 
 Browsing a directory with hundreds or thousands of files takes several seconds.
 
-**Cause:** The slowness is in the network round-trip to fetch the directory listing over SFTP, not in Nexum's rendering. The file list is virtualized (only visible rows are rendered), so a 10,000-file directory renders as fast as a 10-file directory once the data arrives.
+**Cause:** The slowness is in the network round-trip to fetch the directory listing over SFTP, not in Labonair's rendering. The file list is virtualized (only visible rows are rendered), so a 10,000-file directory renders as fast as a 10-file directory once the data arrives.
 
 **Resolution:** There is no client-side fix for slow SFTP listing over a high-latency connection. Narrow your working directory to subdirectories with fewer files when possible.
 
@@ -25,7 +25,7 @@ Keystrokes feel delayed or the terminal output lags behind input.
 
 ## High CPU Usage
 
-Nexum's process is consuming significant CPU even when idle.
+Labonair's process is consuming significant CPU even when idle.
 
 **Cause:** The WebGL renderer in xterm.js uses GPU/CPU resources proportional to terminal activity. A tab with continuous fast-scrolling output (e.g., a build log) can sustain elevated CPU usage.
 
@@ -36,7 +36,7 @@ Nexum's process is consuming significant CPU even when idle.
 
 ## Memory Usage Grows Over Time
 
-Nexum's memory footprint increases over a long session.
+Labonair's memory footprint increases over a long session.
 
 **Cause:** Each terminal tab maintains an xterm.js scrollback buffer in the WebView's JavaScript heap. A large scrollback limit across many tabs accumulates significant memory.
 
@@ -51,8 +51,8 @@ General UI responsiveness degrades after many hours of continuous use.
 
 **Cause:** Tauri's WKWebView can accumulate garbage collected JavaScript heap memory over very long sessions with heavy AI usage, many tab switches, or frequent theme changes.
 
-**Resolution:** Restart Nexum. Running terminal sessions in the Rust backend are terminated, but SSH sessions can be reconnected quickly via the Host Quick-Connect in the Command Palette.
+**Resolution:** Restart Labonair. Running terminal sessions in the Rust backend are terminated, but SSH sessions can be reconnected quickly via the Host Quick-Connect in the Command Palette.
 
 :::tip
-For production monitoring use cases where Nexum runs continuously for days, consider closing and reopening the app once per day to reset the WebView memory state.
+For production monitoring use cases where Labonair runs continuously for days, consider closing and reopening the app once per day to reset the WebView memory state.
 :::

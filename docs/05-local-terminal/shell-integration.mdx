@@ -1,15 +1,15 @@
 ---
 title: "Shell Integration"
-description: "How Nexum injects init scripts to enable CWD tracking, shell markers, and other shell-aware features."
+description: "How Labonair injects init scripts to enable CWD tracking, shell markers, and other shell-aware features."
 ---
 
 # Shell Integration
 
-Nexum's local terminal goes beyond simple PTY passthrough. It injects lightweight shell init scripts into every new shell session to enable features that require cooperation between the shell and the terminal emulator. This is called **shell integration**.
+Labonair's local terminal goes beyond simple PTY passthrough. It injects lightweight shell init scripts into every new shell session to enable features that require cooperation between the shell and the terminal emulator. This is called **shell integration**.
 
 ## How init scripts are injected
 
-When Nexum opens a new local PTY session, it bootstraps the shell by sourcing an init script appropriate for the detected shell. These scripts live in the Rust backend at:
+When Labonair opens a new local PTY session, it bootstraps the shell by sourcing an init script appropriate for the detected shell. These scripts live in the Rust backend at:
 
 ```
 src-tauri/src/modules/pty/scripts/
@@ -23,7 +23,7 @@ The injection is automatic — you do not need to modify your `~/.zshrc` or `~/.
 
 The most visible shell integration feature is **current working directory (CWD) tracking**.
 
-When you `cd` into a new directory, the init script causes the shell to emit an **OSC escape sequence** encoding the new path. Nexum's frontend parses these sequences in `osc-handlers.ts` and updates:
+When you `cd` into a new directory, the init script causes the shell to emit an **OSC escape sequence** encoding the new path. Labonair's frontend parses these sequences in `osc-handlers.ts` and updates:
 
 - The **status bar breadcrumb** at the bottom of the window, which always shows the active terminal's current directory
 - The **workspace CWD** used as the default root for the file explorer and for new tabs opened from this workspace
@@ -43,7 +43,7 @@ The init script also instruments the shell prompt to emit OSC sequences that mar
 |---|---|
 | zsh | Full (CWD + markers) |
 | bash | Full (CWD + markers) |
-| fish | Partial — fish has its own native integration hooks; Nexum uses them where available |
+| fish | Partial — fish has its own native integration hooks; Labonair uses them where available |
 
 :::warning
 If you use a heavily customized shell config that overrides the `PROMPT_COMMAND` (bash) or `precmd` hooks (zsh), shell integration markers may not fire correctly. CWD tracking is more robust and will usually continue working regardless.
@@ -51,4 +51,4 @@ If you use a heavily customized shell config that overrides the `PROMPT_COMMAND`
 
 ## Disabling shell integration
 
-Shell integration can be disabled in **Settings → Terminal → Shell Integration**. With it off, Nexum opens a plain PTY without injecting any init script. CWD tracking and command markers will not be available, but all standard terminal functionality continues to work.
+Shell integration can be disabled in **Settings → Terminal → Shell Integration**. With it off, Labonair opens a plain PTY without injecting any init script. CWD tracking and command markers will not be available, but all standard terminal functionality continues to work.

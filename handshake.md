@@ -150,7 +150,7 @@ Decomposed `src/app/App.tsx` from 1370 → 181 lines into focused per-module hoo
 
 ### What's Next
 - Merge PR #73 after review
-- `nexum-themes` GitHub repo still needs to be created (community themes)
+- `labonair-themes` GitHub repo still needs to be created (community themes)
 - Consider running `pnpm knip` to find further dead code to clean up
 
 ### Blockers
@@ -208,8 +208,8 @@ Completed all 3 phases of `tasks/v1.1_final_architecture_polish.md`. `cargo chec
 **Phase 2 — SFTP Error-Handling Purge**
 - All `console.error` in `SftpContextMenu.tsx` and `SftpPane.tsx` replaced with `handleApiError`
 
-**Phase 3 — Rust `NexumError` Migration**
-- All Tauri host/group commands now return `Result<T, NexumError>`
+**Phase 3 — Rust `LabonairError` Migration**
+- All Tauri host/group commands now return `Result<T, LabonairError>`
 
 ---
 
@@ -221,7 +221,7 @@ Completed all 3 phases of `tasks/v1.1_final_architecture_polish.md`. `cargo chec
 ### What's Next
 - Delete `src/modules/tabs/lib/useTabs.ts` (now dead code) and clean up re-exports in `tabs/index.ts`
 - Functional testing: verify tab open/close, SSH, session restore, command palette, menu items
-- The GitHub repo `Snenjih/nexum-themes` still needs to be created for community themes
+- The GitHub repo `Snenjih/labonair-themes` still needs to be created for community themes
 
 ### Blockers
 - None

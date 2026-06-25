@@ -1,11 +1,11 @@
 ---
 title: "Host Manager Overview"
-description: "The Home Dashboard is your central hub for managing saved SSH and SFTP hosts in Nexum."
+description: "The Home Dashboard is your central hub for managing saved SSH and SFTP hosts in Labonair."
 ---
 
 # Host Manager Overview
 
-The **Home Dashboard** is the default landing page when you open Nexum. It gives you a searchable, organized view of every saved host — so you can reach any server in seconds without memorizing connection details.
+The **Home Dashboard** is the default landing page when you open Labonair. It gives you a searchable, organized view of every saved host — so you can reach any server in seconds without memorizing connection details.
 
 ## Accessing the Host Manager
 
@@ -19,9 +19,9 @@ A **search bar** at the top of the dashboard filters hosts by display name, host
 
 ## Data Storage
 
-Nexum uses a strict two-store model to protect your credentials:
+Labonair uses a strict two-store model to protect your credentials:
 
-- **Host metadata** (display name, hostname, port, username, auth method, group assignment) is stored in a local SQLite database at `~/.local/share/com.nexum.app/nexum.db`.
+- **Host metadata** (display name, hostname, port, username, auth method, group assignment) is stored in a local SQLite database at `~/.local/share/com.labonair.app/labonair.db`.
 - **Passwords and passphrases** are stored separately in the macOS Keychain, referenced by the host's unique UUID — never written to SQLite or any file on disk.
 
 This means that even if someone copies your database file, they cannot obtain any credentials from it.

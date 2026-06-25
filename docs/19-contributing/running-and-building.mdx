@@ -1,11 +1,11 @@
 ---
 title: "Running & Building"
-description: "How to set up the development environment and build Nexum from source."
+description: "How to set up the development environment and build Labonair from source."
 ---
 
 # Running & Building
 
-This page covers everything you need to get Nexum running locally from source.
+This page covers everything you need to get Labonair running locally from source.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ Before running any commands, ensure the following are installed:
 - **Rust** — stable toolchain via [rustup](https://rustup.rs/)
 - **Node.js** — version 20 or higher
 - **pnpm** — install via `npm install -g pnpm`
-- **macOS** — Nexum is currently macOS-only
+- **macOS** — Labonair is currently macOS-only
 - **Xcode Command Line Tools** — run `xcode-select --install` if not already installed
 
 ## Install Dependencies
@@ -41,7 +41,7 @@ Starts the Vite dev server with HMR. The app runs in a browser tab at `localhost
 pnpm tauri dev
 ```
 
-Builds the Rust backend, starts the Vite dev server, and opens the full Nexum app window. All IPC calls work. The Rust backend is rebuilt automatically when you change `.rs` files (via `cargo watch`). Frontend changes HMR instantly without restarting the Rust process.
+Builds the Rust backend, starts the Vite dev server, and opens the full Labonair app window. All IPC calls work. The Rust backend is rebuilt automatically when you change `.rs` files (via `cargo watch`). Frontend changes HMR instantly without restarting the Rust process.
 
 Initial Rust compilation takes 2–5 minutes on first run. Subsequent incremental builds are seconds.
 

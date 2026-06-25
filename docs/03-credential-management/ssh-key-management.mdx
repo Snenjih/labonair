@@ -1,11 +1,11 @@
 ---
 title: "SSH Key Management"
-description: "How Nexum handles SSH private key files, supported key types, and passphrase storage."
+description: "How Labonair handles SSH private key files, supported key types, and passphrase storage."
 ---
 
 # SSH Key Management
 
-Nexum supports SSH key authentication for all saved hosts. Unlike passwords, SSH private keys are **not** imported or copied into Nexum — Nexum reads the key file from its location on your filesystem at connection time. Only passphrases (if the key is encrypted) are stored in the macOS Keychain.
+Labonair supports SSH key authentication for all saved hosts. Unlike passwords, SSH private keys are **not** imported or copied into Labonair — Labonair reads the key file from its location on your filesystem at connection time. Only passphrases (if the key is encrypted) are stored in the macOS Keychain.
 
 ## Supported Key Types
 
@@ -25,21 +25,21 @@ Nexum supports SSH key authentication for all saved hosts. Unlike passwords, SSH
 5. If the key is encrypted, enter the passphrase. Check **"Save passphrase"** to store it in Keychain.
 6. Click **Save**.
 
-The key file **path** is stored in SQLite. The key's contents are never stored anywhere by Nexum.
+The key file **path** is stored in SQLite. The key's contents are never stored anywhere by Labonair.
 
 ## Key File Permissions
 
-SSH clients (including Nexum's underlying `ssh2` library) refuse to use private key files with overly permissive file system permissions. Ensure your key file is readable only by your user:
+SSH clients (including Labonair's underlying `ssh2` library) refuse to use private key files with overly permissive file system permissions. Ensure your key file is readable only by your user:
 
 ```sh
 chmod 600 ~/.ssh/id_ed25519
 ```
 
-If Nexum fails to authenticate and shows a key permission error, this is almost always the cause.
+If Labonair fails to authenticate and shows a key permission error, this is almost always the cause.
 
 ## Generating SSH Keys
 
-Nexum does not include a key generation tool. Use the terminal:
+Labonair does not include a key generation tool. Use the terminal:
 
 ```sh
 ssh-keygen -t ed25519 -C "your_email@example.com"
@@ -51,16 +51,16 @@ This creates `~/.ssh/id_ed25519` (private key) and `~/.ssh/id_ed25519.pub` (publ
 ssh-copy-id -i ~/.ssh/id_ed25519.pub user@server
 ```
 
-Once the key is installed on the server, point Nexum to `~/.ssh/id_ed25519`.
+Once the key is installed on the server, point Labonair to `~/.ssh/id_ed25519`.
 
 ## Passphrase Storage
 
-If your key is encrypted with a passphrase, Nexum can save it to the macOS Keychain so you are not prompted on every connection. The passphrase is stored keyed by the host's UUID — not by the key file path — so the same key file used by two different hosts will have its passphrase stored separately for each host entry.
+If your key is encrypted with a passphrase, Labonair can save it to the macOS Keychain so you are not prompted on every connection. The passphrase is stored keyed by the host's UUID — not by the key file path — so the same key file used by two different hosts will have its passphrase stored separately for each host entry.
 
 :::warning
-If you rotate your SSH key (generate a new key pair and update your server), remember to update the key file path in Nexum's host form. The old Keychain passphrase entry will be replaced when you save the new configuration.
+If you rotate your SSH key (generate a new key pair and update your server), remember to update the key file path in Labonair's host form. The old Keychain passphrase entry will be replaced when you save the new configuration.
 :::
 
 ## Keys Shared Across Multiple Hosts
 
-The same private key file can be used by any number of host entries in Nexum. Each host stores its own path reference and (optionally) its own Keychain passphrase entry. There is no central key registry.
+The same private key file can be used by any number of host entries in Labonair. Each host stores its own path reference and (optionally) its own Keychain passphrase entry. There is no central key registry.

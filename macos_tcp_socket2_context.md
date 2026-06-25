@@ -36,7 +36,7 @@ Connection to 192.168.178.37 port 22 [tcp/ssh] succeeded!
 $ ssh root@192.168.178.37
 (works fine)
 
-$ Nexum TCP connect:
+$ Labonair TCP connect:
 TCP connect to 192.168.178.37:22 failed: No route to host (os error 65)
 ```
 
@@ -159,7 +159,7 @@ fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
 
 ### Manual Test
 ```bash
-# In Nexum UI:
+# In Labonair UI:
 1. Open SSH tab
 2. Connect to 192.168.178.37 (or your local host IP)
 3. Should see "TCP connection established" → handshake → authenticated ✅

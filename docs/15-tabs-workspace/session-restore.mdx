@@ -1,15 +1,15 @@
 ---
 title: "Session Restore"
-description: "How Nexum saves and restores your tab layout and session state across app restarts."
+description: "How Labonair saves and restores your tab layout and session state across app restarts."
 ---
 
 # Session Restore
 
-Nexum automatically saves your workspace layout when you quit and restores it the next time you launch the app. This means you can close Nexum at the end of the day and pick up with the same tab arrangement without rebuilding it from scratch.
+Labonair automatically saves your workspace layout when you quit and restores it the next time you launch the app. This means you can close Labonair at the end of the day and pick up with the same tab arrangement without rebuilding it from scratch.
 
 ## What Gets Saved
 
-When you quit Nexum (`Cmd+Q`), the following state is persisted:
+When you quit Labonair (`Cmd+Q`), the following state is persisted:
 
 - **Tab list** — all open tabs, their types, and their order in the Tab Bar.
 - **Active tab** — which tab was focused at the time of quit.
@@ -20,7 +20,7 @@ Session data is stored locally via `tauri-plugin-store` in a JSON file on your d
 
 ## What Gets Restored
 
-On next launch, Nexum reads the saved state and reconstructs the tab layout. However, **not all tab types auto-reconnect**:
+On next launch, Labonair reads the saved state and reconstructs the tab layout. However, **not all tab types auto-reconnect**:
 
 | Tab Type | Visual State Restored | Auto-Reconnects |
 |---|---|---|
@@ -31,7 +31,7 @@ On next launch, Nexum reads the saved state and reconstructs the tab layout. How
 | `editor` | Yes (file path) | N/A (re-opens file) |
 | `ai-diff` | No — discarded | N/A |
 
-SSH and SFTP tabs are intentionally **not** auto-reconnected. A restored SSH tab shows the host label and a **"Reconnect"** button rather than silently opening a new connection. This is a security decision — Nexum never establishes outbound network connections without explicit user action.
+SSH and SFTP tabs are intentionally **not** auto-reconnected. A restored SSH tab shows the host label and a **"Reconnect"** button rather than silently opening a new connection. This is a security decision — Labonair never establishes outbound network connections without explicit user action.
 
 :::tip
 To reconnect a restored SSH tab quickly, click the **Reconnect** button in the tab's waiting state, or press `Cmd+R` while that tab is focused.
@@ -41,16 +41,16 @@ To reconnect a restored SSH tab quickly, click the **Reconnect** button in the t
 
 Local terminal tabs (`terminal`) restore as a fresh shell session. The previous PTY process was terminated when you quit the app; its history and any running processes are gone. The restored tab starts a new shell at the default working directory.
 
-The shell history itself (e.g., `~/.zsh_history`) is managed by your shell, not Nexum, and persists normally.
+The shell history itself (e.g., `~/.zsh_history`) is managed by your shell, not Labonair, and persists normally.
 
 ## Editor Tab Behavior
 
-Editor tabs restore by re-opening the file at the saved path. If the file has been moved or deleted since the last session, Nexum shows an error in that tab and lets you browse for the file in its new location.
+Editor tabs restore by re-opening the file at the saved path. If the file has been moved or deleted since the last session, Labonair shows an error in that tab and lets you browse for the file in its new location.
 
 :::warning
-Unsaved changes in editor tabs **are not persisted** across sessions. If you quit Nexum with unsaved edits, those changes are lost. Nexum will warn you before quitting if any editor tab has unsaved modifications.
+Unsaved changes in editor tabs **are not persisted** across sessions. If you quit Labonair with unsaved edits, those changes are lost. Labonair will warn you before quitting if any editor tab has unsaved modifications.
 :::
 
 ## Disabling Session Restore
 
-If you prefer Nexum to always start fresh with a single Home tab, you can disable session restore in **Settings** (`Cmd+,`) → **General** → toggle off **Restore tabs on launch**.
+If you prefer Labonair to always start fresh with a single Home tab, you can disable session restore in **Settings** (`Cmd+,`) → **General** → toggle off **Restore tabs on launch**.

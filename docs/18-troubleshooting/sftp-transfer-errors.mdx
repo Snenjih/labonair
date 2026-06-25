@@ -1,11 +1,11 @@
 ---
 title: "SFTP Transfer Errors"
-description: "Diagnose and resolve common SFTP transfer failures in Nexum."
+description: "Diagnose and resolve common SFTP transfer failures in Labonair."
 ---
 
 # SFTP Transfer Errors
 
-SFTP transfers in Nexum are managed by a background queue worker in the Rust backend. Errors are surfaced in the Transfer Queue dropdown with a descriptive message. This page explains the most common errors and how to fix them.
+SFTP transfers in Labonair are managed by a background queue worker in the Rust backend. Errors are surfaced in the Transfer Queue dropdown with a descriptive message. This page explains the most common errors and how to fix them.
 
 ## "Permission Denied"
 
@@ -24,7 +24,7 @@ If you need to operate on system files (e.g., under `/etc/`), your user may need
 
 ## "No Space Left on Device"
 
-The remote filesystem is full. Nexum cannot write the transferred file even if the transfer starts successfully.
+The remote filesystem is full. Labonair cannot write the transferred file even if the transfer starts successfully.
 
 **Resolution:** In an SSH terminal, check disk usage:
 ```bash
@@ -44,7 +44,7 @@ Then transfer the compressed archive as a single file.
 
 ## "File Already Exists"
 
-This is not an error condition — it triggers the Conflict Resolution dialog. Nexum will ask whether to overwrite, skip, or rename the conflicting file. See the Transfer Queue documentation for details on conflict resolution options.
+This is not an error condition — it triggers the Conflict Resolution dialog. Labonair will ask whether to overwrite, skip, or rename the conflicting file. See the Transfer Queue documentation for details on conflict resolution options.
 
 ## Transfer Stuck at 0%
 

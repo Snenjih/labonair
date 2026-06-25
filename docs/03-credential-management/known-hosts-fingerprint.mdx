@@ -1,15 +1,15 @@
 ---
 title: "known_hosts & Fingerprint Verification"
-description: "How Nexum verifies SSH server fingerprints against known_hosts to protect against MITM attacks."
+description: "How Labonair verifies SSH server fingerprints against known_hosts to protect against MITM attacks."
 ---
 
 # known_hosts & Fingerprint Verification
 
-Every time Nexum opens an SSH connection, it verifies the server's public key fingerprint against the entries in `~/.ssh/known_hosts`. This is a standard SSH security mechanism that protects against man-in-the-middle (MITM) attacks and impersonation.
+Every time Labonair opens an SSH connection, it verifies the server's public key fingerprint against the entries in `~/.ssh/known_hosts`. This is a standard SSH security mechanism that protects against man-in-the-middle (MITM) attacks and impersonation.
 
 ## First Connection to a New Host
 
-When you connect to a host for the first time — meaning no entry exists in `known_hosts` for that hostname or IP — Nexum pauses the connection and shows a **"Trust this server?"** dialog containing:
+When you connect to a host for the first time — meaning no entry exists in `known_hosts` for that hostname or IP — Labonair pauses the connection and shows a **"Trust this server?"** dialog containing:
 
 - The server's hostname or IP address
 - The full SSH fingerprint (SHA-256 hash of the server's public key)
@@ -21,12 +21,12 @@ You have two options:
 - **Cancel** — aborts the connection without adding anything to `known_hosts`.
 
 :::tip
-If you know your server's fingerprint in advance (from your cloud provider's console or your own provisioning records), compare it to what Nexum shows before clicking "Trust & Connect".
+If you know your server's fingerprint in advance (from your cloud provider's console or your own provisioning records), compare it to what Labonair shows before clicking "Trust & Connect".
 :::
 
 ## Fingerprint Mismatch
 
-If a server's fingerprint no longer matches the entry in `known_hosts`, Nexum **blocks the connection** and shows a high-severity warning. This can happen for legitimate reasons (server OS reinstall, key rotation) or for malicious ones (a compromised network routing you to a different machine).
+If a server's fingerprint no longer matches the entry in `known_hosts`, Labonair **blocks the connection** and shows a high-severity warning. This can happen for legitimate reasons (server OS reinstall, key rotation) or for malicious ones (a compromised network routing you to a different machine).
 
 The warning dialog displays:
 - The expected fingerprint (from `known_hosts`)
@@ -43,14 +43,14 @@ A fingerprint mismatch warning should be taken seriously. Only accept a new key 
 
 ## No Silent Bypass
 
-Nexum never skips or auto-accepts fingerprint verification. There is no setting to disable this check. This is intentional — silently trusting fingerprints would undermine the security guarantee that `known_hosts` provides.
+Labonair never skips or auto-accepts fingerprint verification. There is no setting to disable this check. This is intentional — silently trusting fingerprints would undermine the security guarantee that `known_hosts` provides.
 
 ## Manual known_hosts Management
 
-Nexum reads and writes `~/.ssh/known_hosts` directly (the same file used by the system `ssh` command). If you need to remove an entry manually — for example, after a legitimate server reinstall — run:
+Labonair reads and writes `~/.ssh/known_hosts` directly (the same file used by the system `ssh` command). If you need to remove an entry manually — for example, after a legitimate server reinstall — run:
 
 ```sh
 ssh-keygen -R <hostname-or-ip>
 ```
 
-Then reconnect through Nexum to re-add the new fingerprint via the "Trust & Connect" dialog.
+Then reconnect through Labonair to re-add the new fingerprint via the "Trust & Connect" dialog.

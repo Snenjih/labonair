@@ -1,15 +1,15 @@
 ---
 title: "Tab Types"
-description: "A reference for all seven tab kinds in Nexum and when each one is used."
+description: "A reference for all seven tab kinds in Labonair and when each one is used."
 ---
 
 # Tab Types
 
-Nexum models every open surface as a **tab** — a typed, discriminated value with a `kind` field. There are currently seven tab types. Each renders a distinct UI in the workspace and has its own lifecycle rules around connection, persistence, and restoration.
+Labonair models every open surface as a **tab** — a typed, discriminated value with a `kind` field. There are currently seven tab types. Each renders a distinct UI in the workspace and has its own lifecycle rules around connection, persistence, and restoration.
 
 ## `home` — Host Manager
 
-The default landing tab. Shows the Host Manager dashboard: a searchable list of all configured SSH/SFTP hosts organized into groups, with action buttons for connecting, editing, and deleting hosts. Every new window starts with a Home tab. Opening Nexum fresh also lands here.
+The default landing tab. Shows the Host Manager dashboard: a searchable list of all configured SSH/SFTP hosts organized into groups, with action buttons for connecting, editing, and deleting hosts. Every new window starts with a Home tab. Opening Labonair fresh also lands here.
 
 ## `terminal` — Local Terminal
 
@@ -39,7 +39,7 @@ An embedded browser preview. Used to render local HTML files or remote URLs with
 
 ## `ai-diff` — AI Diff Review
 
-A special-purpose tab that appears when the AI assistant proposes changes to a file. Shows a standard two-column diff (before / after) using Nexum's diff renderer. You can accept the full change, reject it, or edit the proposed content before applying. Closing this tab without confirming discards the proposed change.
+A special-purpose tab that appears when the AI assistant proposes changes to a file. Shows a standard two-column diff (before / after) using Labonair's diff renderer. You can accept the full change, reject it, or edit the proposed content before applying. Closing this tab without confirming discards the proposed change.
 
 :::tip
 You can have multiple tabs of the same kind open simultaneously. For example, two SSH terminal tabs connected to different servers, or two editor tabs with different files — they are all fully independent.

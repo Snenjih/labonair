@@ -1,20 +1,20 @@
 ---
 title: "AI Not Responding"
-description: "Diagnose and fix issues with the Nexum AI assistant not responding or producing errors."
+description: "Diagnose and fix issues with the Labonair AI assistant not responding or producing errors."
 ---
 
 # AI Not Responding
 
-Nexum's AI assistant makes direct HTTPS calls to the OpenAI API using your BYOK (Bring Your Own Key) API key. If the AI is not responding, one of the following causes is most likely responsible.
+Labonair's AI assistant makes direct HTTPS calls to the OpenAI API using your BYOK (Bring Your Own Key) API key. If the AI is not responding, one of the following causes is most likely responsible.
 
 ## "Invalid API Key"
 
-The API key stored in Nexum is incorrect, expired, or was revoked.
+The API key stored in Labonair is incorrect, expired, or was revoked.
 
 **Resolution:**
 1. Open Settings → Models & Agents
 2. Delete the existing key and re-enter your API key
-3. API keys are stored in the macOS Keychain — Nexum never writes them to disk
+3. API keys are stored in the macOS Keychain — Labonair never writes them to disk
 
 Verify your key is valid at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
 
@@ -35,7 +35,7 @@ Your OpenAI account has hit the request or token rate limit for your usage tier.
 
 ## "Network Error"
 
-Nexum cannot reach the OpenAI API endpoint.
+Labonair cannot reach the OpenAI API endpoint.
 
 **Resolution:** Check your internet connection. If you are on a corporate network, confirm that outbound HTTPS to `api.openai.com` is not blocked by a firewall or proxy.
 
@@ -51,10 +51,10 @@ If the AI panel shows a "Disconnected" or error state and tool calls (read file,
 
 1. Close the AI panel
 2. Re-open it with `Cmd+Shift+A`
-3. If the issue persists, restart Nexum
+3. If the issue persists, restart Labonair
 
 Tool execution requires an active session. If the session state is corrupted, restarting creates a fresh session automatically.
 
 :::tip
-You can verify your API key and check usage/billing at [platform.openai.com/usage](https://platform.openai.com/usage) without leaving the current Nexum session.
+You can verify your API key and check usage/billing at [platform.openai.com/usage](https://platform.openai.com/usage) without leaving the current Labonair session.
 :::

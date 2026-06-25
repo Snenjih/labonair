@@ -1,11 +1,11 @@
 ---
 title: "Code Editor Overview"
-description: "An introduction to Nexum's built-in CodeMirror 6 editor for local and remote file editing."
+description: "An introduction to Labonair's built-in CodeMirror 6 editor for local and remote file editing."
 ---
 
 # Code Editor Overview
 
-Nexum ships a fully featured code editor built on **CodeMirror 6** (via `@uiw/react-codemirror`). It is not a stripped-down viewer — it is a proper editing surface designed to keep you in one window whether you are tweaking a local config file or adjusting a script on a remote server over SFTP.
+Labonair ships a fully featured code editor built on **CodeMirror 6** (via `@uiw/react-codemirror`). It is not a stripped-down viewer — it is a proper editing surface designed to keep you in one window whether you are tweaking a local config file or adjusting a script on a remote server over SFTP.
 
 ## How it fits into the tab system
 
@@ -13,9 +13,9 @@ Every file you open creates a tab of type `editor`. Editor tabs live alongside t
 
 ## Syntax highlighting for 50+ languages
 
-Language detection is automatic. Nexum reads the file extension and maps it to the appropriate CodeMirror language pack via `languageResolver.ts`. Supported languages include TypeScript, JavaScript, Rust, Python, Go, Shell/Bash, JSON, YAML, TOML, HTML, CSS, Markdown, SQL, and many more. Language packs are loaded lazily, so only the grammar for the file you are actually viewing is fetched — startup time is not affected by the full language catalogue.
+Language detection is automatic. Labonair reads the file extension and maps it to the appropriate CodeMirror language pack via `languageResolver.ts`. Supported languages include TypeScript, JavaScript, Rust, Python, Go, Shell/Bash, JSON, YAML, TOML, HTML, CSS, Markdown, SQL, and many more. Language packs are loaded lazily, so only the grammar for the file you are actually viewing is fetched — startup time is not affected by the full language catalogue.
 
-Syntax colors follow the active Nexum theme through injected CSS variables, so highlighting adapts automatically when you switch themes. No separate editor-theme setting is needed.
+Syntax colors follow the active Labonair theme through injected CSS variables, so highlighting adapts automatically when you switch themes. No separate editor-theme setting is needed.
 
 ## Local and remote editing in one flow
 

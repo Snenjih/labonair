@@ -11,7 +11,7 @@ The AI assistant is not operating in the dark. It has real-time access to two pi
 
 ### Current Working Directory (CWD)
 
-The AI knows the directory your active terminal tab is currently in. This is tracked via **OSC sequences** — shell integration codes that Nexum's PTY layer injects into your shell's init script (`zshrc.zsh`, `bashrc.bash`, etc.). Every time you `cd` in the terminal, the CWD is updated in the frontend state automatically.
+The AI knows the directory your active terminal tab is currently in. This is tracked via **OSC sequences** — shell integration codes that Labonair's PTY layer injects into your shell's init script (`zshrc.zsh`, `bashrc.bash`, etc.). Every time you `cd` in the terminal, the CWD is updated in the frontend state automatically.
 
 The AI uses CWD when resolving relative file paths in tool calls and when deciding where to create new files.
 
@@ -21,7 +21,7 @@ The AI can read the last 300 lines of scrollback from the currently active termi
 
 ## Lazy Evaluation
 
-Live context is read **lazily** — only at the moment a context-aware tool is actually called. Nexum does not continuously snapshot your terminal or pre-load context into every message. This means:
+Live context is read **lazily** — only at the moment a context-aware tool is actually called. Labonair does not continuously snapshot your terminal or pre-load context into every message. This means:
 
 - No performance impact from having the AI panel open
 - The context is always fresh — it reflects the state of your terminal at the moment the AI needs it, not when you started the conversation
@@ -29,7 +29,7 @@ Live context is read **lazily** — only at the moment a context-aware tool is a
 
 ## Switching Tabs
 
-Context is always derived from the **currently active terminal tab** in the Nexum workspace. If you have multiple SSH sessions open in different tabs, the AI sees the CWD and buffer of whichever tab is on screen when the tool runs.
+Context is always derived from the **currently active terminal tab** in the Labonair workspace. If you have multiple SSH sessions open in different tabs, the AI sees the CWD and buffer of whichever tab is on screen when the tool runs.
 
 If you want the AI to operate in the context of a specific session, make sure that tab is active before sending your message.
 

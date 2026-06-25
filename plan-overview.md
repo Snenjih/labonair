@@ -1,17 +1,17 @@
 
 
 
-Das ist der entscheidende Masterplan. Da wir nun Terax als Basis nutzen, überspringen wir all die mühsamen Basis-Setups (Tauri-Init, React-Setup, Theme-Engine, CodeMirror, xterm.js). Wir konzentrieren uns in diesem Plan zu 100% darauf, die Terax-Codebase zu "Nexum" umzubauen und unsere genialen Remote-Features in die modulare Architektur (`src/modules/`) zu injizieren.
+Das ist der entscheidende Masterplan. Da wir nun Terax als Basis nutzen, überspringen wir all die mühsamen Basis-Setups (Tauri-Init, React-Setup, Theme-Engine, CodeMirror, xterm.js). Wir konzentrieren uns in diesem Plan zu 100% darauf, die Terax-Codebase zu "Labonair" umzubauen und unsere genialen Remote-Features in die modulare Architektur (`src/modules/`) zu injizieren.
 
 Hier ist die komplett neue, maßgeschneiderte **`plan-overview.md`** (auf Englisch, gemäß meinen Systemvorgaben). Speichere diesen Text in deinem Root-Ordner ab.
 
 ***
 
 ```markdown
-# Nexum: Implementation Plan
+# Labonair: Implementation Plan
 
 ## 1. Project Overview
-- **Project Name**: Nexum
+- **Project Name**: Labonair
 - **Project Purpose**: Transform the open-source "Terax" AI-terminal into a powerful, secure, and native remote workspace for Sysadmins and Developers. Adds SQLite-based host management, native SSH connections with macOS Keychain security, a virtualized split-pane SFTP manager, and remote in-app editing capabilities, while retaining Terax's 60-FPS performance and AI integrations.
 - **Architecture Overview**:
   - **Framework**: Tauri v2, React 19, Vite.
@@ -46,30 +46,30 @@ Status: not_started
 Status: not_started
 
 **Background & Context:**
-The codebase is currently branded as "Terax". We need to safely rename all references, update bundle identifiers, and adjust the `package.json` and `tauri.conf.json` to reflect "Nexum" before adding new features.
+The codebase is currently branded as "Terax". We need to safely rename all references, update bundle identifiers, and adjust the `package.json` and `tauri.conf.json` to reflect "Labonair" before adding new features.
 
 **Work Instructions:**
-1. Update `tauri.conf.json`: Change `productName` to "Nexum" and `identifier` to `com.nexum.app`.
-2. Update `package.json`: Change name to `nexum`.
-3. Update `src/app/App.tsx` and other UI files (like `AiMiniWindow.tsx` and `AboutSection.tsx`) to replace "Terax" with "Nexum".
-4. Update `src-tauri/Cargo.toml`: Change package name and descriptions to Nexum. Update binary/lib names appropriately.
+1. Update `tauri.conf.json`: Change `productName` to "Labonair" and `identifier` to `com.labonair.app`.
+2. Update `package.json`: Change name to `labonair`.
+3. Update `src/app/App.tsx` and other UI files (like `AiMiniWindow.tsx` and `AboutSection.tsx`) to replace "Terax" with "Labonair".
+4. Update `src-tauri/Cargo.toml`: Change package name and descriptions to Labonair. Update binary/lib names appropriately.
 
 **Files to Create/Modify:**
 - `src-tauri/tauri.conf.json`
 - `package.json`
 - `src-tauri/Cargo.toml`
-- `src-tauri/src/main.rs` (update `terax_lib::run()` to `nexum_lib::run()`)
+- `src-tauri/src/main.rs` (update `terax_lib::run()` to `labonair_lib::run()`)
 - `src/app/App.tsx`
 - `src/modules/settings/sections/AboutSection.tsx`
 
 **Expected Outcome:**
-The application builds and runs as "Nexum". Window titles, about sections, and bundle identifiers are updated.
+The application builds and runs as "Labonair". Window titles, about sections, and bundle identifiers are updated.
 
 #### Subphase 1.2 - Tab System Extension & Home View Setup
 Status: not_started
 
 **Background & Context:**
-Terax opens a local terminal by default. Nexum should open a "Home" dashboard (Host Manager) by default. We need to extend Terax's tab system to support the new Nexum specific tabs (`home`, `ssh-terminal`, `sftp`).
+Terax opens a local terminal by default. Labonair should open a "Home" dashboard (Host Manager) by default. We need to extend Terax's tab system to support the new Labonair specific tabs (`home`, `ssh-terminal`, `sftp`).
 
 **Work Instructions:**
 1. Update `src/modules/tabs/lib/useTabs.ts` to include `HomeTab`, `SshTerminalTab`, and `SftpTab` in the `Tab` discriminated union.
@@ -92,7 +92,7 @@ Status: not_started
 Status: not_started
 
 **Background & Context:**
-Nexum requires robust, relational storage for Host configurations (IP, Port, Username) and Groups. Passwords will NOT be stored here.
+Labonair requires robust, relational storage for Host configurations (IP, Port, Username) and Groups. Passwords will NOT be stored here.
 
 **Work Instructions:**
 1. Add `rusqlite` to `src-tauri/Cargo.toml`.
@@ -275,7 +275,7 @@ Leverage Terax's existing `EditorStack` to edit remote files.
 **Work Instructions:**
 1. Update `Tab` union: Ensure `EditorTab` has a property `remoteHostId?: string`.
 2. Implement right-click -> "Edit" in `SftpContextMenu`.
-3. Rust command `prepare_remote_edit`: Downloads file to `/tmp/nexum/...` and returns the local path.
+3. Rust command `prepare_remote_edit`: Downloads file to `/tmp/labonair/...` and returns the local path.
 4. React opens `EditorTab` pointing to this local path.
 5. Intercept the save action (`Cmd+S`) in `EditorPane.tsx`. If `remoteHostId` is present, call Rust `upload_remote_edit` to push the saved temp file back via SFTP.
 
@@ -294,4 +294,4 @@ Clicking "Edit" on a remote file opens CodeMirror. Saving automatically syncs th
 **Was hältst du von dieser neuen Aufteilung?**
 Anstatt 20 Tasks für Dinge zu schreiben, die Terax schon hat, führt dieser Plan die KI wie ein Skalpell genau dorthin, wo der Terax-Code **erweitert** werden muss (Neue Module, Rust-Crates für SSH/SQLite, State-Updates für Transfer-Queues).
 
-Wenn du bereit bist, generiere ich dir im nächsten Schritt die detaillierten **`TASK_*.md`** Dateien (für den `tasks/` Ordner), damit wir den Agenten direkt auf Subphase 1.1 (Das Rebranding von Terax zu Nexum) ansetzen können!
+Wenn du bereit bist, generiere ich dir im nächsten Schritt die detaillierten **`TASK_*.md`** Dateien (für den `tasks/` Ordner), damit wir den Agenten direkt auf Subphase 1.1 (Das Rebranding von Terax zu Labonair) ansetzen können!

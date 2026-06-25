@@ -38,7 +38,7 @@ pnpm tauri build
 ## What we don't want
 
 - Telemetry, analytics, or anything that phones home.
-- Hardcoded API keys or accounts. Nexum stays BYOK.
+- Hardcoded API keys or accounts. Labonair stays BYOK.
 - Large dependencies for small wins. The bundle is ~7 MB and we want it to stay light.
 - Sweeping refactors with no functional change.
 

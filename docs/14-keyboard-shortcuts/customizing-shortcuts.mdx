@@ -1,11 +1,11 @@
 ---
 title: "Customizing Shortcuts"
-description: "How to view, edit, and reset keyboard shortcuts in Nexum."
+description: "How to view, edit, and reset keyboard shortcuts in Labonair."
 ---
 
 # Customizing Shortcuts
 
-Nexum allows you to rebind any keyboard shortcut to a key combination of your choice. Custom bindings are stored persistently and survive app updates.
+Labonair allows you to rebind any keyboard shortcut to a key combination of your choice. Custom bindings are stored persistently and survive app updates.
 
 ## Opening the Shortcuts Editor
 
@@ -38,15 +38,15 @@ A **Reset All** button at the top of the Shortcuts editor restores every shortcu
 Custom shortcuts are stored at:
 
 ```
-~/.local/share/com.nexum.app/keybinds.json
+~/.local/share/com.labonair.app/keybinds.json
 ```
 
 This file is a plain JSON map of action ID to key combination. You can edit it directly in a text editor if you prefer, though the in-app editor is recommended to catch conflicts automatically.
 
 :::tip
-If you are migrating from another terminal emulator (iTerm2, Warp, Alacritty), start by checking which shortcuts conflict with your muscle memory and rebind them first before using Nexum for production work.
+If you are migrating from another terminal emulator (iTerm2, Warp, Alacritty), start by checking which shortcuts conflict with your muscle memory and rebind them first before using Labonair for production work.
 :::
 
 :::warning
-Deleting `keybinds.json` or the entire `~/.local/share/com.nexum.app/` directory resets all shortcuts to defaults along with all other app data. Back up the file separately if you want to preserve a custom shortcut layout.
+Deleting `keybinds.json` or the entire `~/.local/share/com.labonair.app/` directory resets all shortcuts to defaults along with all other app data. Back up the file separately if you want to preserve a custom shortcut layout.
 :::

@@ -24,13 +24,13 @@ The currently active theme is marked with a checkmark indicator on the right sid
 
 ## Live Preview
 
-Hovering over any theme in the sub-page triggers an immediate live preview. Nexum injects the theme's CSS variables onto `document.documentElement.style`, updating every color in the UI in real time. This is the same preview mechanism used in the Settings Theme Picker.
+Hovering over any theme in the sub-page triggers an immediate live preview. Labonair injects the theme's CSS variables onto `document.documentElement.style`, updating every color in the UI in real time. This is the same preview mechanism used in the Settings Theme Picker.
 
 The preview is non-destructive while you are in the palette — your actual saved theme preference has not changed yet.
 
 ## Applying a Theme
 
-Press `Enter` or click the theme name to apply it permanently. Nexum:
+Press `Enter` or click the theme name to apply it permanently. Labonair:
 
 1. Sets the theme as the active theme in the preferences store
 2. Writes the selection to persistent storage (via `tauri-plugin-store`)
@@ -38,7 +38,7 @@ Press `Enter` or click the theme name to apply it permanently. Nexum:
 
 ## Canceling
 
-Press `Escape` to cancel without changing the theme. Nexum reverts the live preview CSS variables back to your previously active theme. The escape hierarchy applies:
+Press `Escape` to cancel without changing the theme. Labonair reverts the live preview CSS variables back to your previously active theme. The escape hierarchy applies:
 
 1. First `Escape` clears the search text within the sub-page
 2. Second `Escape` goes back to the main palette page

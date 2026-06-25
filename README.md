@@ -1,10 +1,10 @@
-## Nexum Terminal and SSH, SFTP
+## Labonair Terminal and SSH, SFTP
 <img src="public/icon_512x512@2x.png" align="left" width="200"/>
 
-### `Nexum`
+### `Labonair`
 <p><strong>macOS-native remote workspace — SSH · SFTP · Terminal · Editor · AI</strong></p>
 
-Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. It combines SSH terminal sessions, a full-featured SFTP file manager, an integrated code editor with remote editing support, and a first-class AI side-panel — all in a single lightweight app. API keys live in the OS keychain, no telemetry, no account required.
+Labonair is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. It combines SSH terminal sessions, a full-featured SFTP file manager, an integrated code editor with remote editing support, and a first-class AI side-panel — all in a single lightweight app. API keys live in the OS keychain, no telemetry, no account required.
 
   <p>
     <img src="https://img.shields.io/badge/version-0.7.0-blue" alt="version" />
@@ -55,7 +55,7 @@ Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. I
 - Local / offline models via LM Studio
 - Voice input, edit diffs, multi-agent and sub-agents
 - Snippets / skills, customizable system prompt
-- `NEXUM.md` for project-level AI memory and configuration
+- `LABONAIR.md` for project-level AI memory and configuration
 - Tasks, plans, search, file read/write tools with in-app approval flow
 
 **Quality**
@@ -74,7 +74,7 @@ Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. I
 ## Configure AI
 
 1. Open **Settings → AI**.
-2. Pick a provider and paste your API key. For local inference, point Nexum at your LM Studio endpoint.
+2. Pick a provider and paste your API key. For local inference, point Labonair at your LM Studio endpoint.
 3. Keys are written to the macOS Keychain — they never touch disk or `localStorage`.
 
 ## Installation
@@ -82,15 +82,15 @@ Nexum is a macOS-native remote workspace built on Tauri 2 + Rust and React 19. I
 ### Homebrew (recommended)
 
 ```sh
-brew tap snenjih/nexum
-brew install --cask nexum
+brew tap snenjih/labonair
+brew install --cask labonair
 ```
 
-> Nexum is not yet notarized. If macOS blocks the app on first launch, right-click `Nexum.app` in `/Applications` → **Open** → **Open** in the dialog.
+> Labonair is not yet notarized. If macOS blocks the app on first launch, right-click `Labonair.app` in `/Applications` → **Open** → **Open** in the dialog.
 
 ### Manual
 
-Download the latest `.dmg` from [Releases](https://github.com/Snenjih/nexum/releases), open it, and drag `Nexum.app` to `/Applications`.
+Download the latest `.dmg` from [Releases](https://github.com/Snenjih/labonair/releases), open it, and drag `Labonair.app` to `/Applications`.
 
 ---
 
@@ -131,7 +131,7 @@ cd src-tauri && cargo clippy    # Rust lint
 ## Architecture
 
 ```
-Nexum (Tauri v2)
+Labonair (Tauri v2)
 ├── Frontend: React 19 + TypeScript + Vite
 │   ├── Tailwind CSS v4 + shadcn/ui
 │   ├── Zustand (tabs, transfers, hosts)
@@ -153,4 +153,4 @@ Issues and PRs are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guideline
 
 ## License
 
-Nexum is licensed under the Apache-2.0 License. See [LICENSE](LICENSE) for details.
+Labonair is licensed under the Apache-2.0 License. See [LICENSE](LICENSE) for details.

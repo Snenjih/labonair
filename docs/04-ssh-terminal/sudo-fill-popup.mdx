@@ -1,15 +1,15 @@
 ---
 title: "Sudo Fill Popup"
-description: "How Nexum detects sudo password prompts and offers to fill your saved host password automatically."
+description: "How Labonair detects sudo password prompts and offers to fill your saved host password automatically."
 ---
 
 # Sudo Fill Popup
 
-Running `sudo` commands is a routine part of server administration. Nexum includes a small quality-of-life feature that detects `sudo` password prompts and offers to fill in your saved host credentials — without storing passwords in any insecure location.
+Running `sudo` commands is a routine part of server administration. Labonair includes a small quality-of-life feature that detects `sudo` password prompts and offers to fill in your saved host credentials — without storing passwords in any insecure location.
 
 ## How it works
 
-Nexum monitors the terminal output stream for patterns that match common `sudo` password prompts, such as:
+Labonair monitors the terminal output stream for patterns that match common `sudo` password prompts, such as:
 
 ```
 [sudo] password for alice:
@@ -31,7 +31,7 @@ The popup appears only when a prompt pattern is detected. It will not appear for
 
 ## Security model
 
-Nexum never auto-submits the password. The sequence is always:
+Labonair never auto-submits the password. The sequence is always:
 
 1. Prompt detected → popup appears
 2. You click **Fill Password** (explicit user action)

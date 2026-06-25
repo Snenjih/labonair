@@ -1,10 +1,10 @@
 # Grundkonzept:
 
-Das ist der ultimative Schritt, um Nexum in die Liga von Raycast, Zed und VS Code zu katapultieren. Eine gut gebaute Command Palette (`Cmd+K` oder `Cmd+Shift+P`) ist das "Rückenmark" einer Power-User-App. 
+Das ist der ultimative Schritt, um Labonair in die Liga von Raycast, Zed und VS Code zu katapultieren. Eine gut gebaute Command Palette (`Cmd+K` oder `Cmd+Shift+P`) ist das "Rückenmark" einer Power-User-App. 
 
 Da du es **extrem modular und dynamisch** haben möchtest, müssen wir weg von einem starren, hardcodierten React-Menü und hin zu einem **"Action Registry" (Aktions-Register) Pattern**.
 
-Hier ist mein Brainstorming-Bericht zu den Möglichkeiten, der Architektur und den coolsten Use-Cases für Nexum. Lass uns das durchgehen, bevor ich dir den finalen Bauplan für den Agenten schreibe.
+Hier ist mein Brainstorming-Bericht zu den Möglichkeiten, der Architektur und den coolsten Use-Cases für Labonair. Lass uns das durchgehen, bevor ich dir den finalen Bauplan für den Agenten schreibe.
 
 ---
 
@@ -42,7 +42,7 @@ Das ist das wichtigste für deinen Workflow:
 Du wolltest Settings direkt toggeln. Das können wir optisch extrem cool machen, indem der aktuelle Status im Titel steht:
 *   `Toggle: Hidden Files [Aktuell: OFF]` -> Drückt man Enter, ändert sich der Zustand sofort auf ON und die Palette schließt sich.
 *   `Toggle: Editor Word Wrap [Aktuell: ON]`
-*   `Theme: Switch to Nexum Dark` -> Ein eigener Command für jedes installierte Theme (Live generiert aus dem `useThemeStore`).
+*   `Theme: Switch to Labonair Dark` -> Ein eigener Command für jedes installierte Theme (Live generiert aus dem `useThemeStore`).
 
 #### C) Workspace & Layout Control (Split Panes)
 Da wir die Split-Panes gebaut haben, steuern wir sie hierüber:
@@ -61,7 +61,7 @@ Da wir die Split-Panes gebaut haben, steuern wir sie hierüber:
 
 Um das Raycast/Zed-Gefühl perfekt zu machen, sollten wir noch an folgende Edge-Cases denken:
 
-1.  **Fuzzy Search (Unscharfe Suche):** Wenn jemand `tm dark` tippt, muss `Theme: Nexum Dark` gefunden werden. Die shadcn `Command` Komponente (die unter der Haube `cmdk` nutzt) macht das standardmäßig schon ziemlich gut.
+1.  **Fuzzy Search (Unscharfe Suche):** Wenn jemand `tm dark` tippt, muss `Theme: Labonair Dark` gefunden werden. Die shadcn `Command` Komponente (die unter der Haube `cmdk` nutzt) macht das standardmäßig schon ziemlich gut.
 2.  **Sub-Menüs (Nested Pages):** Manche Aktionen brauchen Zwischenschritte.
     *   *Szenario:* Du suchst "Theme". Anstatt 20 Themes in der Hauptliste zu haben, drückst du bei `Change Theme...` auf Enter. Die Palette löscht den Suchtext, schiebt sich nach links (Animation) und zeigt *nur noch* die Liste der Themes. Drückt man `Backspace` oder `ESC`, geht man eine Ebene zurück.
 3.  **Kürzlich verwendet (Recent Commands):** Die Palette sollte sich (im LocalStorage) die letzten 3-5 Befehle merken, die der User ausgeführt hat, und sie beim leeren Öffnen ganz oben unter "Recently Used" anzeigen. Das spart gigantisch viel Zeit.
@@ -101,7 +101,7 @@ Anstatt eine globale Variable zu haben (die in React oft zu "Stale Closures" fü
 2.  **Ein Modul steuert seine eigenen Befehle:**
     Wenn wir z. B. das Theme-System haben, schreiben wir in `src/modules/theme/useThemeCommands.ts` einen eigenen kleinen Hook. Dieser Hook macht zwei Dinge:
     *   Er liefert einen Befehl für die `root` Seite zurück: *"Change Theme..."* (Dieser Befehl hat als Aktion kein `perform()`, sondern navigiert zur Seite `themes`).
-    *   Er liefert alle Befehle für die `themes` Seite zurück (z. B. *"Nexum Dark"*, *"Nord"*).
+    *   Er liefert alle Befehle für die `themes` Seite zurück (z. B. *"Labonair Dark"*, *"Nord"*).
 3.  **Der Aggregator (Das Register):**
     In der Command Palette gibt es EINEN zentralen Hook (`useCommandRegistry.ts`), der alle diese kleinen Hooks aufruft und alle generierten "Seiten" in ein großes Objekt zusammenfügt.
 
@@ -117,7 +117,7 @@ Erstelle eine neue Datei namens **`tasks/command_palette_context.md`** im Hauptv
 
 ```markdown
 # PRD: Command Palette (Action Registry & Sub-Menus)
-**Project:** Nexum
+**Project:** Labonair
 **Component:** Global Command Palette (`Cmd+K` / `Cmd+Shift+P`)
 **Goal:** Implement a Raycast/Zed-style command palette. It must be highly modular, support nested sub-menus (pages), fuzzy searching, and context-awareness (only showing editor commands when an editor is active).
 
@@ -165,7 +165,7 @@ Commands are injected via domain-specific hooks to keep logic decoupled. The `us
 
 ### 2.1 `useSystemCommands()`
 Provides global window/app actions:
-- `root` page actions: "Settings", "Keyboard Shortcuts", "Check for Updates", "About Nexum".
+- `root` page actions: "Settings", "Keyboard Shortcuts", "Check for Updates", "About Labonair".
 
 ### 2.2 `useLayoutCommands()`
 Provides workspace split pane controls:
@@ -255,7 +255,7 @@ Bitte speichere diesen Text als **`tasks/command_palette_ui_context.md`** im Hau
 
 ```markdown
 # UI/UX & Layout Context: Command Palette
-**Project:** Nexum
+**Project:** Labonair
 **Component:** Command Palette Visuals & Interactions
 
 ## 1. Global Positioning & Container
@@ -329,7 +329,7 @@ Gib deinem Agenten nun diesen **kombinierten Prompt**, um sicherzustellen, dass 
 > 1. `tasks/command_palette_context.md`
 > 2. `tasks/command_palette_ui_context.md`
 > 
-> Wir bauen nun die Command Palette für Nexum auf Gold-Standard-Niveau (ähnlich wie Raycast/Zed).
+> Wir bauen nun die Command Palette für Labonair auf Gold-Standard-Niveau (ähnlich wie Raycast/Zed).
 > 
 > **Bitte setze dies in den folgenden 4 Phasen um (führe nach jeder Phase `npx tsc --noEmit` aus):**
 > 

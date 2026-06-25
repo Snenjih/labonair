@@ -1,39 +1,39 @@
 ---
 title: "Themes & Appearance Overview"
-description: "How Nexum's JSON-based theme engine works and what it controls."
+description: "How Labonair's JSON-based theme engine works and what it controls."
 ---
 
 # Themes & Appearance Overview
 
-Nexum uses a fully JSON-based theme engine. Every color in the application — from the app shell and sidebar to terminal ANSI colors and editor syntax highlighting — is driven by a single `.json` theme file. There is no hardcoded CSS and no theme-specific stylesheet to maintain.
+Labonair uses a fully JSON-based theme engine. Every color in the application — from the app shell and sidebar to terminal ANSI colors and editor syntax highlighting — is driven by a single `.json` theme file. There is no hardcoded CSS and no theme-specific stylesheet to maintain.
 
 ## What Themes Control
 
-A Nexum theme is a flat JSON document that defines two categories of color tokens:
+A Labonair theme is a flat JSON document that defines two categories of color tokens:
 
 - **UI shell colors** — background, foreground, card surfaces, popovers, primary accent, muted tones, borders, and destructive states. These map directly to CSS custom properties applied to `:root` and consumed by every component in the interface.
 - **Terminal ANSI colors** — the full 16-color palette (`terminal_black` through `terminal_bright_white`) used by xterm.js to render terminal output. Correct ANSI rendering requires all 16 keys to be present.
 
 ## Built-in and User Themes
 
-Nexum ships with a default theme called **Nexum Dark**, which is embedded in the application binary and always available — it cannot be deleted. Additional themes can be installed by users and are stored in:
+Labonair ships with a default theme called **Labonair Dark**, which is embedded in the application binary and always available — it cannot be deleted. Additional themes can be installed by users and are stored in:
 
 ```
-~/.local/share/com.nexum.app/themes/
+~/.local/share/com.labonair.app/themes/
 ```
 
 All `.json` files placed in this directory are automatically picked up by the theme engine on next launch. The Theme Picker also offers an in-app Import flow that copies files to this location for you.
 
 ## Live Preview and Instant Switching
 
-Theme switching in Nexum is designed to be friction-free. Open the Theme Picker and hover over any theme to see a live preview — colors are applied instantly to the running app without any page reload or restart. Clicking a theme makes the selection permanent.
+Theme switching in Labonair is designed to be friction-free. Open the Theme Picker and hover over any theme to see a live preview — colors are applied instantly to the running app without any page reload or restart. Clicking a theme makes the selection permanent.
 
 The change propagates to every part of the UI simultaneously: the terminal recolors ANSI output, the editor updates its syntax tokens, and the app shell reflects the new palette — all in a single paint cycle.
 
 ## Shareable by Design
 
-Because themes are self-contained `.json` files with no external dependencies, they are trivially shareable. Export any installed theme to a file and send it to a colleague, post it in a team wiki, or submit it to the community `nexum-themes` repository on GitHub.
+Because themes are self-contained `.json` files with no external dependencies, they are trivially shareable. Export any installed theme to a file and send it to a colleague, post it in a team wiki, or submit it to the community `labonair-themes` repository on GitHub.
 
 :::tip
-The "Nexum Dark" default theme is a great starting point for creating your own. Export it from the Theme Picker and use it as a base — all required keys are already present.
+The "Labonair Dark" default theme is a great starting point for creating your own. Export it from the Theme Picker and use it as a base — all required keys are already present.
 :::

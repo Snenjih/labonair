@@ -5,7 +5,7 @@ description: "Add a new SSH or SFTP host to the Home Dashboard using the host co
 
 # Creating a Host
 
-Adding a host to Nexum saves its connection details so you can connect with a single click — no need to remember hostnames, ports, or key paths.
+Adding a host to Labonair saves its connection details so you can connect with a single click — no need to remember hostnames, ports, or key paths.
 
 ## Opening the Host Form
 
@@ -29,7 +29,7 @@ Fill in the following details to create a valid host entry:
 
 ## Authentication Method
 
-Choose how Nexum authenticates with this server:
+Choose how Labonair authenticates with this server:
 
 - **Password** — enter a password; it is stored securely in the macOS Keychain, never on disk.
 - **SSH Key** — provide the path to a private key file (e.g. `~/.ssh/id_ed25519`). The file stays on disk; only the passphrase (if any) is stored in Keychain.
@@ -50,5 +50,5 @@ You can create a group and a host at the same time. Just type a new group name i
 :::
 
 :::warning
-Nexum does not generate SSH key pairs. Use `ssh-keygen` in the terminal to create keys, then point Nexum to the resulting private key file. Make sure the key file has permissions `600` (`chmod 600 ~/.ssh/id_ed25519`).
+Labonair does not generate SSH key pairs. Use `ssh-keygen` in the terminal to create keys, then point Labonair to the resulting private key file. Make sure the key file has permissions `600` (`chmod 600 ~/.ssh/id_ed25519`).
 :::

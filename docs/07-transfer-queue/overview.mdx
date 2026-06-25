@@ -1,11 +1,11 @@
 ---
 title: "Transfer Queue Overview"
-description: "How Nexum's background Rust transfer worker manages SFTP uploads and downloads independently of the UI."
+description: "How Labonair's background Rust transfer worker manages SFTP uploads and downloads independently of the UI."
 ---
 
 # Transfer Queue Overview
 
-The Transfer Queue is Nexum's background file transfer engine. It manages all active and pending SFTP uploads and downloads, runs entirely in Rust, and operates independently of any UI component or tab lifecycle.
+The Transfer Queue is Labonair's background file transfer engine. It manages all active and pending SFTP uploads and downloads, runs entirely in Rust, and operates independently of any UI component or tab lifecycle.
 
 ## Architecture
 
@@ -18,11 +18,11 @@ This design separates transfer execution completely from the React component tre
 - **Transfers continue when the SFTP tab is closed** — the worker is not tied to any tab or component lifecycle
 - **Transfers continue when you switch workspaces** — navigating to a terminal tab, the editor, or the home screen has no effect
 - **Transfers stop only when**: explicitly cancelled, the SSH connection drops, or the app is quit
-- **The queue is not persisted** — if Nexum is quit with active transfers, the queue starts empty on the next launch
+- **The queue is not persisted** — if Labonair is quit with active transfers, the queue starts empty on the next launch
 
 ## Accessing the Queue
 
-When transfers are active, a progress ring indicator appears in the Nexum titlebar. Click it to open the Transfer Queue dropdown panel, which shows live progress for all active and recently completed transfers.
+When transfers are active, a progress ring indicator appears in the Labonair titlebar. Click it to open the Transfer Queue dropdown panel, which shows live progress for all active and recently completed transfers.
 
 The indicator is only visible when at least one transfer is active or has completed since the app launched. There is no persistent transfer history across app restarts.
 

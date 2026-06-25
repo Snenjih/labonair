@@ -5,12 +5,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        Nexum targets 60 fps rendering and smooth handling of 10 000+ file lists. If something feels sluggish, please describe it here.
+        Labonair targets 60 fps rendering and smooth handling of 10 000+ file lists. If something feels sluggish, please describe it here.
 
   - type: input
     id: version
     attributes:
-      label: Nexum version
+      label: Labonair version
       placeholder: "1.0.0"
     validations:
       required: true

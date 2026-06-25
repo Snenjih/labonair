@@ -1,10 +1,10 @@
-# Nexum: Project Context & AI Developer Guidelines
-**Project:** Nexum (macOS native SSH/SFTP Client, Terminal & AI Workspace)
-**Base Codebase:** This project is a hard-fork of "Terax" (an AI-native terminal emulator). We are transforming it into "Nexum" by adding powerful Remote (SSH/SFTP) capabilities.
+# Labonair: Project Context & AI Developer Guidelines
+**Project:** Labonair (macOS native SSH/SFTP Client, Terminal & AI Workspace)
+**Base Codebase:** This project is a hard-fork of "Terax" (an AI-native terminal emulator). We are transforming it into "Labonair" by adding powerful Remote (SSH/SFTP) capabilities.
 **Role of the AI:** You are an expert Principal Software Engineer specializing in Rust, Tauri v2, React 19, and macOS desktop application architecture.
 
 ## 1. Project Identity & Aesthetic
-Nexum is a premium, ultra-fast, native-feeling macOS application for developers.
+Labonair is a premium, ultra-fast, native-feeling macOS application for developers.
 - **Visual Style:** Minimalist, high-density, "Vercel / Zed Editor" aesthetic. Subtle borders, transparent backgrounds, strictly no bloated UI elements.
 - **UX Philosophy:** Keyboard-first. Everything should be accessible via shortcuts.
 - **Performance:** 60 FPS is mandatory. UI must never freeze, even when transferring 100 GB via SFTP or parsing massive terminal output.
@@ -22,7 +22,7 @@ Nexum is a premium, ultra-fast, native-feeling macOS application for developers.
 
 ## 3. The Modular Architecture (Crucial)
 The frontend is strictly organized into domain-driven modules inside `src/modules/`.
-**Rule:** When building new Nexum features, you MUST follow this pattern. Do not dump everything into a global components folder.
+**Rule:** When building new Labonair features, you MUST follow this pattern. Do not dump everything into a global components folder.
 - `src/modules/tabs/`: The global tab state (`useTabs.ts`). Tabs use a discriminated union (`kind: "terminal" | "editor" | ...`).
 - `src/modules/terminal/`: Renders xterm.js instances.
 - `src/modules/editor/`: Renders CodeMirror instances.
@@ -45,7 +45,7 @@ The frontend is strictly organized into domain-driven modules inside `src/module
 - **Solution:** All SSH/SFTP I/O MUST execute within an `async` Tauri command (which Tauri automatically routes to a thread pool) or be explicitly spawned via `tokio::spawn`.
 
 ### Rule 4.3: Extending the Tab System
-- **Context:** Nexum relies heavily on tabs. 
+- **Context:** Labonair relies heavily on tabs. 
 - **Rule:** When adding SSH and SFTP views, extend the `Tab` union in `src/modules/tabs/lib/useTabs.ts`.
 - **Example:** Add `SftpTab` (`kind: "sftp"`) and `SshTerminalTab` (`kind: "ssh-terminal"`). Update `App.tsx` to render the correct Stack/Pane based on the active tab's `kind`. Do NOT unmount inactive tabs; hide them using `invisible pointer-events-none` so their PTYs/WebSockets keep streaming in the background (see how `TerminalStack` does it).
 
@@ -58,11 +58,11 @@ The frontend is strictly organized into domain-driven modules inside `src/module
 - **Rule:** Do NOT use React Context for highly volatile global state (like active SFTP transfer progress), as it causes whole-tree re-renders.
 - **Solution:** Use Zustand. Create `src/modules/sftp/store/transferStore.ts` and subscribe to Tauri events (`transfer_progress`) directly inside the Zustand store module, outside of the React render cycle.
 
-## 5. New Architectural Patterns for Nexum
+## 5. New Architectural Patterns for Labonair
 
 ### 5.1 The "Remote Editor" Synergy
 When a user right-clicks a file in the SFTP manager and selects "Edit", we leverage the existing CodeMirror implementation:
-1. Rust downloads the remote file to `/tmp/nexum/...`.
+1. Rust downloads the remote file to `/tmp/labonair/...`.
 2. React opens a new Tab of `kind: "editor"`.
 3. When the user presses `Cmd+S`, the editor triggers its save callback. Rust overwrites the local temp file AND automatically uploads it back to the remote server via the active SSH session.
 

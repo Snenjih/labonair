@@ -1,29 +1,29 @@
 ---
 title: "Installation"
-description: "How to install Nexum on macOS via Homebrew, DMG, or from source."
+description: "How to install Labonair on macOS via Homebrew, DMG, or from source."
 ---
 
 # Installation
 
-Nexum runs on macOS 12 (Monterey) or later and supports both Apple Silicon (M1/M2/M3) and Intel Macs. There are three ways to install it: Homebrew Cask, a manual DMG download, or building from source.
+Labonair runs on macOS 12 (Monterey) or later and supports both Apple Silicon (M1/M2/M3) and Intel Macs. There are three ways to install it: Homebrew Cask, a manual DMG download, or building from source.
 
 ## Option 1: Homebrew (Recommended)
 
-If you have [Homebrew](https://brew.sh) installed, Nexum is available as a Cask:
+If you have [Homebrew](https://brew.sh) installed, Labonair is available as a Cask:
 
 ```bash
-brew install nexum
+brew install labonair
 ```
 
-Homebrew handles all future updates when you run `brew upgrade nexum`. This is the recommended path for most users.
+Homebrew handles all future updates when you run `brew upgrade labonair`. This is the recommended path for most users.
 
 ## Option 2: Manual DMG Download
 
-1. Go to the [GitHub Releases page](https://github.com/nexum-app/nexum/releases).
+1. Go to the [GitHub Releases page](https://github.com/labonair-app/labonair/releases).
 2. Download the latest `.dmg` file (choose `arm64` for Apple Silicon or `x86_64` for Intel).
-3. Open the `.dmg`, then drag **Nexum.app** into your **Applications** folder.
+3. Open the `.dmg`, then drag **Labonair.app** into your **Applications** folder.
 4. Eject the disk image.
-5. Double-click Nexum in Applications to launch.
+5. Double-click Labonair in Applications to launch.
 
 :::warning
 macOS Gatekeeper may show a "cannot be opened because the developer cannot be verified" dialog on first launch. Right-click the app icon, choose **Open**, then confirm. This is a one-time step for downloaded apps outside the App Store.
@@ -31,7 +31,7 @@ macOS Gatekeeper may show a "cannot be opened because the developer cannot be ve
 
 ## Option 3: Build from Source
 
-Building Nexum from source requires:
+Building Labonair from source requires:
 
 - **Rust** (stable toolchain) — install via [rustup](https://rustup.rs)
 - **Node.js** (LTS or current)
@@ -41,8 +41,8 @@ Building Nexum from source requires:
 Clone the repository and build:
 
 ```bash
-git clone https://github.com/nexum-app/nexum.git
-cd nexum
+git clone https://github.com/labonair-app/labonair.git
+cd labonair
 pnpm install
 pnpm tauri build
 ```
@@ -58,9 +58,9 @@ For active development, use `pnpm tauri dev` instead of `pnpm tauri build`. This
 On the very first launch, macOS will prompt for one or more permissions:
 
 - **Network access** — required for SSH/SFTP connections to remote hosts.
-- **Keychain access** — Nexum stores SSH passwords and API keys in the macOS Keychain. Accept the prompt to allow this; credentials are never stored anywhere else.
+- **Keychain access** — Labonair stores SSH passwords and API keys in the macOS Keychain. Accept the prompt to allow this; credentials are never stored anywhere else.
 
-Grant these permissions when asked. Nexum does not request microphone, camera, or location access.
+Grant these permissions when asked. Labonair does not request microphone, camera, or location access.
 
 ## System Requirements
 

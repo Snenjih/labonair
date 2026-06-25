@@ -1,11 +1,11 @@
 ---
 title: "Theme Development"
-description: "How to create, test, and contribute themes for Nexum."
+description: "How to create, test, and contribute themes for Labonair."
 ---
 
 # Theme Development
 
-Nexum themes are JSON files that define a complete color palette. The Rust backend manages them as files; the React frontend injects them as CSS variables at runtime. This page explains the full lifecycle.
+Labonair themes are JSON files that define a complete color palette. The Rust backend manages them as files; the React frontend injects them as CSS variables at runtime. This page explains the full lifecycle.
 
 ## Theme JSON Format
 
@@ -30,7 +30,7 @@ All color values are HEX strings. The Rust backend validates the JSON schema on 
 
 ## CSS Injection
 
-When Nexum loads a theme, the React frontend:
+When Labonair loads a theme, the React frontend:
 
 1. Calls `themes_get_all` on boot to fetch all theme metadata
 2. Reads the active theme ID from the preferences store
@@ -53,10 +53,10 @@ For example, `"background": "#1a1a2e"` becomes `--background: <oklch equivalent>
 Installed themes are stored at:
 
 ```
-~/.local/share/com.nexum.app/themes/
+~/.local/share/com.labonair.app/themes/
 ```
 
-Each `.json` file in this directory is a theme. You can place theme files here manually without using the import UI — Nexum reads this directory on each launch.
+Each `.json` file in this directory is a theme. You can place theme files here manually without using the import UI — Labonair reads this directory on each launch.
 
 ## Testing a Theme
 
@@ -68,7 +68,7 @@ Each `.json` file in this directory is a theme. You can place theme files here m
 
 ## Contributing Community Themes
 
-Submit a pull request to the [nexum-themes repository](https://github.com/Snenjih/nexum-themes). Include:
+Submit a pull request to the [labonair-themes repository](https://github.com/Snenjih/labonair-themes). Include:
 - Your theme `.json` file
 - A screenshot showing the theme in a terminal, editor, and SFTP tab
 

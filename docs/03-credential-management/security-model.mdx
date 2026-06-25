@@ -1,17 +1,17 @@
 ---
 title: "Security Model"
-description: "How Nexum separates host metadata from credentials to ensure passwords and keys are never stored on disk."
+description: "How Labonair separates host metadata from credentials to ensure passwords and keys are never stored on disk."
 ---
 
 # Security Model
 
-Nexum is built around a strict separation between **host metadata** and **credentials**. The goal is simple: even if an attacker gains access to Nexum's database file, they cannot obtain any passwords, passphrases, or API keys.
+Labonair is built around a strict separation between **host metadata** and **credentials**. The goal is simple: even if an attacker gains access to Labonair's database file, they cannot obtain any passwords, passphrases, or API keys.
 
 ## Two-Store Architecture
 
 ### SQLite — Host Metadata Only
 
-Nexum stores the following in a local SQLite database at `~/.local/share/com.nexum.app/nexum.db`:
+Labonair stores the following in a local SQLite database at `~/.local/share/com.labonair.app/labonair.db`:
 
 - Display name
 - Hostname / IP address
@@ -26,14 +26,14 @@ Nexum stores the following in a local SQLite database at `~/.local/share/com.nex
 
 ### macOS Keychain — Credentials Only
 
-All secrets are stored in the macOS Keychain via Nexum's Rust `keyring` crate integration:
+All secrets are stored in the macOS Keychain via Labonair's Rust `keyring` crate integration:
 
 - SSH passwords
 - SSH key passphrases
 - AI provider API keys
 
 Each credential is stored with:
-- **Service**: `com.nexum.app`
+- **Service**: `com.labonair.app`
 - **Account**: the host's UUID (a random identifier, not the hostname)
 
 The UUID-based account key means the Keychain entry reveals nothing about which server it belongs to, even if the Keychain is inspected directly.
@@ -45,16 +45,16 @@ If the SQLite database file is copied or leaked:
 - The attacker sees hostnames, usernames, and connection metadata — essentially the same information stored in a plain-text SSH config.
 - They cannot retrieve any password or passphrase, because those are locked inside the Keychain.
 
-The Keychain itself is protected by macOS system security — unlocked only by the user's login password or Touch ID, and only accessible to processes that macOS has authorized (i.e., Nexum itself).
+The Keychain itself is protected by macOS system security — unlocked only by the user's login password or Touch ID, and only accessible to processes that macOS has authorized (i.e., Labonair itself).
 
 ## Keychain Access Authorization
 
-On the first credential save, macOS may display a prompt asking whether to allow Nexum to access the Keychain. Click **Always Allow** to prevent repeated prompts. If you accidentally click **Deny**, you can re-authorize by opening **Keychain Access.app**, finding the `com.nexum.app` entry, and updating its access control settings.
+On the first credential save, macOS may display a prompt asking whether to allow Labonair to access the Keychain. Click **Always Allow** to prevent repeated prompts. If you accidentally click **Deny**, you can re-authorize by opening **Keychain Access.app**, finding the `com.labonair.app` entry, and updating its access control settings.
 
 :::tip
-To audit exactly what Nexum has stored, open **Keychain Access.app** and search for `com.nexum.app`. Each entry corresponds to one host's credential, identified by its UUID.
+To audit exactly what Labonair has stored, open **Keychain Access.app** and search for `com.labonair.app`. Each entry corresponds to one host's credential, identified by its UUID.
 :::
 
 :::warning
-Nexum's Keychain entries are **not** synced to iCloud Keychain. They are local to the Mac where Nexum is installed. If you migrate to a new machine, you will need to re-enter credentials.
+Labonair's Keychain entries are **not** synced to iCloud Keychain. They are local to the Mac where Labonair is installed. If you migrate to a new machine, you will need to re-enter credentials.
 :::

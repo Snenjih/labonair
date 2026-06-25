@@ -1,11 +1,11 @@
 ---
 title: "SSH Terminal Overview"
-description: "A guide to Nexum's full-featured SSH terminal, powered by xterm.js and the ssh2 Rust crate."
+description: "A guide to Labonair's full-featured SSH terminal, powered by xterm.js and the ssh2 Rust crate."
 ---
 
 # SSH Terminal Overview
 
-Nexum ships a first-class SSH terminal that feels identical to a local shell — because under the hood it uses the exact same rendering stack. Every SSH session is rendered through **xterm.js** with the WebGL addon enabled, giving you GPU-accelerated text output at any window size without tearing or lag.
+Labonair ships a first-class SSH terminal that feels identical to a local shell — because under the hood it uses the exact same rendering stack. Every SSH session is rendered through **xterm.js** with the WebGL addon enabled, giving you GPU-accelerated text output at any window size without tearing or lag.
 
 ## How it fits into the workspace
 
@@ -13,7 +13,7 @@ SSH terminals live in their own tab type (`ssh-terminal`) alongside local worksp
 
 ## Protocol and authentication
 
-The SSH protocol layer is handled entirely in Rust via the **ssh2** crate. Nexum supports:
+The SSH protocol layer is handled entirely in Rust via the **ssh2** crate. Labonair supports:
 
 - **SSH protocol 2** only (protocol 1 is obsolete and intentionally not supported)
 - **Password authentication** — credentials stored securely in the macOS Keychain, never on disk

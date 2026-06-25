@@ -1,6 +1,6 @@
 ---
 title: "Opening Files"
-description: "All the ways to open a file in the Nexum code editor."
+description: "All the ways to open a file in the Labonair code editor."
 ---
 
 # Opening Files
@@ -13,17 +13,17 @@ Click any file in the sidebar tree. The file opens immediately in a new editor t
 
 ## From the SFTP pane (remote files)
 
-In an open SFTP session, right-click any file and choose **Edit**. Nexum:
+In an open SFTP session, right-click any file and choose **Edit**. Labonair:
 
 1. Calls the `prepare_remote_edit` Rust command.
-2. Downloads the file to `/tmp/nexum_edits/<uuid>_<filename>`.
+2. Downloads the file to `/tmp/labonair_edits/<uuid>_<filename>`.
 3. Opens the local temp copy in a new editor tab with a cloud indicator.
 
 Saving with `Cmd+S` uploads the changes back to the remote host. See [Remote File Editing](./remote-file-editing) for the full workflow.
 
 ## From the AI assistant
 
-When the AI uses the `write_file` tool it does not silently overwrite your file. Instead, Nexum opens an **AI Diff** tab showing exactly what would change. You review the diff and click **Accept** or **Reject**. If you accept, the file is written and a normal editor tab reflects the new content.
+When the AI uses the `write_file` tool it does not silently overwrite your file. Instead, Labonair opens an **AI Diff** tab showing exactly what would change. You review the diff and click **Accept** or **Reject**. If you accept, the file is written and a normal editor tab reflects the new content.
 
 ## From the Command Palette
 

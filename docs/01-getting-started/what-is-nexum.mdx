@@ -1,11 +1,11 @@
 ---
-title: "What is Nexum"
-description: "An overview of Nexum — the open-source macOS SSH/SFTP client, terminal emulator, and AI workspace."
+title: "What is Labonair"
+description: "An overview of Labonair — the open-source macOS SSH/SFTP client, terminal emulator, and AI workspace."
 ---
 
-# What is Nexum
+# What is Labonair
 
-Nexum is an open-source, native macOS application that combines an SSH terminal client, SFTP file manager, local terminal emulator, and an AI assistant into a single cohesive workspace. It targets sysadmins and backend developers who need a fast, secure, and integrated environment for working on remote servers — without stitching together half a dozen separate tools.
+Labonair is an open-source, native macOS application that combines an SSH terminal client, SFTP file manager, local terminal emulator, and an AI assistant into a single cohesive workspace. It targets sysadmins and backend developers who need a fast, secure, and integrated environment for working on remote servers — without stitching together half a dozen separate tools.
 
 Think of it as Termius meets Zed: the connection management and protocol depth of a dedicated SSH client, the editor experience of a modern IDE, and the performance of a natively compiled Rust backend.
 
@@ -25,14 +25,14 @@ Think of it as Termius meets Zed: the connection management and protocol depth o
 
 ## Performance
 
-Nexum is built to stay fast at scale. The SFTP file list uses `@tanstack/react-virtual` for virtual scrolling, maintaining 60 FPS with 10,000+ remote files. Terminal rendering uses the WebGL addon for xterm.js, offloading glyph compositing to the GPU.
+Labonair is built to stay fast at scale. The SFTP file list uses `@tanstack/react-virtual` for virtual scrolling, maintaining 60 FPS with 10,000+ remote files. Terminal rendering uses the WebGL addon for xterm.js, offloading glyph compositing to the GPU.
 
 The backend is written in Rust with Tokio async I/O, so SSH connections, file transfers, and PTY sessions never block each other or the UI thread.
 
 ## Technology Stack
 
-Nexum is built with Tauri v2 — a Rust + WebView framework for macOS (and eventually other platforms). The backend is pure Rust; the frontend is React 19 with TypeScript, Tailwind CSS v4, and shadcn/ui components.
+Labonair is built with Tauri v2 — a Rust + WebView framework for macOS (and eventually other platforms). The backend is pure Rust; the frontend is React 19 with TypeScript, Tailwind CSS v4, and shadcn/ui components.
 
 :::tip
-Nexum is fully open-source. If you hit a bug or want to contribute a feature, the repository is available on GitHub.
+Labonair is fully open-source. If you hit a bug or want to contribute a feature, the repository is available on GitHub.
 :::

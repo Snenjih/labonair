@@ -1,11 +1,11 @@
 ---
 title: "Connecting to a Host"
-description: "How Nexum establishes an SSH or SFTP connection and handles authentication, errors, and fingerprint verification."
+description: "How Labonair establishes an SSH or SFTP connection and handles authentication, errors, and fingerprint verification."
 ---
 
 # Connecting to a Host
 
-Nexum handles the full connection lifecycle — from initiating the TCP connection to interactive authentication challenges — without leaving the current window.
+Labonair handles the full connection lifecycle — from initiating the TCP connection to interactive authentication challenges — without leaving the current window.
 
 ## Starting a Connection
 
@@ -29,7 +29,7 @@ When a connection is initiated, a **Loading Screen** replaces the terminal area 
 
 ## Authentication
 
-If Nexum has a saved credential for this host (password or passphrase stored in Keychain), it attempts authentication automatically — no user interaction required.
+If Labonair has a saved credential for this host (password or passphrase stored in Keychain), it attempts authentication automatically — no user interaction required.
 
 If authentication fails, or if no credential is saved, the Loading Screen **transforms inline** into an authentication form:
 
@@ -41,14 +41,14 @@ Submitting the inline form retries the connection immediately — no need to res
 
 ## Fingerprint Verification
 
-On every connection, Nexum checks the server's SSH fingerprint against `~/.ssh/known_hosts`.
+On every connection, Labonair checks the server's SSH fingerprint against `~/.ssh/known_hosts`.
 
 - **New host (no existing entry):** A "Trust this server?" dialog shows the server's fingerprint. Click **Trust & Connect** to add it to `known_hosts` and proceed.
 - **Fingerprint mismatch:** The connection is blocked and a high-severity security warning is shown. See [known_hosts & Fingerprint Verification](../03-credential-management/known-hosts-fingerprint) for guidance.
 
 ## Successful Connection
 
-When authentication succeeds, Nexum fires a `session_established` event internally, the Loading Screen disappears, and the terminal becomes fully interactive. For SFTP tabs, the remote file browser loads the home directory.
+When authentication succeeds, Labonair fires a `session_established` event internally, the Loading Screen disappears, and the terminal becomes fully interactive. For SFTP tabs, the remote file browser loads the home directory.
 
 ## Connection Errors
 

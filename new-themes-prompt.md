@@ -1,7 +1,7 @@
-# Nexum Theme Schema v2 — Migration Prompt for Community Themes Repository
+# Labonair Theme Schema v2 — Migration Prompt for Community Themes Repository
 
 > **Context for the agent executing this prompt:**
-> This document is a complete migration guide for the Nexum community themes repository.
+> This document is a complete migration guide for the Labonair community themes repository.
 > You must update every existing theme file AND the indexer/CI pipeline to conform to the
 > new schema defined below. Read this entire document before writing a single line of code.
 
@@ -9,7 +9,7 @@
 
 ## What Changed and Why
 
-Nexum's theme engine has been expanded from ~38 color variables to ~70. The new schema
+Labonair's theme engine has been expanded from ~38 color variables to ~70. The new schema
 (`schema.json` in the main app repo) is now the canonical definition for what a theme file
 can express. Every key in the schema maps to a live CSS custom property in the app.
 
@@ -25,7 +25,7 @@ The changes fall into four categories:
 
 ## Full Schema Reference (v2)
 
-This is the complete set of valid keys for a Nexum theme JSON file. Every key is optional —
+This is the complete set of valid keys for a Labonair theme JSON file. Every key is optional —
 the app falls back to CSS defaults for any missing key. Themes do not need to include all keys,
 but well-crafted themes should define all of them.
 
@@ -219,7 +219,7 @@ The `selection` key (and optionally `border.transparent`) supports **8-digit hex
 
 ## Instructions for the Agent
 
-You are working in the Nexum community themes repository. Your job is:
+You are working in the Labonair community themes repository. Your job is:
 
 ### 1. Migrate every existing theme JSON file
 
@@ -278,7 +278,7 @@ valid keys with the Full Schema Reference above.
 
 ## Backward Compatibility Note
 
-The Nexum app itself accepts **both** old and new key names. A theme file with `terminal_black`
+The Labonair app itself accepts **both** old and new key names. A theme file with `terminal_black`
 still works in the app — the engine maps both to `--terminal-black`. However:
 
 - This repository should migrate all themes to v2 keys for consistency
@@ -288,14 +288,14 @@ still works in the app — the engine maps both to `--terminal-black`. However:
 
 ---
 
-## Reference: Nexum Dark (default theme, v2)
+## Reference: Labonair Dark (default theme, v2)
 
 Use this as a reference for what a complete v2 theme looks like:
 
 ```json
 {
-  "name": "Nexum Dark",
-  "author": "Nexum",
+  "name": "Labonair Dark",
+  "author": "Labonair",
   "type": "dark",
   "colors": {
     "background": "#0f111a",

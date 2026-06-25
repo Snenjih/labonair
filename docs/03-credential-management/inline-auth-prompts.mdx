@@ -1,11 +1,11 @@
 ---
 title: "Inline Auth Prompts"
-description: "How Nexum handles authentication failures and interactive challenges using inline prompts within the connection Loading Screen."
+description: "How Labonair handles authentication failures and interactive challenges using inline prompts within the connection Loading Screen."
 ---
 
 # Inline Auth Prompts
 
-When a connection requires additional authentication input — because no credential is saved, a saved credential is wrong, or the server requires a second factor — Nexum does not open a separate modal window. Instead, the **SSH Loading Screen** transforms in place into an inline authentication form, keeping the entire connection flow contained within the tab.
+When a connection requires additional authentication input — because no credential is saved, a saved credential is wrong, or the server requires a second factor — Labonair does not open a separate modal window. Instead, the **SSH Loading Screen** transforms in place into an inline authentication form, keeping the entire connection flow contained within the tab.
 
 ## When Inline Prompts Appear
 
@@ -43,7 +43,7 @@ Shown when the server sends a keyboard-interactive challenge — typically a TOT
 - Submit to send the response to the server. If further challenges follow (multi-step keyboard-interactive), additional prompts appear in sequence.
 
 :::warning
-Never share a TOTP code with anyone. Nexum only transmits it directly to the SSH server — it is not logged, cached, or sent anywhere else.
+Never share a TOTP code with anyone. Labonair only transmits it directly to the SSH server — it is not logged, cached, or sent anywhere else.
 :::
 
 ## Submitting and Retrying
@@ -52,4 +52,4 @@ All inline prompts retry the connection immediately on submit — there is no se
 
 ## Styling and Layout
 
-All inline auth prompts are rendered inside the Loading Screen component — the same space occupied by the connection progress indicators. No overlays, no modal dialogs, and no focus traps that interfere with other open tabs. The rest of the Nexum workspace remains accessible while a prompt is waiting for input.
+All inline auth prompts are rendered inside the Loading Screen component — the same space occupied by the connection progress indicators. No overlays, no modal dialogs, and no focus traps that interfere with other open tabs. The rest of the Labonair workspace remains accessible while a prompt is waiting for input.

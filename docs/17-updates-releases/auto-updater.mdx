@@ -1,33 +1,33 @@
 ---
 title: "Auto-Updater"
-description: "How Nexum automatically checks for and installs updates in the background."
+description: "How Labonair automatically checks for and installs updates in the background."
 ---
 
 # Auto-Updater
 
-Nexum includes a built-in automatic updater powered by Tauri's update plugin. When a new version is released, Nexum detects it and walks you through the update process with minimal friction — no browser visits, no manual downloads.
+Labonair includes a built-in automatic updater powered by Tauri's update plugin. When a new version is released, Labonair detects it and walks you through the update process with minimal friction — no browser visits, no manual downloads.
 
 ## How It Works
 
-Each time Nexum launches, it silently queries the GitHub Releases feed for the latest version. The check happens in the background and does not delay startup or block the UI in any way.
+Each time Labonair launches, it silently queries the GitHub Releases feed for the latest version. The check happens in the background and does not delay startup or block the UI in any way.
 
-If your installed version is already current, nothing happens. If a newer version is available, Nexum surfaces an **"Update Available"** dialog.
+If your installed version is already current, nothing happens. If a newer version is available, Labonair surfaces an **"Update Available"** dialog.
 
 ## Update Flow
 
-1. **Detection** — On launch, Nexum compares the running version against the latest GitHub release.
+1. **Detection** — On launch, Labonair compares the running version against the latest GitHub release.
 2. **Notification** — An "Update Available" dialog appears with the new version number and a summary of what's included (release notes pulled from the GitHub release).
 3. **Download** — Click **"Download & Install"** to begin. The update downloads in the background using Tauri's updater. A progress indicator shows in the dialog while the download is in progress.
-4. **Restart prompt** — Once the download is complete and the update is verified, Nexum prompts you to **restart the app** to apply the update. Your open session state is saved before restart.
-5. **Relaunch** — After restarting, Nexum launches with the new version. Your hosts, settings, themes, and AI session history are all preserved.
+4. **Restart prompt** — Once the download is complete and the update is verified, Labonair prompts you to **restart the app** to apply the update. Your open session state is saved before restart.
+5. **Relaunch** — After restarting, Labonair launches with the new version. Your hosts, settings, themes, and AI session history are all preserved.
 
 :::tip
-You do not need to accept an update immediately. Close the update dialog and continue working — Nexum will remind you on the next launch. The update package is cached locally so the download does not repeat.
+You do not need to accept an update immediately. Close the update dialog and continue working — Labonair will remind you on the next launch. The update package is cached locally so the download does not repeat.
 :::
 
 ## What the Updater Updates
 
-The auto-updater replaces the core Nexum app binary and frontend bundle. It does **not** modify:
+The auto-updater replaces the core Labonair app binary and frontend bundle. It does **not** modify:
 
 - Your host database (`hosts.db`)
 - macOS Keychain entries (SSH passwords, API keys)

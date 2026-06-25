@@ -5,11 +5,11 @@ description: "How to read the Transfer Queue panel in the titlebar — progress 
 
 # Transfer Queue UI
 
-The Transfer Queue panel is accessible from the Nexum titlebar and gives you a live view of all active, completed, and failed transfers during the current session.
+The Transfer Queue panel is accessible from the Labonair titlebar and gives you a live view of all active, completed, and failed transfers during the current session.
 
 ## The Titlebar Indicator
 
-When one or more transfers are active, a circular progress ring appears in the Nexum titlebar. The ring animates to reflect aggregate transfer progress. Once all transfers complete, the ring is replaced by a static checkmark icon that remains visible until you start another transfer.
+When one or more transfers are active, a circular progress ring appears in the Labonair titlebar. The ring animates to reflect aggregate transfer progress. Once all transfers complete, the ring is replaced by a static checkmark icon that remains visible until you start another transfer.
 
 If no transfers have occurred in the current session, the indicator is hidden entirely.
 
@@ -53,5 +53,5 @@ The panel subscribes to `transfer_progress` Tauri events emitted by the Rust bac
 There is no manual refresh — the panel always reflects the current state of the Rust worker.
 
 :::tip
-If a transfer shows an unexpectedly low speed, it is usually a sign of network latency or server-side I/O limits rather than a Nexum issue. Check your connection to the remote host with a `ping` in a terminal tab to get a baseline.
+If a transfer shows an unexpectedly low speed, it is usually a sign of network latency or server-side I/O limits rather than a Labonair issue. Check your connection to the remote host with a `ping` in a terminal tab to get a baseline.
 :::

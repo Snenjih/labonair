@@ -1,19 +1,19 @@
 ---
 title: "Window Resize & PTY"
-description: "How Nexum keeps the remote PTY in sync with the terminal pane size as you resize the window or adjust the layout."
+description: "How Labonair keeps the remote PTY in sync with the terminal pane size as you resize the window or adjust the layout."
 ---
 
 # Window Resize & PTY
 
-One of the subtle but important aspects of a good SSH terminal is keeping the remote pseudo-terminal (PTY) in sync with the visible terminal area at all times. Nexum handles this automatically, so you never see line-wrapping artifacts or incorrect `$COLUMNS`/`$LINES` values.
+One of the subtle but important aspects of a good SSH terminal is keeping the remote pseudo-terminal (PTY) in sync with the visible terminal area at all times. Labonair handles this automatically, so you never see line-wrapping artifacts or incorrect `$COLUMNS`/`$LINES` values.
 
 ## How resize works
 
-When you resize the Nexum window, drag a panel divider, or adjust the layout in any way that changes the terminal pane dimensions:
+When you resize the Labonair window, drag a panel divider, or adjust the layout in any way that changes the terminal pane dimensions:
 
 1. The **xterm.js `fit` addon** measures the terminal container element in pixels.
 2. It calculates the number of columns and rows that fit exactly, based on the current font size and line height.
-3. Nexum calls the `ssh_pty_resize` IPC command with the new `{cols, rows}` values.
+3. Labonair calls the `ssh_pty_resize` IPC command with the new `{cols, rows}` values.
 4. The Rust backend sends a **window-change packet** (`SSH_MSG_CHANNEL_REQUEST` with `window-change` type) over the active SSH channel to the server.
 5. The remote shell receives the updated terminal dimensions and updates `$COLUMNS` and `$LINES` immediately.
 
@@ -25,14 +25,14 @@ Without accurate PTY dimensions:
 - Interactive applications like `vim`, `htop`, `tmux`, and `less` lay out their UI incorrectly.
 - Tab completion hints and prompts using `$COLUMNS` for alignment display incorrectly.
 
-Nexum sends a resize packet on every dimension change, so interactive applications always have accurate layout information.
+Labonair sends a resize packet on every dimension change, so interactive applications always have accurate layout information.
 
 ## Automatic — no action needed
 
 You do not need to manually trigger a resize. Every time the terminal container changes size — whether from a window resize, panel drag, sidebar toggle, or zoom — the fit addon recalculates and the IPC call fires within the same render cycle.
 
 :::tip
-If you ever notice a terminal application that appears to have stale dimensions after a resize, run `resize` in the shell (available on most systems) to force the shell to re-read the PTY dimensions. This is rarely needed since Nexum keeps dimensions in sync continuously.
+If you ever notice a terminal application that appears to have stale dimensions after a resize, run `resize` in the shell (available on most systems) to force the shell to re-read the PTY dimensions. This is rarely needed since Labonair keeps dimensions in sync continuously.
 :::
 
 ## Relationship to local terminal

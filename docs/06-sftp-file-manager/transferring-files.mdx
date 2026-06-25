@@ -5,7 +5,7 @@ description: "Upload and download files and folders between your local machine a
 
 # Transferring Files
 
-File transfers in Nexum are handled by a background Rust worker built on Tokio. Once you start a transfer, it runs independently of the UI. You can close the SFTP tab or switch to another workspace — the transfer continues and progress is always visible in the titlebar Transfer Queue indicator.
+File transfers in Labonair are handled by a background Rust worker built on Tokio. Once you start a transfer, it runs independently of the UI. You can close the SFTP tab or switch to another workspace — the transfer continues and progress is always visible in the titlebar Transfer Queue indicator.
 
 ## Drag and Drop
 
@@ -53,7 +53,7 @@ See [Transfer Queue UI](/docs/07-transfer-queue/transfer-queue-ui) for full deta
 If a file with the same name already exists at the destination, the transfer pauses and a conflict resolution dialog appears. You can choose to overwrite, skip, or rename the incoming file. See [Conflict Resolution](/docs/06-sftp-file-manager/conflict-resolution) for details.
 
 :::tip
-To transfer a large folder, drag it from the source pane and drop it on the destination pane. Nexum walks the entire directory tree recursively — no need to manually select nested contents.
+To transfer a large folder, drag it from the source pane and drop it on the destination pane. Labonair walks the entire directory tree recursively — no need to manually select nested contents.
 :::
 
 :::warning

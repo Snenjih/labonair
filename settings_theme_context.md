@@ -1,5 +1,5 @@
 # Settings UI & Theme Engine Context
-**Project:** Nexum
+**Project:** Labonair
 **Goal:** Complete overhaul of the Settings Window UI to match the "Zed Editor" aesthetic, and implementation of a JSON-based Theme Engine.
 
 ## 1. UI/UX Architecture (Zed-Style Layout)
@@ -40,12 +40,12 @@ Extend `src/modules/settings/store.ts` (`Preferences` type and `DEFAULT_PREFEREN
 
 ## 3. The JSON Theme Engine (Rust + React)
 Themes are no longer hardcoded CSS. They are standalone `.json` files.
-- **Storage:** Rust must manage a folder `~/.local/share/com.nexum.app/themes/`.
+- **Storage:** Rust must manage a folder `~/.local/share/com.labonair.app/themes/`.
 - **Default Theme:** A hardcoded `default-dark.json` must be embedded in Rust. If the user selects another theme, its JSON values override the default ones.
 - **Theme JSON Structure:**
   ```json
   {
-    "name": "Nexum Dark",
+    "name": "Labonair Dark",
     "author": "Crynta",
     "type": "dark",
     "colors": {

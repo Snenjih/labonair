@@ -1,11 +1,11 @@
 ---
 title: "known_hosts Warning"
-description: "What to do when Nexum shows a server fingerprint mismatch warning."
+description: "What to do when Labonair shows a server fingerprint mismatch warning."
 ---
 
 # known_hosts Warning
 
-When you connect to an SSH server, Nexum verifies the server's cryptographic fingerprint against the entries in `~/.ssh/known_hosts`. If the fingerprint does not match the stored value, Nexum shows a known_hosts warning dialog before allowing the connection to proceed.
+When you connect to an SSH server, Labonair verifies the server's cryptographic fingerprint against the entries in `~/.ssh/known_hosts`. If the fingerprint does not match the stored value, Labonair shows a known_hosts warning dialog before allowing the connection to proceed.
 
 ## Why This Warning Appears
 
@@ -26,7 +26,7 @@ There are two categories of cause: expected and dangerous.
 
 1. Verify the new fingerprint with your server administrator or cloud provider console
 2. Click **"Accept New Key"** in the warning dialog
-3. Nexum updates the `~/.ssh/known_hosts` entry and proceeds with the connection
+3. Labonair updates the `~/.ssh/known_hosts` entry and proceeds with the connection
 
 **If the change is unexpected:**
 
@@ -47,11 +47,11 @@ The known_hosts file is a plain text file located at:
 ~/.ssh/known_hosts
 ```
 
-Each line represents one stored host fingerprint. You can open it in Nexum's editor or any text editor to inspect, edit, or remove specific entries manually.
+Each line represents one stored host fingerprint. You can open it in Labonair's editor or any text editor to inspect, edit, or remove specific entries manually.
 
 To remove a stale entry for a specific host from the command line:
 ```bash
 ssh-keygen -R hostname_or_ip
 ```
 
-This is equivalent to what Nexum does internally when you click "Accept New Key."
+This is equivalent to what Labonair does internally when you click "Accept New Key."

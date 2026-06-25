@@ -1,15 +1,15 @@
 ---
 title: "Syntax Highlighting"
-description: "How Nexum auto-detects file languages and applies syntax highlighting using CodeMirror 6 language packs."
+description: "How Labonair auto-detects file languages and applies syntax highlighting using CodeMirror 6 language packs."
 ---
 
 # Syntax Highlighting
 
-Nexum uses **CodeMirror 6** language packs for syntax highlighting. Language detection is fully automatic — you never need to select a language from a dropdown.
+Labonair uses **CodeMirror 6** language packs for syntax highlighting. Language detection is fully automatic — you never need to select a language from a dropdown.
 
 ## How language detection works
 
-When a file opens, Nexum's `languageResolver.ts` module inspects the file extension and maps it to the appropriate CodeMirror language pack. If the extension is recognized, the correct grammar loads immediately. If the file has no extension (or an unrecognized one), the editor falls back to plain text mode with no highlighting applied.
+When a file opens, Labonair's `languageResolver.ts` module inspects the file extension and maps it to the appropriate CodeMirror language pack. If the extension is recognized, the correct grammar loads immediately. If the file has no extension (or an unrecognized one), the editor falls back to plain text mode with no highlighting applied.
 
 ## Supported languages
 
@@ -32,11 +32,11 @@ If a file uses an unconventional extension, rename it temporarily (or use the re
 
 ## Theme integration
 
-Syntax colors are not hardcoded. Nexum injects the active theme's CSS variables into the CodeMirror editor, so keywords, strings, comments, and other tokens all follow the current Nexum theme. Switching themes in Settings updates syntax colors across all open editor tabs in real time — no reload required.
+Syntax colors are not hardcoded. Labonair injects the active theme's CSS variables into the CodeMirror editor, so keywords, strings, comments, and other tokens all follow the current Labonair theme. Switching themes in Settings updates syntax colors across all open editor tabs in real time — no reload required.
 
 ## Lazy loading
 
-Language packs are loaded on demand. Only the grammar for the file currently being opened is fetched at that moment. Switching between a Rust file and a Python file loads the Python pack only when you open the Python file. This keeps Nexum's startup time fast regardless of how many language packs are bundled.
+Language packs are loaded on demand. Only the grammar for the file currently being opened is fetched at that moment. Switching between a Rust file and a Python file loads the Python pack only when you open the Python file. This keeps Labonair's startup time fast regardless of how many language packs are bundled.
 
 ## Plain text fallback
 
