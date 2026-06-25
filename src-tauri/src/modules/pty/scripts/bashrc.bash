@@ -1,4 +1,4 @@
-# nexum-shell-integration (bashrc)
+# labonair-shell-integration (bashrc)
 #
 # Differences vs zsh integration:
 # - We emulate login-shell init manually (/etc/profile, profile files) because
@@ -7,8 +7,8 @@
 #   skip it — a fragile DEBUG-trap alternative would clobber the user's own
 #   traps and interact badly with debuggers.
 
-if [ -z "$__NEXUM_HOOKS_LOADED" ]; then
-  __NEXUM_HOOKS_LOADED=1
+if [ -z "$__LABONAIR_HOOKS_LOADED" ]; then
+  __LABONAIR_HOOKS_LOADED=1
 
   [ -f /etc/profile ] && source /etc/profile
   [ -f /etc/bashrc ] && source /etc/bashrc
@@ -24,7 +24,7 @@ if [ -z "$__NEXUM_HOOKS_LOADED" ]; then
   # on reload, guard with a flag.
   [ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc"
 
-  _nexum_urlencode() {
+  _labonair_urlencode() {
     local LC_ALL=C s="$1" i c
     for (( i=0; i<${#s}; i++ )); do
       c="${s:i:1}"
@@ -35,20 +35,20 @@ if [ -z "$__NEXUM_HOOKS_LOADED" ]; then
     done
   }
 
-  _nexum_precmd() {
-    local _nexum_ret=$?
-    printf '\e]133;D;%s\e\\' "$_nexum_ret"
-    printf '\e]7;file://%s%s\e\\' "${HOSTNAME:-$(uname -n 2>/dev/null)}" "$(_nexum_urlencode "$PWD")"
-    if [ -z "$__NEXUM_PS1_INJECTED" ]; then
+  _labonair_precmd() {
+    local _labonair_ret=$?
+    printf '\e]133;D;%s\e\\' "$_labonair_ret"
+    printf '\e]7;file://%s%s\e\\' "${HOSTNAME:-$(uname -n 2>/dev/null)}" "$(_labonair_urlencode "$PWD")"
+    if [ -z "$__LABONAIR_PS1_INJECTED" ]; then
       PS1='\[\e]133;B\e\\\]'"$PS1"
-      __NEXUM_PS1_INJECTED=1
+      __LABONAIR_PS1_INJECTED=1
     fi
     printf '\e]133;A\e\\'
   }
 
   case ":${PROMPT_COMMAND:-}:" in
-    *":_nexum_precmd:"*) ;;
-    *) PROMPT_COMMAND="_nexum_precmd${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
+    *":_labonair_precmd:"*) ;;
+    *) PROMPT_COMMAND="_labonair_precmd${PROMPT_COMMAND:+;$PROMPT_COMMAND}" ;;
   esac
 
   # Pre-exec marker via PS0 (bash 4.4+). PS0 is expanded just before a command
@@ -59,6 +59,6 @@ if [ -z "$__NEXUM_HOOKS_LOADED" ]; then
     PS0='\[\e]133;C\e\\\]'"${PS0:-}"
   fi
 
-  _nexum_precmd
+  _labonair_precmd
 fi
 :

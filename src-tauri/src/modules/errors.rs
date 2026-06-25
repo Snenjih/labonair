@@ -3,7 +3,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug, Serialize)]
 #[serde(tag = "code", content = "message")]
-pub enum NexumError {
+pub enum LabonairError {
     #[error("Authentication failed: {0}")]
     AuthFailed(String),
     #[error("Network connection lost: {0}")]
@@ -16,20 +16,20 @@ pub enum NexumError {
     Internal(String),
 }
 
-impl From<ssh2::Error> for NexumError {
+impl From<ssh2::Error> for LabonairError {
     fn from(e: ssh2::Error) -> Self {
-        NexumError::Internal(e.to_string())
+        LabonairError::Internal(e.to_string())
     }
 }
 
-impl From<std::io::Error> for NexumError {
+impl From<std::io::Error> for LabonairError {
     fn from(e: std::io::Error) -> Self {
-        NexumError::IoError(e.to_string())
+        LabonairError::IoError(e.to_string())
     }
 }
 
-impl From<rusqlite::Error> for NexumError {
+impl From<rusqlite::Error> for LabonairError {
     fn from(e: rusqlite::Error) -> Self {
-        NexumError::Internal(e.to_string())
+        LabonairError::Internal(e.to_string())
     }
 }

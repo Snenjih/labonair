@@ -163,7 +163,7 @@ pub async fn ssh_start_tunnels(
     }
 
     let password: Option<String> = if auth_method == "password" {
-        crate::modules::secrets::get_password(&app, &secrets, "nexum-app", &host_id)
+        crate::modules::secrets::get_password(&app, &secrets, "labonair-app", &host_id)
             .ok()
             .flatten()
     } else {

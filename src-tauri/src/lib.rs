@@ -156,7 +156,7 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         if let Some(t) = tab.as_deref().filter(|s| !s.is_empty()) {
             // emit() serializes via JSON — no string-escape footgun, unlike
             // eval() with format!(). Frontend listens via Tauri event API.
-            let _ = window.emit("nexum:settings-tab", t);
+            let _ = window.emit("labonair:settings-tab", t);
         }
         return Ok(());
     }
@@ -213,21 +213,21 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
 }
 
 fn build_menu(app: &tauri::App) -> tauri::Result<Menu<tauri::Wry>> {
-    // ── Nexum app menu ────────────────────────────────────────────────────────
+    // ── Labonair app menu ─────────────────────────────────────────────────────
     let about_meta = AboutMetadata {
         version: Some(env!("CARGO_PKG_VERSION").to_string()),
         copyright: Some("© 2026 Snenjih".to_string()),
-        credits: Some("A modern terminal, SSH & SFTP client with integrated AI for developers.\n\nnexum.app".to_string()),
+        credits: Some("A modern terminal, SSH & SFTP client with integrated AI for developers.\n\nlabonair.app".to_string()),
         icon: Some(tauri::include_image!("icons/128x128@2x.png")),
         ..Default::default()
     };
-    let about       = PredefinedMenuItem::about(app, Some("About Nexum"), Some(about_meta))?;
+    let about       = PredefinedMenuItem::about(app, Some("About Labonair"), Some(about_meta))?;
     let settings    = MenuItem::with_id(app, "settings", "Settings...", true, Some("CmdOrCtrl+,"))?;
     let hide        = PredefinedMenuItem::hide(app, None)?;
     let hide_others = PredefinedMenuItem::hide_others(app, None)?;
     let show_all    = PredefinedMenuItem::show_all(app, None)?;
     let quit        = PredefinedMenuItem::quit(app, None)?;
-    let app_menu    = Submenu::with_items(app, "Nexum", true, &[
+    let app_menu    = Submenu::with_items(app, "Labonair", true, &[
         &about, &settings,
         &PredefinedMenuItem::separator(app)?,
         &hide, &hide_others, &show_all,
@@ -359,6 +359,24 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            // Migrate nexum-settings.json → labonair-settings.json on first launch
+            {
+                let config_dir = paths::config_dir();
+                let old_settings = config_dir.join("nexum-settings.json");
+                let new_settings = config_dir.join("labonair-settings.json");
+                if old_settings.exists() && !new_settings.exists() {
+                    let _ = std::fs::rename(&old_settings, &new_settings);
+                }
+            }
+
+            // Migrate nexum-* keychain service names → labonair-* once at startup.
+            // The SecretsState isn't managed yet at this point, so we use a temporary
+            // instance to perform the one-time key rename in the secrets store file.
+            {
+                let temp_secrets = secrets::SecretsState::default();
+                secrets::migrate_service_names(app.handle(), &temp_secrets);
+            }
+
             let conn = initialize_db(paths::data_dir())
                 .expect("failed to initialize database");
             app.manage(HostsDb(std::sync::Mutex::new(conn)));
@@ -387,7 +405,7 @@ pub fn run() {
             // The window-state plugin has already applied the saved geometry by this point;
             // if the user has disabled the feature we reset to defaults instead.
             let restore_window = std::fs::read_to_string(
-                    paths::config_dir().join("nexum-settings.json")
+                    paths::config_dir().join("labonair-settings.json")
                 ).ok()
                 .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
                 .and_then(|v| v.get("restoreWindowState").and_then(|b| b.as_bool()))

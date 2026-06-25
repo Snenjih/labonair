@@ -2,7 +2,7 @@ use crate::modules::hosts::HostsDb;
 use crate::modules::secrets::{delete_password, store_password, SecretsState};
 use base64::Engine as _;
 
-const CRED_SERVICE: &str = "nexum-cred";
+const CRED_SERVICE: &str = "labonair-cred";
 
 const SELECT_CREDS: &str =
     "SELECT id, name, cred_type, key_path, key_type, public_key, has_secret, created_at FROM credentials";
@@ -94,7 +94,7 @@ fn pkey_to_openssh_pubkey(
     }
     let b64 = base64::engine::general_purpose::STANDARD.encode(&wire);
     let prefix = if key_type == "ed25519" { "ssh-ed25519" } else { "ssh-rsa" };
-    Ok(format!("{} {} nexum-generated", prefix, b64))
+    Ok(format!("{} {} labonair-generated", prefix, b64))
 }
 
 #[tauri::command]

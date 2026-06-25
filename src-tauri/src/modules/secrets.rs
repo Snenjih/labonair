@@ -324,6 +324,44 @@ pub async fn secrets_set_encryption_enabled(
     Ok(())
 }
 
+// ── Keychain migration (nexum-* → labonair-*) ────────────────────────────────
+
+/// Migrate all stored secrets from old nexum-* service names to labonair-*.
+/// Called once on first launch after the rename. Safe to call multiple times
+/// (subsequent calls are no-ops because old keys will already be gone).
+pub(crate) fn migrate_service_names(app: &AppHandle, state: &SecretsState) {
+    let renames = [
+        ("nexum-app", "labonair-app"),
+        ("nexum-cred", "labonair-cred"),
+        ("nexum-sudo", "labonair-sudo"),
+    ];
+    // Read the current map; skip silently on error (first run, empty store, etc.)
+    let Ok(mut map) = read_map(app, state) else { return };
+    let mut changed = false;
+    for (old_svc, new_svc) in &renames {
+        let old_prefix = format!("{}::", old_svc);
+        let new_prefix = format!("{}::", new_svc);
+        // Collect keys that need renaming (avoid mutating while iterating).
+        let to_rename: Vec<String> = map
+            .keys()
+            .filter(|k| k.starts_with(&old_prefix))
+            .cloned()
+            .collect();
+        for old_key in to_rename {
+            let new_key = format!("{}{}", new_prefix, &old_key[old_prefix.len()..]);
+            if let Some(value) = map.remove(&old_key) {
+                map.insert(new_key, value);
+                changed = true;
+            }
+        }
+    }
+    if changed {
+        let _ = write_map(app, state, &map);
+        // Invalidate the in-memory cache so subsequent reads see the new keys.
+        invalidate_cache(state);
+    }
+}
+
 // ── Internal helpers for Rust callers (db.rs, client.rs) ─────────────────────
 
 pub(crate) fn store_password(

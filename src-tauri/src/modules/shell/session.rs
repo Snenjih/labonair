@@ -33,7 +33,7 @@ pub struct SessionRunOutput {
 /// Sentinel emitted on stdout immediately before the command exits, so we can
 /// recover the post-command cwd. Picks an unlikely literal — collisions with
 /// real command output would corrupt cwd tracking.
-const CWD_SENTINEL: &str = "__NEXUM_CWD__";
+const CWD_SENTINEL: &str = "__LABONAIR_CWD__";
 
 impl ShellSession {
     pub fn new(initial_cwd: PathBuf) -> Self {
@@ -61,7 +61,7 @@ impl ShellSession {
         // Append a cwd-reporting tail. Run with `set +e` semantics by
         // capturing $? right after the command, then printing the sentinel.
         let wrapped = format!(
-            "{trimmed}\n__nexum_rc=$?\nprintf '\\n%s%s\\n' '{CWD_SENTINEL}' \"$(pwd)\"\nexit $__nexum_rc\n",
+            "{trimmed}\n__labonair_rc=$?\nprintf '\\n%s%s\\n' '{CWD_SENTINEL}' \"$(pwd)\"\nexit $__labonair_rc\n",
         );
 
         let (tx, rx) = mpsc::channel::<Result<super::CommandOutput, String>>();

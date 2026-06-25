@@ -8,7 +8,7 @@ pub fn config_dir() -> PathBuf {
     #[cfg(target_os = "windows")]
     let base = dirs::config_dir().expect("cannot resolve config dir");
 
-    let dir = base.join("nexum");
+    let dir = base.join("labonair");
     let _ = std::fs::create_dir_all(&dir);
     dir
 }
@@ -17,7 +17,7 @@ pub fn data_dir() -> PathBuf {
     // Maps to ~/Library/Application Support on macOS, ~/.local/share on Linux,
     // %LOCALAPPDATA% on Windows — all browsable, none treated as app bundles.
     let base = dirs::data_local_dir().expect("cannot resolve local data dir");
-    let dir = base.join("Nexum");
+    let dir = base.join("Labonair");
     let _ = std::fs::create_dir_all(&dir);
     dir
 }

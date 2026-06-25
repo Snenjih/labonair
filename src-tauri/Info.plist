@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Nexum uses your microphone for AI voice input.</string>
+	<string>Labonair uses your microphone for AI voice input.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Nexum needs access to your local network to connect to SSH servers and devices like Raspberry Pis on your local network.</string>
+	<string>Labonair needs access to your local network to connect to SSH servers and devices like Raspberry Pis on your local network.</string>
 
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 Snenjih. All rights reserved.</string>

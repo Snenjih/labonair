@@ -1,12 +1,18 @@
 use super::{Group, Host, HostsDb, ReorderItem};
-use crate::modules::errors::NexumError;
+use crate::modules::errors::LabonairError;
 use crate::modules::secrets::{delete_password, get_password, store_password, SecretsState};
 
 pub fn initialize_db(
     app_local_data_dir: std::path::PathBuf,
 ) -> Result<rusqlite::Connection, String> {
     std::fs::create_dir_all(&app_local_data_dir).map_err(|e| e.to_string())?;
-    let db_path = app_local_data_dir.join("nexum.db");
+    // Migrate nexum.db → labonair.db on first launch after rename
+    let labonair_path = app_local_data_dir.join("labonair.db");
+    let nexum_path = app_local_data_dir.join("nexum.db");
+    if nexum_path.exists() && !labonair_path.exists() {
+        let _ = std::fs::rename(&nexum_path, &labonair_path);
+    }
+    let db_path = app_local_data_dir.join("labonair.db");
     let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
     conn.execute_batch("PRAGMA journal_mode=WAL;")
         .map_err(|e| e.to_string())?;
@@ -146,8 +152,8 @@ const SELECT_HOSTS: &str = "SELECT id, name, host_address, port, username, auth_
     jump_host_id, notes FROM hosts";
 
 #[tauri::command]
-pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     let mut stmt = conn
         .prepare(&format!("{} ORDER BY pin_to_top DESC, sort_order ASC, name ASC", SELECT_HOSTS))?;
     let hosts = stmt
@@ -184,7 +190,7 @@ pub async fn hosts_create(
     credential_id: Option<String>,
     jump_host_id: Option<String>,
     notes: Option<String>,
-) -> Result<Host, NexumError> {
+) -> Result<Host, LabonairError> {
     let id = uuid::Uuid::new_v4().to_string();
     let created_at = now_millis();
     let pin = pin_to_top.unwrap_or(false) as i64;
@@ -192,7 +198,7 @@ pub async fn hosts_create(
     let sudo_set = sudo_password.is_some() as i64;
 
     {
-        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         let snippet_id: Option<&str> = startup_snippet_id.as_deref().filter(|s| !s.is_empty());
         conn.execute(
             "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
@@ -212,20 +218,20 @@ pub async fn hosts_create(
     }
     if let Some(pw) = password {
         if !pw.is_empty() {
-            store_password(&app, &secrets, "nexum-app", &id, &pw).map_err(NexumError::Internal)?;
+            store_password(&app, &secrets, "labonair-app", &id, &pw).map_err(LabonairError::Internal)?;
         }
     }
     if let Some(sp) = sudo_password {
         if !sp.is_empty() {
-            store_password(&app, &secrets, "nexum-sudo", &id, &sp).map_err(NexumError::Internal)?;
+            store_password(&app, &secrets, "labonair-sudo", &id, &sp).map_err(LabonairError::Internal)?;
         }
     }
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     conn.query_row(
         &format!("{} WHERE id=?1", SELECT_HOSTS),
         rusqlite::params![id],
         row_to_host,
-    ).map_err(NexumError::from)
+    ).map_err(LabonairError::from)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -257,9 +263,9 @@ pub async fn hosts_update(
     credential_id: Option<String>,
     jump_host_id: Option<String>,
     notes: Option<String>,
-) -> Result<Host, NexumError> {
+) -> Result<Host, LabonairError> {
     {
-        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         if let Some(v) = &name {
             conn.execute("UPDATE hosts SET name=?1 WHERE id=?2", rusqlite::params![v, id])?;
         }
@@ -328,28 +334,28 @@ pub async fn hosts_update(
     }
     if let Some(pw) = password {
         if pw.is_empty() {
-            let _ = delete_password(&app, &secrets, "nexum-app", &id);
+            let _ = delete_password(&app, &secrets, "labonair-app", &id);
         } else {
-            store_password(&app, &secrets, "nexum-app", &id, &pw).map_err(NexumError::Internal)?;
+            store_password(&app, &secrets, "labonair-app", &id, &pw).map_err(LabonairError::Internal)?;
         }
     }
     if let Some(sp) = sudo_password {
         if sp.is_empty() {
-            let _ = delete_password(&app, &secrets, "nexum-sudo", &id);
-            let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+            let _ = delete_password(&app, &secrets, "labonair-sudo", &id);
+            let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
             let _ = conn.execute("UPDATE hosts SET sudo_password_set=0 WHERE id=?1", rusqlite::params![id]);
         } else {
-            store_password(&app, &secrets, "nexum-sudo", &id, &sp).map_err(NexumError::Internal)?;
-            let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+            store_password(&app, &secrets, "labonair-sudo", &id, &sp).map_err(LabonairError::Internal)?;
+            let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
             let _ = conn.execute("UPDATE hosts SET sudo_password_set=1 WHERE id=?1", rusqlite::params![id]);
         }
     }
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     conn.query_row(
         &format!("{} WHERE id=?1", SELECT_HOSTS),
         rusqlite::params![id],
         row_to_host,
-    ).map_err(NexumError::from)
+    ).map_err(LabonairError::from)
 }
 
 #[tauri::command]
@@ -358,13 +364,13 @@ pub async fn hosts_delete(
     db: tauri::State<'_, HostsDb>,
     secrets: tauri::State<'_, SecretsState>,
     id: String,
-) -> Result<(), NexumError> {
+) -> Result<(), LabonairError> {
     {
-        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         conn.execute("DELETE FROM hosts WHERE id=?1", rusqlite::params![id])?;
     }
-    let _ = delete_password(&app, &secrets, "nexum-app", &id);
-    let _ = delete_password(&app, &secrets, "nexum-sudo", &id);
+    let _ = delete_password(&app, &secrets, "labonair-app", &id);
+    let _ = delete_password(&app, &secrets, "labonair-sudo", &id);
     Ok(())
 }
 
@@ -372,8 +378,8 @@ pub async fn hosts_delete(
 pub async fn hosts_reorder(
     db: tauri::State<'_, HostsDb>,
     items: Vec<ReorderItem>,
-) -> Result<(), NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+) -> Result<(), LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     for item in &items {
         conn.execute(
             "UPDATE hosts SET sort_order=?1 WHERE id=?2",
@@ -389,9 +395,9 @@ pub async fn get_sudo_password(
     db: tauri::State<'_, HostsDb>,
     secrets: tauri::State<'_, SecretsState>,
     host_id: String,
-) -> Result<Option<String>, NexumError> {
+) -> Result<Option<String>, LabonairError> {
     let sudo_set: bool = {
-        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         conn.query_row(
             "SELECT sudo_password_set FROM hosts WHERE id=?1",
             rusqlite::params![host_id],
@@ -403,12 +409,12 @@ pub async fn get_sudo_password(
     if !sudo_set {
         return Ok(None);
     }
-    get_password(&app, &secrets, "nexum-sudo", &host_id).map_err(NexumError::Internal)
+    get_password(&app, &secrets, "labonair-sudo", &host_id).map_err(LabonairError::Internal)
 }
 
 #[tauri::command]
-pub async fn groups_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Group>, NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+pub async fn groups_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Group>, LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     let mut stmt = conn
         .prepare("SELECT id, name, icon, color, created_at FROM groups ORDER BY name")?;
     let groups = stmt
@@ -431,11 +437,11 @@ pub async fn groups_create(
     name: String,
     icon: Option<String>,
     color: Option<String>,
-) -> Result<Group, NexumError> {
+) -> Result<Group, LabonairError> {
     let id = uuid::Uuid::new_v4().to_string();
     let created_at = now_millis();
     {
-        let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         conn.execute(
             "INSERT INTO groups (id, name, icon, color, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
             rusqlite::params![id, name, icon, color, created_at],
@@ -445,8 +451,8 @@ pub async fn groups_create(
 }
 
 #[tauri::command]
-pub async fn groups_delete(db: tauri::State<'_, HostsDb>, id: String) -> Result<(), NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+pub async fn groups_delete(db: tauri::State<'_, HostsDb>, id: String) -> Result<(), LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     conn.execute("DELETE FROM groups WHERE id=?1", rusqlite::params![id])?;
     Ok(())
 }
@@ -456,8 +462,8 @@ pub async fn groups_update(
     db: tauri::State<'_, HostsDb>,
     id: String,
     name: String,
-) -> Result<Group, NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+) -> Result<Group, LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     conn.execute(
         "UPDATE groups SET name=?1 WHERE id=?2",
         rusqlite::params![name, id],

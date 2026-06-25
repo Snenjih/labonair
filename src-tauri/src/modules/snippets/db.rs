@@ -1,5 +1,5 @@
 use super::{CommandSnippet, SnippetGroup, SnippetReorderItem};
-use crate::modules::errors::NexumError;
+use crate::modules::errors::LabonairError;
 use crate::modules::hosts::HostsDb;
 
 fn now_millis() -> i64 {
@@ -45,8 +45,8 @@ const SELECT_SNIPPETS: &str =
 // ── Snippets ─────────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn snippets_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<CommandSnippet>, NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+pub async fn snippets_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<CommandSnippet>, LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     let mut stmt = conn
         .prepare(&format!("{} ORDER BY sort_order ASC, name ASC", SELECT_SNIPPETS))?;
     let snippets = stmt
@@ -69,13 +69,13 @@ pub async fn snippets_create(
     group_id: Option<String>,
     tags: Option<String>,
     sort_order: Option<i64>,
-) -> Result<CommandSnippet, NexumError> {
+) -> Result<CommandSnippet, LabonairError> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = now_millis();
     let exec_mode = default_exec_mode.unwrap_or_else(|| "terminal".to_string());
     let order = sort_order.unwrap_or(0);
 
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     conn.execute(
         "INSERT INTO snippets (id, name, description, command, target, host_id, \
          default_exec_mode, working_dir, group_id, tags, sort_order, created_at, updated_at) \
@@ -108,9 +108,9 @@ pub async fn snippets_update(
     group_id: Option<String>,
     tags: Option<String>,
     sort_order: Option<i64>,
-) -> Result<CommandSnippet, NexumError> {
+) -> Result<CommandSnippet, LabonairError> {
     let now = now_millis();
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
 
     macro_rules! maybe_update {
         ($field:expr, $col:literal, $val:expr) => {
@@ -160,8 +160,8 @@ pub async fn snippets_update(
 pub async fn snippets_delete(
     db: tauri::State<'_, HostsDb>,
     id: String,
-) -> Result<(), NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+) -> Result<(), LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     conn.execute("DELETE FROM snippets WHERE id=?1", rusqlite::params![id])?;
     Ok(())
 }
@@ -170,8 +170,8 @@ pub async fn snippets_delete(
 pub async fn snippets_reorder(
     db: tauri::State<'_, HostsDb>,
     items: Vec<SnippetReorderItem>,
-) -> Result<(), NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+) -> Result<(), LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     for item in &items {
         conn.execute(
             "UPDATE snippets SET sort_order=?1 WHERE id=?2",
@@ -184,8 +184,8 @@ pub async fn snippets_reorder(
 // ── Snippet Groups ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn snippet_groups_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<SnippetGroup>, NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+pub async fn snippet_groups_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<SnippetGroup>, LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     let mut stmt = conn
         .prepare("SELECT id, name, icon, color, sort_order, created_at FROM snippet_groups ORDER BY sort_order ASC, name ASC")?;
     let groups = stmt
@@ -200,10 +200,10 @@ pub async fn snippet_groups_create(
     name: String,
     icon: Option<String>,
     color: Option<String>,
-) -> Result<SnippetGroup, NexumError> {
+) -> Result<SnippetGroup, LabonairError> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = now_millis();
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     conn.execute(
         "INSERT INTO snippet_groups (id, name, icon, color, sort_order, created_at) VALUES (?1,?2,?3,?4,0,?5)",
         rusqlite::params![id, name, icon, color, now],
@@ -218,8 +218,8 @@ pub async fn snippet_groups_update(
     name: Option<String>,
     icon: Option<String>,
     color: Option<String>,
-) -> Result<SnippetGroup, NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+) -> Result<SnippetGroup, LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     if let Some(v) = name {
         conn.execute("UPDATE snippet_groups SET name=?1 WHERE id=?2", rusqlite::params![v, id])?;
     }
@@ -240,8 +240,8 @@ pub async fn snippet_groups_update(
 pub async fn snippet_groups_delete(
     db: tauri::State<'_, HostsDb>,
     id: String,
-) -> Result<(), NexumError> {
-    let conn = db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+) -> Result<(), LabonairError> {
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     conn.execute("UPDATE snippets SET group_id=NULL WHERE group_id=?1", rusqlite::params![id])?;
     conn.execute("DELETE FROM snippet_groups WHERE id=?1", rusqlite::params![id])?;
     Ok(())

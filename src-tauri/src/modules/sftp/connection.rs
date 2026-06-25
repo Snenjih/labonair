@@ -1,5 +1,5 @@
 use tauri::Emitter;
-use crate::modules::errors::NexumError;
+use crate::modules::errors::LabonairError;
 use crate::modules::ssh::{TrustState, SessionHandle, SftpHandle};
 use super::state::{SftpSession, SftpState};
 
@@ -18,11 +18,11 @@ pub async fn sftp_connect(
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
     secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
     app: tauri::AppHandle,
-) -> Result<(), NexumError> {
+) -> Result<(), LabonairError> {
     // Fetch host from DB (fast, sync).
     let (host_address, port, username, auth_method, private_key_path, keep_alive_interval,
          keep_alive_tries, default_path_sftp, credential_id) = {
-        let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         let mut stmt = conn.prepare(
             "SELECT host_address, port, username, auth_method, private_key_path, \
              keep_alive_interval, keep_alive_tries, default_path_sftp, credential_id \
@@ -45,13 +45,13 @@ pub async fn sftp_connect(
 
     // Resolve credential overrides.
     let (auth_method, private_key_path) = if let Some(ref cid) = credential_id {
-        let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         let (cred_type, cred_key_path): (String, Option<String>) = conn.query_row(
             "SELECT cred_type, key_path FROM credentials WHERE id=?1",
             rusqlite::params![cid],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
-        .map_err(|_| NexumError::Internal(format!(
+        .map_err(|_| LabonairError::Internal(format!(
             "Credential '{}' not found — it may have been deleted.", cid
         )))?;
         (cred_type, cred_key_path)
@@ -65,9 +65,9 @@ pub async fn sftp_connect(
             password_override.clone()
         } else {
             if let Some(ref cid) = credential_id {
-                crate::modules::secrets::get_password(&app, &secrets, "nexum-cred", cid).ok().flatten()
+                crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", cid).ok().flatten()
             } else {
-                crate::modules::secrets::get_password(&app, &secrets, "nexum-app", &host_id).ok().flatten()
+                crate::modules::secrets::get_password(&app, &secrets, "labonair-app", &host_id).ok().flatten()
             }
         }
     } else {
@@ -77,7 +77,7 @@ pub async fn sftp_connect(
     // Passphrase from credential secret for key auth.
     let passphrase = if credential_id.is_some() && auth_method == "key" && passphrase.is_none() {
         if let Some(ref cid) = credential_id {
-            crate::modules::secrets::get_password(&app, &secrets, "nexum-cred", cid).ok().flatten()
+            crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", cid).ok().flatten()
         } else {
             passphrase
         }
@@ -100,10 +100,10 @@ pub async fn sftp_connect(
         )
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?;
+    .map_err(|e| LabonairError::Internal(e.to_string()))?;
 
     if result.is_ok() {
-        let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -117,11 +117,11 @@ pub async fn sftp_connect(
     result.map_err(|s| {
         let lower = s.to_lowercase();
         if lower.contains("authentication failed") || lower.contains("not authenticated") || s == "passphrase_required" {
-            NexumError::AuthFailed(s)
+            LabonairError::AuthFailed(s)
         } else if lower.contains("tcp connect") || lower.contains("network") || lower.contains("broken pipe") {
-            NexumError::NetworkError(s)
+            LabonairError::NetworkError(s)
         } else {
-            NexumError::Internal(s)
+            LabonairError::Internal(s)
         }
     })
 }
@@ -207,8 +207,8 @@ fn sftp_connect_blocking(
 pub fn sftp_disconnect(
     session_id: String,
     state: tauri::State<'_, SftpState>,
-) -> Result<(), NexumError> {
-    let mut map = state.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+) -> Result<(), LabonairError> {
+    let mut map = state.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     map.remove(&session_id);
     Ok(())
 }

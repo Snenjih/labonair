@@ -1,5 +1,5 @@
 use tauri::Emitter;
-use crate::modules::errors::NexumError;
+use crate::modules::errors::LabonairError;
 
 macro_rules! log_step {
     ($app:expr, $session_id:expr, $msg:expr) => {
@@ -41,11 +41,11 @@ pub async fn ssh_connect(
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
     secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
     app: tauri::AppHandle,
-) -> Result<(), NexumError> {
+) -> Result<(), LabonairError> {
     // Step 1: Fetch host from SQLite (fast, sync — do before spawn_blocking)
     log_step!(app, session_id, "Reading host configuration…");
     let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, default_path_ssh, credential_id, jump_host_id) = {
-        let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         let mut stmt = conn
             .prepare(
                 "SELECT host_address, port, username, auth_method, private_key_path, \
@@ -72,13 +72,13 @@ pub async fn ssh_connect(
     let (auth_method, private_key_path) = if let Some(cid) = &credential_id {
         log_step!(app, session_id, "Resolving credential…");
         let (cred_type, cred_key_path, cred_has_secret): (String, Option<String>, bool) = {
-            let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+            let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
             conn.query_row(
                 "SELECT cred_type, key_path, has_secret FROM credentials WHERE id=?1",
                 rusqlite::params![cid],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2).map(|v| v != 0).unwrap_or(false))),
             )
-            .map_err(|_| NexumError::Internal(format!("Credential '{}' not found — it may have been deleted. Please update the host's auth settings.", cid)))?
+            .map_err(|_| LabonairError::Internal(format!("Credential '{}' not found — it may have been deleted. Please update the host's auth settings.", cid)))?
         };
         let _ = cred_has_secret; // used below for password fetch
         (cred_type, cred_key_path)
@@ -94,9 +94,9 @@ pub async fn ssh_connect(
         } else {
             log_step!(app, session_id, "Retrieving credentials from local store…");
             if let Some(cid) = &credential_id {
-                crate::modules::secrets::get_password(&app, &secrets, "nexum-cred", cid).ok().flatten()
+                crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", cid).ok().flatten()
             } else {
-                crate::modules::secrets::get_password(&app, &secrets, "nexum-app", &host_id).ok().flatten()
+                crate::modules::secrets::get_password(&app, &secrets, "labonair-app", &host_id).ok().flatten()
             }
         }
     } else {
@@ -106,7 +106,7 @@ pub async fn ssh_connect(
     // For key auth via credential, the passphrase may be stored in the credential's secret.
     let passphrase = if credential_id.is_some() && auth_method == "key" && passphrase.is_none() {
         if let Some(cid) = &credential_id {
-            crate::modules::secrets::get_password(&app, &secrets, "nexum-cred", cid).ok().flatten()
+            crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", cid).ok().flatten()
         } else {
             passphrase
         }
@@ -128,7 +128,7 @@ pub async fn ssh_connect(
         let (jh_addr, jh_port, jh_user, jh_auth, jh_key, jh_kai, jh_cred_id): (
             String, i64, String, String, Option<String>, Option<i64>, Option<String>,
         ) = {
-            let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+            let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
             conn.query_row(
                 "SELECT host_address, port, username, auth_method, private_key_path, \
                  keep_alive_interval, credential_id FROM hosts WHERE id = ?1",
@@ -145,19 +145,19 @@ pub async fn ssh_connect(
                     ))
                 },
             )
-            .map_err(|_| NexumError::Internal(format!("Jump host '{}' not found", jid)))?
+            .map_err(|_| LabonairError::Internal(format!("Jump host '{}' not found", jid)))?
         };
 
         // Resolve credential for jump host if needed
         let (jh_auth, jh_key) = if let Some(ref jcid) = jh_cred_id {
             let (cred_type, cred_key_path): (String, Option<String>) = {
-                let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+                let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
                 conn.query_row(
                     "SELECT cred_type, key_path FROM credentials WHERE id=?1",
                     rusqlite::params![jcid],
                     |r| Ok((r.get(0)?, r.get(1)?)),
                 )
-                .map_err(|_| NexumError::Internal(format!("Jump host credential '{}' not found", jcid)))?
+                .map_err(|_| LabonairError::Internal(format!("Jump host credential '{}' not found", jcid)))?
             };
             (cred_type, cred_key_path)
         } else {
@@ -167,11 +167,11 @@ pub async fn ssh_connect(
         // Fetch jump host password from keyring
         let jh_pw: Option<String> = if jh_auth == "password" {
             if let Some(ref jcid) = jh_cred_id {
-                crate::modules::secrets::get_password(&app, &secrets, "nexum-cred", jcid)
+                crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", jcid)
                     .ok()
                     .flatten()
             } else {
-                crate::modules::secrets::get_password(&app, &secrets, "nexum-app", jid)
+                crate::modules::secrets::get_password(&app, &secrets, "labonair-app", jid)
                     .ok()
                     .flatten()
             }
@@ -213,11 +213,11 @@ pub async fn ssh_connect(
         )
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?;
+    .map_err(|e| LabonairError::Internal(e.to_string()))?;
 
     if result.is_ok() {
         // Update last_connected_at on the DB thread after successful connect.
-        let conn = hosts_db.0.lock().map_err(|e| NexumError::Internal(e.to_string()))?;
+        let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -231,25 +231,25 @@ pub async fn ssh_connect(
     result.map_err(classify_ssh_error)
 }
 
-/// Maps a string error from ssh_connect_blocking to a structured NexumError variant.
-fn classify_ssh_error(s: String) -> NexumError {
+/// Maps a string error from ssh_connect_blocking to a structured LabonairError variant.
+fn classify_ssh_error(s: String) -> LabonairError {
     let lower = s.to_lowercase();
     if lower.contains("authentication failed")
         || lower.contains("not authenticated")
         || s == "passphrase_required"
     {
-        NexumError::AuthFailed(s)
+        LabonairError::AuthFailed(s)
     } else if lower.contains("tcp connect")
         || lower.contains("network")
         || lower.contains("connection reset")
         || lower.contains("broken pipe")
         || lower.contains("no route to host")
     {
-        NexumError::NetworkError(s)
+        LabonairError::NetworkError(s)
     } else if lower.contains("mismatch") || lower.contains("host key") || lower.contains("user rejected host") {
-        NexumError::HostKeyMismatch(s)
+        LabonairError::HostKeyMismatch(s)
     } else {
-        NexumError::Internal(s)
+        LabonairError::Internal(s)
     }
 }
 

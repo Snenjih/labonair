@@ -1,5 +1,5 @@
 use crate::modules::sftp::SftpState;
-use crate::modules::errors::NexumError;
+use crate::modules::errors::LabonairError;
 use std::io::{Read as _, Write as _};
 use std::sync::Arc;
 
@@ -55,7 +55,7 @@ pub async fn sftp_read_dir(
     session_id: String,
     path: String,
     state: tauri::State<'_, SftpState>,
-) -> Result<Vec<FileNode>, NexumError> {
+) -> Result<Vec<FileNode>, LabonairError> {
     let state_inner = state.inner().clone();
 
     tokio::task::spawn_blocking(move || {
@@ -128,8 +128,8 @@ pub async fn sftp_read_dir(
         Ok(files)
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }
 
 #[tauri::command]
@@ -138,7 +138,7 @@ pub async fn sftp_rename(
     old_path: String,
     new_path: String,
     state: tauri::State<'_, SftpState>,
-) -> Result<(), NexumError> {
+) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
@@ -151,8 +151,8 @@ pub async fn sftp_rename(
         .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }
 
 #[tauri::command]
@@ -160,7 +160,7 @@ pub async fn sftp_delete(
     session_id: String,
     paths: Vec<String>,
     state: tauri::State<'_, SftpState>,
-) -> Result<(), NexumError> {
+) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
@@ -178,8 +178,8 @@ pub async fn sftp_delete(
         Ok(())
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }
 
 #[tauri::command]
@@ -187,7 +187,7 @@ pub async fn sftp_mkdir(
     session_id: String,
     path: String,
     state: tauri::State<'_, SftpState>,
-) -> Result<(), NexumError> {
+) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
@@ -196,8 +196,8 @@ pub async fn sftp_mkdir(
             .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }
 
 #[tauri::command]
@@ -206,7 +206,7 @@ pub async fn sftp_chmod(
     path: String,
     permissions: u32,
     state: tauri::State<'_, SftpState>,
-) -> Result<(), NexumError> {
+) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
@@ -219,8 +219,8 @@ pub async fn sftp_chmod(
             .map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }
 
 #[tauri::command]
@@ -228,7 +228,7 @@ pub async fn prepare_remote_edit(
     session_id: String,
     remote_path: String,
     state: tauri::State<'_, SftpState>,
-) -> Result<String, NexumError> {
+) -> Result<String, LabonairError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         let file_data = {
@@ -251,7 +251,7 @@ pub async fn prepare_remote_edit(
             Ok::<_, String>(buf)
         }?;
 
-        let temp_dir = std::env::temp_dir().join("nexum_remote_edits");
+        let temp_dir = std::env::temp_dir().join("labonair_remote_edits");
         std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
         let file_name = std::path::Path::new(&remote_path)
             .file_name()
@@ -263,8 +263,8 @@ pub async fn prepare_remote_edit(
         Ok(temp_path.to_string_lossy().to_string())
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }
 
 #[tauri::command]
@@ -273,13 +273,13 @@ pub async fn save_remote_edit(
     remote_path: String,
     local_temp_path: String,
     state: tauri::State<'_, SftpState>,
-) -> Result<(), NexumError> {
+) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         // Validate that the path is inside the expected temp directory to prevent
         // the frontend from reading arbitrary local files and uploading them.
-        let temp_dir = std::fs::canonicalize(std::env::temp_dir().join("nexum_remote_edits"))
-            .unwrap_or_else(|_| std::env::temp_dir().join("nexum_remote_edits"));
+        let temp_dir = std::fs::canonicalize(std::env::temp_dir().join("labonair_remote_edits"))
+            .unwrap_or_else(|_| std::env::temp_dir().join("labonair_remote_edits"));
         let canonical = std::fs::canonicalize(&local_temp_path)
             .map_err(|e| format!("invalid temp path: {e}"))?;
         if !canonical.starts_with(&temp_dir) {
@@ -294,8 +294,8 @@ pub async fn save_remote_edit(
         remote_file.write_all(&data).map_err(|e| e.to_string())
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }
 
 /// Run `du -sh '<path>'` on the remote server and return the human-readable size.
@@ -304,7 +304,7 @@ pub async fn sftp_calculate_size(
     session_id: String,
     path: String,
     state: tauri::State<'_, SftpState>,
-) -> Result<String, NexumError> {
+) -> Result<String, LabonairError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
@@ -319,8 +319,8 @@ pub async fn sftp_calculate_size(
         Ok(stdout.split_whitespace().next().unwrap_or("?").to_string())
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }
 
 /// Execute `chown owner:group '<path>'` on the remote server.
@@ -331,7 +331,7 @@ pub async fn sftp_chown(
     owner: String,
     group: String,
     state: tauri::State<'_, SftpState>,
-) -> Result<(), NexumError> {
+) -> Result<(), LabonairError> {
     let spec = match (owner.is_empty(), group.is_empty()) {
         (true, true)   => return Ok(()),
         (false, false) => format!("{}:{}", shell_quote(&owner), shell_quote(&group)),
@@ -357,8 +357,8 @@ pub async fn sftp_chown(
         Ok(())
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }
 
 /// Run `find <start_path> -iname '*<query>*' -maxdepth 5` on the remote server.
@@ -369,7 +369,7 @@ pub async fn sftp_deep_search(
     start_path: String,
     query: String,
     state: tauri::State<'_, SftpState>,
-) -> Result<Vec<String>, NexumError> {
+) -> Result<Vec<String>, LabonairError> {
     let state_inner = state.inner().clone();
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
@@ -392,6 +392,6 @@ pub async fn sftp_deep_search(
         Ok(stdout.lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect())
     })
     .await
-    .map_err(|e| NexumError::Internal(e.to_string()))?
-    .map_err(NexumError::Internal)
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
 }

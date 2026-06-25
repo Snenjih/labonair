@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Nexum",
+  "productName": "Labonair",
   "version": "1.9.0",
-  "identifier": "com.nexum.app",
+  "identifier": "com.labonair.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
   "app": {
     "windows": [
       {
-        "title": "Nexum",
+        "title": "Labonair",
         "width": 800,
         "height": 600,
         "minWidth": 420,
@@ -46,7 +46,7 @@
     ],
     "macOS": {
       "minimumSystemVersion": "10.15",
-      "entitlements": "Nexum.entitlements"
+      "entitlements": "Labonair.entitlements"
     },
     "linux": {
       "deb": {
@@ -62,13 +62,13 @@
     },
     "category": "DeveloperTool",
     "shortDescription": "AI-native terminal emulator",
-    "longDescription": "Nexum — an open-source AI-native terminal emulator with multi-tab, file explorer, code editor, web preview, voice input, and AI agents."
+    "longDescription": "Labonair — an open-source AI-native terminal emulator with multi-tab, file explorer, code editor, web preview, voice input, and AI agents."
   },
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJFNjc1QzhDMTNFRUU3NzIKUldSeTUrNFRqRnhudmpmNHFURGZhK0Z0V3dVRkp1U2pvMCt4a3JidXhIQzl1Q1RNSDBuOUZaRmcK",
       "endpoints": [
-        "https://github.com/Snenjih/nexum/releases/latest/download/latest.json"
+        "https://github.com/Snenjih/labonair/releases/latest/download/latest.json"
       ]
     }
   }
