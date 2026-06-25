@@ -1,6 +1,55 @@
 # Handshake — Session State
 
-## Last Session: 2026-06-18 (Source Control System — Full Audit Fix Pass)
+## Last Session: 2026-06-25 (Full App Rename: Nexum → Labonair)
+
+### What Was Done
+Complete rename of the app from "Nexum" to "Labonair" across all layers. 4 sequential subagents + 1 direct fix pass. `cargo check` ✅ · `tsc --noEmit` ✅ · pushed to remote ✅
+
+**Commits:**
+1. `62da1cf` — `refactor(rust)`: Rust backend + config (27 files)
+2. `c840c7c` — `refactor(frontend)`: TypeScript frontend + data migration (56 files)
+3. `31cca0c` — `docs`: CI/CD, issue templates, 109 docs files (129 files)
+4. `566a704` — `fix`: HTML entry points + default-dark.json (3 files)
+
+**Key changes:**
+- Bundle ID: `com.nexum.app` → `com.labonair.app`
+- Cargo package: `nexum`/`nexum_lib` → `labonair`/`labonair_lib`
+- `NexumError` → `LabonairError` (~120 Rust occurrences)
+- All keychain services `nexum-{app,cred,sudo}` → `labonair-{app,cred,sudo}` with auto-migration
+- DB migration: `nexum.db` → `labonair.db` via `fs::rename` on first launch
+- All 10 tauri-store files renamed (`nexum-*.json` → `labonair-*.json`) with migration
+- All localStorage keys migrated via `runStoreMigration()` in `App.tsx`
+- All Tauri events: `nexum:*` → `labonair:*`
+- CSS: `nexum-tab-in` → `labonair-tab-in`
+- AI system prompt: "You are Nexum" → "You are Labonair"
+- Shell integration: `NEXUM_*` env vars → `LABONAIR_*`
+- CI/CD: DMG names, Homebrew tap, event types updated
+
+**⚠️ PENDING — manual GitHub steps required:**
+```bash
+# 1. Rename main repo
+gh repo rename labonair --yes
+git remote set-url origin https://github.com/Snenjih/labonair.git
+
+# 2. Rename themes repo
+gh api -X PATCH /repos/Snenjih/nexum-themes -f name=labonair-themes
+
+# 3. Rename Homebrew tap + update formula
+gh api -X PATCH /repos/Snenjih/homebrew-nexum -f name=homebrew-labonair
+# Then: clone homebrew-labonair, git mv Casks/nexum.rb Casks/labonair.rb
+# Update bundle_id, app name, DMG URL pattern in formula, push
+```
+
+### Current State
+Rename fully complete in the codebase. GitHub repo still named `Snenjih/nexum` — rename pending.
+
+### What's Next
+- Complete the 3 GitHub repo renames above
+- Update tauri.conf.json updater URL if needed after main repo rename (already points to `Snenjih/labonair`)
+
+---
+
+## Previous Session: 2026-06-18 (Source Control System — Full Audit Fix Pass)
 
 ### What Was Done
 Comprehensive audit of the source control system found 25 issues. All 25 fixed across 6 sequential subagents + 1 notification agent. `cargo check` ✅ · `tsc --noEmit` ✅
