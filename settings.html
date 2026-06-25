@@ -4,12 +4,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nexum — Settings</title>
+    <title>Labonair — Settings</title>
     <script>
       // Apply theme synchronously before paint to avoid a white flash on dark mode.
       (function () {
         try {
-          var t = localStorage.getItem("nexum-ui-theme-shadow");
+          var t = localStorage.getItem("labonair-ui-theme-shadow") || localStorage.getItem("nexum-ui-theme-shadow");
           var resolved =
             t === "light" || t === "dark"
               ? t
