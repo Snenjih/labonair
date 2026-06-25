@@ -233,10 +233,7 @@ export function AiInputBar() {
   return (
     <div className="shrink-0 border-t border-border/60 bg-card/40 px-3 py-2">
       <div
-        className={cn(
-          "flex flex-col gap-1.5 rounded-lg border border-transparent px-1 py-1",
-          "transition-colors focus-within:border-border focus-within:ring-1 focus-within:ring-ring/30",
-        )}
+        className="flex flex-col gap-1.5 rounded-lg px-1 py-1"
       >
         <ChipsRow
           files={c.files}
