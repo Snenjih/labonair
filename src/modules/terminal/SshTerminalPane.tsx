@@ -104,6 +104,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
     const { resolvedTheme } = useTheme();
 
     const containerRef = useRef<HTMLDivElement>(null);
+    const tabVisibleRef = useRef(tabVisible);
+    useEffect(() => { tabVisibleRef.current = tabVisible; }, [tabVisible]);
     const termRef = useRef<Terminal | null>(null);
     const fitRef = useRef<FitAddon | null>(null);
     const serializeRef = useRef<SerializeAddon | null>(null);
@@ -284,6 +286,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
 
     useEffect(() => {
       function onUp(e: PointerEvent) {
+        if (!tabVisibleRef.current) return;
         const paths = explorerDrag.get();
         if (!paths || !isConnected) return;
         const el = wrapperRef.current;

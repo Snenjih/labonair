@@ -54,6 +54,8 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
+    const visibleRef = useRef(visible);
+    useEffect(() => { visibleRef.current = visible; }, [visible]);
     const { resolvedTheme } = useTheme();
     const session = useTerminalSession({
       container: containerRef,
@@ -76,6 +78,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(
     // Capture-phase pointerup so the drop fires even if xterm consumes the event.
     useEffect(() => {
       function onUp(e: PointerEvent) {
+        if (!visibleRef.current) return;
         const paths = explorerDrag.get();
         if (!paths) return;
         const el = containerRef.current;
