@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Nexum Version Bump Script
-# Updates version in all three locations: package.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json
+# Labonair Version Bump Script
+# Updates version in all four locations: package.json, src-tauri/Cargo.toml, src-tauri/Cargo.lock, src-tauri/tauri.conf.json
 
 set -e
 
@@ -52,7 +52,7 @@ rm src-tauri/Cargo.toml.bak
 
 # Sync Cargo.lock to the new version
 echo "🔒 Updating src-tauri/Cargo.lock..."
-(cd src-tauri && cargo update --package nexum 2>/dev/null)
+(cd src-tauri && cargo update --package labonair 2>/dev/null || true)
 
 # Update src-tauri/tauri.conf.json
 echo "🎛️  Updating src-tauri/tauri.conf.json..."
