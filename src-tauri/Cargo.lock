@@ -2438,7 +2438,7 @@ dependencies = [
 
 [[package]]
 name = "labonair"
-version = "1.9.0"
+version = "1.9.1"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
