@@ -307,8 +307,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         const paneId = (e as CustomEvent<{ paneId: string }>).detail?.paneId;
         if (paneId === sessionId) handleReconnect();
       }
-      window.addEventListener("nexum:ssh-reconnect", onReconnect);
-      return () => window.removeEventListener("nexum:ssh-reconnect", onReconnect);
+      window.addEventListener("labonair:ssh-reconnect", onReconnect);
+      return () => window.removeEventListener("labonair:ssh-reconnect", onReconnect);
     }, [sessionId, handleReconnect]);
 
     // Apply live preference changes

@@ -54,7 +54,7 @@ export function KeyboardShortcutsSection() {
     <div className="flex flex-col gap-6">
       <SectionHeader
         title="Keyboard Shortcuts"
-        description="Customize the keyboard shortcuts for Nexum. Click a shortcut to record a new binding."
+        description="Customize the keyboard shortcuts for Labonair. Click a shortcut to record a new binding."
       />
 
       {/* Toolbar */}

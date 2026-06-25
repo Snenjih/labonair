@@ -1,20 +1,20 @@
 import type { UIMessage } from "@ai-sdk/react";
 import { DirectChatTransport } from "ai";
 import { getModelContextLimit, modelKeepsReasoning, TERMINAL_BUFFER_LINES, type ModelId, type ProviderInstance } from "../config";
-import { createNexumAgent, type AgentUsageDelta } from "./agent";
+import { createLabonairAgent, type AgentUsageDelta } from "./agent";
 import { compact } from "./compact";
 import type { ProviderKeys } from "./keyring";
 import { parseModelRef } from "./modelRef";
 import { native } from "./native";
 import type { ToolContext } from "../tools/tools";
 
-const NEXUM_MD_MAX_BYTES = 32 * 1024;
+const LABONAIR_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
 const projectMemoryCache = new Map<string, MemoryCacheEntry>();
 
-async function readNexumMd(workspaceRoot: string | null): Promise<string | null> {
+async function readLabonairMd(workspaceRoot: string | null): Promise<string | null> {
   if (!workspaceRoot) return null;
-  const path = `${workspaceRoot.replace(/\/$/, "")}/NEXUM.md`;
+  const path = `${workspaceRoot.replace(/\/$/, "")}/LABONAIR.md`;
   const cached = projectMemoryCache.get(workspaceRoot);
   // Cache for 30s — cheap re-read after that to pick up edits.
   if (cached && Date.now() - cached.mtime < 30_000) return cached.content;
@@ -25,8 +25,8 @@ async function readNexumMd(workspaceRoot: string | null): Promise<string | null>
       return null;
     }
     const content =
-      r.content.length > NEXUM_MD_MAX_BYTES
-        ? r.content.slice(0, NEXUM_MD_MAX_BYTES)
+      r.content.length > LABONAIR_MD_MAX_BYTES
+        ? r.content.slice(0, LABONAIR_MD_MAX_BYTES)
         : r.content;
     projectMemoryCache.set(workspaceRoot, { content, mtime: Date.now() });
     return content;
@@ -112,9 +112,9 @@ export function createContextAwareTransport(deps: Deps) {
     }) {
       const live = deps.getLive();
       const modelId = deps.getModelId();
-      const projectMemory = await readNexumMd(live.workspaceRoot);
+      const projectMemory = await readLabonairMd(live.workspaceRoot);
       const bufferLines = deps.getTerminalContextLines?.() ?? TERMINAL_BUFFER_LINES;
-      const agent = await createNexumAgent({
+      const agent = await createLabonairAgent({
         keys: deps.getKeys(),
         instances: deps.getInstances?.(),
         instanceKeys: deps.getInstanceKeys?.(),
@@ -149,8 +149,8 @@ export function createContextAwareTransport(deps: Deps) {
     async reconnectToStream(options: unknown) {
       const live = deps.getLive();
       const modelId = deps.getModelId();
-      const projectMemory = await readNexumMd(live.workspaceRoot);
-      const agent = await createNexumAgent({
+      const projectMemory = await readLabonairMd(live.workspaceRoot);
+      const agent = await createLabonairAgent({
         keys: deps.getKeys(),
         instances: deps.getInstances?.(),
         instanceKeys: deps.getInstanceKeys?.(),

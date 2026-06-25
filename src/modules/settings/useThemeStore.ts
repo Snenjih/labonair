@@ -25,12 +25,12 @@ const MOCK_COMMUNITY_THEMES: RemoteTheme[] = [
     id: "catppuccin-mocha",
     name: "Catppuccin Mocha",
     version: "1.0.0",
-    description: "Soothing pastel theme for Nexum",
+    description: "Soothing pastel theme for Labonair",
     author: "Catppuccin",
     authorUrl: "https://github.com/catppuccin",
     type: "dark",
     rawUrl:
-      "https://raw.githubusercontent.com/Snenjih/nexum-themes/main/themes/catppuccin-mocha.json",
+      "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/themes/catppuccin-mocha.json",
   },
   {
     id: "nord",
@@ -41,12 +41,12 @@ const MOCK_COMMUNITY_THEMES: RemoteTheme[] = [
     authorUrl: "https://github.com/arcticicestudio",
     type: "dark",
     rawUrl:
-      "https://raw.githubusercontent.com/Snenjih/nexum-themes/main/themes/nord.json",
+      "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/themes/nord.json",
   },
 ];
 
 const COMMUNITY_INDEX_URL =
-  "https://raw.githubusercontent.com/Snenjih/nexum-themes/main/index.json";
+  "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/index.json";
 
 type ThemeStore = {
   installedThemes: ThemeMeta[];

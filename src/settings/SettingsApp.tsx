@@ -104,7 +104,7 @@ export function SettingsApp() {
       }
     };
     const unlistenPromise = getCurrentWebviewWindow().listen<string>(
-      "nexum:settings-tab",
+      "labonair:settings-tab",
       (e) => apply(e.payload),
     );
     return () => {
@@ -114,7 +114,7 @@ export function SettingsApp() {
 
   const handleOpenInEditor = useCallback(async () => {
     const { config } = await getStoragePaths();
-    await emit("nexum:open-file", { path: `${config}/nexum-settings.json` });
+    await emit("labonair:open-file", { path: `${config}/labonair-settings.json` });
   }, []);
 
   const trimmed = searchQuery.trim().toLowerCase();

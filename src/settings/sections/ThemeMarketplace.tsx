@@ -100,7 +100,7 @@ export function ThemeMarketplace() {
       setCreatorOpen(false);
       setCreatorName("");
       setTab("installed");
-      await emit("nexum:open-file", { path: filePath });
+      await emit("labonair:open-file", { path: filePath });
     } catch (e) {
       handleApiError(e, "Theme creation failed", "Themes");
     } finally {
@@ -147,7 +147,7 @@ export function ThemeMarketplace() {
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 px-2.5 text-[11.5px]"
-            onClick={() => void openUrl("https://github.com/Snenjih/nexum-themes?tab=contributing-ov-file")}
+            onClick={() => void openUrl("https://github.com/Snenjih/labonair-themes?tab=contributing-ov-file")}
           >
             <HugeiconsIcon icon={GithubIcon} size={12} strokeWidth={2} />
             Contribute

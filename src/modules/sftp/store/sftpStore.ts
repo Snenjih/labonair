@@ -2,7 +2,7 @@ import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import type { FileNode } from "../types";
-import { isNexumError } from "@/types";
+import { isLabonairError } from "@/types";
 
 interface DirEntry {
   name: string;
@@ -126,7 +126,7 @@ export const useSftpStore = create<SftpStore>((set) => ({
           [tabId]: {
             ...s.tabs[tabId],
             isLoadingLocal: false,
-            error: isNexumError(e) ? e.message : String(e),
+            error: isLabonairError(e) ? e.message : String(e),
           },
         },
       }));
@@ -161,7 +161,7 @@ export const useSftpStore = create<SftpStore>((set) => ({
           [tabId]: {
             ...s.tabs[tabId],
             isLoadingRemote: false,
-            error: isNexumError(e) ? e.message : String(e),
+            error: isLabonairError(e) ? e.message : String(e),
           },
         },
       }));

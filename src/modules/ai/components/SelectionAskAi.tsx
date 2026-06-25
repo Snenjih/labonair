@@ -42,7 +42,7 @@ export function SelectionAskAi({ x, y, onAsk, onDismiss }: Props) {
         }}
         className="flex h-7 w-full items-center justify-between gap-1.5 rounded-md border border-border/60 bg-card px-2 text-xs shadow-lg hover:border-border hover:bg-accent"
       >
-        <span>Ask Nexum</span>
+        <span>Ask Labonair</span>
         <KbdGroup>
           <Kbd className="h-4 min-w-4 px-1 text-[10px]">⌘L</Kbd>
         </KbdGroup>

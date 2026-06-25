@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 
-const RECENT_KEY = "nexum-palette-recent";
+const RECENT_KEY = "labonair-palette-recent";
 
 function loadRecent(): string[] {
   try {

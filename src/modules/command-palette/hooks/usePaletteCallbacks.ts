@@ -159,7 +159,7 @@ export function usePaletteCallbacks({
       },
       reconnectCurrentSsh: () => {
         const paneId = selectActivePaneId(useTabsStore.getState());
-        if (paneId) window.dispatchEvent(new CustomEvent("nexum:ssh-reconnect", { detail: { paneId } }));
+        if (paneId) window.dispatchEvent(new CustomEvent("labonair:ssh-reconnect", { detail: { paneId } }));
       },
       openNewHostForm: () => {
         openHomeTab();

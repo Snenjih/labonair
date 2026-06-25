@@ -217,7 +217,7 @@ export function useSettingsCommands(): {
       contexts: ["sftp"],
       icon: createElement(HugeiconsIcon, { icon: EyeIcon, strokeWidth: 2, className: "size-4" }),
       perform: () => {
-        window.dispatchEvent(new CustomEvent("nexum:sftp-toggle-hidden"));
+        window.dispatchEvent(new CustomEvent("labonair:sftp-toggle-hidden"));
       },
     },
     {

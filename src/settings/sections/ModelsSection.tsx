@@ -91,7 +91,7 @@ export function ModelsSection() {
     <div className="flex flex-col gap-7">
       <SectionHeader
         title="Models"
-        description="Bring your own keys. They live in your OS keychain and are used only by Nexum."
+        description="Bring your own keys. They live in your OS keychain and are used only by Labonair."
       />
 
       {/* Default model */}

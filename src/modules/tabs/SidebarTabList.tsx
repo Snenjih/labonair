@@ -124,7 +124,7 @@ export function SidebarTabList({
               onClick={() => onSelect(t.id)}
               className={cn(
                 "group flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors",
-                isNew && "nexum-tab-in",
+                isNew && "labonair-tab-in",
                 isActive
                   ? "bg-foreground/[0.07] text-foreground"
                   : "text-muted-foreground hover:bg-accent/30 hover:text-foreground",

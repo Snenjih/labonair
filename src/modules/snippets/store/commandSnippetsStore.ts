@@ -44,7 +44,7 @@ export const useCommandSnippetsStore = create<CommandSnippetsState>((set, get) =
     ]);
     set({ snippets, groups, hydrated: true });
 
-    void listen("nexum://snippets-changed", async () => {
+    void listen("labonair://snippets-changed", async () => {
       const [s, g] = await Promise.all([
         invoke<CommandSnippet[]>("snippets_get_all"),
         invoke<SnippetGroup[]>("snippet_groups_get_all"),

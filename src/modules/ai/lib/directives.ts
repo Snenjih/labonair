@@ -16,7 +16,7 @@ let _storePromise: Promise<LazyStore> | null = null;
 async function getStore(): Promise<LazyStore> {
   if (!_storePromise) {
     _storePromise = getStoragePaths().then(
-      (p) => new LazyStore(`${p.config}/nexum-directives.json`, { defaults: {}, autoSave: 200 }),
+      (p) => new LazyStore(`${p.config}/labonair-directives.json`, { defaults: {}, autoSave: 200 }),
     );
   }
   return _storePromise;
@@ -25,7 +25,7 @@ async function getStore(): Promise<LazyStore> {
 async function migrateFromSnippets(): Promise<Directive[]> {
   try {
     const p = await getStoragePaths();
-    const oldStore = new LazyStore(`${p.config}/nexum-snippets.json`, { defaults: {}, autoSave: false });
+    const oldStore = new LazyStore(`${p.config}/labonair-snippets.json`, { defaults: {}, autoSave: false });
     const old = await oldStore.get<Directive[]>("snippets");
     return old ?? [];
   } catch {

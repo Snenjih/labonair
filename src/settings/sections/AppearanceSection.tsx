@@ -356,7 +356,7 @@ export function AppearanceSection() {
                       Open in Finder
                     </ContextMenuItem>
                     <ContextMenuItem
-                      onClick={() => void emit("nexum:open-preview", {
+                      onClick={() => void emit("labonair:open-preview", {
                         path: bg.path,
                         title: bg.filename.replace(/\.[^.]+$/, ""),
                       })}

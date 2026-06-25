@@ -466,7 +466,7 @@ let _storePromise: Promise<LazyStore> | null = null;
 async function getStore(): Promise<LazyStore> {
   if (!_storePromise) {
     _storePromise = getStoragePaths().then(
-      (p) => new LazyStore(`${p.config}/nexum-settings.json`, { defaults: {}, autoSave: 200 }),
+      (p) => new LazyStore(`${p.config}/labonair-settings.json`, { defaults: {}, autoSave: 200 }),
     );
   }
   return _storePromise;
@@ -1567,7 +1567,7 @@ export async function onPreferencesChange(
 
 // API key changes are stored in OS keychain (not the prefs store),
 // so we broadcast via a Tauri event for cross-window listeners.
-const KEYS_CHANGED_EVENT = "nexum://ai-keys-changed";
+const KEYS_CHANGED_EVENT = "labonair://ai-keys-changed";
 
 export async function emitKeysChanged(): Promise<void> {
   await emit(KEYS_CHANGED_EVENT);

@@ -23,7 +23,7 @@ export function ShortcutsDialog({ open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
-            Quick reference for Nexum controls.
+            Quick reference for Labonair controls.
           </DialogDescription>
         </DialogHeader>
 

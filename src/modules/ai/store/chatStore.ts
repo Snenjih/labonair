@@ -372,20 +372,20 @@ export const useChatStore = create<StoreState>((set, get) => ({
     set({ apiKeys: next, agentMeta: IDLE_META });
   },
 
-  selectedModelId: (() => { try { return (localStorage.getItem("nexum-selected-model") as ModelId | null) ?? DEFAULT_MODEL_ID; } catch { return DEFAULT_MODEL_ID; } })(),
+  selectedModelId: (() => { try { return (localStorage.getItem("labonair-selected-model") as ModelId | null) ?? DEFAULT_MODEL_ID; } catch { return DEFAULT_MODEL_ID; } })(),
   setSelectedModelId: (id) => {
     const recents = [id, ...get().recentModelIds.filter((r) => r !== id)].slice(0, 10);
     set({ selectedModelId: id, recentModelIds: recents });
-    try { localStorage.setItem("nexum-selected-model", id); } catch { /* ignore */ }
-    try { localStorage.setItem("nexum-recent-models", JSON.stringify(recents)); } catch { /* ignore */ }
+    try { localStorage.setItem("labonair-selected-model", id); } catch { /* ignore */ }
+    try { localStorage.setItem("labonair-recent-models", JSON.stringify(recents)); } catch { /* ignore */ }
   },
-  favoriteModelIds: (() => { try { return JSON.parse(localStorage.getItem("nexum-favorite-models") ?? "[]") as string[]; } catch { return []; } })(),
-  recentModelIds: (() => { try { return JSON.parse(localStorage.getItem("nexum-recent-models") ?? "[]") as string[]; } catch { return []; } })(),
+  favoriteModelIds: (() => { try { return JSON.parse(localStorage.getItem("labonair-favorite-models") ?? "[]") as string[]; } catch { return []; } })(),
+  recentModelIds: (() => { try { return JSON.parse(localStorage.getItem("labonair-recent-models") ?? "[]") as string[]; } catch { return []; } })(),
   toggleFavoriteModel: (id) => {
     const favs = get().favoriteModelIds;
     const next = favs.includes(id) ? favs.filter((f) => f !== id) : [...favs, id];
     set({ favoriteModelIds: next });
-    try { localStorage.setItem("nexum-favorite-models", JSON.stringify(next)); } catch { /* ignore */ }
+    try { localStorage.setItem("labonair-favorite-models", JSON.stringify(next)); } catch { /* ignore */ }
   },
 
   mini: { open: false },

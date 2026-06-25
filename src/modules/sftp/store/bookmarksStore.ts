@@ -24,7 +24,7 @@ let _storePromise: ReturnType<typeof load> | null = null;
 function getStore() {
   if (!_storePromise) {
     _storePromise = getStoragePaths().then((p) =>
-      load(`${p.data}/nexum-bookmarks.json`, { autoSave: true, defaults: {} }),
+      load(`${p.data}/labonair-bookmarks.json`, { autoSave: true, defaults: {} }),
     );
   }
   return _storePromise;

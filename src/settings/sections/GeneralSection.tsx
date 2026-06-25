@@ -41,8 +41,8 @@ import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
-const REPO_URL = "https://github.com/Snenjih/nexum";
-const WEBSITE = "https://nexum.app";
+const REPO_URL = "https://github.com/Snenjih/labonair";
+const WEBSITE = "https://labonair.app";
 
 const PLATFORM_LABEL: Record<string, string> = {
   macos: "macOS",
@@ -90,7 +90,7 @@ const LINKS: {
 
 export function GeneralSection() {
   const [version, setVersion] = useState("");
-  const [name, setName] = useState("Nexum");
+  const [name, setName] = useState("Labonair");
   const [build, setBuild] = useState("");
   const [pendingEncryption, setPendingEncryption] = useState(false);
 
@@ -281,7 +281,7 @@ export function GeneralSection() {
         <div className="flex flex-col gap-2">
           <SettingRow
             title="Launch at login"
-            description="Open Nexum automatically when you sign in."
+            description="Open Labonair automatically when you sign in."
           >
             <Switch
               checked={autostart}
@@ -340,7 +340,7 @@ export function GeneralSection() {
           </SettingRow>
           <SettingRow
             title="Default opening tab"
-            description="Which tab opens when Nexum launches. Takes effect on next launch."
+            description="Which tab opens when Labonair launches. Takes effect on next launch."
           >
             <Select
               value={defaultStartupTab}

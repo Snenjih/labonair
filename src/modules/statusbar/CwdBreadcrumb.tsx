@@ -167,7 +167,7 @@ function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenu
         className="text-[12px]"
         onSelect={() =>
           window.dispatchEvent(
-            new CustomEvent<string>("nexum:ai-attach-file", { detail: seg.fullPath })
+            new CustomEvent<string>("labonair:ai-attach-file", { detail: seg.fullPath })
           )
         }
       >

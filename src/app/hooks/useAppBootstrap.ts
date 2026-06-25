@@ -12,6 +12,7 @@ import { useThemeEngine } from "@/lib/useThemeEngine";
 import { useLayoutEngine } from "@/lib/useLayoutEngine";
 import { useTerminalCursorBlinkInterval } from "@/lib/useTerminalCursorBlinkInterval";
 import { handleApiError } from "@/lib/errors";
+import { runStoreMigration } from "@/lib/storeMigration";
 import { homeDir } from "@tauri-apps/api/path";
 
 export interface AppBootstrapReturn {
@@ -78,6 +79,11 @@ export function useAppBootstrap(): AppBootstrapReturn {
     if (!prefsHydrated) return;
     setSelectedModelId(prefDefaultModel);
   }, [prefsHydrated, prefDefaultModel, setSelectedModelId]);
+
+  // Run store migration (nexum → labonair) before hydrating sessions
+  useEffect(() => {
+    void runStoreMigration();
+  }, []);
 
   // Hydrate sessions immediately
   useEffect(() => {

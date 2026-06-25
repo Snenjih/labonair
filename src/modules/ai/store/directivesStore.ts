@@ -7,7 +7,7 @@ import {
   type Directive,
 } from "../lib/directives";
 
-const CHANGED_EVENT = "nexum://ai-directives-changed";
+const CHANGED_EVENT = "labonair://ai-directives-changed";
 
 type State = {
   hydrated: boolean;

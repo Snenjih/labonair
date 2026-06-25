@@ -65,11 +65,11 @@ export function UpdaterDialog() {
                 ? "Update ready to install"
                 : downloading
                   ? "Downloading update…"
-                  : `Nexum ${update?.version} is available`}
+                  : `Labonair ${update?.version} is available`}
             </p>
             <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
               {ready
-                ? "Nexum will restart to finish installing."
+                ? "Labonair will restart to finish installing."
                 : downloading
                   ? progress !== null
                     ? `${progress.toFixed(0)}% — ${formatBytes(status.downloaded)}`

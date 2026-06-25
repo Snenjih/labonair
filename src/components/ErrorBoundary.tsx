@@ -42,7 +42,7 @@ export class ErrorBoundary extends React.Component<{ children: ReactNode }, Stat
           <div className="flex flex-col gap-1">
             <h1 className="text-xl font-semibold tracking-tight">Something went wrong</h1>
             <p className="text-sm text-muted-foreground">
-              Nexum encountered an unexpected error. Reloading will restore the app to a working state.
+              Labonair encountered an unexpected error. Reloading will restore the app to a working state.
             </p>
           </div>
 
@@ -57,7 +57,7 @@ export class ErrorBoundary extends React.Component<{ children: ReactNode }, Stat
             onClick={() => window.location.reload()}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
-            Reload Nexum
+            Reload Labonair
           </button>
         </div>
       </div>

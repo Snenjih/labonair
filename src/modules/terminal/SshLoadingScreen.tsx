@@ -104,14 +104,14 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
       // session_established event triggers onConnected
     })
       .catch((err: unknown) => {
-        // Structured NexumError from the Rust backend
+        // Structured LabonairError from the Rust backend
         if (typeof err === "object" && err !== null && "code" in err && "message" in err) {
-          const nexumErr = err as { code: string; message: string };
-          if (nexumErr.code === "AuthFailed" || nexumErr.code === "HostKeyMismatch") {
+          const labonairErr = err as { code: string; message: string };
+          if (labonairErr.code === "AuthFailed" || labonairErr.code === "HostKeyMismatch") {
             // Already handled by auth_required / known_hosts_warning events
             return;
           }
-          setErrorMessage(nexumErr.message);
+          setErrorMessage(labonairErr.message);
           setStatus("error");
           return;
         }
@@ -175,7 +175,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
         // Save the new password to keychain if the user entered one to fix auth.
         if (pendingPasswordRef.current && hostId) {
           invoke("secrets_set", {
-            service: "nexum-app",
+            service: "labonair-app",
             account: hostId,
             password: pendingPasswordRef.current,
           }).catch((e) => handleApiError(e, "Failed to save credentials", "SSH"));

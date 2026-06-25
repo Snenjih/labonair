@@ -15,7 +15,7 @@ import {
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { SLASH_COMMANDS, NEXUM_CMD_RE } from "../lib/slashCommands";
+import { SLASH_COMMANDS, LABONAIR_CMD_RE } from "../lib/slashCommands";
 import { ToolCallChip } from "./ToolCallChip";
 import { Spinner } from "@/components/ui/spinner";
 import type {
@@ -94,7 +94,7 @@ export function AiChatView({
       <Conversation>
         <ConversationContent>
           <ConversationEmptyState
-            title="Ask Nexum anything"
+            title="Ask Labonair anything"
             description="Explain command output, fix errors, generate snippets, or run a task."
           />
         </ConversationContent>
@@ -148,7 +148,7 @@ const RenderedMessage = memo(function RenderedMessage({
       .map((p) => p.text)
       .join("\n");
 
-    const cmdMatch = rawText.match(NEXUM_CMD_RE);
+    const cmdMatch = rawText.match(LABONAIR_CMD_RE);
     const commandName = cmdMatch?.[1] ?? null;
     const text = cmdMatch ? rawText.slice(cmdMatch[0].length) : rawText;
 

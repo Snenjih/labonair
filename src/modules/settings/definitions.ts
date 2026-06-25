@@ -34,7 +34,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "autostart",
     label: "Launch at login",
-    description: "Open Nexum automatically when you sign in.",
+    description: "Open Labonair automatically when you sign in.",
     category: "General",
     controlType: "Switch",
   },
@@ -55,7 +55,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "defaultStartupTab",
     label: "Default opening tab",
-    description: "Which tab opens when Nexum launches. Takes effect on next launch.",
+    description: "Which tab opens when Labonair launches. Takes effect on next launch.",
     category: "General",
     controlType: "Select",
     options: [

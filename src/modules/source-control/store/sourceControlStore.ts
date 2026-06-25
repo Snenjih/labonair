@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { load } from "@tauri-apps/plugin-store";
 import type { GitStatus, Branch, StashEntry, SelectionMode, FileDiffStat } from "../types";
 
-const STORE_FILE = "nexum-git.json";
+const STORE_FILE = "labonair-git.json";
 const STORE_KEY = "recentMessages";
 
 function getStore() {

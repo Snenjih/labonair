@@ -1,4 +1,4 @@
-export const KEYRING_SERVICE = "nexum-ai";
+export const KEYRING_SERVICE = "labonair-ai";
 
 export type ProviderId =
   | "openai"
@@ -503,7 +503,7 @@ export type ProviderInstance = {
 export const MAX_AGENT_STEPS = 10;
 export const TERMINAL_BUFFER_LINES = 300;
 
-export const SYSTEM_PROMPT = `You are Nexum, an AI assistant embedded in a developer terminal emulator.
+export const SYSTEM_PROMPT = `You are Labonair, an AI assistant embedded in a developer terminal emulator.
 
 Every turn includes a <terminal-context> block with: workspace_root, active_terminal_cwd, optionally active_file, and the last lines of the user's terminal. Treat this as ground truth — do not ask the user where they are.
 
@@ -544,7 +544,7 @@ APPROVAL:
 STYLE:
 - Concise. No filler, no apologies, no restating the question.`;
 
-export const SYSTEM_PROMPT_LITE = `You are Nexum, an AI assistant embedded in a developer terminal emulator.
+export const SYSTEM_PROMPT_LITE = `You are Labonair, an AI assistant embedded in a developer terminal emulator.
 
 Every turn includes a <terminal-context> block with workspace_root, active_terminal_cwd, and recent terminal output. Treat it as ground truth.
 

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 
-const STYLE_ID = "nexum-cursor-blink-interval";
+const STYLE_ID = "labonair-cursor-blink-interval";
 
 function applyInterval(ms: number): void {
   let el = document.getElementById(STYLE_ID) as HTMLStyleElement | null;

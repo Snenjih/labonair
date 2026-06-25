@@ -110,19 +110,19 @@ export function useMenuBridge(actions: AppActions): void {
     return () => cleanups.forEach((fn) => fn());
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // nexum:open-file listener
+  // labonair:open-file listener
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    listen<{ path: string }>("nexum:open-file", (event) => {
+    listen<{ path: string }>("labonair:open-file", (event) => {
       actions.openFileTab(event.payload.path);
     }).then((fn) => { unlisten = fn; });
     return () => unlisten?.();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // nexum:open-preview listener
+  // labonair:open-preview listener
   useEffect(() => {
     let unlisten: (() => void) | undefined;
-    listen<{ path: string; title: string }>("nexum:open-preview", (event) => {
+    listen<{ path: string; title: string }>("labonair:open-preview", (event) => {
       useTabsStore.getState().newPreviewTab(event.payload.path, event.payload.title);
     }).then((fn) => { unlisten = fn; });
     return () => unlisten?.();

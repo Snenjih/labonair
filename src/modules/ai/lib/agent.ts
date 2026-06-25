@@ -67,7 +67,7 @@ type AgentDeps = {
   ollamaChatModelId?: string;
   /** True when /plan is active — agent should batch edits for review. */
   planMode?: boolean;
-  /** Contents of NEXUM.md at workspace root, if present. Appended verbatim. */
+  /** Contents of LABONAIR.md at workspace root, if present. Appended verbatim. */
   projectMemory?: string | null;
   /** Max number of agentic steps before stopping. Overrides MAX_AGENT_STEPS. */
   maxAgentSteps?: number;
@@ -403,7 +403,7 @@ function buildModelLegacy(
   });
 }
 
-export async function createNexumAgent({
+export async function createLabonairAgent({
   keys,
   instances,
   instanceKeys,
@@ -436,7 +436,7 @@ export async function createNexumAgent({
     : "";
   const memoryBlock =
     projectMemory && projectMemory.trim().length > 0
-      ? `\n\n## PROJECT — NEXUM.md\n${projectMemory.trim()}`
+      ? `\n\n## PROJECT — LABONAIR.md\n${projectMemory.trim()}`
       : "";
   const planBlock = planMode
     ? `\n\n## PLAN MODE — ACTIVE\nMutating tools (write_file, edit, multi_edit, create_directory) will queue their changes for the user to review as a single diff. Do NOT execute bash_run or bash_background while plan mode is active — restrict yourself to reads (read_file, grep, glob, list_directory) and the queued mutations. After queueing the full set of edits, stop and return a brief summary; do not continue acting until the user has accepted/rejected.`
@@ -523,8 +523,8 @@ export async function createNexumAgent({
 
 export { modelKeepsReasoning };
 
-export type NexumAgent = Awaited<ReturnType<typeof createNexumAgent>>;
+export type LabonairAgent = Awaited<ReturnType<typeof createLabonairAgent>>;
 
-export function createNexumTransport(agent: NexumAgent) {
+export function createLabonairTransport(agent: LabonairAgent) {
   return new DirectChatTransport({ agent });
 }

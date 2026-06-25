@@ -219,7 +219,7 @@ export function TabBar({
                     "group relative z-[1] h-7 shrink-0 gap-1.5 rounded-md text-xs",
                     "bg-transparent data-active:bg-transparent dark:data-active:bg-transparent",
                     "transition-colors justify-between",
-                    isNew && "nexum-tab-in",
+                    isNew && "labonair-tab-in",
                     isActive
                       ? "text-foreground dark:text-foreground"
                       : "text-muted-foreground hover:text-foreground/80",

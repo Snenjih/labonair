@@ -70,7 +70,7 @@ export function useAiLiveBridge({
       void openSettingsWindow("models");
       return;
     }
-    window.dispatchEvent(new CustomEvent<string>("nexum:ai-attach-file", { detail: path }));
+    window.dispatchEvent(new CustomEvent<string>("labonair:ai-attach-file", { detail: path }));
     openPanel();
     focusInput(null);
   }, [hasComposer]);

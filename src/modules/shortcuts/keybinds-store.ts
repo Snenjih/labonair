@@ -8,7 +8,7 @@ let _storePromise: Promise<LazyStore> | null = null;
 async function getStore(): Promise<LazyStore> {
   if (!_storePromise) {
     _storePromise = getStoragePaths().then(
-      (p) => new LazyStore(`${p.config}/nexum-keybinds.json`, { defaults: {}, autoSave: 200 }),
+      (p) => new LazyStore(`${p.config}/labonair-keybinds.json`, { defaults: {}, autoSave: 200 }),
     );
   }
   return _storePromise;
@@ -58,7 +58,7 @@ export async function onKeybindsChange(
   });
 }
 
-const KEYBINDS_CHANGED_EVENT = "nexum://keybinds-changed";
+const KEYBINDS_CHANGED_EVENT = "labonair://keybinds-changed";
 
 export async function emitKeybindsChanged(): Promise<void> {
   await emit(KEYBINDS_CHANGED_EVENT);

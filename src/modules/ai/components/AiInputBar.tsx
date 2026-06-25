@@ -326,7 +326,7 @@ export function AiInputBar() {
                     }
                   }
                 }}
-                placeholder="Ask Nexum anything   ·   @ files   ·   # directives"
+                placeholder="Ask Labonair anything   ·   @ files   ·   # directives"
                 rows={1}
                 className={cn(
                   "max-h-40 flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none",
