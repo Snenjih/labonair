@@ -86,11 +86,19 @@ brew tap snenjih/labonair
 brew install --cask labonair
 ```
 
-> Labonair is not yet notarized. If macOS blocks the app on first launch, right-click `Labonair.app` in `/Applications` → **Open** → **Open** in the dialog.
+Homebrew automatically removes the quarantine attribute, so the app opens without warnings.
 
 ### Manual
 
 Download the latest `.dmg` from [Releases](https://github.com/Snenjih/labonair/releases), open it, and drag `Labonair.app` to `/Applications`.
+
+If macOS blocks the app on first launch, run:
+
+```sh
+xattr -rd com.apple.quarantine /Applications/Labonair.app
+```
+
+Then right-click `Labonair.app` → **Open** → **Open** in the dialog.
 
 ---
 
