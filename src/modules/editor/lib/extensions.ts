@@ -1,7 +1,37 @@
 import { indentUnit } from "@codemirror/language";
 import { lintGutter } from "@codemirror/lint";
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import { Compartment, EditorState, RangeSetBuilder, type Extension } from "@codemirror/state";
+import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type ViewUpdate } from "@codemirror/view";
+
+const fullLineDeco = Decoration.line({ class: "cm-line-sel-full" });
+
+const fullWidthLineSelectionPlugin = ViewPlugin.fromClass(
+  class {
+    decorations: DecorationSet;
+    constructor(view: EditorView) { this.decorations = this.build(view); }
+    update(u: ViewUpdate) {
+      if (u.selectionSet || u.docChanged || u.viewportChanged)
+        this.decorations = this.build(u.view);
+    }
+    build(view: EditorView): DecorationSet {
+      const builder = new RangeSetBuilder<Decoration>();
+      const { state } = view;
+      for (const range of state.selection.ranges) {
+        if (range.empty) continue;
+        const from = Math.min(range.from, range.to);
+        const to = Math.max(range.from, range.to);
+        const startLine = state.doc.lineAt(from);
+        const endLine = state.doc.lineAt(to);
+        for (let n = startLine.number + 1; n < endLine.number; n++) {
+          const line = state.doc.line(n);
+          builder.add(line.from, line.from, fullLineDeco);
+        }
+      }
+      return builder.finish();
+    }
+  },
+  { decorations: (v) => v.decorations },
+);
 
 // Compartments allow runtime reconfiguration without rebuilding state.
 export const fontSizeCompartment = new Compartment();
@@ -27,6 +57,7 @@ export function buildSharedExtensions(
   lineHeight = 1.55,
 ): Extension[] {
   return [
+    fullWidthLineSelectionPlugin,
     indentWithTabsCompartment.of(indentUnit.of("  ")),
     EditorState.tabSize.of(2),
     keymap.of([{ key: "Mod-f", run: () => true }]),
@@ -100,6 +131,10 @@ export function buildSharedExtensions(
           backgroundColor:
             "color-mix(in srgb, var(--foreground) 18%, transparent) !important",
         },
+      ".cm-line-sel-full": {
+        backgroundColor:
+          "color-mix(in srgb, var(--foreground) 18%, transparent)",
+      },
       ".cm-panels": {
         backgroundColor: "var(--popover)",
         color: "var(--popover-foreground)",
