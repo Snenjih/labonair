@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { generateText } from "ai";
 import { git } from "./gitInvoke";
-import { getAllKeys } from "@/modules/ai/lib/keyring";
-import { buildLanguageModel } from "@/modules/ai/lib/agent";
-import { PROVIDERS, providerNeedsKey, type ProviderId } from "@/modules/ai/config";
+import { useProvidersStore } from "@/modules/ai/store/providersStore";
+import { buildLanguageModelFromInstance } from "@/modules/ai/lib/agent";
+import { providerNeedsKey, type ProviderId } from "@/modules/ai/config";
 
 const COMMIT_MSG_SYSTEM_PROMPT = `You are a git commit message generator. Given a unified diff, produce a single conventional commit message. Format: type(scope): subject. Subject must be under 72 characters. Types: feat, fix, docs, style, refactor, perf, test, chore, ci. Only output the commit message — no explanation, no markdown, no quotes.`;
 
-/** Picks the first cloud provider that has a key configured, in order. */
 const PREFERRED_PROVIDERS: ProviderId[] = [
   "openai",
   "anthropic",
@@ -20,9 +19,9 @@ const PREFERRED_PROVIDERS: ProviderId[] = [
   "openrouter",
 ];
 
-/** Default model IDs for each provider — cheap/fast choices preferred. */
+/** Default cheap/fast model IDs per provider for commit message generation. */
 const DEFAULT_MODEL_FOR_PROVIDER: Partial<Record<ProviderId, string>> = {
-  openai: "gpt-4.1-mini",
+  openai: "gpt-4o-mini",
   anthropic: "claude-haiku-4-5",
   google: "gemini-2.0-flash",
   xai: "grok-3-mini",
@@ -35,6 +34,8 @@ const DEFAULT_MODEL_FOR_PROVIDER: Partial<Record<ProviderId, string>> = {
 
 export function useAiCommitMessage(repoRoot: string | null) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const instances = useProvidersStore((s) => s.instances);
+  const instanceKeys = useProvidersStore((s) => s.instanceKeys);
 
   async function generate(): Promise<string | null> {
     if (!repoRoot) return null;
@@ -56,39 +57,39 @@ export function useAiCommitMessage(repoRoot: string | null) {
       }
       if (!diff.trim()) return null;
 
-      // 2. Get all configured provider keys
-      const keys = await getAllKeys();
-
-      // 3. Pick the first provider that has a key
-      let selectedProvider: ProviderId | null = null;
+      // 2. Pick the first cloud provider instance that has a key, in preference order
+      let selectedInstance = null;
       let selectedModelId = "";
+
       for (const providerId of PREFERRED_PROVIDERS) {
-        if (providerNeedsKey(providerId) && keys[providerId]) {
-          selectedProvider = providerId;
-          selectedModelId = DEFAULT_MODEL_FOR_PROVIDER[providerId] ?? "";
-          break;
-        }
+        const inst = instances.find((i) => i.providerId === providerId);
+        if (!inst) continue;
+        if (providerNeedsKey(providerId) && !instanceKeys[inst.id]) continue;
+        selectedInstance = inst;
+        selectedModelId = DEFAULT_MODEL_FOR_PROVIDER[providerId] ?? "";
+        break;
       }
 
-      // Also check keyless providers (lmstudio, mlx, ollama) from PROVIDERS list
-      if (!selectedProvider) {
-        for (const p of PROVIDERS) {
-          if (!providerNeedsKey(p.id)) {
-            selectedProvider = p.id;
-            selectedModelId = DEFAULT_MODEL_FOR_PROVIDER[p.id] ?? "";
+      // Fallback: any local provider (lmstudio, mlx, ollama, openai-compatible)
+      if (!selectedInstance) {
+        for (const inst of instances) {
+          if (!providerNeedsKey(inst.providerId)) {
+            selectedInstance = inst;
+            selectedModelId = inst.localModelId ?? "";
             break;
           }
         }
       }
 
-      if (!selectedProvider) {
-        throw new Error("No AI API key configured. Add one in Settings → AI.");
+      if (!selectedInstance) {
+        throw new Error("No AI provider configured. Add one in Settings → AI.");
       }
 
-      // 4. Build model and generate commit message
-      const model = await buildLanguageModel(
-        selectedProvider,
-        keys,
+      // 3. Build model and generate commit message
+      const key = instanceKeys[selectedInstance.id] ?? null;
+      const model = await buildLanguageModelFromInstance(
+        selectedInstance,
+        key,
         selectedModelId,
       );
 
