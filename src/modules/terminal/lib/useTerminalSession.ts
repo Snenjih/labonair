@@ -324,6 +324,17 @@ export function useTerminalSession({
 
       term.onData((data) => pty.write(data));
 
+      // Shift+Enter → send ESC + CR (\x1b\r) so Claude Code and similar
+      // CLI tools can distinguish it from plain Enter and insert a newline
+      // instead of submitting. Without this, xterm sends \r for both.
+      term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+        if (e.key === "Enter" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          if (e.type === "keydown") pty.write("\x1b\r");
+          return false; // prevent xterm from also sending \r
+        }
+        return true;
+      });
+
       // Two-stage debounce:
       //  - FIT runs frequently (~one frame) so xterm visually keeps up with
       //    the window during drag. Local, no IPC.
