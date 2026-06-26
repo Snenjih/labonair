@@ -264,8 +264,8 @@ function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
                   <span className="text-[12px] text-muted-foreground/50">—</span>
                 ) : (
                   <KbdGroup>
-                    {effectiveKeys.map((k, i) => (
-                      <Kbd key={i}>{k}</Kbd>
+                    {effectiveKeys.map((k) => (
+                      <Kbd key={k}>{k}</Kbd>
                     ))}
                   </KbdGroup>
                 )}
@@ -314,8 +314,8 @@ function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
                 <div className="flex min-w-[120px] items-center gap-1 rounded-md border border-accent bg-accent/10 px-2 py-1">
                   {rowState.liveModifiers.length > 0 ? (
                     <KbdGroup>
-                      {rowState.liveModifiers.map((k, i) => (
-                        <Kbd key={i}>{k}</Kbd>
+                      {rowState.liveModifiers.map((k) => (
+                        <Kbd key={k}>{k}</Kbd>
                       ))}
                     </KbdGroup>
                   ) : (
@@ -360,8 +360,8 @@ function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
               {/* Show the captured binding */}
               <div className="flex items-center gap-2">
                 <KbdGroup>
-                  {buildDisplayKeysFromBinding(rowState.captured).map((k, i) => (
-                    <Kbd key={i}>{k}</Kbd>
+                  {buildDisplayKeysFromBinding(rowState.captured).map((k) => (
+                    <Kbd key={k}>{k}</Kbd>
                   ))}
                 </KbdGroup>
               </div>

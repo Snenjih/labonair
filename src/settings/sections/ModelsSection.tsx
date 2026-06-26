@@ -246,6 +246,7 @@ function LmStudioChatBlock() {
 
   useEffect(() => setUrlDraft(baseURL), [baseURL]);
   useEffect(() => setModelDraft(chatModelId), [chatModelId]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: urlDraft is the reset trigger
   useEffect(() => setTestStatus("idle"), [urlDraft]);
 
   const canSave = urlDraft.trim().length > 0 && modelDraft.trim().length > 0;
@@ -370,6 +371,7 @@ function OpenAICompatibleBlock({
 
   useEffect(() => setUrlDraft(baseURL), [baseURL]);
   useEffect(() => setModelDraft(modelId), [modelId]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: urlDraft is the reset trigger
   useEffect(() => setTestStatus("idle"), [urlDraft]);
 
   const canSave = urlDraft.trim().length > 0 && modelDraft.trim().length > 0;

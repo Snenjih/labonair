@@ -81,6 +81,7 @@ export function AiInputBar() {
   const [fileActiveIndex, setFileActiveIndex] = useState(0);
   const fileDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: c.value triggers autoresize on content change
   useEffect(() => {
     autoresize(c.textareaRef.current);
   }, [c.value, c.textareaRef]);

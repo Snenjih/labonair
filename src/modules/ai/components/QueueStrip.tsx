@@ -31,7 +31,7 @@ export function QueueStrip({ sessionId }: Props) {
       </div>
       <ul className="flex flex-col gap-0.5">
         <AnimatePresence initial={false}>
-          {queue!.map((item, index) => (
+          {queue?.map((item, index) => (
             <motion.li
               key={item.id}
               layout

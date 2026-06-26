@@ -73,7 +73,7 @@ function buildSummary(
     case "bash_run":
     case "bash_background": {
       const cmd = String(input.command ?? "");
-      const truncated = cmd.length > 50 ? cmd.slice(0, 50) + "…" : cmd;
+      const truncated = cmd.length > 50 ? `${cmd.slice(0, 50)}…` : cmd;
       const exitCode =
         out && typeof out === "object" && "exit_code" in out
           ? (out as { exit_code: number | null }).exit_code
@@ -206,8 +206,8 @@ function ExpandedDetail({
       : [];
     return (
       <div className="max-h-48 overflow-auto pt-2.5">
-        {entries.slice(0, 40).map((e, i) => (
-          <div key={i} className="flex gap-2 font-mono text-[10px]">
+        {entries.slice(0, 40).map((e) => (
+          <div key={e.name} className="flex gap-2 font-mono text-[10px]">
             <span className="w-3 shrink-0 text-muted-foreground">
               {e.kind === "dir" ? "d" : "f"}
             </span>
@@ -231,7 +231,7 @@ function ExpandedDetail({
     return (
       <div className="max-h-48 overflow-auto space-y-0.5 pt-2.5">
         {shown.map((hit, i) => (
-          <div key={i} className="flex min-w-0 gap-2 font-mono text-[10px]">
+          <div key={`${hit.rel ?? hit.path ?? ""}:${hit.line ?? i}`} className="flex min-w-0 gap-2 font-mono text-[10px]">
             <span className="shrink-0 text-muted-foreground">
               {hit.rel ?? hit.path ?? ""}:{hit.line ?? ""}
             </span>
@@ -258,8 +258,8 @@ function ExpandedDetail({
     const hits = outObj?.hits ?? [];
     return (
       <div className="max-h-48 overflow-auto space-y-0.5 pt-2.5">
-        {hits.slice(0, 30).map((hit, i) => (
-          <div key={i} className="font-mono text-[10px] text-foreground/80">
+        {hits.slice(0, 30).map((hit) => (
+          <div key={hit.rel ?? hit.path} className="font-mono text-[10px] text-foreground/80">
             {hit.rel ?? hit.path ?? ""}
           </div>
         ))}

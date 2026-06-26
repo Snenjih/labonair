@@ -47,10 +47,10 @@ export function useWhisperRecording({
     !!navigator.mediaDevices?.getUserMedia &&
     typeof MediaRecorder !== "undefined";
 
-  const teardownStream = () => {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+  const teardownStream = useCallback(() => {
+    for (const track of (streamRef.current?.getTracks() ?? [])) track.stop();
     streamRef.current = null;
-  };
+  }, []);
 
   const stop = useCallback(() => {
     const rec = recRef.current;
@@ -96,14 +96,14 @@ export function useWhisperRecording({
       teardownStream();
       setState("idle");
     }
-  }, [apiKey, onResult, state, supported]);
+  }, [apiKey, onResult, state, supported, teardownStream]);
 
   useEffect(() => {
     return () => {
       recRef.current?.stop();
       teardownStream();
     };
-  }, []);
+  }, [teardownStream]);
 
   return {
     state,

@@ -104,6 +104,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
   }, [focusSignal, pendingPrefill, consumePrefill]);
 
   // Listen for explorer's "Attach to Agent" event.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: attachFileByPath is stable (closes over setFiles only)
   useEffect(() => {
     const onAttach = (e: Event) => {
       const path = (e as CustomEvent<string>).detail;
@@ -113,8 +114,6 @@ export function AiComposerProvider({ children }: ProviderProps) {
     };
     window.addEventListener("labonair:ai-attach-file", onAttach);
     return () => window.removeEventListener("labonair:ai-attach-file", onAttach);
-    // attachFileByPath is stable for our purposes (closes over setFiles only)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

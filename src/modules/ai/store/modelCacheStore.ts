@@ -1,7 +1,7 @@
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { create } from "zustand";
 import { getStoragePaths } from "@/lib/paths";
-import { type DynamicModelInfo, type ProviderInstance, type ProviderId } from "../config";
+import type { DynamicModelInfo, ProviderInstance, ProviderId } from "../config";
 import { fetchModelsForInstance, getTtlForProvider } from "../lib/fetchModels";
 
 const CACHE_STORE_KEY = "ai.modelCache";

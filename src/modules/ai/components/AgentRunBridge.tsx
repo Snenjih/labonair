@@ -148,6 +148,7 @@ function Bridge({
   // open duplicates. Reset when the session changes.
   const openedRef = useRef<Set<string>>(new Set());
   const fileMutationFingerprintRef = useRef<string>("");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sessionId triggers the reset, refs are the side-effected values
   useEffect(() => {
     openedRef.current = new Set();
     fileMutationFingerprintRef.current = "";

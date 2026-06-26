@@ -107,17 +107,19 @@ export function useMenuBridge(actions: AppActions): void {
       listen(event, () => menuHandlersRef.current[event]?.()).then((u) => cleanups.push(u));
     };
     for (const event of Object.keys(menuHandlersRef.current)) on(event);
-    return () => cleanups.forEach((fn) => fn());
+    return () => { for (const fn of cleanups) fn(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // labonair:open-file listener
+  const openFileTabRef = useRef(actions.openFileTab);
+  openFileTabRef.current = actions.openFileTab;
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     listen<{ path: string }>("labonair:open-file", (event) => {
-      actions.openFileTab(event.payload.path);
+      openFileTabRef.current(event.payload.path);
     }).then((fn) => { unlisten = fn; });
     return () => unlisten?.();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // labonair:open-preview listener
   useEffect(() => {
