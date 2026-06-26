@@ -267,12 +267,7 @@ export function useTerminalSession({
             const webgl = new WebglAddon();
             webgl.onContextLoss(() => {
               webgl.dispose();
-              // GPU context was lost (driver hiccup, resource pressure from TUI
-              // apps doing full-screen redraws). xterm.js falls back to its DOM
-              // renderer automatically after dispose(); we re-attach WebGL after
-              // 1 s so the terminal returns to GPU rendering. The disposed check
-              // prevents a retry from firing after the tab is closed.
-              webglRetryTimer = setTimeout(attachWebGL, 1000);
+              if (!disposed) webglRetryTimer = setTimeout(attachWebGL, 1000);
             });
             term.loadAddon(webgl);
           } catch (e) {
