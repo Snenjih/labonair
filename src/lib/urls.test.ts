@@ -22,7 +22,7 @@ describe("sameOrigin", () => {
     expect(sameOrigin("http://localhost:3000", "http://localhost:4000")).toBe(false);
   });
 
-  it("returns false for string equality fallback when both are invalid URLs", () => {
+  it("falls back to string equality and returns true when both are invalid URLs", () => {
     expect(sameOrigin("not-a-url", "not-a-url")).toBe(true);
   });
 
@@ -34,7 +34,7 @@ describe("sameOrigin", () => {
     expect(sameOrigin("https://example.com", "not-a-url")).toBe(false);
   });
 
-  it("returns false for empty strings", () => {
+  it("falls back to string equality and returns true for two empty strings", () => {
     expect(sameOrigin("", "")).toBe(true);
   });
 });

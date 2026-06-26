@@ -14,7 +14,7 @@ pub fn initialize_db(
     }
     let db_path = app_local_data_dir.join("labonair.db");
     let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
-    conn.execute_batch("PRAGMA journal_mode=WAL;")
+    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys = ON;")
         .map_err(|e| e.to_string())?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS groups (
@@ -489,6 +489,7 @@ mod tests {
 
     fn init_test_db() -> Connection {
         let conn = Connection::open_in_memory().expect("in-memory db");
+        conn.execute_batch("PRAGMA foreign_keys = ON;").expect("fk");
         conn.execute_batch(
             "CREATE TABLE groups (
                 id TEXT PRIMARY KEY,
