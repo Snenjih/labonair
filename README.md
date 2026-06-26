@@ -1,5 +1,5 @@
 ## Labonair Terminal and SSH, SFTP
-<img src="public/icon_512x512@2x.png" align="left" width="200"/>
+<img src="src-tauri/icons/icon.png" align="left" width="200"/>
 
 ### `Labonair`
 <p><strong>macOS-native remote workspace — SSH · SFTP · Terminal · Editor · AI</strong></p>
