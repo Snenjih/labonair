@@ -116,7 +116,7 @@ export function OutlinePanel({ items, onJump }: Props) {
               )}
             >
               <OutlineItemIcon item={item} />
-              <span className="truncate text-foreground/80 leading-tight">{item.label}</span>
+              <span className="min-w-0 flex-1 truncate text-foreground/80 leading-tight">{item.label}</span>
               <span className="ml-auto shrink-0 text-[10px] tabular-nums text-muted-foreground/40 opacity-0 group-hover:opacity-100">
                 {item.line}
               </span>

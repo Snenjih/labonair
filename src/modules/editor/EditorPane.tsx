@@ -430,9 +430,14 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
         view.dispatch({
           effects: languageCompartment.reconfigure(ext ?? []),
         });
-        // Re-extract outline after language is resolved
-        if (editorShowOutline) {
-          setOutline(extractOutline(view));
+        // Wait one frame so Lezer can reparse with the new language before
+        // we extract the outline (ensureSyntaxTree inside handles the rest).
+        if (editorShowOutlineRef.current) {
+          requestAnimationFrame(() => {
+            if (cancelled) return;
+            const v = cmRef.current?.view;
+            if (v) setOutline(extractOutline(v));
+          });
         }
       });
       return () => {
@@ -506,8 +511,10 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
 
     const handleOutlineToggle = useCallback((v: boolean) => {
       if (v) {
-        const view = cmRef.current?.view;
-        if (view) setOutline(extractOutline(view));
+        requestAnimationFrame(() => {
+          const view = cmRef.current?.view;
+          if (view) setOutline(extractOutline(view));
+        });
       }
     }, []);
 
@@ -571,18 +578,22 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
 
     const showOutlinePanel = editorShowOutline && outline.length > 0;
 
-    const editorWithOutline = showOutlinePanel ? (
+    // Always render ResizablePanelGroup with a stable id so CodeMirror never
+    // unmounts when the outline panel is toggled (avoids losing syntax highlighting).
+    const editorWithOutline = (
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
-        <ResizablePanel defaultSize={78} minSize={40}>
+        <ResizablePanel id="editor-cm" defaultSize={showOutlinePanel ? 78 : 100} minSize={40}>
           <div className="h-full flex flex-col">{codeMirrorEl}</div>
         </ResizablePanel>
-        <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={22} minSize={15} maxSize={40}>
-          <OutlinePanel items={outline} onJump={handleJump} />
-        </ResizablePanel>
+        {showOutlinePanel && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel id="editor-outline" defaultSize={22} minSize={15} maxSize={40}>
+              <OutlinePanel items={outline} onJump={handleJump} />
+            </ResizablePanel>
+          </>
+        )}
       </ResizablePanelGroup>
-    ) : (
-      <div className="flex-1 min-h-0 flex flex-col">{codeMirrorEl}</div>
     );
 
     return (
