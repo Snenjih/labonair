@@ -70,6 +70,77 @@ pub fn fs_rename(from: String, to: String) -> Result<(), String> {
     })
 }
 
+/// Copies one or more source paths into a destination directory.
+/// Files are copied with std::fs::copy; directories are copied recursively.
+/// If a name conflict exists the copy is placed as "name (1).ext", "name (2).ext", etc.
+/// Returns the list of final destination paths.
+#[tauri::command]
+pub fn fs_copy_into(src_paths: Vec<String>, dest_dir: String) -> Result<Vec<String>, String> {
+    let dest = expand_home(&dest_dir)?;
+    if !dest.is_dir() {
+        return Err(format!("destination is not a directory: {}", dest.display()));
+    }
+    let mut results = Vec::new();
+    for src_str in &src_paths {
+        let src = expand_home(src_str)?;
+        if !src.exists() {
+            return Err(format!("source not found: {}", src.display()));
+        }
+        let name = src
+            .file_name()
+            .ok_or_else(|| format!("no filename: {}", src.display()))?
+            .to_string_lossy()
+            .to_string();
+        let dest_path = resolve_conflict_path(&dest, &name);
+        if src.is_dir() {
+            copy_dir_recursive(&src, &dest_path)?;
+        } else {
+            std::fs::copy(&src, &dest_path)
+                .map_err(|e| format!("copy failed: {e}"))?;
+        }
+        results.push(dest_path.to_string_lossy().into_owned());
+    }
+    Ok(results)
+}
+
+fn resolve_conflict_path(dest_dir: &std::path::Path, name: &str) -> std::path::PathBuf {
+    let candidate = dest_dir.join(name);
+    if !candidate.exists() {
+        return candidate;
+    }
+    let stem = std::path::Path::new(name)
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    let ext = std::path::Path::new(name)
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()))
+        .unwrap_or_default();
+    for i in 1..=99u32 {
+        let candidate = dest_dir.join(format!("{stem} ({i}){ext}"));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    dest_dir.join(format!("{stem} (99){ext}"))
+}
+
+fn copy_dir_recursive(src: &std::path::Path, dest: &std::path::Path) -> Result<(), String> {
+    std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
+    for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let ty = entry.file_type().map_err(|e| e.to_string())?;
+        let dest_child = dest.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_recursive(&entry.path(), &dest_child)?;
+        } else {
+            std::fs::copy(entry.path(), &dest_child).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
 /// Deletes a file or directory (recursively for dirs). Callers are
 /// responsible for confirming destructive operations with the user.
 #[tauri::command]

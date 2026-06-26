@@ -29,6 +29,7 @@ import { copyToClipboard, revealInFinder } from "./lib/contextActions";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useFileTree } from "./lib/useFileTree";
+import { useOsFileDrop } from "./lib/useOsFileDrop";
 
 type SearchHit = {
   path: string;
@@ -68,6 +69,12 @@ export function FileExplorer({
   const [searching, setSearching] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  const { dropTargetPath } = useOsFileDrop(
+    rootPath,
+    !!query.trim(),
+    (destDir) => tree.refresh(destDir),
+  );
 
   type FlatItem = { path: string; isDir: boolean };
   const flat = useMemo<FlatItem[]>(() => {
@@ -371,7 +378,11 @@ export function FileExplorer({
       ) : (
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <ScrollArea className="min-h-0 flex-1">
+            <div className="relative min-h-0 flex-1">
+              {dropTargetPath === rootPath && (
+                <div className="pointer-events-none absolute inset-0 z-10 rounded-sm ring-2 ring-inset ring-primary/60 bg-primary/5" />
+              )}
+              <ScrollArea className="h-full">
               <div className="py-1" ref={listRef}>
                 {pendingAtRoot && (
                   <div
@@ -415,10 +426,12 @@ export function FileExplorer({
                       onAttachToAgent={onAttachToAgent}
                       selectedPath={selectedPath}
                       onSelectPath={setSelectedPath}
+                      dropTargetPath={dropTargetPath}
                     />
                   ))}
               </div>
-            </ScrollArea>
+              </ScrollArea>
+            </div>
           </ContextMenuTrigger>
           <ContextMenuContent className={COMPACT_CONTENT}>
             {onRevealInTerminal && (

@@ -358,6 +358,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_drag::init())
         .setup(|app| {
             // Migrate nexum-settings.json → labonair-settings.json on first launch
             {
@@ -513,6 +514,7 @@ pub fn run() {
             fs::mutate::fs_create_dir,
             fs::mutate::fs_rename,
             fs::mutate::fs_delete,
+            fs::mutate::fs_copy_into,
             fs::search::fs_search,
             fs::grep::fs_grep,
             fs::grep::fs_glob,

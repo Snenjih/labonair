@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { arrayMove } from "@dnd-kit/sortable";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
@@ -60,6 +61,7 @@ export type TabsState = {
   openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
   openGitDiffTab: (repoRoot: string, filePath: string, staged: boolean, section: "staged" | "unstaged" | "untracked") => number;
   renameTab: (id: number, label: string) => void;
+  reorderTabs: (activeTabId: number, overTabId: number) => void;
   setActivePaneId: (tabId: number, paneId: string) => void;
   updatePaneSessionCwd: (tabId: number, sessionId: string, cwd: string) => void;
   splitPane: (tabId: number, direction: PaneDirection) => void;
@@ -521,6 +523,15 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       _nextId: s._nextId + 1,
     }));
     return id;
+  },
+
+  reorderTabs: (activeTabId, overTabId) => {
+    set((s) => {
+      const from = s.tabs.findIndex((t) => t.id === activeTabId);
+      const to = s.tabs.findIndex((t) => t.id === overTabId);
+      if (from === -1 || to === -1 || from === to) return s;
+      return { tabs: arrayMove(s.tabs, from, to) };
+    });
   },
 
   setActivePaneId: (tabId, paneId) => {

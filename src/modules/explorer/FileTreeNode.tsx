@@ -6,6 +6,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useState } from "react";
@@ -38,6 +39,7 @@ type Props = {
   onAttachToAgent?: (path: string) => void;
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
+  dropTargetPath: string | null;
 };
 
 function FileTreeNodeImpl({
@@ -52,6 +54,7 @@ function FileTreeNodeImpl({
   onAttachToAgent,
   selectedPath,
   onSelectPath,
+  dropTargetPath,
 }: Props) {
   const path = tree.joinPath(parentPath, entry.name);
   const isDir = entry.kind === "dir";
@@ -110,6 +113,7 @@ function FileTreeNodeImpl({
             <button
               type="button"
               data-fs-path={path}
+              data-fs-is-dir={isDir ? "true" : "false"}
               onClick={handleClick}
               onDoubleClick={() => !isDir && tree.beginRename(path)}
               onPointerDown={(e) => {
@@ -124,6 +128,39 @@ function FileTreeNodeImpl({
                     dragging = true;
                     document.removeEventListener("pointermove", onMove);
                     explorerDrag.start([path]);
+
+                    // Watch for pointer leaving the window — trigger native OS drag
+                    let nativeDragStarted = false;
+                    function onMoveForNative(nev: PointerEvent) {
+                      if (nativeDragStarted) return;
+                      const el = document.documentElement;
+                      if (
+                        nev.clientX < 0 || nev.clientY < 0 ||
+                        nev.clientX > el.clientWidth || nev.clientY > el.clientHeight
+                      ) {
+                        nativeDragStarted = true;
+                        document.removeEventListener("pointermove", onMoveForNative);
+                        document.removeEventListener("pointerup", onUp);
+                        explorerDrag.end();
+                        const image = makeDragImage(entry.name);
+                        const channel = new Channel<unknown>();
+                        void invoke("plugin:drag|start_drag", {
+                          item: [path],
+                          image,
+                          onEvent: channel,
+                        });
+                      }
+                    }
+                    document.addEventListener("pointermove", onMoveForNative);
+
+                    // Wrap the original onUp to also remove the native listener
+                    const origOnUp = onUp;
+                    function onUpWrapped() {
+                      document.removeEventListener("pointermove", onMoveForNative);
+                      origOnUp();
+                    }
+                    document.removeEventListener("pointerup", onUp);
+                    document.addEventListener("pointerup", onUpWrapped);
                   }
                 }
                 function onUp() {
@@ -137,6 +174,7 @@ function FileTreeNodeImpl({
               className={cn(
                 "group flex w-full items-center gap-2 rounded-sm px-1.5 py-0.5 text-left text-[13px] text-foreground/85 transition-colors hover:bg-accent/70 cursor-pointer",
                 isSelected && "bg-accent text-foreground",
+                dropTargetPath === path && "ring-1 ring-inset ring-primary bg-primary/10",
                 entry.name.startsWith(".") && "opacity-60",
                 entry.is_ignored && "opacity-50",
               )}
@@ -304,6 +342,7 @@ function FileTreeNodeImpl({
             onAttachToAgent={onAttachToAgent}
             selectedPath={selectedPath}
             onSelectPath={onSelectPath}
+            dropTargetPath={dropTargetPath}
           />
         ))}
     </>
@@ -311,3 +350,20 @@ function FileTreeNodeImpl({
 }
 
 export const FileTreeNode = memo(FileTreeNodeImpl);
+
+function makeDragImage(name: string): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = 220;
+  canvas.height = 36;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  ctx.fillStyle = "rgba(30, 30, 30, 0.88)";
+  ctx.beginPath();
+  ctx.roundRect(0, 0, 220, 36, 8);
+  ctx.fill();
+  ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+  ctx.font = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+  const label = name.length > 26 ? `${name.slice(0, 23)}…` : name;
+  ctx.fillText(label, 12, 23);
+  return canvas.toDataURL("image/png");
+}

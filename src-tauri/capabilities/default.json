@@ -21,6 +21,7 @@
     "dialog:allow-open",
     "dialog:allow-save",
     "dialog:allow-confirm",
-    "dialog:allow-ask"
+    "dialog:allow-ask",
+    "drag:allow-start-drag"
   ]
 }
