@@ -385,71 +385,73 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
       const earlyBuffer: string[] = [];
       let term: Terminal | null = null;
 
-      listen<{ session_id: string; data: string }>("ssh_pty_output", (event) => {
-        if (event.payload.session_id !== sessionId) return;
-        const { data } = event.payload;
-        if (term) {
-          term.write(data);
-        } else {
-          earlyBuffer.push(data);
-        }
-
-        if (session.hostId) {
-          const capturedData = data;
-          setTimeout(() => {
-            const stripped = stripAnsi(capturedData);
-            outputTailRef.current = (outputTailRef.current + stripped).slice(-TAIL_MAX);
-
-            if (SUDO_PROMPT_RE.test(outputTailRef.current)) {
-              if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
-              sudoDebounceRef.current = setTimeout(async () => {
-                sudoDebounceRef.current = null;
-                if (sudoPopupRef.current) return;
-                try {
-                  const pw = await invoke<string | null>("get_sudo_password", { hostId: session.hostId });
-                  if (!pw) return;
-                  sudoPasswordRef.current = pw;
-                  const pos = term && containerRef.current
-                    ? getCursorPixelPos(term, containerRef.current)
-                    : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-                  showSudoPopup(pos);
-                } catch {
-                  // keychain unavailable — silent no-op
-                }
-              }, 300);
-            }
-          }, 0);
-        }
-      }).then((unlisten) => cleanups.push(unlisten));
-
-      listen<{ session_id: string; reason: string }>("ssh_connection_lost", ({ payload }) => {
-        if (payload.session_id !== sessionId) return;
-        setIsDisconnected(true);
-        setDisconnectReason(payload.reason);
-        useNotificationStore.getState().addNotification({
-          type: "error",
-          title: "SSH Connection Lost",
-          message: payload.reason || "The connection was dropped unexpectedly.",
-          source: session.title || "SSH",
-        });
-        // Auto-reconnect: skip on intentional disconnect or auth failure
-        const prefs = usePreferencesStore.getState();
-        const isAuthFailure = (payload.reason ?? "").toLowerCase().includes("auth");
-        if (!intentionalDisconnectRef.current && prefs.sshAutoReconnect && !isAuthFailure) {
-          reconnectAttemptRef.current = 0;
-          startAutoReconnectRef.current();
-        }
-      }).then((unlisten) => cleanups.push(unlisten));
-
-      listen<{ session_id: string }>("session_established", ({ payload }) => {
-        if (payload.session_id !== sessionId) return;
-        reconnectAttemptRef.current = 0;
-        setReconnectAttempt(0);
-        setAutoReconnectFailed(false);
-      }).then((unlisten) => cleanups.push(unlisten));
-
       (async () => {
         const prefs = usePreferencesStore.getState();
+
+        // Register all three listeners concurrently — sequential awaits would open a
+        // window where ssh_connection_lost or session_established could fire before
+        // their listener is live, silently dropping the event.
+        const [unlistenOutput, unlistenLost, unlistenEstablished] = await Promise.all([
+          listen<{ session_id: string; data: string }>("ssh_pty_output", (event) => {
+            if (event.payload.session_id !== sessionId) return;
+            const { data } = event.payload;
+            if (term) {
+              term.write(data);
+            } else {
+              earlyBuffer.push(data);
+            }
+
+            if (session.hostId) {
+              const stripped = stripAnsi(data);
+              outputTailRef.current = (outputTailRef.current + stripped).slice(-TAIL_MAX);
+
+              if (SUDO_PROMPT_RE.test(outputTailRef.current)) {
+                if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
+                sudoDebounceRef.current = setTimeout(async () => {
+                  sudoDebounceRef.current = null;
+                  if (sudoPopupRef.current) return;
+                  try {
+                    const pw = await invoke<string | null>("get_sudo_password", { hostId: session.hostId });
+                    if (!pw) return;
+                    sudoPasswordRef.current = pw;
+                    const pos = term && containerRef.current
+                      ? getCursorPixelPos(term, containerRef.current)
+                      : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+                    showSudoPopup(pos);
+                  } catch {
+                    // keychain unavailable — silent no-op
+                  }
+                }, 300);
+              }
+            }
+          }),
+          listen<{ session_id: string; reason: string }>("ssh_connection_lost", ({ payload }) => {
+            if (payload.session_id !== sessionId) return;
+            setIsDisconnected(true);
+            setDisconnectReason(payload.reason);
+            useNotificationStore.getState().addNotification({
+              type: "error",
+              title: "SSH Connection Lost",
+              message: payload.reason || "The connection was dropped unexpectedly.",
+              source: session.title || "SSH",
+            });
+            // Read prefs fresh at disconnect time so live setting changes are respected.
+            const currentPrefs = usePreferencesStore.getState();
+            const isAuthFailure = (payload.reason ?? "").toLowerCase().includes("auth");
+            if (!intentionalDisconnectRef.current && currentPrefs.sshAutoReconnect && !isAuthFailure) {
+              reconnectAttemptRef.current = 0;
+              startAutoReconnectRef.current();
+            }
+          }),
+          listen<{ session_id: string }>("session_established", ({ payload }) => {
+            if (payload.session_id !== sessionId) return;
+            reconnectAttemptRef.current = 0;
+            setReconnectAttempt(0);
+            setAutoReconnectFailed(false);
+          }),
+        ]);
+        if (disposed) { unlistenOutput(); unlistenLost(); unlistenEstablished(); return; }
+        cleanups.push(unlistenOutput, unlistenLost, unlistenEstablished);
 
         await document.fonts.load(`${prefs.terminalFontSize}px "JetBrains Mono"`);
         if (disposed || !containerRef.current) return;
@@ -561,13 +563,24 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         onSearchReadyRef.current?.(search);
 
         if (prefs.terminalUseWebGL) {
-          try {
-            const webgl = new WebglAddon();
-            webgl.onContextLoss(() => webgl.dispose());
-            t.loadAddon(webgl);
-          } catch (e) {
-            console.warn("WebGL unavailable:", e);
-          }
+          let webglRetryTimer: ReturnType<typeof setTimeout> | null = null;
+          const attachWebGL = () => {
+            if (disposed) return;
+            try {
+              const webgl = new WebglAddon();
+              webgl.onContextLoss(() => {
+                webgl.dispose();
+                if (!disposed) webglRetryTimer = setTimeout(attachWebGL, 1000);
+              });
+              t.loadAddon(webgl);
+            } catch (e) {
+              console.warn("WebGL unavailable:", e);
+            }
+          };
+          attachWebGL();
+          cleanups.push(() => {
+            if (webglRetryTimer) clearTimeout(webglRetryTimer);
+          });
         }
 
         for (const chunk of earlyBuffer) t.write(chunk);
@@ -644,7 +657,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
         });
 
         if (isActive) t.focus();
-      })();
+      })().catch(console.error);
 
       return () => {
         disposed = true;

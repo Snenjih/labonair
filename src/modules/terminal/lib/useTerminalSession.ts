@@ -260,13 +260,24 @@ export function useTerminalSession({
       }
 
       if (prefs.terminalUseWebGL) {
-        try {
-          const webgl = new WebglAddon();
-          webgl.onContextLoss(() => webgl.dispose());
-          term.loadAddon(webgl);
-        } catch (e) {
-          console.warn("WebGL renderer unavailable:", e);
-        }
+        let webglRetryTimer: ReturnType<typeof setTimeout> | null = null;
+        const attachWebGL = () => {
+          if (disposed) return;
+          try {
+            const webgl = new WebglAddon();
+            webgl.onContextLoss(() => {
+              webgl.dispose();
+              if (!disposed) webglRetryTimer = setTimeout(attachWebGL, 1000);
+            });
+            term.loadAddon(webgl);
+          } catch (e) {
+            console.warn("WebGL renderer unavailable:", e);
+          }
+        };
+        attachWebGL();
+        cleanups.push(() => {
+          if (webglRetryTimer) clearTimeout(webglRetryTimer);
+        });
       }
 
       const prompt = registerPromptTracker(term);

@@ -245,6 +245,9 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "aiEnabled": void store.setAiEnabled(value as boolean); break;
     case "showEditPrediction": void store.setShowEditPrediction(value as boolean); break;
     case "autocompleteEnabled": void store.setAutocompleteEnabled(value as boolean); break;
+    case "sshAutoReconnect": void store.setSshAutoReconnect(value as boolean); break;
+    case "sshAutoReconnectDelay": void store.setSshAutoReconnectDelay(Number(value)); break;
+    case "sshAutoReconnectMaxAttempts": void store.setSshAutoReconnectMaxAttempts(Number(value)); break;
   }
 }
 
