@@ -11,7 +11,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import { registerCwdHandler, registerPromptTracker } from "./osc-handlers";
+import { registerCwdHandler, registerPromptTracker, registerTerminalQueryHandlers } from "./osc-handlers";
 import { openPty, type PtySession } from "./pty-bridge";
 
 type Options = {
@@ -327,6 +327,7 @@ export function useTerminalSession({
         return;
       }
       ptyRef.current = pty;
+      cleanups.push(registerTerminalQueryHandlers(term, (d) => pty.write(d)));
 
       if (initialCommand) {
         const cmd = initialCommand.endsWith("\n") ? initialCommand : initialCommand + "\n";

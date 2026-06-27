@@ -1,4 +1,5 @@
 import { buildTerminalTheme } from "@/styles/terminalTheme";
+import { registerTerminalQueryHandlers } from "@/modules/terminal/lib/osc-handlers";
 import { handleApiError } from "@/lib/errors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
@@ -609,6 +610,11 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(
           if (sudoPopupRef.current) hideSudoPopup();
           invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
         });
+        cleanups.push(
+          registerTerminalQueryHandlers(t, (d) =>
+            invoke("ssh_pty_write", { sessionId, data: d }).catch(console.error),
+          ),
+        );
 
         const FIT_DEBOUNCE_MS = 8;
         const PTY_RESIZE_DEBOUNCE_MS = 256;
