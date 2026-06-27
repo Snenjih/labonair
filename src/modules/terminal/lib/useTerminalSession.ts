@@ -37,6 +37,15 @@ const FONT_WEIGHT_MAP: Record<string, string | number> = {
   bold: "bold",
 };
 
+// WebGL context loss leaves _renderer.value undefined for ~1000ms during recovery.
+// Any fit() call in that window crashes with "undefined is not an object (evaluating
+// 'this._renderer.value.dimensions')". Safe to swallow — the next successful fit()
+// after WebGL re-attaches corrects dimensions.
+function safeFit(fit: FitAddon | null | undefined): void {
+  if (!fit) return;
+  try { fit.fit(); } catch { /* renderer not ready */ }
+}
+
 let _bellAudioCtx: AudioContext | null = null;
 function getBellAudioContext(): AudioContext {
   if (!_bellAudioCtx || _bellAudioCtx.state === "closed") {
@@ -88,19 +97,19 @@ export function useTerminalSession({
       }
       if (state.terminalFontFamily !== prev.terminalFontFamily) {
         term.options.fontFamily = state.terminalFontFamily;
-        fit?.fit();
+        safeFit(fit);
       }
       if (state.terminalFontSize !== prev.terminalFontSize) {
         term.options.fontSize = state.terminalFontSize;
-        fit?.fit();
+        safeFit(fit);
       }
       if (state.terminalLetterSpacing !== prev.terminalLetterSpacing) {
         term.options.letterSpacing = state.terminalLetterSpacing;
-        fit?.fit();
+        safeFit(fit);
       }
       if (state.terminalLineHeight !== prev.terminalLineHeight) {
         term.options.lineHeight = state.terminalLineHeight;
-        fit?.fit();
+        safeFit(fit);
       }
       if (state.terminalFontWeight !== prev.terminalFontWeight) {
         term.options.fontWeight = FONT_WEIGHT_MAP[state.terminalFontWeight] as
@@ -383,7 +392,7 @@ export function useTerminalSession({
           if (w === lastW && h === lastH) return;
           lastW = w;
           lastH = h;
-          fit.fit();
+          safeFit(fit);
           // Schedule (or re-schedule) a single trailing pty.resize. The
           // shell sees one SIGWINCH after the drag settles, not 60+/s.
           if (ptyTimer) clearTimeout(ptyTimer);
@@ -421,7 +430,7 @@ export function useTerminalSession({
     if (term && fit) {
       const prevCols = term.cols;
       const prevRows = term.rows;
-      fit.fit();
+      safeFit(fit);
       if (pty && (term.cols !== prevCols || term.rows !== prevRows)) {
         pty.resize(term.cols, term.rows);
       }
