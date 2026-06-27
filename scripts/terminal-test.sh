@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nexum Terminal Capability Test Suite v2.0
+# Labonair Terminal Capability Test Suite v2.0
 # bash scripts/terminal-test.sh [--perf] [--scroll] [--interactive] [--all]
 
 set -uo pipefail
@@ -95,12 +95,12 @@ _tbl_row() {
 clear
 printf '\033[1;38;2;100;180;255m'
 cat <<'EOF'
-  ███╗   ██╗███████╗██╗  ██╗██╗   ██╗███╗   ███╗
-  ████╗  ██║██╔════╝╚██╗██╔╝██║   ██║████╗ ████║
-  ██╔██╗ ██║█████╗   ╚███╔╝ ██║   ██║██╔████╔██║
-  ██║╚██╗██║██╔══╝   ██╔██╗ ██║   ██║██║╚██╔╝██║
-  ██║ ╚████║███████╗██╔╝ ██╗╚██████╔╝██║ ╚═╝ ██║
-  ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚═╝
+  ██╗      █████╗ ██████╗  ██████╗ ███╗   ██╗ █████╗ ██╗██████╗
+  ██║     ██╔══██╗██╔══██╗██╔═══██╗████╗  ██║██╔══██╗██║██╔══██╗
+  ██║     ███████║██████╔╝ ██║   ██║██╔██╗ ██║███████║██║██████╔╝
+  ██║     ██╔══██║██╔══██╗ ██║   ██║██║╚██╗██║██╔══██║██║██╔══██╗
+  ███████╗██║  ██║██████╔╝ ╚██████╔╝██║ ╚████║██║  ██║██║██║  ██║
+  ╚══════╝╚═╝  ╚═╝╚═════╝   ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝
 EOF
 printf '\033[0m\033[38;2;120;120;160m  Terminal Capability Test Suite  v2.0\033[0m\n\n'
 
@@ -272,7 +272,7 @@ printf '═%.0s' $(seq 1 $((W-2))); printf '╗'
 for r in $(seq 1 $((H-2))); do
   printf '\033[%d;%dH║\033[0m' $(( startrow+r )) "$startcol"
   case $r in
-    2) printf '\033[1;38;2;255;200;50m  %-*s\033[0m' $((W-3)) "Nexum TUI — Alternate Screen Test" ;;
+    2) printf '\033[1;38;2;255;200;50m  %-*s\033[0m' $((W-3)) "Labonair TUI — Alternate Screen Test" ;;
     4) printf '\033[38;2;150;220;150m  ✓ alternate screen active\033[0m' ;;
     5) printf '\033[38;2;150;220;150m  ✓ cursor addressing works\033[0m' ;;
     6) printf '\033[38;2;150;220;150m  ✓ color in TUI context\033[0m' ;;
@@ -491,16 +491,16 @@ record "Focus Tracking (mode 1004)" PASS "toggle accepted — vim uses this for 
 # 18 · OSC SEQUENCES  ← NEW
 # =============================================================================
 section "18 · OSC Sequences"
-printf '\033]0;Nexum Test Suite\007'
-record "OSC 0 — Window Title" PASS "title set to 'Nexum Test Suite'"
+printf '\033]0;Labonair Test Suite\007'
+record "OSC 0 — Window Title" PASS "title set to 'Labonair Test Suite'"
 
-printf '\033]8;;https://nexum.app\033\\click-me\033]8;;\033\\\n'
+printf '\033]8;;https://labonair.app\033\\click-me\033]8;;\033\\\n'
 printf "     ^^ OSC 8 hyperlink above\n"
 record "OSC 8 — Hyperlinks" PASS "visual — 'click-me' should be a clickable link"
 
-# OSC 52 clipboard write (base64("nexum-test") = bmV4dW0tdGVzdA==)
-printf '\033]52;c;bmV4dW0tdGVzdA==\007'
-record "OSC 52 — Clipboard Write" PASS "tried to write 'nexum-test' to clipboard"
+# OSC 52 clipboard write (base64("labonair-test") = bGFib25haXItdGVzdA==)
+printf '\033]52;c;bGFib25haXItdGVzdA==\007'
+record "OSC 52 — Clipboard Write" PASS "tried to write 'labonair-test' to clipboard"
 
 # OSC 10/11 — query fg/bg color
 osc_resp=$(query_terminal '\033]10;?\007' $'\007' 4)
@@ -635,5 +635,10 @@ elif [[ $WARN -gt 0 ]]; then
 else
   printf "  \033[1;32m→ All tests passed — terminal fully capable.\033[0m\n"
 fi
+
+printf "\n"
+printf '\033[1;38;2;100;180;255m'
+printf "  ╚"; printf '═%.0s' $(seq 1 81); printf "╝\n"
+printf '\033[0m'
 
 printf "\n\033[38;2;70;70;90m  Tip: bash scripts/terminal-test.sh --all  (enables perf + scroll + interactive)\033[0m\n\n"
