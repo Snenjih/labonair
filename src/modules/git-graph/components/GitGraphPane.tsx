@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { AnimatePresence } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { Refresh01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -14,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { GitGraphTab } from "@/modules/tabs/types";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import { git } from "@/modules/source-control/lib/gitInvoke";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { NewBranchDialog } from "@/modules/source-control/components/NewBranchDialog";
@@ -21,7 +21,6 @@ import { useGitGraph } from "../lib/useGitGraph";
 import type { LayoutCommit } from "../types";
 import { GitGraphCanvas } from "./GitGraphCanvas";
 import { CommitDetailPanel } from "./CommitDetailPanel";
-import { CommitDiffPanel } from "./CommitDiffPanel";
 
 function LoadingSkeleton() {
   return (
@@ -120,7 +119,7 @@ export function GitGraphPane({ tab }: Props) {
 function GitGraphPaneContent({ tab }: Props) {
   const { commits, isLoading, error, hasMore, loadMore, reload, lastRefreshedAt } = useGitGraph(tab.repositoryPath);
   const [selectedCommit, setSelectedCommit] = useState<LayoutCommit | null>(null);
-  const [commitDiffHash, setCommitDiffHash] = useState<string | null>(null);
+  const openCommitDiffTab = useTabsStore((s) => s.openCommitDiffTab);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isActioning, setIsActioning] = useState(false);
   const [checkoutConfirmCommit, setCheckoutConfirmCommit] = useState<LayoutCommit | null>(null);
@@ -230,7 +229,7 @@ function GitGraphPaneContent({ tab }: Props) {
           commits={commits}
           onSelectCommit={setSelectedCommit}
           selectedHash={selectedCommit?.hash ?? null}
-          onViewChanges={(commit) => setCommitDiffHash(commit.hash)}
+          onViewChanges={(commit) => openCommitDiffTab(tab.repositoryPath, commit.hash)}
           onCheckoutCommit={handleCheckoutCommit}
           onCreateBranchHere={(commit) => setCreateBranchFromCommit(commit.hash)}
           onCherryPick={handleCherryPick}
@@ -250,26 +249,16 @@ function GitGraphPaneContent({ tab }: Props) {
         )}
       </div>
 
-      {/* Detail / Diff panels */}
-      <AnimatePresence>
-        {commitDiffHash && (
-          <CommitDiffPanel
-            key={`diff-${commitDiffHash}`}
-            hash={commitDiffHash}
-            repositoryPath={tab.repositoryPath}
-            onClose={() => setCommitDiffHash(null)}
-          />
-        )}
-        {selectedCommit && !commitDiffHash && (
-          <CommitDetailPanel
-            key={selectedCommit.hash}
-            commit={selectedCommit}
-            repositoryPath={tab.repositoryPath}
-            onClose={() => setSelectedCommit(null)}
-            onViewChanges={(hash) => setCommitDiffHash(hash)}
-          />
-        )}
-      </AnimatePresence>
+      {/* Detail panel */}
+      {selectedCommit && (
+        <CommitDetailPanel
+          key={selectedCommit.hash}
+          commit={selectedCommit}
+          repositoryPath={tab.repositoryPath}
+          onClose={() => setSelectedCommit(null)}
+          onViewChanges={(hash) => openCommitDiffTab(tab.repositoryPath, hash)}
+        />
+      )}
 
       {/* Checkout confirmation */}
       <AlertDialog

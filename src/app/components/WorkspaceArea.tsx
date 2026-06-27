@@ -10,7 +10,7 @@ import { PreviewStack } from "@/modules/preview";
 import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { SftpStack } from "@/modules/sftp/SftpStack";
-import { GitGraphStack } from "@/modules/git-graph";
+import { GitGraphStack, CommitDiffStack } from "@/modules/git-graph";
 import { useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import { WorkspaceStack } from "@/modules/terminal/WorkspaceStack";
 import type { WorkspacePaneHandle, TerminalPaneHandle } from "@/modules/terminal";
@@ -71,6 +71,7 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
   const isHomeTab = activeTabKind === "home";
   const isGitGraphTab = activeTabKind === "git-graph";
   const isGitDiffTab = activeTabKind === "git-diff";
+  const isCommitDiffTab = activeTabKind === "commit-diff";
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -153,6 +154,15 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           aria-hidden={!isGitDiffTab}
         >
           <GitDiffStack />
+        </div>
+        <div
+          className={cn(
+            "absolute inset-0 px-3 pt-2 pb-2",
+            isCommitDiffTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
+          )}
+          aria-hidden={!isCommitDiffTab}
+        >
+          <CommitDiffStack />
         </div>
       </div>
 

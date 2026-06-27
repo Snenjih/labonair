@@ -112,7 +112,15 @@ export type GitDiffTab = {
   section: "staged" | "unstaged" | "untracked";
 };
 
-export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | GitGraphTab | GitDiffTab;
+export type CommitDiffTab = {
+  id: number;
+  kind: "commit-diff";
+  title: string;
+  repositoryPath: string;
+  hash: string;
+};
+
+export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | GitGraphTab | GitDiffTab | CommitDiffTab;
 
 export type TabPatch = Partial<{
   title: string;

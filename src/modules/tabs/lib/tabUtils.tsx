@@ -41,6 +41,7 @@ export function labelFor(t: Tab): string {
   if (t.kind === "sftp") return t.title;
   if (t.kind === "git-graph") return t.title;
   if (t.kind === "git-diff") return t.title;
+  if (t.kind === "commit-diff") return t.title;
   const wt = t as WorkspaceTab;
   if (wt.customTitle) return wt.customTitle;
   const activeSession = wt.sessions[wt.activePaneId];
@@ -86,6 +87,11 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
   if (tab.kind === "git-diff") {
     return (
       <HugeiconsIcon icon={GitCompareIcon} size={14} strokeWidth={1.75} className="shrink-0 text-modified" />
+    );
+  }
+  if (tab.kind === "commit-diff") {
+    return (
+      <HugeiconsIcon icon={GitCompareIcon} size={14} strokeWidth={1.75} className="shrink-0 text-info" />
     );
   }
   if (tab.kind === "workspace") {

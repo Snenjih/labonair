@@ -14,6 +14,7 @@ import {
   basename,
   titleFromUrl,
   type AiDiffStatus,
+  type CommitDiffTab,
   type GitDiffTab,
   type PaneDirection,
   type PaneNode,
@@ -60,6 +61,7 @@ export type TabsState = {
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
   openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
   openGitDiffTab: (repoRoot: string, filePath: string, staged: boolean, section: "staged" | "unstaged" | "untracked") => number;
+  openCommitDiffTab: (repositoryPath: string, hash: string) => number;
   renameTab: (id: number, label: string) => void;
   reorderTabs: (activeTabId: number, overTabId: number) => void;
   setActivePaneId: (tabId: number, paneId: string) => void;
@@ -516,6 +518,31 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       filePath,
       staged,
       section,
+    };
+    set((s) => ({
+      tabs: [...s.tabs, tab],
+      activeId: id,
+      _nextId: s._nextId + 1,
+    }));
+    return id;
+  },
+
+  openCommitDiffTab: (repositoryPath, hash) => {
+    const shortHash = hash.slice(0, 7);
+    const existing = get().tabs.find(
+      (t) => t.kind === "commit-diff" && t.repositoryPath === repositoryPath && t.hash === hash,
+    );
+    if (existing) {
+      set({ activeId: existing.id });
+      return existing.id;
+    }
+    const id = get()._nextId;
+    const tab: CommitDiffTab = {
+      id,
+      kind: "commit-diff",
+      title: shortHash,
+      repositoryPath,
+      hash,
     };
     set((s) => ({
       tabs: [...s.tabs, tab],
