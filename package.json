@@ -16,7 +16,10 @@
     "check": "biome check --write src",
     "knip": "knip",
     "analyze:bundle": "ANALYZE=true vite build",
-    "size": "size-limit"
+    "size": "size-limit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",
@@ -120,7 +123,9 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/coverage-v8": "^4.1.8",
     "babel-plugin-react-compiler": "^1.0.0",
+    "jsdom": "^29.1.1",
     "knip": "^6.15.0",
     "react-compiler-healthcheck": "^1.0.0",
     "react-scan": "^0.5.7",

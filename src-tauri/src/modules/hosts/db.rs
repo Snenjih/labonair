@@ -14,7 +14,7 @@ pub fn initialize_db(
     }
     let db_path = app_local_data_dir.join("labonair.db");
     let conn = rusqlite::Connection::open(&db_path).map_err(|e| e.to_string())?;
-    conn.execute_batch("PRAGMA journal_mode=WAL;")
+    conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys = ON;")
         .map_err(|e| e.to_string())?;
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS groups (
@@ -480,4 +480,162 @@ pub async fn groups_update(
         }),
     )?;
     Ok(group)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn init_test_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("in-memory db");
+        conn.execute_batch("PRAGMA foreign_keys = ON;").expect("fk");
+        conn.execute_batch(
+            "CREATE TABLE groups (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                icon TEXT,
+                color TEXT,
+                created_at INTEGER NOT NULL
+            );
+            CREATE TABLE hosts (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                host_address TEXT NOT NULL,
+                port INTEGER NOT NULL DEFAULT 22,
+                username TEXT NOT NULL,
+                auth_method TEXT NOT NULL DEFAULT 'password',
+                private_key_path TEXT,
+                group_id TEXT REFERENCES groups(id) ON DELETE SET NULL,
+                tags TEXT,
+                created_at INTEGER NOT NULL,
+                last_connected_at INTEGER,
+                default_path_ssh TEXT,
+                default_path_sftp TEXT,
+                pin_to_top INTEGER NOT NULL DEFAULT 0,
+                sudo_password_set INTEGER NOT NULL DEFAULT 0,
+                keep_alive_interval INTEGER,
+                keep_alive_tries INTEGER,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                tunnels TEXT,
+                startup_snippet_id TEXT,
+                startup_snippet_mode TEXT,
+                credential_id TEXT
+            );",
+        )
+        .expect("schema");
+        conn
+    }
+
+    fn insert_group(conn: &Connection, id: &str, name: &str) -> Group {
+        let created_at = 1_000_000i64;
+        conn.execute(
+            "INSERT INTO groups (id, name, icon, color, created_at) VALUES (?1, ?2, NULL, NULL, ?3)",
+            rusqlite::params![id, name, created_at],
+        )
+        .unwrap();
+        Group {
+            id: id.to_string(),
+            name: name.to_string(),
+            icon: None,
+            color: None,
+            created_at,
+        }
+    }
+
+    fn query_groups(conn: &Connection) -> Vec<Group> {
+        let mut stmt = conn
+            .prepare("SELECT id, name, icon, color, created_at FROM groups ORDER BY name")
+            .unwrap();
+        stmt.query_map([], |row| {
+            Ok(Group {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                icon: row.get(2)?,
+                color: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        })
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
+    }
+
+    #[test]
+    fn empty_db_returns_no_groups() {
+        let conn = init_test_db();
+        assert!(query_groups(&conn).is_empty());
+    }
+
+    #[test]
+    fn insert_group_and_query_returns_it() {
+        let conn = init_test_db();
+        let group = insert_group(&conn, "g1", "My Group");
+        let groups = query_groups(&conn);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0], group);
+    }
+
+    #[test]
+    fn groups_ordered_alphabetically() {
+        let conn = init_test_db();
+        insert_group(&conn, "g2", "Zebra");
+        insert_group(&conn, "g1", "Alpha");
+        let groups = query_groups(&conn);
+        assert_eq!(groups[0].name, "Alpha");
+        assert_eq!(groups[1].name, "Zebra");
+    }
+
+    #[test]
+    fn update_group_name() {
+        let conn = init_test_db();
+        insert_group(&conn, "g1", "Old Name");
+        conn.execute(
+            "UPDATE groups SET name=?1 WHERE id=?2",
+            rusqlite::params!["New Name", "g1"],
+        )
+        .unwrap();
+        let groups = query_groups(&conn);
+        assert_eq!(groups[0].name, "New Name");
+    }
+
+    #[test]
+    fn delete_group_removes_it() {
+        let conn = init_test_db();
+        insert_group(&conn, "g1", "To Delete");
+        conn.execute("DELETE FROM groups WHERE id=?1", rusqlite::params!["g1"])
+            .unwrap();
+        assert!(query_groups(&conn).is_empty());
+    }
+
+    #[test]
+    fn deleting_group_sets_host_group_id_to_null() {
+        let conn = init_test_db();
+        insert_group(&conn, "g1", "Group");
+        conn.execute(
+            "INSERT INTO hosts (id, name, host_address, port, username, auth_method, group_id, created_at) \
+             VALUES ('h1', 'Host', '1.2.3.4', 22, 'admin', 'password', 'g1', 1000000)",
+            [],
+        )
+        .unwrap();
+        conn.execute("DELETE FROM groups WHERE id='g1'", []).unwrap();
+        let group_id: Option<String> = conn
+            .query_row("SELECT group_id FROM hosts WHERE id='h1'", [], |r| r.get(0))
+            .unwrap();
+        assert!(group_id.is_none());
+    }
+
+    #[test]
+    fn schema_init_is_idempotent() {
+        let conn = Connection::open_in_memory().expect("in-memory db");
+        let schema = "CREATE TABLE IF NOT EXISTS groups (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            icon TEXT,
+            color TEXT,
+            created_at INTEGER NOT NULL
+        );";
+        conn.execute_batch(schema).expect("first run");
+        conn.execute_batch(schema).expect("second run should not panic");
+    }
 }

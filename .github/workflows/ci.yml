@@ -35,6 +35,12 @@ jobs:
       - name: Type-check
         run: pnpm check-types
 
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Unit tests
+        run: pnpm test:run
+
       - name: Build frontend
         run: pnpm build
 
@@ -77,6 +83,10 @@ jobs:
       - name: cargo clippy
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        working-directory: src-tauri
+        run: cargo test --lib
 
       - uses: taiki-e/install-action@v2
         with:

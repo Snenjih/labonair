@@ -246,3 +246,187 @@ pub async fn snippet_groups_delete(
     conn.execute("DELETE FROM snippet_groups WHERE id=?1", rusqlite::params![id])?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn init_test_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("in-memory db");
+        conn.execute_batch(
+            "CREATE TABLE snippet_groups (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                icon TEXT,
+                color TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL
+            );
+            CREATE TABLE snippets (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT,
+                command TEXT NOT NULL,
+                target TEXT NOT NULL DEFAULT 'local',
+                host_id TEXT,
+                default_exec_mode TEXT NOT NULL DEFAULT 'terminal',
+                working_dir TEXT,
+                group_id TEXT REFERENCES snippet_groups(id) ON DELETE SET NULL,
+                tags TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );",
+        )
+        .expect("schema");
+        conn
+    }
+
+    fn query_snippet_groups(conn: &Connection) -> Vec<SnippetGroup> {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, icon, color, sort_order, created_at \
+                 FROM snippet_groups ORDER BY sort_order ASC, name ASC",
+            )
+            .unwrap();
+        stmt.query_map([], |row| {
+            Ok(SnippetGroup {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                icon: row.get(2)?,
+                color: row.get(3)?,
+                sort_order: row.get::<_, i64>(4).unwrap_or(0),
+                created_at: row.get(5)?,
+            })
+        })
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
+    }
+
+    fn insert_snippet_group(conn: &Connection, id: &str, name: &str) -> SnippetGroup {
+        let now = 1_000_000i64;
+        conn.execute(
+            "INSERT INTO snippet_groups (id, name, icon, color, sort_order, created_at) \
+             VALUES (?1, ?2, NULL, NULL, 0, ?3)",
+            rusqlite::params![id, name, now],
+        )
+        .unwrap();
+        SnippetGroup {
+            id: id.to_string(),
+            name: name.to_string(),
+            icon: None,
+            color: None,
+            sort_order: 0,
+            created_at: now,
+        }
+    }
+
+    #[test]
+    fn empty_db_has_no_snippet_groups() {
+        let conn = init_test_db();
+        assert!(query_snippet_groups(&conn).is_empty());
+    }
+
+    #[test]
+    fn insert_and_query_snippet_group() {
+        let conn = init_test_db();
+        let group = insert_snippet_group(&conn, "sg1", "Deploy");
+        let groups = query_snippet_groups(&conn);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0], group);
+    }
+
+    #[test]
+    fn update_snippet_group_name() {
+        let conn = init_test_db();
+        insert_snippet_group(&conn, "sg1", "Old");
+        conn.execute(
+            "UPDATE snippet_groups SET name=?1 WHERE id=?2",
+            rusqlite::params!["New", "sg1"],
+        )
+        .unwrap();
+        let groups = query_snippet_groups(&conn);
+        assert_eq!(groups[0].name, "New");
+    }
+
+    #[test]
+    fn delete_snippet_group_removes_it() {
+        let conn = init_test_db();
+        insert_snippet_group(&conn, "sg1", "To Delete");
+        conn.execute(
+            "DELETE FROM snippet_groups WHERE id=?1",
+            rusqlite::params!["sg1"],
+        )
+        .unwrap();
+        assert!(query_snippet_groups(&conn).is_empty());
+    }
+
+    #[test]
+    fn delete_snippet_group_nulls_snippet_group_id() {
+        let conn = init_test_db();
+        insert_snippet_group(&conn, "sg1", "Group");
+        let now = 1_000_000i64;
+        conn.execute(
+            "INSERT INTO snippets (id, name, command, target, default_exec_mode, group_id, sort_order, created_at, updated_at) \
+             VALUES ('s1', 'My Script', 'echo hi', 'local', 'terminal', 'sg1', 0, ?1, ?1)",
+            rusqlite::params![now],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE snippets SET group_id=NULL WHERE group_id='sg1'",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "DELETE FROM snippet_groups WHERE id='sg1'",
+            [],
+        )
+        .unwrap();
+        let group_id: Option<String> = conn
+            .query_row(
+                "SELECT group_id FROM snippets WHERE id='s1'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(group_id.is_none());
+    }
+
+    #[test]
+    fn snippets_reorder_updates_sort_order() {
+        let conn = init_test_db();
+        let now = 1_000_000i64;
+        for (id, name, order) in &[("s1", "Alpha", 0i64), ("s2", "Beta", 1)] {
+            conn.execute(
+                "INSERT INTO snippets (id, name, command, target, default_exec_mode, sort_order, created_at, updated_at) \
+                 VALUES (?1, ?2, 'echo', 'local', 'terminal', ?3, ?4, ?4)",
+                rusqlite::params![id, name, order, now],
+            )
+            .unwrap();
+        }
+        // Reorder: swap sort orders
+        conn.execute(
+            "UPDATE snippets SET sort_order=?1 WHERE id='s1'",
+            rusqlite::params![10i64],
+        )
+        .unwrap();
+        conn.execute(
+            "UPDATE snippets SET sort_order=?1 WHERE id='s2'",
+            rusqlite::params![0i64],
+        )
+        .unwrap();
+        let orders: Vec<(String, i64)> = {
+            let mut stmt = conn
+                .prepare("SELECT id, sort_order FROM snippets ORDER BY sort_order ASC")
+                .unwrap();
+            stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))
+                .unwrap()
+                .collect::<Result<_, _>>()
+                .unwrap()
+        };
+        assert_eq!(orders[0].0, "s2");
+        assert_eq!(orders[1].0, "s1");
+    }
+}
