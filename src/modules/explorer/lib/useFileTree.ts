@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { handleApiError } from "@/lib/errors";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createAsyncQueue } from "./asyncQueue";
 import type { FsProvider } from "./fsProvider";
 import { useLocalExplorerStore } from "./useLocalExplorerStore";
 
@@ -19,6 +20,19 @@ export function dirname(path: string): string {
   if (i <= 0) return "/";
   return path.slice(0, i);
 }
+
+// Caps how many readDir requests are in flight at once (e.g. expanding
+// several directories in quick succession). Local reads don't strictly need
+// this, but remote reads all funnel through a single mutex-guarded SFTP
+// channel — bounding concurrency here keeps requests queued client-side
+// instead of piling up blocked on the backend's lock.
+const READDIR_CONCURRENCY = 3;
+
+// Remote providers have no push-based watch — poll expanded directories at
+// a conservative interval instead so browsing doesn't go completely stale
+// during a long session. Local providers use OS watchers (fs:dir-changed)
+// and never hit this path.
+const REMOTE_POLL_INTERVAL_MS = 20_000;
 
 export function useFileTree(
   provider: FsProvider,
@@ -40,25 +54,67 @@ export function useFileTree(
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
 
+  const queueRef = useRef(createAsyncQueue(READDIR_CONCURRENCY));
+  // Deduplicates overlapping fetchChildren(path) calls for the exact same
+  // path (e.g. a double-click racing a keyboard toggle) — callers piggyback
+  // on the same in-flight request instead of firing a second one.
+  const inFlightRef = useRef<Map<string, Promise<void>>>(new Map());
+
   const fetchChildren = useCallback(
-    async (path: string) => {
-      const show_hidden = useLocalExplorerStore.getState().showHidden;
-      const requestGeneration = useLocalExplorerStore.getState().generation;
-      setNode(path, { status: "loading" });
-      try {
-        const page = await provider.readDir(path, { showHidden: show_hidden });
-        // Discard a response that outlived a scope change (e.g. the user
-        // switched away from this host/root while the request was in
-        // flight) — applying it now would write into whatever scope is
-        // active by the time it resolves.
-        if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
-        setNode(path, { status: "loaded", entries: page.entries, hasMore: page.hasMore });
-      } catch (e) {
-        if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
-        setNode(path, { status: "error", message: String(e) });
+    (path: string, opts?: { append?: boolean }): Promise<void> => {
+      const append = opts?.append ?? false;
+      // Dedupe only applies to plain re-fetches — a `loadMore` (append) call
+      // is a distinct request even if a base fetch for the same path happens
+      // to be in flight.
+      if (!append) {
+        const inFlight = inFlightRef.current.get(path);
+        if (inFlight) return inFlight;
       }
+
+      const promise = queueRef.current.run(async () => {
+        const show_hidden = useLocalExplorerStore.getState().showHidden;
+        const requestGeneration = useLocalExplorerStore.getState().generation;
+        const existing = useLocalExplorerStore.getState().nodes[path];
+        const offset = append && existing?.status === "loaded" ? existing.entries.length : 0;
+
+        if (!append) setNode(path, { status: "loading" });
+        try {
+          const page = await provider.readDir(path, { showHidden: show_hidden, offset });
+          // Discard a response that outlived a scope change (e.g. the user
+          // switched away from this host/root while the request was in
+          // flight) — applying it now would write into whatever scope is
+          // active by the time it resolves.
+          if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
+          const current = useLocalExplorerStore.getState().nodes[path];
+          const priorEntries = append && current?.status === "loaded" ? current.entries : [];
+          setNode(path, {
+            status: "loaded",
+            entries: [...priorEntries, ...page.entries],
+            hasMore: page.hasMore,
+          });
+        } catch (e) {
+          if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
+          if (!append) setNode(path, { status: "error", message: String(e) });
+          else handleApiError(e, "Failed to load more entries", "File Tree");
+        }
+      });
+
+      if (!append) {
+        inFlightRef.current.set(path, promise);
+        void promise.finally(() => {
+          inFlightRef.current.delete(path);
+        });
+      }
+      return promise;
     },
     [setNode, provider],
+  );
+
+  const loadMore = useCallback(
+    (path: string) => {
+      void fetchChildren(path, { append: true });
+    },
+    [fetchChildren],
   );
 
   // Scope (provider identity) or root change → reset persisted tree state and reload root.
@@ -120,6 +176,26 @@ export function useFileTree(
     });
     return () => unlisten?.();
   }, [fetchChildren, provider.capabilities.supportsWatch]);
+
+  // Providers without push-based watching (remote/SFTP) get a conservative
+  // background refresh of the root and every currently-expanded directory
+  // instead — dedupe + the concurrency queue above mean this can never pile
+  // up requests even if a poll tick lands while a manual fetch is still
+  // running. Local providers rely on OS watchers and skip this entirely.
+  useEffect(() => {
+    if (provider.capabilities.supportsWatch || !rootPath) return;
+    const interval = setInterval(() => {
+      const state = useLocalExplorerStore.getState();
+      // Scope may have moved on since this interval was scheduled (e.g. the
+      // sidebar target changed) — a stale poll must not resurrect it.
+      if (state.scopeKey !== provider.id || state.rootPath !== rootPath) return;
+      void fetchChildren(rootPath);
+      for (const path of state.expanded) {
+        void fetchChildren(path);
+      }
+    }, REMOTE_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [provider, rootPath, fetchChildren]);
 
   const toggle = useCallback(
     (path: string) => {
@@ -251,6 +327,7 @@ export function useFileTree(
     toggle,
     expand,
     refresh,
+    loadMore,
     beginCreate,
     cancelCreate,
     commitCreate,

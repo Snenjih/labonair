@@ -68,9 +68,13 @@ export function createRemoteFsProvider(sessionId: string, hostId: string): FsPro
     capabilities: REMOTE_CAPABILITIES,
     joinPath,
 
-    async readDir(path) {
-      const raw = await invoke<RawFileNode[]>("sftp_read_dir", { sessionId, path });
-      const page: ReadDirPage = { entries: raw.map(toFileEntry), hasMore: false };
+    async readDir(path, opts) {
+      const raw = await invoke<{ entries: RawFileNode[]; has_more: boolean }>("sftp_read_dir_page", {
+        sessionId,
+        path,
+        offset: opts?.offset ?? 0,
+      });
+      const page: ReadDirPage = { entries: raw.entries.map(toFileEntry), hasMore: raw.has_more };
       return page;
     },
 

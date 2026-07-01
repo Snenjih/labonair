@@ -6,7 +6,8 @@ export type TreeRow =
   | { kind: "entry"; path: string; parentPath: string; depth: number; entry: FileEntry }
   | { kind: "pending-create"; parentPath: string; depth: number; createKind: "file" | "dir" }
   | { kind: "loading"; parentPath: string; depth: number }
-  | { kind: "error"; parentPath: string; depth: number; message: string };
+  | { kind: "error"; parentPath: string; depth: number; message: string }
+  | { kind: "load-more"; parentPath: string; depth: number };
 
 /**
  * Flattens the tree store's per-directory node map into the ordered list of
@@ -53,6 +54,10 @@ export function buildTreeRows(
       if (entry.kind === "dir" && expanded.has(path)) {
         walk(path, depth + 1);
       }
+    }
+
+    if (node.hasMore) {
+      out.push({ kind: "load-more", parentPath: parent, depth });
     }
   }
 

@@ -115,13 +115,22 @@ export function VirtualizedTreeList({
                 >
                   Loading…
                 </div>
-              ) : (
+              ) : row.kind === "error" ? (
                 <div
                   className="flex h-full items-center text-[11px] text-destructive"
                   style={{ paddingLeft: 6 + row.depth * 12 + 18 }}
                 >
                   {row.message}
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => tree.loadMore(row.parentPath)}
+                  className="flex h-full w-full items-center text-[11px] text-primary hover:underline"
+                  style={{ paddingLeft: 6 + row.depth * 12 + 18 }}
+                >
+                  Load more…
+                </button>
               )}
             </div>
           );

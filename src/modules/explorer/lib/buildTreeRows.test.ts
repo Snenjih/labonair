@@ -105,6 +105,35 @@ describe("buildTreeRows", () => {
     ]);
   });
 
+  it("emits a load-more row after a paginated directory's entries", () => {
+    const nodes: Record<string, ChildrenState> = {
+      "/r": { status: "loaded", entries: [entry("a"), entry("b")], hasMore: true },
+    };
+    const rows = buildTreeRows("/r", nodes, new Set(), joinPath, null);
+    expect(rows).toEqual([
+      { kind: "entry", path: "/r/a", parentPath: "/r", depth: 0, entry: entry("a") },
+      { kind: "entry", path: "/r/b", parentPath: "/r", depth: 0, entry: entry("b") },
+      { kind: "load-more", parentPath: "/r", depth: 0 },
+    ]);
+  });
+
+  it("does not emit a load-more row when hasMore is false or absent", () => {
+    const nodes: Record<string, ChildrenState> = {
+      "/r": { status: "loaded", entries: [entry("a")], hasMore: false },
+    };
+    const rows = buildTreeRows("/r", nodes, new Set(), joinPath, null);
+    expect(rows.some((r) => r.kind === "load-more")).toBe(false);
+  });
+
+  it("nests a load-more row at the child directory's own depth", () => {
+    const nodes: Record<string, ChildrenState> = {
+      "/r": { status: "loaded", entries: [entry("a", "dir")] },
+      "/r/a": { status: "loaded", entries: [entry("a1")], hasMore: true },
+    };
+    const rows = buildTreeRows("/r", nodes, new Set(["/r/a"]), joinPath, null);
+    expect(rows[rows.length - 1]).toEqual({ kind: "load-more", parentPath: "/r/a", depth: 1 });
+  });
+
   it("stops recursing past a directory whose node failed to load", () => {
     const nodes: Record<string, ChildrenState> = {
       "/r": { status: "loaded", entries: [entry("a", "dir"), entry("b", "dir")] },
