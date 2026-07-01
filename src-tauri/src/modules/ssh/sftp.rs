@@ -77,6 +77,72 @@ fn mode_to_string(mode: u32) -> String {
         .collect()
 }
 
+/// Lists and normalizes one directory's entries. Shared by `sftp_read_dir`
+/// and `sftp_read_dir_page` so the symlink-resolution/sort logic only lives
+/// in one place.
+fn list_dir_entries(
+    sftp: &crate::modules::ssh::SftpHandle,
+    path: &str,
+) -> Result<Vec<FileNode>, String> {
+    let entries = sftp.0
+        .readdir(std::path::Path::new(path))
+        .map_err(|e| e.to_string())?;
+
+    let mut files: Vec<FileNode> = entries
+        .into_iter()
+        .map(|(pb, stat)| {
+            let name = pb
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| pb.to_string_lossy().to_string());
+            let is_symlink = stat.file_type().is_symlink();
+            let (symlink_target, resolved_is_dir) = if is_symlink {
+                // readlink gives the raw target (may be relative).
+                let raw_target = sftp.0.readlink(&pb).ok()
+                    .map(|p| p.to_string_lossy().to_string());
+                // Resolve relative targets against the entry's parent directory
+                // so navigation works regardless of how the symlink was created.
+                let abs_target = raw_target.as_deref().map(|t| {
+                    if t.starts_with('/') {
+                        t.to_string()
+                    } else {
+                        let parent = pb.parent()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_else(|| "/".to_string());
+                        format!("{}/{}", parent.trim_end_matches('/'), t)
+                    }
+                });
+                // stat() follows the symlink; tells us if the target is a dir.
+                let is_target_dir = abs_target.as_deref()
+                    .and_then(|t| sftp.0.stat(std::path::Path::new(t)).ok())
+                    .map(|s| s.is_dir())
+                    .unwrap_or(false);
+                (abs_target, is_target_dir)
+            } else {
+                (None, stat.is_dir())
+            };
+            FileNode {
+                path: pb.to_string_lossy().to_string(),
+                name,
+                size: stat.size.unwrap_or(0),
+                modified_at: stat.mtime.unwrap_or(0) as i64,
+                is_dir: resolved_is_dir,
+                is_symlink,
+                symlink_target,
+                permissions: mode_to_string(stat.perm.unwrap_or(0)),
+            }
+        })
+        .collect();
+
+    files.sort_by(|a, b| {
+        b.is_dir
+            .cmp(&a.is_dir)
+            .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+
+    Ok(files)
+}
+
 #[tauri::command]
 pub async fn sftp_read_dir(
     session_id: String,
@@ -96,65 +162,67 @@ pub async fn sftp_read_dir(
 
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
         log::debug!("[SFTP] readdir({})…", path);
-
-        let entries = sftp.0
-            .readdir(std::path::Path::new(&path))
-            .map_err(|e| e.to_string())?;
-
-        let mut files: Vec<FileNode> = entries
-            .into_iter()
-            .map(|(pb, stat)| {
-                let name = pb
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| pb.to_string_lossy().to_string());
-                let is_symlink = stat.file_type().is_symlink();
-                let (symlink_target, resolved_is_dir) = if is_symlink {
-                    // readlink gives the raw target (may be relative).
-                    let raw_target = sftp.0.readlink(&pb).ok()
-                        .map(|p| p.to_string_lossy().to_string());
-                    // Resolve relative targets against the entry's parent directory
-                    // so navigation works regardless of how the symlink was created.
-                    let abs_target = raw_target.as_deref().map(|t| {
-                        if t.starts_with('/') {
-                            t.to_string()
-                        } else {
-                            let parent = pb.parent()
-                                .map(|p| p.to_string_lossy().to_string())
-                                .unwrap_or_else(|| "/".to_string());
-                            format!("{}/{}", parent.trim_end_matches('/'), t)
-                        }
-                    });
-                    // stat() follows the symlink; tells us if the target is a dir.
-                    let is_target_dir = abs_target.as_deref()
-                        .and_then(|t| sftp.0.stat(std::path::Path::new(t)).ok())
-                        .map(|s| s.is_dir())
-                        .unwrap_or(false);
-                    (abs_target, is_target_dir)
-                } else {
-                    (None, stat.is_dir())
-                };
-                FileNode {
-                    path: pb.to_string_lossy().to_string(),
-                    name,
-                    size: stat.size.unwrap_or(0),
-                    modified_at: stat.mtime.unwrap_or(0) as i64,
-                    is_dir: resolved_is_dir,
-                    is_symlink,
-                    symlink_target,
-                    permissions: mode_to_string(stat.perm.unwrap_or(0)),
-                }
-            })
-            .collect();
-
-        files.sort_by(|a, b| {
-            b.is_dir
-                .cmp(&a.is_dir)
-                .then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-        });
-
+        let files = list_dir_entries(&sftp, &path)?;
         log::debug!("[SFTP] readdir complete — {} entries.", files.len());
         Ok(files)
+    })
+    .await
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
+}
+
+/// Default page size for `sftp_read_dir_page` — large enough that ordinary
+/// directories never paginate, small enough that a directory with tens of
+/// thousands of entries doesn't serialize a huge array over IPC in one call.
+const DEFAULT_PAGE_LIMIT: usize = 500;
+
+#[derive(Debug, serde::Serialize)]
+pub struct SftpReadDirPage {
+    pub entries: Vec<FileNode>,
+    pub has_more: bool,
+    pub next_offset: Option<usize>,
+}
+
+/// Pure slicing logic, split out so it's unit-testable without a live SFTP
+/// session — the actual command just does I/O then delegates here.
+fn paginate_entries(mut entries: Vec<FileNode>, offset: usize, limit: usize) -> SftpReadDirPage {
+    let total = entries.len();
+    if offset >= total {
+        return SftpReadDirPage { entries: Vec::new(), has_more: false, next_offset: None };
+    }
+    let end = (offset + limit).min(total);
+    let has_more = end < total;
+    SftpReadDirPage {
+        entries: entries.drain(offset..end).collect(),
+        has_more,
+        next_offset: if has_more { Some(end) } else { None },
+    }
+}
+
+/// Paginated variant of `sftp_read_dir`. Introduced alongside the unpaginated
+/// command (not as a replacement) so the existing dual-pane SFTP tab keeps
+/// using the simple, unpaginated call while the sidebar tree opts into
+/// paging for very large directories.
+#[tauri::command]
+pub async fn sftp_read_dir_page(
+    session_id: String,
+    path: String,
+    offset: Option<usize>,
+    limit: Option<usize>,
+    state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<SftpReadDirPage, LabonairError> {
+    let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
+    let offset = offset.unwrap_or(0);
+    let limit = limit.unwrap_or(DEFAULT_PAGE_LIMIT);
+
+    tokio::task::spawn_blocking(move || {
+        let sftp_arc: Arc<std::sync::Mutex<crate::modules::ssh::SftpHandle>> =
+            get_sftp_arc!(state_inner, &session_id);
+        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        let files = list_dir_entries(&sftp, &path)?;
+        Ok(paginate_entries(files, offset, limit))
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
@@ -215,8 +283,78 @@ pub async fn sftp_delete(
     .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
+/// Splits an absolute (or relative) POSIX path into its ordered ancestor
+/// directories, closest-root-first, ending with `path` itself — e.g.
+/// `/a/b/c` -> `["/a", "/a/b", "/a/b/c"]`. Used to emulate `mkdir -p`, which
+/// the SFTP subsystem has no direct equivalent for (its `mkdir` only ever
+/// creates a single level and errors if any parent is missing).
+fn mkdir_ancestors(path: &str) -> Vec<String> {
+    let trimmed = path.trim_end_matches('/');
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    let is_absolute = trimmed.starts_with('/');
+    let mut out = Vec::new();
+    let mut acc = String::new();
+    for segment in trimmed.trim_start_matches('/').split('/') {
+        if segment.is_empty() {
+            continue;
+        }
+        acc = if acc.is_empty() {
+            if is_absolute { format!("/{segment}") } else { segment.to_string() }
+        } else {
+            format!("{acc}/{segment}")
+        };
+        out.push(acc.clone());
+    }
+    out
+}
+
 #[tauri::command]
 pub async fn sftp_mkdir(
+    session_id: String,
+    path: String,
+    recursive: Option<bool>,
+    state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), LabonairError> {
+    let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
+    let recursive = recursive.unwrap_or(false);
+    tokio::task::spawn_blocking(move || {
+        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
+        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        if !recursive {
+            return sftp.0.mkdir(std::path::Path::new(&path), 0o755)
+                .map_err(|e| e.to_string());
+        }
+        // mkdir -p semantics: create every missing ancestor, tolerate ones
+        // that already exist (including `path` itself) instead of failing.
+        for ancestor in mkdir_ancestors(&path) {
+            let p = std::path::Path::new(&ancestor);
+            if sftp.0.stat(p).is_ok() {
+                continue;
+            }
+            if let Err(e) = sftp.0.mkdir(p, 0o755) {
+                // A concurrent mkdir (or a race with the stat() above) can still
+                // land on "already exists" here — only surface a real failure.
+                if sftp.0.stat(p).is_err() {
+                    return Err(format!("mkdir({ancestor}) failed: {e}"));
+                }
+            }
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
+}
+
+/// Creates a new empty file. Fails if the file already exists — matches
+/// `fs_create_file`'s local semantics so the "New File" tree action behaves
+/// identically regardless of provider.
+#[tauri::command]
+pub async fn sftp_create_file(
     session_id: String,
     path: String,
     state: tauri::State<'_, SftpState>,
@@ -227,8 +365,11 @@ pub async fn sftp_mkdir(
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-        sftp.0.mkdir(std::path::Path::new(&path), 0o755)
-            .map_err(|e| e.to_string())
+        let p = std::path::Path::new(&path);
+        if sftp.0.stat(p).is_ok() {
+            return Err(format!("already exists: {path}"));
+        }
+        sftp.0.create(p).map(|_| ()).map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
@@ -441,4 +582,122 @@ pub async fn sftp_deep_search(
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
     .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn node(name: &str, is_dir: bool) -> FileNode {
+        FileNode {
+            name: name.to_string(),
+            path: format!("/root/{name}"),
+            size: 0,
+            modified_at: 0,
+            is_dir,
+            is_symlink: false,
+            symlink_target: None,
+            permissions: String::new(),
+        }
+    }
+
+    fn nodes(n: usize) -> Vec<FileNode> {
+        (0..n).map(|i| node(&format!("file{i}"), false)).collect()
+    }
+
+    // --- mkdir_ancestors ---
+
+    #[test]
+    fn mkdir_ancestors_splits_absolute_path() {
+        assert_eq!(
+            mkdir_ancestors("/a/b/c"),
+            vec!["/a".to_string(), "/a/b".to_string(), "/a/b/c".to_string()]
+        );
+    }
+
+    #[test]
+    fn mkdir_ancestors_handles_single_segment() {
+        assert_eq!(mkdir_ancestors("/a"), vec!["/a".to_string()]);
+    }
+
+    #[test]
+    fn mkdir_ancestors_handles_relative_path() {
+        assert_eq!(mkdir_ancestors("a/b"), vec!["a".to_string(), "a/b".to_string()]);
+    }
+
+    #[test]
+    fn mkdir_ancestors_strips_trailing_slash() {
+        assert_eq!(
+            mkdir_ancestors("/a/b/"),
+            vec!["/a".to_string(), "/a/b".to_string()]
+        );
+    }
+
+    #[test]
+    fn mkdir_ancestors_root_is_empty() {
+        assert_eq!(mkdir_ancestors("/"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn mkdir_ancestors_empty_string_is_empty() {
+        assert_eq!(mkdir_ancestors(""), Vec::<String>::new());
+    }
+
+    #[test]
+    fn mkdir_ancestors_collapses_repeated_slashes() {
+        assert_eq!(
+            mkdir_ancestors("/a//b"),
+            vec!["/a".to_string(), "/a/b".to_string()]
+        );
+    }
+
+    // --- paginate_entries ---
+
+    #[test]
+    fn paginate_first_page_reports_has_more() {
+        let page = paginate_entries(nodes(10), 0, 4);
+        assert_eq!(page.entries.len(), 4);
+        assert!(page.has_more);
+        assert_eq!(page.next_offset, Some(4));
+        assert_eq!(page.entries[0].name, "file0");
+        assert_eq!(page.entries[3].name, "file3");
+    }
+
+    #[test]
+    fn paginate_last_page_reports_no_more() {
+        let page = paginate_entries(nodes(10), 8, 4);
+        assert_eq!(page.entries.len(), 2);
+        assert!(!page.has_more);
+        assert_eq!(page.next_offset, None);
+    }
+
+    #[test]
+    fn paginate_offset_past_end_returns_empty() {
+        let page = paginate_entries(nodes(5), 10, 4);
+        assert!(page.entries.is_empty());
+        assert!(!page.has_more);
+        assert_eq!(page.next_offset, None);
+    }
+
+    #[test]
+    fn paginate_exact_boundary_has_no_more() {
+        let page = paginate_entries(nodes(8), 0, 8);
+        assert_eq!(page.entries.len(), 8);
+        assert!(!page.has_more);
+        assert_eq!(page.next_offset, None);
+    }
+
+    #[test]
+    fn paginate_empty_input_returns_empty_page() {
+        let page = paginate_entries(Vec::new(), 0, 500);
+        assert!(page.entries.is_empty());
+        assert!(!page.has_more);
+    }
+
+    #[test]
+    fn paginate_default_limit_fits_typical_directory() {
+        let page = paginate_entries(nodes(200), 0, DEFAULT_PAGE_LIMIT);
+        assert_eq!(page.entries.len(), 200);
+        assert!(!page.has_more);
+    }
 }
