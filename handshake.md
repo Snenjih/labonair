@@ -1,6 +1,35 @@
 # Handshake — Session State
 
-## Last Session: 2026-06-25 (Full App Rename: Nexum → Labonair)
+## Last Session: 2026-07-01 (Sidebar Explorer: SSH Host Browsing via Shared FsProvider)
+
+### What Was Done
+Extended the local-only sidebar file tree to also browse SSH hosts, without replacing the existing dual-pane SFTP transfer tab. Full plan was designed via plan-mode (3 Explore agents + 1 Plan agent researching tab/session model, SSH/SFTP backend architecture, and existing explorer/SFTP components before implementation started). 7 sequential commits on `feat/explorer-remote-provider`, PR #115 opened against `main`. `cargo check` ✅ · `cargo clippy` ✅ · `cargo test --lib` (42/42) ✅ · `tsc --noEmit` ✅ · `vitest run` (266/266) ✅. **Not merged — no manual `pnpm tauri dev` testing done (headless sandbox, no display).**
+
+**Commits (see PR #115 for full descriptions):**
+1. `0e8f3ef` — `refactor(explorer)`: extract `FsProvider` interface + `LocalFsProvider`, migrate local tree onto it (behavior-neutral)
+2. `afe4a61` — `fix(sftp)`: classify network errors, emit `ssh_connection_lost` from SFTP browsing commands (previously only PTY/transfer-worker did), idempotent `sftp_connect`
+3. `37d6dce` — `feat(sftp)`: add `sftp_create_file`, recursive `sftp_mkdir`, new additive `sftp_read_dir_page` command
+4. `9107de5` — `feat(explorer)`: `RemoteFsProvider`, `useExplorerTarget` (session-reuse: sftp-tab session reused as-is, ssh-terminal-only gets a lazy ref-counted session), `useLazyExplorerSession`, `ExplorerAuthPrompt`
+5. `b93c48d` — `perf(explorer)`: `buildTreeRows` + `VirtualizedTreeList` — tree was recursive (FileTreeNode nested itself), now flattened + `@tanstack/react-virtual`
+6. `b59e2ab` — `perf(explorer)`: remote pagination via `sftp_read_dir_page` ("Load more…" row), request dedupe + concurrency-capped queue (`asyncQueue.ts`), 20s background polling for `supportsWatch:false` providers
+7. `ff4822e` — `fix(explorer)`: host-deletion force-disconnects its lazy session (fixes a latent leak in an unused Phase-3 helper); also fixed a **pre-existing, unrelated** bug found along the way — see below
+
+**Bug found & fixed along the way (unrelated to this feature, but blocked verifying new Rust tests):**
+`src-tauri/src/modules/errors.rs`'s `#[cfg(test)]` module still referenced the pre-rename `NexumError` type (leftover from the 2026-06-25 rename) — `cargo check` doesn't compile `#[cfg(test)]` code so this was invisible until `cargo test` was run. Fixed via find-replace. See `~/.claude/.../memory/bugs_and_fixes.md`.
+
+**Deliberate scope cut (documented in PR):** "Download to…/Upload here…" context-menu actions from the dual-pane tab aren't wired into the sidebar tree yet — bulk transfers still go through the dual-pane tab. Also decided *against* adding ref-counted disconnect logic to `SftpPane.tsx` for the tab/tree session-sharing case — reasoning is in commit 7's message.
+
+### Current State
+Branch `feat/explorer-remote-provider` pushed, PR #115 open against `main`, not merged. All automated checks green. Manual verification checklist is in the PR description — needs a human with `pnpm tauri dev` + a real SSH host to run it before merge.
+
+### What's Next
+- Run the manual verification checklist in PR #115 against a real SSH host
+- If that surfaces issues, fix on the same branch (don't start a new one)
+- After merge: the deferred Download-to/Upload-here tree actions would be the natural follow-up if wanted
+
+---
+
+## Previous Session: 2026-06-25 (Full App Rename: Nexum → Labonair)
 
 ### What Was Done
 Complete rename of the app from "Nexum" to "Labonair" across all layers. 4 sequential subagents + 1 direct fix pass. `cargo check` ✅ · `tsc --noEmit` ✅ · pushed to remote ✅
