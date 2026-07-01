@@ -8,6 +8,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { onKeysChanged } from "@/modules/settings/store";
 import { useKeybindsStore } from "@/modules/shortcuts";
 import { bootstrapTransferListeners } from "@/modules/sftp/store/transferStore";
+import { bootstrapSftpConnectionListener } from "@/modules/sftp/store/sftpStore";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { useLayoutEngine } from "@/lib/useLayoutEngine";
 import { useTerminalCursorBlinkInterval } from "@/lib/useTerminalCursorBlinkInterval";
@@ -118,6 +119,9 @@ export function useAppBootstrap(): AppBootstrapReturn {
 
   // Bootstrap SFTP transfer listeners
   useEffect(() => { void bootstrapTransferListeners(); }, []);
+
+  // Bootstrap SFTP connection-lost listener (dead sessions → reconnect banner)
+  useEffect(() => { void bootstrapSftpConnectionListener(); }, []);
 
   // Global unhandled error handlers
   useEffect(() => {

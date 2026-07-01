@@ -41,9 +41,9 @@ mod tests {
     #[test]
     fn io_error_conversion_produces_io_error_variant() {
         let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
-        let err = NexumError::from(io_err);
-        assert!(matches!(err, NexumError::IoError(_)));
-        if let NexumError::IoError(msg) = &err {
+        let err = LabonairError::from(io_err);
+        assert!(matches!(err, LabonairError::IoError(_)));
+        if let LabonairError::IoError(msg) = &err {
             assert!(msg.contains("file not found"));
         }
     }
@@ -51,13 +51,13 @@ mod tests {
     #[test]
     fn rusqlite_error_conversion_produces_internal_variant() {
         let db_err = rusqlite::Error::QueryReturnedNoRows;
-        let err = NexumError::from(db_err);
-        assert!(matches!(err, NexumError::Internal(_)));
+        let err = LabonairError::from(db_err);
+        assert!(matches!(err, LabonairError::Internal(_)));
     }
 
     #[test]
     fn error_serializes_with_code_tag_and_message_content() {
-        let err = NexumError::AuthFailed("bad password".to_string());
+        let err = LabonairError::AuthFailed("bad password".to_string());
         let json = serde_json::to_value(&err).unwrap();
         assert_eq!(json["code"], "AuthFailed");
         assert_eq!(json["message"], "bad password");
@@ -65,12 +65,12 @@ mod tests {
 
     #[test]
     fn each_variant_produces_distinct_code_field() {
-        let variants: &[(&str, NexumError)] = &[
-            ("AuthFailed", NexumError::AuthFailed("x".into())),
-            ("NetworkError", NexumError::NetworkError("x".into())),
-            ("HostKeyMismatch", NexumError::HostKeyMismatch("x".into())),
-            ("IoError", NexumError::IoError("x".into())),
-            ("Internal", NexumError::Internal("x".into())),
+        let variants: &[(&str, LabonairError)] = &[
+            ("AuthFailed", LabonairError::AuthFailed("x".into())),
+            ("NetworkError", LabonairError::NetworkError("x".into())),
+            ("HostKeyMismatch", LabonairError::HostKeyMismatch("x".into())),
+            ("IoError", LabonairError::IoError("x".into())),
+            ("Internal", LabonairError::Internal("x".into())),
         ];
         for (expected_code, err) in variants {
             let json = serde_json::to_value(err).unwrap();
@@ -87,16 +87,16 @@ mod tests {
     #[test]
     fn partial_eq_works_for_same_variants() {
         assert_eq!(
-            NexumError::AuthFailed("x".into()),
-            NexumError::AuthFailed("x".into())
+            LabonairError::AuthFailed("x".into()),
+            LabonairError::AuthFailed("x".into())
         );
     }
 
     #[test]
     fn partial_eq_distinguishes_different_variants() {
         assert_ne!(
-            NexumError::AuthFailed("x".into()),
-            NexumError::Internal("x".into())
+            LabonairError::AuthFailed("x".into()),
+            LabonairError::Internal("x".into())
         );
     }
 }

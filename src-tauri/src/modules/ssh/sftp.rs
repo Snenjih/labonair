@@ -1,10 +1,37 @@
 use crate::modules::sftp::SftpState;
+use crate::modules::sftp::net_error::is_network_error;
 use crate::modules::errors::LabonairError;
 use std::io::{Read as _, Write as _};
 use std::sync::Arc;
 
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// Classifies a raw SFTP/exec error. Network-level failures remove the dead
+/// session from `SftpState` and emit `ssh_connection_lost` — the same event
+/// `pty.rs` emits for PTY sessions and the transfer worker emits for failed
+/// jobs — so every browsing surface (sidebar tree, SFTP tab) reacts the same
+/// way to a dropped connection instead of just showing a one-off error toast.
+fn handle_sftp_error(
+    app: &tauri::AppHandle,
+    state: &SftpState,
+    session_id: &str,
+    e: String,
+) -> LabonairError {
+    if is_network_error(&e) {
+        if let Ok(mut map) = state.0.lock() {
+            map.remove(session_id);
+        }
+        use tauri::Emitter;
+        let _ = app.emit(
+            "ssh_connection_lost",
+            serde_json::json!({ "session_id": session_id, "reason": e }),
+        );
+        LabonairError::NetworkError(e)
+    } else {
+        LabonairError::Internal(e)
+    }
 }
 
 /// Extract the SFTP Arc under a brief outer-lock, then release it so no
@@ -55,8 +82,10 @@ pub async fn sftp_read_dir(
     session_id: String,
     path: String,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<Vec<FileNode>, LabonairError> {
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
 
     tokio::task::spawn_blocking(move || {
         log::debug!("[SFTP] sftp_read_dir: tab={} path={}", session_id, path);
@@ -129,7 +158,7 @@ pub async fn sftp_read_dir(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
 #[tauri::command]
@@ -138,8 +167,10 @@ pub async fn sftp_rename(
     old_path: String,
     new_path: String,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
@@ -152,7 +183,7 @@ pub async fn sftp_rename(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
 #[tauri::command]
@@ -160,8 +191,10 @@ pub async fn sftp_delete(
     session_id: String,
     paths: Vec<String>,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
@@ -179,7 +212,7 @@ pub async fn sftp_delete(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
 #[tauri::command]
@@ -187,8 +220,10 @@ pub async fn sftp_mkdir(
     session_id: String,
     path: String,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
@@ -197,7 +232,7 @@ pub async fn sftp_mkdir(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
 #[tauri::command]
@@ -206,8 +241,10 @@ pub async fn sftp_chmod(
     path: String,
     permissions: u32,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
@@ -220,7 +257,7 @@ pub async fn sftp_chmod(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
 #[tauri::command]
@@ -228,8 +265,10 @@ pub async fn prepare_remote_edit(
     session_id: String,
     remote_path: String,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<String, LabonairError> {
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         let file_data = {
             let sftp_arc = get_sftp_arc!(state_inner, &session_id);
@@ -264,7 +303,7 @@ pub async fn prepare_remote_edit(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
 #[tauri::command]
@@ -273,8 +312,10 @@ pub async fn save_remote_edit(
     remote_path: String,
     local_temp_path: String,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), LabonairError> {
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         // Validate that the path is inside the expected temp directory to prevent
         // the frontend from reading arbitrary local files and uploading them.
@@ -295,7 +336,7 @@ pub async fn save_remote_edit(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
 /// Run `du -sh '<path>'` on the remote server and return the human-readable size.
@@ -304,8 +345,10 @@ pub async fn sftp_calculate_size(
     session_id: String,
     path: String,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<String, LabonairError> {
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
         // Acquire Arc under brief lock, then release before I/O.
@@ -320,7 +363,7 @@ pub async fn sftp_calculate_size(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
 /// Execute `chown owner:group '<path>'` on the remote server.
@@ -331,6 +374,7 @@ pub async fn sftp_chown(
     owner: String,
     group: String,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), LabonairError> {
     let spec = match (owner.is_empty(), group.is_empty()) {
         (true, true)   => return Ok(()),
@@ -339,6 +383,7 @@ pub async fn sftp_chown(
         (true, false)  => format!(":{}", shell_quote(&group)),
     };
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
         // Acquire Arc under brief lock, then release before I/O.
@@ -358,7 +403,7 @@ pub async fn sftp_chown(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
 /// Run `find <start_path> -iname '*<query>*' -maxdepth 5` on the remote server.
@@ -369,8 +414,10 @@ pub async fn sftp_deep_search(
     start_path: String,
     query: String,
     state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<Vec<String>, LabonairError> {
     let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
         // Acquire Arc under brief lock, then release before I/O.
@@ -393,5 +440,5 @@ pub async fn sftp_deep_search(
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
-    .map_err(LabonairError::Internal)
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }

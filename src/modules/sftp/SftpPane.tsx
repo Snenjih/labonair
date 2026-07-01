@@ -45,9 +45,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     loadRemoteDir,
     setSelectedLocal,
     setSelectedRemote,
+    clearDisconnected,
     tabs,
   } = useSftpStore();
   const tabState = tabs[tabId];
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const hosts = useHostsStore((s) => s.hosts);
   const host = hosts.find((h) => h.id === tab.hostId);
@@ -292,6 +294,20 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     }
   }
 
+  async function handleReconnect() {
+    setIsReconnecting(true);
+    try {
+      await invoke("sftp_connect", { sessionId: tabId, hostId: tab.hostId });
+      clearDisconnected(tabId);
+      loadLocalDir(tabId, tabState?.localPath ?? "~");
+      loadRemoteDir(tabId, tabState?.remotePath ?? host?.default_path_sftp ?? "/");
+    } catch (e) {
+      handleApiError(e, "Reconnect failed", "SFTP");
+    } finally {
+      setIsReconnecting(false);
+    }
+  }
+
   const localPath = tabState?.localPath ?? "~";
   const remotePath = tabState?.remotePath ?? "/";
 
@@ -351,6 +367,22 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
           {hostLabel}
         </span>
       </div>
+
+      {tabState?.disconnected && (
+        <div className="h-8 shrink-0 border-b border-destructive/40 bg-destructive/10 flex items-center px-3 gap-2">
+          <span className="text-[11px] text-destructive truncate flex-1">
+            Connection lost{tabState.disconnectReason ? ` — ${tabState.disconnectReason}` : ""}
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleReconnect()}
+            disabled={isReconnecting}
+            className="text-[11px] font-medium text-destructive underline decoration-dotted underline-offset-2 hover:text-destructive/80 disabled:opacity-50"
+          >
+            {isReconnecting ? "Reconnecting…" : "Reconnect"}
+          </button>
+        </div>
+      )}
 
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
         {/* LOCAL */}

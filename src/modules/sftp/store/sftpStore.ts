@@ -1,5 +1,6 @@
 import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
 import type { FileNode } from "../types";
 import { isLabonairError } from "@/types";
@@ -21,6 +22,10 @@ interface SftpTabState {
   selectedLocalPaths: Set<string>;
   selectedRemotePaths: Set<string>;
   error: string | null;
+  /** Set when the backend emits `ssh_connection_lost` for this tab's session — the
+   *  live SFTP connection died mid-browsing (not just a single failed request). */
+  disconnected: boolean;
+  disconnectReason: string | null;
 }
 
 interface SftpStore {
@@ -37,6 +42,9 @@ interface SftpStore {
 
   setSelectedLocal: (tabId: string, paths: Set<string>) => void;
   setSelectedRemote: (tabId: string, paths: Set<string>) => void;
+
+  setDisconnected: (tabId: string, reason: string) => void;
+  clearDisconnected: (tabId: string) => void;
 }
 
 const DEFAULT_TAB_STATE = (): SftpTabState => ({
@@ -49,6 +57,8 @@ const DEFAULT_TAB_STATE = (): SftpTabState => ({
   selectedLocalPaths: new Set(),
   selectedRemotePaths: new Set(),
   error: null,
+  disconnected: false,
+  disconnectReason: null,
 });
 
 function mapDirEntry(parentPath: string, entry: DirEntry): FileNode {
@@ -183,4 +193,41 @@ export const useSftpStore = create<SftpStore>((set) => ({
         [tabId]: { ...s.tabs[tabId], selectedRemotePaths: paths },
       },
     })),
+
+  setDisconnected: (tabId, reason) =>
+    set((s) => {
+      if (!s.tabs[tabId]) return s;
+      return {
+        tabs: {
+          ...s.tabs,
+          [tabId]: { ...s.tabs[tabId], disconnected: true, disconnectReason: reason },
+        },
+      };
+    }),
+
+  clearDisconnected: (tabId) =>
+    set((s) => {
+      if (!s.tabs[tabId]) return s;
+      return {
+        tabs: {
+          ...s.tabs,
+          [tabId]: { ...s.tabs[tabId], disconnected: false, disconnectReason: null },
+        },
+      };
+    }),
 }));
+
+let _connectionListenerBootstrapped = false;
+
+/** Mirrors the same `ssh_connection_lost` event pty.rs/worker.rs emit for dead
+ *  connections onto whichever SFTP tab owns that session_id, so browsing panes
+ *  can show a reconnect affordance instead of silently failing every request. */
+export async function bootstrapSftpConnectionListener() {
+  if (_connectionListenerBootstrapped) return;
+  _connectionListenerBootstrapped = true;
+
+  await listen<{ session_id: string; reason: string }>("ssh_connection_lost", (event) => {
+    const { session_id, reason } = event.payload;
+    useSftpStore.getState().setDisconnected(session_id, reason);
+  });
+}
