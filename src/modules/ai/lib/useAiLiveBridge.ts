@@ -64,16 +64,19 @@ export function useAiLiveBridge({
     }
   }, [hasComposer, panelOpen]);
 
-  const handleAttachFileToAgent = useCallback((path: string) => {
-    const { openPanel, focusInput } = useChatStore.getState();
-    if (!hasComposer) {
-      void openSettingsWindow("models");
-      return;
-    }
-    window.dispatchEvent(new CustomEvent<string>("labonair:ai-attach-file", { detail: path }));
-    openPanel();
-    focusInput(null);
-  }, [hasComposer]);
+  const handleAttachFileToAgent = useCallback(
+    (path: string) => {
+      const { openPanel, focusInput } = useChatStore.getState();
+      if (!hasComposer) {
+        void openSettingsWindow("models");
+        return;
+      }
+      window.dispatchEvent(new CustomEvent<string>("labonair:ai-attach-file", { detail: path }));
+      openPanel();
+      focusInput(null);
+    },
+    [hasComposer],
+  );
 
   const askFromSelection = useCallback(() => {
     const { focusInput, attachSelection } = useChatStore.getState();
@@ -104,7 +107,10 @@ export function useAiLiveBridge({
         el.closest("[data-ai-mini-window]")
       );
     };
-    const onDown = (e: MouseEvent) => { if (isInsideAi(e.target)) return; setAskPopup(null); };
+    const onDown = (e: MouseEvent) => {
+      if (isInsideAi(e.target)) return;
+      setAskPopup(null);
+    };
     const onUp = (e: MouseEvent) => {
       if (isInsideAi(e.target)) return;
       setTimeout(() => {
@@ -169,7 +175,10 @@ export function useAiLiveBridge({
         const t = storeTabs.find((x) => x.id === aid);
         return t?.kind === "editor" ? (t as { path: string }).path : null;
       },
-      openPreview: (url: string) => { openPreviewTab(url); return true; },
+      openPreview: (url: string) => {
+        openPreviewTab(url);
+        return true;
+      },
       getActiveTabKind: () => {
         const { tabs: storeTabs, activeId: aid } = useTabsStore.getState();
         return storeTabs.find((x) => x.id === aid)?.kind ?? null;

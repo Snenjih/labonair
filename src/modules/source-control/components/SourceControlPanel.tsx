@@ -48,8 +48,8 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
         <span className="text-[11px] text-muted-foreground/60">
           {totalChanges > 0 ? (
             <>
-              <span className="font-semibold text-foreground/80">{totalChanges}</span>
-              {" "}Change{totalChanges !== 1 ? "s" : ""}
+              <span className="font-semibold text-foreground/80">{totalChanges}</span> Change
+              {totalChanges !== 1 ? "s" : ""}
             </>
           ) : (
             "No changes"
@@ -57,12 +57,8 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
         </span>
         {(totalAdded > 0 || totalRemoved > 0) && (
           <span className="flex items-center gap-1.5 text-[10px] tabular-nums">
-            {totalAdded > 0 && (
-              <span className="font-semibold text-success">+{totalAdded}</span>
-            )}
-            {totalRemoved > 0 && (
-              <span className="font-semibold text-error">−{totalRemoved}</span>
-            )}
+            {totalAdded > 0 && <span className="font-semibold text-success">+{totalAdded}</span>}
+            {totalRemoved > 0 && <span className="font-semibold text-error">−{totalRemoved}</span>}
           </span>
         )}
       </div>
@@ -81,10 +77,7 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
             unstaged={status?.unstaged ?? []}
             onRefresh={refresh}
           />
-          <UntrackedSection
-            files={status?.untracked ?? []}
-            onRefresh={refresh}
-          />
+          <UntrackedSection files={status?.untracked ?? []} onRefresh={refresh} />
         </div>
       </ScrollArea>
 

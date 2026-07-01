@@ -107,8 +107,7 @@ export function CommitDiffTabPane({ repositoryPath, hash }: Props) {
       {/* Header */}
       <div className="flex h-9 shrink-0 items-center gap-3 border-b border-border/50 px-3">
         <span className="text-[11px] font-medium text-foreground/80">
-          Changes in{" "}
-          <code className="font-mono text-foreground">{shortHash}</code>
+          Changes in <code className="font-mono text-foreground">{shortHash}</code>
         </span>
         {filePaths.length > 0 && (
           <span className="text-[10px] text-muted-foreground/60">{filePaths.length} files changed</span>
@@ -178,9 +177,7 @@ export function CommitDiffTabPane({ repositoryPath, hash }: Props) {
                     </div>
                   );
                 }
-                return (
-                  <DiffLine key={i} line={line} isInOurs={isInOurs} isInTheirs={isInTheirs} />
-                );
+                return <DiffLine key={i} line={line} isInOurs={isInOurs} isInTheirs={isInTheirs} />;
               });
             })()}
           </div>

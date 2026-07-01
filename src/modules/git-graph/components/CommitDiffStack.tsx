@@ -19,16 +19,10 @@ export function CommitDiffStack() {
         return (
           <div
             key={t.id}
-            className={cn(
-              "absolute inset-0",
-              !visible && "invisible pointer-events-none",
-            )}
+            className={cn("absolute inset-0", !visible && "invisible pointer-events-none")}
             aria-hidden={!visible}
           >
-            <CommitDiffTabPane
-              repositoryPath={t.repositoryPath}
-              hash={t.hash}
-            />
+            <CommitDiffTabPane repositoryPath={t.repositoryPath} hash={t.hash} />
           </div>
         );
       })}

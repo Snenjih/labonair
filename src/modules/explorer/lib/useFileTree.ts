@@ -34,21 +34,9 @@ const READDIR_CONCURRENCY = 3;
 // and never hit this path.
 const REMOTE_POLL_INTERVAL_MS = 20_000;
 
-export function useFileTree(
-  provider: FsProvider,
-  rootPath: string | null,
-  options?: Options,
-) {
-  const {
-    nodes,
-    expanded,
-    showHidden,
-    setScope,
-    setNode,
-    toggleExpanded,
-    addExpanded,
-    toggleShowHidden,
-  } = useLocalExplorerStore();
+export function useFileTree(provider: FsProvider, rootPath: string | null, options?: Options) {
+  const { nodes, expanded, showHidden, setScope, setNode, toggleExpanded, addExpanded, toggleShowHidden } =
+    useLocalExplorerStore();
 
   // Ephemeral UI states — don't need to survive sidebar hide/show.
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
@@ -264,7 +252,11 @@ export function useFileTree(
         else await provider.createFile(path);
         await fetchChildren(pendingCreate.parentPath);
       } catch (e) {
-        handleApiError(e, `${pendingCreate.kind === "dir" ? "Create folder" : "Create file"} failed`, "File Tree");
+        handleApiError(
+          e,
+          `${pendingCreate.kind === "dir" ? "Create folder" : "Create file"} failed`,
+          "File Tree",
+        );
       } finally {
         setPendingCreate(null);
       }

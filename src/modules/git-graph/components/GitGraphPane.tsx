@@ -92,16 +92,9 @@ function RefreshAge({ date }: { date: Date }) {
   }, []);
 
   const seconds = Math.round((Date.now() - date.getTime()) / 1000);
-  const label =
-    seconds < 60
-      ? `${seconds}s ago`
-      : `${Math.round(seconds / 60)}m ago`;
+  const label = seconds < 60 ? `${seconds}s ago` : `${Math.round(seconds / 60)}m ago`;
 
-  return (
-    <span className="text-[10px] text-muted-foreground/40">
-      {label}
-    </span>
-  );
+  return <span className="text-[10px] text-muted-foreground/40">{label}</span>;
 }
 
 interface Props {
@@ -117,7 +110,9 @@ export function GitGraphPane({ tab }: Props) {
 }
 
 function GitGraphPaneContent({ tab }: Props) {
-  const { commits, isLoading, error, hasMore, loadMore, reload, lastRefreshedAt } = useGitGraph(tab.repositoryPath);
+  const { commits, isLoading, error, hasMore, loadMore, reload, lastRefreshedAt } = useGitGraph(
+    tab.repositoryPath,
+  );
   const [selectedCommit, setSelectedCommit] = useState<LayoutCommit | null>(null);
   const openCommitDiffTab = useTabsStore((s) => s.openCommitDiffTab);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -146,7 +141,9 @@ function GitGraphPaneContent({ tab }: Props) {
       reload();
     } catch (e) {
       setActionError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Checkout Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Checkout Failed", message: String(e) });
     } finally {
       setIsActioning(false);
       setCheckoutConfirmCommit(null);
@@ -166,7 +163,9 @@ function GitGraphPaneContent({ tab }: Props) {
       reload();
     } catch (e) {
       setActionError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Cherry-pick Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Cherry-pick Failed", message: String(e) });
     } finally {
       setIsActioning(false);
       setCherryPickConfirmCommit(null);
@@ -270,9 +269,8 @@ function GitGraphPaneContent({ tab }: Props) {
             <AlertDialogTitle>Checkout commit?</AlertDialogTitle>
             <AlertDialogDescription>
               You will enter detached HEAD state at{" "}
-              <code className="font-mono text-foreground">{checkoutConfirmCommit?.shortHash}</code>.
-              Any new commits will not be on a named branch. You can create a branch later with
-              "Create Branch Here".
+              <code className="font-mono text-foreground">{checkoutConfirmCommit?.shortHash}</code>. Any new
+              commits will not be on a named branch. You can create a branch later with "Create Branch Here".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -294,9 +292,8 @@ function GitGraphPaneContent({ tab }: Props) {
             <AlertDialogTitle>Cherry-pick commit?</AlertDialogTitle>
             <AlertDialogDescription>
               Apply the changes from commit{" "}
-              <code className="font-mono text-foreground">{cherryPickConfirmCommit?.shortHash}</code>{" "}
-              "{cherryPickConfirmCommit?.subject?.slice(0, 60)}"
-              onto the current branch.
+              <code className="font-mono text-foreground">{cherryPickConfirmCommit?.shortHash}</code> "
+              {cherryPickConfirmCommit?.subject?.slice(0, 60)}" onto the current branch.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

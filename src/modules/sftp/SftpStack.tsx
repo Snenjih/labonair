@@ -11,9 +11,7 @@ type Props = {
 };
 
 export function SftpStack({ onOpenSshTerminal, onOpenRemoteEditor, onPathsChange }: Props) {
-  const sftpTabs = useTabsStore(
-    useShallow((s) => s.tabs.filter((t): t is SftpTab => t.kind === "sftp")),
-  );
+  const sftpTabs = useTabsStore(useShallow((s) => s.tabs.filter((t): t is SftpTab => t.kind === "sftp")));
   const activeId = useTabsStore((s) => s.activeId);
 
   if (sftpTabs.length === 0) return null;
@@ -23,10 +21,7 @@ export function SftpStack({ onOpenSshTerminal, onOpenRemoteEditor, onPathsChange
       {sftpTabs.map((t) => (
         <div
           key={t.id}
-          className={cn(
-            "absolute inset-0",
-            activeId === t.id ? "z-10" : "z-0 opacity-0 pointer-events-none",
-          )}
+          className={cn("absolute inset-0", activeId === t.id ? "z-10" : "z-0 opacity-0 pointer-events-none")}
           aria-hidden={activeId !== t.id}
         >
           <SftpPane

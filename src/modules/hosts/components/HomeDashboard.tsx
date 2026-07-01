@@ -109,7 +109,16 @@ function EmptyState({ onNew }: { onNew: () => void }) {
   return (
     <div className="flex h-full flex-col items-center justify-start gap-4 text-center px-8 pt-12">
       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <rect x="2" y="3" width="20" height="14" rx="2" />
           <path d="M8 21h8M12 17v4" />
         </svg>
@@ -144,8 +153,23 @@ interface SortableHostCardProps {
   dndDisabled: boolean;
 }
 
-function SortableHostCard({ host, isSelected, isMultiSelected, onSelect, onEdit, group, newSshTab, newSftpTab, pingStatus, layoutMode, dndDisabled }: SortableHostCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: host.id, disabled: dndDisabled });
+function SortableHostCard({
+  host,
+  isSelected,
+  isMultiSelected,
+  onSelect,
+  onEdit,
+  group,
+  newSshTab,
+  newSftpTab,
+  pingStatus,
+  layoutMode,
+  dndDisabled,
+}: SortableHostCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: host.id,
+    disabled: dndDisabled,
+  });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -192,7 +216,15 @@ const SORT_LABELS: Record<SortMode, string> = {
   z_a: "Z–A",
 };
 
-export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSshTab: ConnectFn; newQuickSshTab: QuickConnectFn; newSftpTab: ConnectFn }) {
+export function HomeDashboard({
+  newSshTab,
+  newQuickSshTab,
+  newSftpTab,
+}: {
+  newSshTab: ConnectFn;
+  newQuickSshTab: QuickConnectFn;
+  newSftpTab: ConnectFn;
+}) {
   const hosts = useHostsStore((s) => s.hosts);
   const groups = useHostsStore((s) => s.groups);
   const selectedHostId = useHostsStore((s) => s.selectedHostId);
@@ -236,11 +268,17 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
 
   // Local ordered list for dnd (mirrors store but allows optimistic reorder)
   const [localHosts, setLocalHosts] = useState<Host[]>([]);
-  useEffect(() => { setLocalHosts(hosts); }, [hosts]);
+  useEffect(() => {
+    setLocalHosts(hosts);
+  }, [hosts]);
 
   // Initial load
-  useEffect(() => { void fetchData(); }, [fetchData]);
-  useEffect(() => { if (!credsFetched) void fetchCredentials(); }, [fetchCredentials, credsFetched]);
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
+  useEffect(() => {
+    if (!credsFetched) void fetchCredentials();
+  }, [fetchCredentials, credsFetched]);
 
   // Ping worker lifecycle — restarts whenever the interval preference changes
   useEffect(() => {
@@ -250,13 +288,17 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
 
   // Auto-refresh every 30 s
   useEffect(() => {
-    const id = setInterval(() => { void fetchData(); }, AUTO_REFRESH_MS);
+    const id = setInterval(() => {
+      void fetchData();
+    }, AUTO_REFRESH_MS);
     return () => clearInterval(id);
   }, [fetchData]);
 
   // Refresh when the window regains focus
   useEffect(() => {
-    const onFocus = () => { void fetchData(); };
+    const onFocus = () => {
+      void fetchData();
+    };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [fetchData]);
@@ -280,17 +322,12 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
     return list;
   }, [localHosts, activeGroupId, search]);
 
-  const sortedHosts = useMemo(
-    () => applyHostSorting(filteredHosts, sortMode),
-    [filteredHosts, sortMode],
-  );
+  const sortedHosts = useMemo(() => applyHostSorting(filteredHosts, sortMode), [filteredHosts, sortMode]);
 
   const filteredCredentials = useMemo(() => {
     if (!search.trim()) return credentials;
     const q = search.toLowerCase();
-    return credentials.filter(
-      (c) => c.name.toLowerCase().includes(q) || c.cred_type.includes(q)
-    );
+    return credentials.filter((c) => c.name.toLowerCase().includes(q) || c.cred_type.includes(q));
   }, [credentials, search]);
 
   const sortedCredentials = useMemo(
@@ -317,9 +354,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
     }
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const handleDragEnd = async (event: DragEndEvent) => {
     // DnD only works in last_connected (natural) order — ignore drags when sorted
@@ -359,20 +394,26 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
     <div className="flex h-full w-full overflow-hidden">
       {/* LEFT MASTER PANE */}
       <div className="flex flex-1 flex-col overflow-hidden min-w-0">
-
         {/* ── Row 1: Search ── */}
         <div className="flex items-center gap-2 px-4 pt-2.5 pb-2">
           <div className="relative flex-1">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              width="13" height="13" viewBox="0 0 13 13" fill="none"
+              width="13"
+              height="13"
+              viewBox="0 0 13 13"
+              fill="none"
             >
               <circle cx="5.5" cy="5.5" r="4.5" stroke="currentColor" strokeWidth="1.2" />
               <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
             </svg>
             <Input
               className="h-9 pl-9 text-sm bg-muted border-0 focus-visible:ring-1"
-              placeholder={viewMode === "hosts" ? "Find a host or type user@hostname to quick-connect…" : "Find a credential…"}
+              placeholder={
+                viewMode === "hosts"
+                  ? "Find a host or type user@hostname to quick-connect…"
+                  : "Find a credential…"
+              }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -397,7 +438,13 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
               <DropdownMenuTrigger asChild>
                 <Button size="sm" className="h-8 rounded-l-none rounded-r-2xl px-2 text-xs">
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M2 3.5L5 6.5L8 3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </Button>
               </DropdownMenuTrigger>
@@ -410,10 +457,20 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                   }
                 }}
               >
-                <DropdownMenuItem onClick={() => { setViewMode("hosts"); setSelectedHost("__new__"); }}>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setViewMode("hosts");
+                    setSelectedHost("__new__");
+                  }}
+                >
                   New Host
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setViewMode("credentials"); setSelectedCredential("__new__"); }}>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setViewMode("credentials");
+                    setSelectedCredential("__new__");
+                  }}
+                >
                   New Credential
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -449,7 +506,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                 "flex items-center justify-center px-2 h-8 transition-colors",
                 layoutMode === "grid"
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent"
+                  : "text-muted-foreground hover:bg-accent",
               )}
             >
               {/* Grid icon */}
@@ -467,12 +524,17 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                 "flex items-center justify-center px-2 h-8 transition-colors",
                 layoutMode === "list"
                   ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent"
+                  : "text-muted-foreground hover:bg-accent",
               )}
             >
               {/* List icon */}
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M1 3h12M1 7h12M1 11h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                <path
+                  d="M1 3h12M1 7h12M1 11h12"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -488,7 +550,12 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
               >
                 {/* Sort icon */}
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M1 3h10M3 6h6M5 9h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  <path
+                    d="M1 3h10M3 6h6M5 9h2"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                  />
                 </svg>
                 {SORT_LABELS[sortMode]}
               </Button>
@@ -536,7 +603,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                   "px-3 h-8 text-xs font-medium transition-colors",
                   viewMode === v
                     ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent"
+                    : "text-muted-foreground hover:bg-accent",
                 )}
               >
                 {v === "hosts" ? "Hosts" : "Credentials"}
@@ -585,7 +652,10 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 onKeyDown={handleGroupKeyDown}
-                onBlur={() => { setAddingGroup(false); setGroupName(""); }}
+                onBlur={() => {
+                  setAddingGroup(false);
+                  setGroupName("");
+                }}
                 placeholder="Group name…"
                 className="h-8 rounded-lg border border-primary bg-card px-3 text-sm text-foreground outline-none ring-2 ring-primary/40 shrink-0"
               />
@@ -601,13 +671,26 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
               {quickConnectMatch && (
                 <button
                   onClick={() => {
-                    newQuickSshTab(quickConnectMatch.username, quickConnectMatch.hostAddress, quickConnectMatch.port);
+                    newQuickSshTab(
+                      quickConnectMatch.username,
+                      quickConnectMatch.hostAddress,
+                      quickConnectMatch.port,
+                    );
                     setSearch("");
                   }}
                   className="mb-4 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-left hover:bg-primary/10 transition-colors"
                 >
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15">
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" className="text-primary">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      className="text-primary"
+                    >
                       <rect x="1" y="3" width="12" height="8" rx="1.5" />
                       <path d="M4 7l1.5 1.5L4 10M8 9.5h2" />
                     </svg>
@@ -625,11 +708,15 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
               {!hasFetched || isLoading ? (
                 layoutMode === "list" ? (
                   <div className="flex flex-col rounded-xl border border-border overflow-hidden">
-                    {[...Array(4)].map((_, i) => <SkeletonListRow key={i} />)}
+                    {[...Array(4)].map((_, i) => (
+                      <SkeletonListRow key={i} />
+                    ))}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {[...Array(3)].map((_, i) => <SkeletonCard key={i} />)}
+                    {[...Array(3)].map((_, i) => (
+                      <SkeletonCard key={i} />
+                    ))}
                   </div>
                 )
               ) : sortedHosts.length === 0 && !search && !activeGroupId ? (
@@ -639,11 +726,7 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                   No hosts match your search
                 </div>
               ) : sortedHosts.length > 0 ? (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext
                     items={sortedHosts.map((h) => h.id)}
                     strategy={layoutMode === "list" ? verticalListSortingStrategy : rectSortingStrategy}
@@ -702,10 +785,19 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
                   className="flex h-full flex-col items-center justify-center gap-4 text-center px-8 py-16"
                 >
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="7.5" cy="15.5" r="5.5"/>
-                      <path d="m21 2-9.6 9.6"/>
-                      <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                    <svg
+                      width="32"
+                      height="32"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="7.5" cy="15.5" r="5.5" />
+                      <path d="m21 2-9.6 9.6" />
+                      <path d="m15.5 7.5 3 3L22 7l-3-3" />
                     </svg>
                   </div>
                   <div className="space-y-1">
@@ -805,7 +897,12 @@ export function HomeDashboard({ newSshTab, newQuickSshTab, newSftpTab }: { newSs
       />
 
       {/* Delete group confirmation */}
-      <AlertDialog open={!!groupToDelete} onOpenChange={(open) => { if (!open) setGroupToDelete(null); }}>
+      <AlertDialog
+        open={!!groupToDelete}
+        onOpenChange={(open) => {
+          if (!open) setGroupToDelete(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{groupToDelete?.name}"?</AlertDialogTitle>

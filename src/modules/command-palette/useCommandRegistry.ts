@@ -25,8 +25,12 @@ export function useCommandRegistry(
   const systemPage = useSystemCommands(cb);
   const layoutPage = useLayoutCommands(cb, activeTabKind);
   const { rootActions: hostRootActions, sshPage, sftpPage } = useHostCommands(cb);
-  const { rootActions: settingsRootActions, themesPage, appModePage, editorThemePage } =
-    useSettingsCommands();
+  const {
+    rootActions: settingsRootActions,
+    themesPage,
+    appModePage,
+    editorThemePage,
+  } = useSettingsCommands();
   const { rootAction: zoomRootAction, zoomPage } = useZoomCommands(activeTabKind);
   const { rootAction: tabRootAction, tabsPage } = useTabCommands(cb);
   const { rootActions: snippetRootActions, snippetsPage } = useSnippetCommands(cb);
@@ -39,9 +43,7 @@ export function useCommandRegistry(
   return useMemo(() => {
     const filterByContext = (actions: CommandAction[]): CommandAction[] => {
       if (!activeContext) return actions.filter((a) => !a.contexts?.length);
-      return actions.filter(
-        (a) => !a.contexts?.length || a.contexts.includes(activeContext),
-      );
+      return actions.filter((a) => !a.contexts?.length || a.contexts.includes(activeContext));
     };
 
     const rootActions: CommandAction[] = [

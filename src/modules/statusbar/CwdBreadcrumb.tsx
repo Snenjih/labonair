@@ -21,12 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ArrowDown01Icon,
-  Folder01Icon,
-  Home03Icon,
-  MoreHorizontalIcon,
-} from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Folder01Icon, Home03Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
@@ -83,9 +78,7 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props
   }
 
   if (!cwd) {
-    return (
-      <span className="text-xs text-muted-foreground/70">no directory</span>
-    );
+    return <span className="text-xs text-muted-foreground/70">no directory</span>;
   }
 
   const segments = segmentsFromCwd(cwd, home);
@@ -109,12 +102,7 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props
           </span>
         ))}
         <BreadcrumbItem>
-          <CurrentSegmentWithContextMenu
-            seg={current}
-            cwd={cwd}
-            onCd={onCd}
-            onCdInNewTab={onCdInNewTab}
-          />
+          <CurrentSegmentWithContextMenu seg={current} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
@@ -141,24 +129,15 @@ function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenu
       >
         Copy absolute path
       </ContextMenuItem>
-      <ContextMenuItem
-        className="text-[12px]"
-        onSelect={() => void navigator.clipboard.writeText(rel)}
-      >
+      <ContextMenuItem className="text-[12px]" onSelect={() => void navigator.clipboard.writeText(rel)}>
         Copy relative path
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem
-        className="text-[12px]"
-        onSelect={() => onCd(seg.fullPath)}
-      >
+      <ContextMenuItem className="text-[12px]" onSelect={() => onCd(seg.fullPath)}>
         Open in current terminal
       </ContextMenuItem>
       {onCdInNewTab && (
-        <ContextMenuItem
-          className="text-[12px]"
-          onSelect={() => onCdInNewTab(seg.fullPath)}
-        >
+        <ContextMenuItem className="text-[12px]" onSelect={() => onCdInNewTab(seg.fullPath)}>
           Open in new terminal
         </ContextMenuItem>
       )}
@@ -166,9 +145,7 @@ function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenu
       <ContextMenuItem
         className="text-[12px]"
         onSelect={() =>
-          window.dispatchEvent(
-            new CustomEvent<string>("labonair:ai-attach-file", { detail: seg.fullPath })
-          )
+          window.dispatchEvent(new CustomEvent<string>("labonair:ai-attach-file", { detail: seg.fullPath }))
         }
       >
         Reference in AI chat
@@ -265,15 +242,10 @@ function CurrentSegmentDropdown({
         {children === null ? (
           <div className="px-2 py-1.5 text-xs text-muted-foreground">Loading…</div>
         ) : children.length === 0 ? (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">
-            {error ?? "No subfolders"}
-          </div>
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">{error ?? "No subfolders"}</div>
         ) : (
           children.map((name) => (
-            <DropdownMenuItem
-              key={name}
-              onSelect={() => onCd(path === "/" ? `/${name}` : `${path}/${name}`)}
-            >
+            <DropdownMenuItem key={name} onSelect={() => onCd(path === "/" ? `/${name}` : `${path}/${name}`)}>
               <HugeiconsIcon
                 icon={Folder01Icon}
                 className="size-3.5 text-muted-foreground"

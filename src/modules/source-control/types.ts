@@ -60,7 +60,7 @@ export interface FileDiffStat {
 }
 
 export type SelectionMode =
-  | { type: 'file'; path: string; staged: boolean }
-  | { type: 'section'; section: 'staged' | 'unstaged' | 'untracked' }
-  | { type: 'all' }
-  | { type: 'commit'; hash: string; repositoryPath: string };
+  | { type: "file"; path: string; staged: boolean }
+  | { type: "section"; section: "staged" | "unstaged" | "untracked" }
+  | { type: "all" }
+  | { type: "commit"; hash: string; repositoryPath: string };

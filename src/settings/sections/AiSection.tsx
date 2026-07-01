@@ -1,11 +1,5 @@
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,13 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -37,21 +25,10 @@ import {
   type ModelId,
   type ProviderId,
 } from "@/modules/ai/config";
-import {
-  BUILTIN_AGENTS,
-  type Agent,
-  type AgentIconId,
-} from "@/modules/ai/lib/agents";
-import {
-  isValidHandle,
-  normalizeHandle,
-  type Directive,
-} from "@/modules/ai/lib/directives";
+import { BUILTIN_AGENTS, type Agent, type AgentIconId } from "@/modules/ai/lib/agents";
+import { isValidHandle, normalizeHandle, type Directive } from "@/modules/ai/lib/directives";
 import { newAgentId, useAgentsStore } from "@/modules/ai/store/agentsStore";
-import {
-  newDirectiveId,
-  useDirectivesStore,
-} from "@/modules/ai/store/directivesStore";
+import { newDirectiveId, useDirectivesStore } from "@/modules/ai/store/directivesStore";
 import { useProvidersStore } from "@/modules/ai/store/providersStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -85,21 +62,10 @@ import { ProviderInstanceCard } from "../components/ProviderInstanceCard";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
-const ICON_OPTIONS: AgentIconId[] = [
-  "coder",
-  "architect",
-  "reviewer",
-  "security",
-  "designer",
-  "spark",
-];
+const ICON_OPTIONS: AgentIconId[] = ["coder", "architect", "reviewer", "security", "designer", "spark"];
 
 function SubSectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="text-sm font-semibold tracking-tight text-foreground">
-      {children}
-    </h3>
-  );
+  return <h3 className="text-sm font-semibold tracking-tight text-foreground">{children}</h3>;
 }
 
 function SectionDivider() {
@@ -207,9 +173,7 @@ function DefaultsContent() {
   // Determine if a provider has at least one configured instance with a key
   const providerHasKey = (id: ProviderId): boolean => {
     if (!providerNeedsKey(id)) return true;
-    return instances
-      .filter((i) => i.providerId === id)
-      .some((i) => !!instanceKeys[i.id]);
+    return instances.filter((i) => i.providerId === id).some((i) => !!instanceKeys[i.id]);
   };
 
   const handleAutocompleteToggle = (v: boolean) => {
@@ -240,11 +204,7 @@ function DefaultsContent() {
                 {defaultModelInfo.provider === "lmstudio" ||
                 defaultModelInfo.provider === "openai-compatible" ? (
                   <HugeiconsIcon
-                    icon={
-                      defaultModelInfo.provider === "openai-compatible"
-                        ? Settings01Icon
-                        : ComputerIcon
-                    }
+                    icon={defaultModelInfo.provider === "openai-compatible" ? Settings01Icon : ComputerIcon}
                     size={14}
                     strokeWidth={1.75}
                     className="text-muted-foreground"
@@ -375,9 +335,7 @@ function ProvidersContent() {
         <div className="flex flex-col gap-2">
           {instances.map((inst) => {
             const sameCount = instances.filter((i) => i.providerId === inst.providerId).length;
-            return (
-              <ProviderInstanceCard key={inst.id} instance={inst} sameProviderCount={sameCount} />
-            );
+            return <ProviderInstanceCard key={inst.id} instance={inst} sameProviderCount={sameCount} />;
           })}
         </div>
       )}
@@ -396,10 +354,7 @@ function GeneralContent() {
         title="Disable AI"
         description="Turn off all AI features across the app. The AI panel, input bar, and autocomplete will be hidden."
       >
-        <Switch
-          checked={!aiEnabled}
-          onCheckedChange={(v) => void setAiEnabled(!v)}
-        />
+        <Switch checked={!aiEnabled} onCheckedChange={(v) => void setAiEnabled(!v)} />
       </SettingRow>
       <SettingRow
         title="Warn on destructive commands"
@@ -575,8 +530,8 @@ function DirectivesContent() {
 
       {directives.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border/60 bg-card/30 px-4 py-6 text-center text-[11px] text-muted-foreground">
-          No directives yet. Create one and insert it with{" "}
-          <code className="font-mono">#handle</code> in the AI input.
+          No directives yet. Create one and insert it with <code className="font-mono">#handle</code> in the
+          AI input.
         </div>
       ) : (
         <ul className="flex flex-col gap-1.5">
@@ -591,9 +546,7 @@ function DirectivesContent() {
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[12px] font-medium">{d.name}</span>
                 {d.description ? (
-                  <span className="truncate text-[10.5px] text-muted-foreground">
-                    {d.description}
-                  </span>
+                  <span className="truncate text-[10.5px] text-muted-foreground">{d.description}</span>
                 ) : null}
               </div>
               <Button
@@ -652,9 +605,7 @@ function AgentCard({
     <div
       className={cn(
         "group relative flex flex-col gap-1.5 rounded-lg border bg-card/60 px-3 py-2.5 transition-colors",
-        active
-          ? "border-foreground/30 ring-1 ring-foreground/10"
-          : "border-border/60 hover:border-border",
+        active ? "border-foreground/30 ring-1 ring-foreground/10" : "border-border/60 hover:border-border",
       )}
     >
       <div className="flex items-start gap-2">
@@ -753,9 +704,7 @@ function AgentEditorDialog({
                       onClick={() => setDraft({ ...draft, icon: id })}
                       className={cn(
                         "flex size-7 items-center justify-center rounded-md border transition-colors",
-                        active
-                          ? "border-foreground/40 bg-accent"
-                          : "border-border/60 hover:bg-accent/60",
+                        active ? "border-foreground/40 bg-accent" : "border-border/60 hover:bg-accent/60",
                       )}
                     >
                       <HugeiconsIcon icon={Icon} size={13} strokeWidth={1.75} />
@@ -794,7 +743,9 @@ function AgentEditorDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
           <Button size="sm" disabled={!canSave} onClick={() => onSave({ ...draft, builtIn: false })}>
             Save
           </Button>
@@ -826,10 +777,7 @@ function DirectiveEditorDialog({
       : existing.some((d) => d.id !== draft.id && d.handle === draft.handle)
         ? "Already in use."
         : null;
-  const canSave =
-    !handleErr &&
-    draft.name.trim().length > 0 &&
-    draft.content.trim().length > 0;
+  const canSave = !handleErr && draft.name.trim().length > 0 && draft.content.trim().length > 0;
 
   return (
     <Dialog open={!!directive} onOpenChange={(o) => !o && onClose()}>
@@ -849,9 +797,7 @@ function DirectiveEditorDialog({
                 placeholder="e.g. concise"
                 className="h-8 font-mono text-[12px]"
               />
-              {handleErr && (
-                <span className="text-[10.5px] text-destructive">{handleErr}</span>
-              )}
+              {handleErr && <span className="text-[10.5px] text-destructive">{handleErr}</span>}
             </div>
             <div className="flex flex-1 flex-col gap-1">
               <Label>Name</Label>
@@ -953,9 +899,5 @@ function NumInput({
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="text-[11px] font-medium tracking-tight text-muted-foreground">{children}</span>;
 }

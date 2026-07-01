@@ -10,9 +10,7 @@ type Props = {
 };
 
 export function AiDiffStack({ onAccept, onReject }: Props) {
-  const diffs = useTabsStore(
-    useShallow((s) => s.tabs.filter((t): t is AiDiffTab => t.kind === "ai-diff")),
-  );
+  const diffs = useTabsStore(useShallow((s) => s.tabs.filter((t): t is AiDiffTab => t.kind === "ai-diff")));
   const activeId = useTabsStore((s) => s.activeId);
   if (diffs.length === 0) return null;
   return (
@@ -22,10 +20,7 @@ export function AiDiffStack({ onAccept, onReject }: Props) {
         return (
           <div
             key={t.id}
-            className={cn(
-              "absolute inset-0",
-              !visible && "invisible pointer-events-none",
-            )}
+            className={cn("absolute inset-0", !visible && "invisible pointer-events-none")}
             aria-hidden={!visible}
           >
             <AiDiffPane

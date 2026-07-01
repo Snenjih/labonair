@@ -72,12 +72,7 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
 
   if (!current) return null;
 
-  const field = (
-    label: string,
-    key: keyof Host,
-    type = "text",
-    placeholder = "",
-  ) => (
+  const field = (label: string, key: keyof Host, type = "text", placeholder = "") => (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <Input
@@ -118,11 +113,7 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
 
       {/* Action buttons */}
       <div className="flex gap-2 px-4 py-3 border-b border-border">
-        <Button
-          size="sm"
-          className="flex-1 h-8 text-xs"
-          onClick={() => newSshTab(host!.id, current.name)}
-        >
+        <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => newSshTab(host!.id, current.name)}>
           Connect SSH
         </Button>
         <Button
@@ -146,7 +137,12 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
             <Input
               type="number"
               value={current.port}
-              onChange={(e) => setDraft((d) => { const v = parseInt(e.target.value, 10); return { ...d, port: Number.isNaN(v) ? d.port : v }; })}
+              onChange={(e) =>
+                setDraft((d) => {
+                  const v = parseInt(e.target.value, 10);
+                  return { ...d, port: Number.isNaN(v) ? d.port : v };
+                })
+              }
               onBlur={handleBlur}
               className="h-8 text-sm bg-background"
             />
@@ -168,7 +164,8 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
               <option value="">None</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.icon ? `${g.icon} ` : ""}{g.name}
+                  {g.icon ? `${g.icon} ` : ""}
+                  {g.name}
                 </option>
               ))}
             </select>
@@ -177,7 +174,9 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
 
         {/* SSH / Connection */}
         <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">SSH / Connection</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            SSH / Connection
+          </p>
           {field("Username", "username", "text", "root")}
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Auth Method</Label>
@@ -185,7 +184,10 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
               {(["password", "key"] as const).map((method) => (
                 <button
                   key={method}
-                  onClick={() => { setDraft((d) => ({ ...d, auth_method: method })); setTimeout(handleBlur, 0); }}
+                  onClick={() => {
+                    setDraft((d) => ({ ...d, auth_method: method }));
+                    setTimeout(handleBlur, 0);
+                  }}
                   className={`flex-1 rounded-md border py-1.5 text-xs font-medium transition-all ${
                     current.auth_method === method
                       ? "border-primary bg-primary text-primary-foreground"
@@ -197,9 +199,8 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
               ))}
             </div>
           </div>
-          {current.auth_method === "key" && (
-            field("Private Key Path", "private_key_path", "text", "~/.ssh/id_rsa")
-          )}
+          {current.auth_method === "key" &&
+            field("Private Key Path", "private_key_path", "text", "~/.ssh/id_rsa")}
         </section>
 
         {/* Credentials */}
@@ -223,7 +224,9 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
 
         {/* Notes */}
         <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes / Runbook</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Notes / Runbook
+          </p>
           <textarea
             placeholder="Configuration notes, credentials hints, runbook steps…"
             value={current.notes ?? ""}
@@ -245,12 +248,16 @@ export function HostInspector({ hostId, onClose }: HostInspectorProps) {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete "{current.name}"?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently remove the host and its stored credentials. This action cannot be undone.
+                This will permanently remove the host and its stored credentials. This action cannot be
+                undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>

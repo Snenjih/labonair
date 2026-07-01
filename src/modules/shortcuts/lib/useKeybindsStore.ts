@@ -16,11 +16,7 @@ type KeybindsState = {
   setKeybind: (id: string, binding: KeyBindingOrDisabled) => Promise<void>;
   resetKeybind: (id: string) => Promise<void>;
   resetAll: () => Promise<void>;
-  matchesShortcut: (
-    id: string,
-    defaultMatch: (e: KeyboardEvent) => boolean,
-    e: KeyboardEvent,
-  ) => boolean;
+  matchesShortcut: (id: string, defaultMatch: (e: KeyboardEvent) => boolean, e: KeyboardEvent) => boolean;
   getEffectiveDisplayKeys: (id: string, defaultKeys: string[]) => string[];
 };
 

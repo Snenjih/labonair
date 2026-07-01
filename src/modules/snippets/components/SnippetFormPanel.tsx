@@ -12,13 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
@@ -75,10 +69,30 @@ function snippetToForm(s: CommandSnippet): FormState {
   };
 }
 
-const EXEC_MODES: Array<{ value: SnippetExecMode; icon: typeof Logout01Icon; label: string; description: string }> = [
-  { value: "terminal", icon: Logout01Icon, label: "Terminal", description: "Opens a new terminal tab and runs the command." },
-  { value: "silent", icon: SlidersHorizontalIcon, label: "Silent", description: "Runs in background, output visible in log drawer." },
-  { value: "inject", icon: ComputerIcon, label: "Inject", description: "Pastes command into the active terminal without running." },
+const EXEC_MODES: Array<{
+  value: SnippetExecMode;
+  icon: typeof Logout01Icon;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "terminal",
+    icon: Logout01Icon,
+    label: "Terminal",
+    description: "Opens a new terminal tab and runs the command.",
+  },
+  {
+    value: "silent",
+    icon: SlidersHorizontalIcon,
+    label: "Silent",
+    description: "Runs in background, output visible in log drawer.",
+  },
+  {
+    value: "inject",
+    icon: ComputerIcon,
+    label: "Inject",
+    description: "Pastes command into the active terminal without running.",
+  },
 ];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -179,7 +193,6 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
       {/* Scrollable form body */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="space-y-5 px-3 py-3">
-
           {/* ── General ── */}
           <div>
             <SectionLabel>General</SectionLabel>
@@ -239,7 +252,6 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
           <div>
             <SectionLabel>Execution</SectionLabel>
             <div className="space-y-2.5">
-
               {/* Target toggle */}
               <FieldRow label="Target">
                 <div className="flex gap-1">
@@ -252,7 +264,7 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
                         "flex flex-1 items-center justify-center gap-1.5 rounded border py-1.5 text-[11px] font-medium transition-all",
                         form.target === t
                           ? "border-primary/60 bg-primary/10 text-foreground dark:text-primary"
-                          : "border-border/40 bg-background/60 text-muted-foreground hover:border-border/70 hover:text-foreground"
+                          : "border-border/40 bg-background/60 text-muted-foreground hover:border-border/70 hover:text-foreground",
                       )}
                     >
                       <HugeiconsIcon
@@ -288,10 +300,7 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
               )}
 
               {/* Exec mode — 3-way button group */}
-              <FieldRow
-                label="Default Mode"
-                hint={activeExecMode?.description}
-              >
+              <FieldRow label="Default Mode" hint={activeExecMode?.description}>
                 <div className="flex gap-1">
                   {EXEC_MODES.map(({ value, icon, label }) => (
                     <button
@@ -302,7 +311,7 @@ export function SnippetFormPanel({ snippetId, onClose }: Props) {
                         "flex flex-1 flex-col items-center gap-1 rounded border px-1 py-1.5 transition-all",
                         form.defaultExecMode === value
                           ? "border-primary/60 bg-primary/10 text-foreground dark:text-primary"
-                          : "border-border/40 bg-background/60 text-muted-foreground hover:border-border/70 hover:text-foreground"
+                          : "border-border/40 bg-background/60 text-muted-foreground hover:border-border/70 hover:text-foreground",
                       )}
                     >
                       <HugeiconsIcon icon={icon} size={12} strokeWidth={1.5} />

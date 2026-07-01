@@ -42,21 +42,18 @@ export function useSnippetExec({
         (e) => {
           if (e.payload.runId !== runId) return;
           appendRunLine(runId, e.payload.data, e.payload.stream);
-        }
+        },
       );
-      const donePromise = listen<{ runId: string; exitCode: number }>(
-        "snippet_run_done",
-        (e) => {
-          if (e.payload.runId !== runId) return;
-          updateRunLog(runId, {
-            status: e.payload.exitCode === 0 ? "done" : "error",
-            exitCode: e.payload.exitCode,
-          });
-          // Clean up this run's listeners
-          cleanupRef.current.get(runId)?.();
-          cleanupRef.current.delete(runId);
-        }
-      );
+      const donePromise = listen<{ runId: string; exitCode: number }>("snippet_run_done", (e) => {
+        if (e.payload.runId !== runId) return;
+        updateRunLog(runId, {
+          status: e.payload.exitCode === 0 ? "done" : "error",
+          exitCode: e.payload.exitCode,
+        });
+        // Clean up this run's listeners
+        cleanupRef.current.get(runId)?.();
+        cleanupRef.current.delete(runId);
+      });
 
       const cleanup = () => {
         void outPromise.then((fn) => fn());
@@ -64,7 +61,7 @@ export function useSnippetExec({
       };
       cleanupRef.current.set(runId, cleanup);
     },
-    [appendRunLine, updateRunLog]
+    [appendRunLine, updateRunLog],
   );
 
   const execSnippet = useCallback(
@@ -112,7 +109,12 @@ export function useSnippetExec({
         if (!sshSession) {
           updateRunLog(runId, {
             status: "error",
-            lines: [{ data: `No active SSH session for this host. Open a terminal tab first or use Terminal mode.\n`, stream: "stderr" }],
+            lines: [
+              {
+                data: `No active SSH session for this host. Open a terminal tab first or use Terminal mode.\n`,
+                stream: "stderr",
+              },
+            ],
           });
           return;
         }
@@ -139,16 +141,23 @@ export function useSnippetExec({
         }
       }
     },
-    [tabs, activeTerminalRef, onNewLocalTab, onNewSshTab, onOpenLogDrawer, addRunLog, updateRunLog, appendRunLine, registerRunListeners]
+    [
+      tabs,
+      activeTerminalRef,
+      onNewLocalTab,
+      onNewSshTab,
+      onOpenLogDrawer,
+      addRunLog,
+      updateRunLog,
+      appendRunLine,
+      registerRunListeners,
+    ],
   );
 
   return { execSnippet };
 }
 
-function findSshSessionForHost(
-  tabs: WorkspaceTab[],
-  hostId: string | null | undefined
-): string | null {
+function findSshSessionForHost(tabs: WorkspaceTab[], hostId: string | null | undefined): string | null {
   if (!hostId) return null;
   for (const tab of tabs) {
     for (const [sessionId, session] of Object.entries(tab.sessions)) {

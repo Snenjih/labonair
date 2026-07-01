@@ -478,222 +478,129 @@ export async function loadPreferences(): Promise<Preferences> {
   const get = <T>(k: string): T | undefined => map.get(k) as T | undefined;
   return {
     theme: get<ThemePref>(KEY_THEME) ?? DEFAULT_PREFERENCES.theme,
-    defaultModelId:
-      get<ModelId>(KEY_DEFAULT_MODEL) ?? DEFAULT_PREFERENCES.defaultModelId,
-    editorTheme:
-      get<EditorThemeId>(KEY_EDITOR_THEME) ?? DEFAULT_PREFERENCES.editorTheme,
-    customInstructions:
-      get<string>(KEY_CUSTOM_INSTRUCTIONS) ??
-      DEFAULT_PREFERENCES.customInstructions,
+    defaultModelId: get<ModelId>(KEY_DEFAULT_MODEL) ?? DEFAULT_PREFERENCES.defaultModelId,
+    editorTheme: get<EditorThemeId>(KEY_EDITOR_THEME) ?? DEFAULT_PREFERENCES.editorTheme,
+    customInstructions: get<string>(KEY_CUSTOM_INSTRUCTIONS) ?? DEFAULT_PREFERENCES.customInstructions,
     autostart: get<boolean>(KEY_AUTOSTART) ?? DEFAULT_PREFERENCES.autostart,
-    restoreWindowState:
-      get<boolean>(KEY_RESTORE_WINDOW) ??
-      DEFAULT_PREFERENCES.restoreWindowState,
-    autocompleteEnabled:
-      get<boolean>(KEY_AUTOCOMPLETE_ENABLED) ??
-      DEFAULT_PREFERENCES.autocompleteEnabled,
+    restoreWindowState: get<boolean>(KEY_RESTORE_WINDOW) ?? DEFAULT_PREFERENCES.restoreWindowState,
+    autocompleteEnabled: get<boolean>(KEY_AUTOCOMPLETE_ENABLED) ?? DEFAULT_PREFERENCES.autocompleteEnabled,
     autocompleteProvider:
-      get<AutocompleteProviderId>(KEY_AUTOCOMPLETE_PROVIDER) ??
-      DEFAULT_PREFERENCES.autocompleteProvider,
-    autocompleteModelId:
-      get<string>(KEY_AUTOCOMPLETE_MODEL) ??
-      DEFAULT_PREFERENCES.autocompleteModelId,
-    lmstudioBaseURL:
-      get<string>(KEY_LMSTUDIO_BASE_URL) ??
-      DEFAULT_PREFERENCES.lmstudioBaseURL,
-    lmstudioChatModelId:
-      get<string>(KEY_LMSTUDIO_CHAT_MODEL_ID) ??
-      DEFAULT_PREFERENCES.lmstudioChatModelId,
+      get<AutocompleteProviderId>(KEY_AUTOCOMPLETE_PROVIDER) ?? DEFAULT_PREFERENCES.autocompleteProvider,
+    autocompleteModelId: get<string>(KEY_AUTOCOMPLETE_MODEL) ?? DEFAULT_PREFERENCES.autocompleteModelId,
+    lmstudioBaseURL: get<string>(KEY_LMSTUDIO_BASE_URL) ?? DEFAULT_PREFERENCES.lmstudioBaseURL,
+    lmstudioChatModelId: get<string>(KEY_LMSTUDIO_CHAT_MODEL_ID) ?? DEFAULT_PREFERENCES.lmstudioChatModelId,
     openaiCompatibleBaseURL:
-      get<string>(KEY_OPENAI_COMPATIBLE_BASE_URL) ??
-      DEFAULT_PREFERENCES.openaiCompatibleBaseURL,
+      get<string>(KEY_OPENAI_COMPATIBLE_BASE_URL) ?? DEFAULT_PREFERENCES.openaiCompatibleBaseURL,
     openaiCompatibleModelId:
-      get<string>(KEY_OPENAI_COMPATIBLE_MODEL_ID) ??
-      DEFAULT_PREFERENCES.openaiCompatibleModelId,
-    mlxBaseURL:
-      get<string>(KEY_MLX_BASE_URL) ?? DEFAULT_PREFERENCES.mlxBaseURL,
-    mlxChatModelId:
-      get<string>(KEY_MLX_CHAT_MODEL_ID) ?? DEFAULT_PREFERENCES.mlxChatModelId,
-    ollamaBaseURL:
-      get<string>(KEY_OLLAMA_BASE_URL) ?? DEFAULT_PREFERENCES.ollamaBaseURL,
-    ollamaChatModelId:
-      get<string>(KEY_OLLAMA_CHAT_MODEL_ID) ??
-      DEFAULT_PREFERENCES.ollamaChatModelId,
+      get<string>(KEY_OPENAI_COMPATIBLE_MODEL_ID) ?? DEFAULT_PREFERENCES.openaiCompatibleModelId,
+    mlxBaseURL: get<string>(KEY_MLX_BASE_URL) ?? DEFAULT_PREFERENCES.mlxBaseURL,
+    mlxChatModelId: get<string>(KEY_MLX_CHAT_MODEL_ID) ?? DEFAULT_PREFERENCES.mlxChatModelId,
+    ollamaBaseURL: get<string>(KEY_OLLAMA_BASE_URL) ?? DEFAULT_PREFERENCES.ollamaBaseURL,
+    ollamaChatModelId: get<string>(KEY_OLLAMA_CHAT_MODEL_ID) ?? DEFAULT_PREFERENCES.ollamaChatModelId,
     vimMode: get<boolean>(KEY_VIM_MODE) ?? DEFAULT_PREFERENCES.vimMode,
     defaultStartupTab:
-      get<"terminal" | "host-manager">(KEY_DEFAULT_STARTUP_TAB) ??
-      DEFAULT_PREFERENCES.defaultStartupTab,
-    startupTerminalCount: Math.min(
-      3,
-      Math.max(1, get<number>(KEY_STARTUP_TERMINAL_COUNT) ?? 1),
-    ) as 1 | 2 | 3,
-    sessionRestore:
-      get<boolean>(KEY_SESSION_RESTORE) ?? DEFAULT_PREFERENCES.sessionRestore,
+      get<"terminal" | "host-manager">(KEY_DEFAULT_STARTUP_TAB) ?? DEFAULT_PREFERENCES.defaultStartupTab,
+    startupTerminalCount: Math.min(3, Math.max(1, get<number>(KEY_STARTUP_TERMINAL_COUNT) ?? 1)) as 1 | 2 | 3,
+    sessionRestore: get<boolean>(KEY_SESSION_RESTORE) ?? DEFAULT_PREFERENCES.sessionRestore,
     sessionScrollbackLines:
       get<number>(KEY_SESSION_SCROLLBACK_LINES) ?? DEFAULT_PREFERENCES.sessionScrollbackLines,
 
     appTheme: get<string>(KEY_APP_THEME) ?? DEFAULT_PREFERENCES.appTheme,
-    appFontFamily:
-      get<string>(KEY_APP_FONT_FAMILY) ?? DEFAULT_PREFERENCES.appFontFamily,
-    appFontSize:
-      get<number>(KEY_APP_FONT_SIZE) ?? DEFAULT_PREFERENCES.appFontSize,
-    appLineHeight:
-      get<number>(KEY_APP_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.appLineHeight,
-    backgroundImage:
-      get<string>(KEY_BG_IMAGE) ?? DEFAULT_PREFERENCES.backgroundImage,
-    backgroundOpacity:
-      get<number>(KEY_BG_OPACITY) ?? DEFAULT_PREFERENCES.backgroundOpacity,
-    backgroundBlur:
-      get<number>(KEY_BG_BLUR) ?? DEFAULT_PREFERENCES.backgroundBlur,
-    backgroundTintColor:
-      get<string>(KEY_BG_TINT_COLOR) ?? DEFAULT_PREFERENCES.backgroundTintColor,
-    backgroundTintOpacity: Math.min(
-      100,
-      Math.max(0, get<number>(KEY_BG_TINT_OPACITY) ?? 0),
-    ),
-    appCornerRadius: Math.min(
-      20,
-      Math.max(0, get<number>(KEY_APP_CORNER_RADIUS) ?? 5),
-    ),
+    appFontFamily: get<string>(KEY_APP_FONT_FAMILY) ?? DEFAULT_PREFERENCES.appFontFamily,
+    appFontSize: get<number>(KEY_APP_FONT_SIZE) ?? DEFAULT_PREFERENCES.appFontSize,
+    appLineHeight: get<number>(KEY_APP_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.appLineHeight,
+    backgroundImage: get<string>(KEY_BG_IMAGE) ?? DEFAULT_PREFERENCES.backgroundImage,
+    backgroundOpacity: get<number>(KEY_BG_OPACITY) ?? DEFAULT_PREFERENCES.backgroundOpacity,
+    backgroundBlur: get<number>(KEY_BG_BLUR) ?? DEFAULT_PREFERENCES.backgroundBlur,
+    backgroundTintColor: get<string>(KEY_BG_TINT_COLOR) ?? DEFAULT_PREFERENCES.backgroundTintColor,
+    backgroundTintOpacity: Math.min(100, Math.max(0, get<number>(KEY_BG_TINT_OPACITY) ?? 0)),
+    appCornerRadius: Math.min(20, Math.max(0, get<number>(KEY_APP_CORNER_RADIUS) ?? 5)),
     appDensity: ((): "compact" | "default" | "relaxed" => {
       const v = get<string>(KEY_APP_DENSITY);
       return v === "compact" || v === "relaxed" ? v : "default";
     })(),
 
-    terminalShell:
-      get<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
-    terminalDefaultPath:
-      get<string>(KEY_TERMINAL_DEFAULT_PATH) ?? DEFAULT_PREFERENCES.terminalDefaultPath,
-    terminalCursorBlink:
-      get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ??
-      DEFAULT_PREFERENCES.terminalCursorBlink,
+    terminalShell: get<string>(KEY_TERMINAL_SHELL) ?? DEFAULT_PREFERENCES.terminalShell,
+    terminalDefaultPath: get<string>(KEY_TERMINAL_DEFAULT_PATH) ?? DEFAULT_PREFERENCES.terminalDefaultPath,
+    terminalCursorBlink: get<boolean>(KEY_TERMINAL_CURSOR_BLINK) ?? DEFAULT_PREFERENCES.terminalCursorBlink,
     terminalCursorBlinkInterval: Math.min(
       2000,
       Math.max(
         200,
-        get<number>(KEY_TERMINAL_CURSOR_BLINK_INTERVAL) ??
-          DEFAULT_PREFERENCES.terminalCursorBlinkInterval,
+        get<number>(KEY_TERMINAL_CURSOR_BLINK_INTERVAL) ?? DEFAULT_PREFERENCES.terminalCursorBlinkInterval,
       ),
     ),
     terminalCursorStyle:
       get<"block" | "underline" | "bar">(KEY_TERMINAL_CURSOR_STYLE) ??
       DEFAULT_PREFERENCES.terminalCursorStyle,
-    terminalFontFamily:
-      get<string>(KEY_TERMINAL_FONT_FAMILY) ??
-      DEFAULT_PREFERENCES.terminalFontFamily,
-    terminalFontSize:
-      get<number>(KEY_TERMINAL_FONT_SIZE) ?? DEFAULT_PREFERENCES.terminalFontSize,
-    terminalScrollback:
-      get<number>(KEY_TERMINAL_SCROLLBACK) ??
-      DEFAULT_PREFERENCES.terminalScrollback,
+    terminalFontFamily: get<string>(KEY_TERMINAL_FONT_FAMILY) ?? DEFAULT_PREFERENCES.terminalFontFamily,
+    terminalFontSize: get<number>(KEY_TERMINAL_FONT_SIZE) ?? DEFAULT_PREFERENCES.terminalFontSize,
+    terminalScrollback: get<number>(KEY_TERMINAL_SCROLLBACK) ?? DEFAULT_PREFERENCES.terminalScrollback,
     terminalLetterSpacing:
-      get<number>(KEY_TERMINAL_LETTER_SPACING) ??
-      DEFAULT_PREFERENCES.terminalLetterSpacing,
-    terminalLineHeight:
-      get<number>(KEY_TERMINAL_LINE_HEIGHT) ??
-      DEFAULT_PREFERENCES.terminalLineHeight,
+      get<number>(KEY_TERMINAL_LETTER_SPACING) ?? DEFAULT_PREFERENCES.terminalLetterSpacing,
+    terminalLineHeight: get<number>(KEY_TERMINAL_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.terminalLineHeight,
     terminalFontWeight:
-      get<"normal" | "medium" | "bold">(KEY_TERMINAL_FONT_WEIGHT) ??
-      DEFAULT_PREFERENCES.terminalFontWeight,
+      get<"normal" | "medium" | "bold">(KEY_TERMINAL_FONT_WEIGHT) ?? DEFAULT_PREFERENCES.terminalFontWeight,
     terminalShowPaneHeader:
-      get<boolean>(KEY_TERMINAL_SHOW_PANE_HEADER) ??
-      DEFAULT_PREFERENCES.terminalShowPaneHeader,
+      get<boolean>(KEY_TERMINAL_SHOW_PANE_HEADER) ?? DEFAULT_PREFERENCES.terminalShowPaneHeader,
     terminalShowPaneFooter:
-      get<boolean>(KEY_TERMINAL_SHOW_PANE_FOOTER) ??
-      DEFAULT_PREFERENCES.terminalShowPaneFooter,
-    terminalUseWebGL:
-      get<boolean>(KEY_TERMINAL_USE_WEBGL) ??
-      DEFAULT_PREFERENCES.terminalUseWebGL,
-    terminalBell:
-      get<boolean>(KEY_TERMINAL_BELL) ?? DEFAULT_PREFERENCES.terminalBell,
+      get<boolean>(KEY_TERMINAL_SHOW_PANE_FOOTER) ?? DEFAULT_PREFERENCES.terminalShowPaneFooter,
+    terminalUseWebGL: get<boolean>(KEY_TERMINAL_USE_WEBGL) ?? DEFAULT_PREFERENCES.terminalUseWebGL,
+    terminalBell: get<boolean>(KEY_TERMINAL_BELL) ?? DEFAULT_PREFERENCES.terminalBell,
 
-    editorFontSize:
-      get<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
-    editorFontFamily:
-      get<string>(KEY_EDITOR_FONT_FAMILY) ?? DEFAULT_PREFERENCES.editorFontFamily,
+    editorFontSize: get<number>(KEY_EDITOR_FONT_SIZE) ?? DEFAULT_PREFERENCES.editorFontSize,
+    editorFontFamily: get<string>(KEY_EDITOR_FONT_FAMILY) ?? DEFAULT_PREFERENCES.editorFontFamily,
     editorLineHeight: Math.min(
       3.0,
-      Math.max(
-        1.0,
-        get<number>(KEY_EDITOR_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.editorLineHeight,
-      ),
+      Math.max(1.0, get<number>(KEY_EDITOR_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.editorLineHeight),
     ),
     editorAutoSave:
-      get<"off" | "afterDelay" | "onFocusChange">(KEY_EDITOR_AUTO_SAVE) ??
-      DEFAULT_PREFERENCES.editorAutoSave,
+      get<"off" | "afterDelay" | "onFocusChange">(KEY_EDITOR_AUTO_SAVE) ?? DEFAULT_PREFERENCES.editorAutoSave,
     editorAutoSaveDelay: Math.min(
       60000,
-      Math.max(
-        100,
-        get<number>(KEY_EDITOR_AUTO_SAVE_DELAY) ??
-          DEFAULT_PREFERENCES.editorAutoSaveDelay,
-      ),
+      Math.max(100, get<number>(KEY_EDITOR_AUTO_SAVE_DELAY) ?? DEFAULT_PREFERENCES.editorAutoSaveDelay),
     ),
-    editorLineNumbers:
-      get<boolean>(KEY_EDITOR_LINE_NUMBERS) ??
-      DEFAULT_PREFERENCES.editorLineNumbers,
-    editorWordWrap:
-      get<boolean>(KEY_EDITOR_WORD_WRAP) ?? DEFAULT_PREFERENCES.editorWordWrap,
-    editorTabSize:
-      get<2 | 4 | 8>(KEY_EDITOR_TAB_SIZE) ?? DEFAULT_PREFERENCES.editorTabSize,
+    editorLineNumbers: get<boolean>(KEY_EDITOR_LINE_NUMBERS) ?? DEFAULT_PREFERENCES.editorLineNumbers,
+    editorWordWrap: get<boolean>(KEY_EDITOR_WORD_WRAP) ?? DEFAULT_PREFERENCES.editorWordWrap,
+    editorTabSize: get<2 | 4 | 8>(KEY_EDITOR_TAB_SIZE) ?? DEFAULT_PREFERENCES.editorTabSize,
     editorIndentWithTabs:
       get<boolean>(KEY_EDITOR_INDENT_WITH_TABS) ?? DEFAULT_PREFERENCES.editorIndentWithTabs,
     editorBracketMatching:
-      get<boolean>(KEY_EDITOR_BRACKET_MATCHING) ??
-      DEFAULT_PREFERENCES.editorBracketMatching,
+      get<boolean>(KEY_EDITOR_BRACKET_MATCHING) ?? DEFAULT_PREFERENCES.editorBracketMatching,
     editorShowCursorPosition:
-      get<boolean>(KEY_EDITOR_SHOW_CURSOR_POSITION) ??
-      DEFAULT_PREFERENCES.editorShowCursorPosition,
+      get<boolean>(KEY_EDITOR_SHOW_CURSOR_POSITION) ?? DEFAULT_PREFERENCES.editorShowCursorPosition,
     editorShowSelectionStats:
-      get<boolean>(KEY_EDITOR_SHOW_SELECTION_STATS) ??
-      DEFAULT_PREFERENCES.editorShowSelectionStats,
-    editorShowOutline:
-      get<boolean>(KEY_EDITOR_SHOW_OUTLINE) ??
-      DEFAULT_PREFERENCES.editorShowOutline,
-    editorFormatOnSave:
-      get<boolean>(KEY_EDITOR_FORMAT_ON_SAVE) ??
-      DEFAULT_PREFERENCES.editorFormatOnSave,
+      get<boolean>(KEY_EDITOR_SHOW_SELECTION_STATS) ?? DEFAULT_PREFERENCES.editorShowSelectionStats,
+    editorShowOutline: get<boolean>(KEY_EDITOR_SHOW_OUTLINE) ?? DEFAULT_PREFERENCES.editorShowOutline,
+    editorFormatOnSave: get<boolean>(KEY_EDITOR_FORMAT_ON_SAVE) ?? DEFAULT_PREFERENCES.editorFormatOnSave,
     editorIndentationGuides:
-      get<boolean>(KEY_EDITOR_INDENTATION_GUIDES) ??
-      DEFAULT_PREFERENCES.editorIndentationGuides,
+      get<boolean>(KEY_EDITOR_INDENTATION_GUIDES) ?? DEFAULT_PREFERENCES.editorIndentationGuides,
     editorTrimTrailingWhitespace:
-      get<boolean>(KEY_EDITOR_TRIM_TRAILING_WHITESPACE) ??
-      DEFAULT_PREFERENCES.editorTrimTrailingWhitespace,
+      get<boolean>(KEY_EDITOR_TRIM_TRAILING_WHITESPACE) ?? DEFAULT_PREFERENCES.editorTrimTrailingWhitespace,
     editorInsertFinalNewline:
-      get<boolean>(KEY_EDITOR_INSERT_FINAL_NEWLINE) ??
-      DEFAULT_PREFERENCES.editorInsertFinalNewline,
+      get<boolean>(KEY_EDITOR_INSERT_FINAL_NEWLINE) ?? DEFAULT_PREFERENCES.editorInsertFinalNewline,
     editorAutocompleteDebounceMs: Math.min(
       2000,
       Math.max(
         50,
-        get<number>(KEY_EDITOR_AUTOCOMPLETE_DEBOUNCE_MS) ??
-          DEFAULT_PREFERENCES.editorAutocompleteDebounceMs,
+        get<number>(KEY_EDITOR_AUTOCOMPLETE_DEBOUNCE_MS) ?? DEFAULT_PREFERENCES.editorAutocompleteDebounceMs,
       ),
     ),
 
-    sftpFontSize:
-      get<number>(KEY_SFTP_FONT_SIZE) ?? DEFAULT_PREFERENCES.sftpFontSize,
-    sftpShowHiddenFiles:
-      get<boolean>(KEY_SFTP_SHOW_HIDDEN) ?? DEFAULT_PREFERENCES.sftpShowHiddenFiles,
-    sftpShowUpFolder:
-      get<boolean>(KEY_SFTP_SHOW_UP_FOLDER) ?? DEFAULT_PREFERENCES.sftpShowUpFolder,
-    sftpColumnSize:
-      get<boolean>(KEY_SFTP_COLUMN_SIZE) ?? DEFAULT_PREFERENCES.sftpColumnSize,
-    sftpColumnModified:
-      get<boolean>(KEY_SFTP_COLUMN_MODIFIED) ?? DEFAULT_PREFERENCES.sftpColumnModified,
+    sftpFontSize: get<number>(KEY_SFTP_FONT_SIZE) ?? DEFAULT_PREFERENCES.sftpFontSize,
+    sftpShowHiddenFiles: get<boolean>(KEY_SFTP_SHOW_HIDDEN) ?? DEFAULT_PREFERENCES.sftpShowHiddenFiles,
+    sftpShowUpFolder: get<boolean>(KEY_SFTP_SHOW_UP_FOLDER) ?? DEFAULT_PREFERENCES.sftpShowUpFolder,
+    sftpColumnSize: get<boolean>(KEY_SFTP_COLUMN_SIZE) ?? DEFAULT_PREFERENCES.sftpColumnSize,
+    sftpColumnModified: get<boolean>(KEY_SFTP_COLUMN_MODIFIED) ?? DEFAULT_PREFERENCES.sftpColumnModified,
     sftpColumnPermissions:
       get<boolean>(KEY_SFTP_COLUMN_PERMISSIONS) ?? DEFAULT_PREFERENCES.sftpColumnPermissions,
-    sftpColumnType:
-      get<boolean>(KEY_SFTP_COLUMN_TYPE) ?? DEFAULT_PREFERENCES.sftpColumnType,
+    sftpColumnType: get<boolean>(KEY_SFTP_COLUMN_TYPE) ?? DEFAULT_PREFERENCES.sftpColumnType,
     sftpRemoteEditShowTransfers:
       get<boolean>(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS) ?? DEFAULT_PREFERENCES.sftpRemoteEditShowTransfers,
 
-    commandPaletteBlur:
-      get<number>(KEY_COMMAND_PALETTE_BLUR) ??
-      DEFAULT_PREFERENCES.commandPaletteBlur,
+    commandPaletteBlur: get<number>(KEY_COMMAND_PALETTE_BLUR) ?? DEFAULT_PREFERENCES.commandPaletteBlur,
     commandPaletteOpacity:
-      get<number>(KEY_COMMAND_PALETTE_OPACITY) ??
-      DEFAULT_PREFERENCES.commandPaletteOpacity,
+      get<number>(KEY_COMMAND_PALETTE_OPACITY) ?? DEFAULT_PREFERENCES.commandPaletteOpacity,
     commandPalettePosition:
       get<"top" | "center" | "high">(KEY_COMMAND_PALETTE_POSITION) ??
       DEFAULT_PREFERENCES.commandPalettePosition,
@@ -701,11 +608,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<"fast" | "normal" | "slow" | "none">(KEY_COMMAND_PALETTE_ANIMATION) ??
       DEFAULT_PREFERENCES.commandPaletteAnimation,
     commandPaletteShowRecent:
-      get<boolean>(KEY_COMMAND_PALETTE_SHOW_RECENT) ??
-      DEFAULT_PREFERENCES.commandPaletteShowRecent,
+      get<boolean>(KEY_COMMAND_PALETTE_SHOW_RECENT) ?? DEFAULT_PREFERENCES.commandPaletteShowRecent,
     commandPaletteHistorySize:
-      get<number>(KEY_COMMAND_PALETTE_HISTORY_SIZE) ??
-      DEFAULT_PREFERENCES.commandPaletteHistorySize,
+      get<number>(KEY_COMMAND_PALETTE_HISTORY_SIZE) ?? DEFAULT_PREFERENCES.commandPaletteHistorySize,
     commandPaletteSearchMode:
       get<"contains" | "startsWith" | "fuzzy">(KEY_COMMAND_PALETTE_SEARCH_MODE) ??
       DEFAULT_PREFERENCES.commandPaletteSearchMode,
@@ -713,40 +618,27 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY) ??
       DEFAULT_PREFERENCES.commandPaletteCloseOnOverlayClick,
 
-    sidebarPosition:
-      get<"left" | "right">(KEY_SIDEBAR_POSITION) ??
-      DEFAULT_PREFERENCES.sidebarPosition,
+    sidebarPosition: get<"left" | "right">(KEY_SIDEBAR_POSITION) ?? DEFAULT_PREFERENCES.sidebarPosition,
     sidebarOpen: get<boolean>(KEY_SIDEBAR_OPEN) ?? DEFAULT_PREFERENCES.sidebarOpen,
     sidebarActivePanel: (() => {
       const raw = get<string>(KEY_SIDEBAR_ACTIVE_PANEL);
-      return (["explorer", "snippets", "tabs"] as const).includes(
-        raw as "explorer" | "snippets" | "tabs",
-      )
+      return (["explorer", "snippets", "tabs"] as const).includes(raw as "explorer" | "snippets" | "tabs")
         ? (raw as "explorer" | "snippets" | "tabs")
         : DEFAULT_PREFERENCES.sidebarActivePanel;
     })(),
-    credentialEncryption:
-      get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
-    checkForUpdates:
-      get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
+    credentialEncryption: get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
+    checkForUpdates: get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
 
-    hostPingInterval:
-      get<number>(KEY_HOST_PING_INTERVAL) ?? DEFAULT_PREFERENCES.hostPingInterval,
-    hmLayout:
-      get<"grid" | "list">(KEY_HM_LAYOUT) ?? DEFAULT_PREFERENCES.hmLayout,
-    hmSort:
-      get<"last_connected" | "a_z" | "z_a">(KEY_HM_SORT) ?? DEFAULT_PREFERENCES.hmSort,
+    hostPingInterval: get<number>(KEY_HOST_PING_INTERVAL) ?? DEFAULT_PREFERENCES.hostPingInterval,
+    hmLayout: get<"grid" | "list">(KEY_HM_LAYOUT) ?? DEFAULT_PREFERENCES.hmLayout,
+    hmSort: get<"last_connected" | "a_z" | "z_a">(KEY_HM_SORT) ?? DEFAULT_PREFERENCES.hmSort,
 
-    aiEnabled:
-      get<boolean>(KEY_AI_ENABLED) ?? DEFAULT_PREFERENCES.aiEnabled,
-    showEditPrediction:
-      get<boolean>(KEY_SHOW_EDIT_PREDICTION) ?? DEFAULT_PREFERENCES.showEditPrediction,
-    aiMaxAgentSteps:
-      get<number>(KEY_AI_MAX_AGENT_STEPS) ?? DEFAULT_PREFERENCES.aiMaxAgentSteps,
+    aiEnabled: get<boolean>(KEY_AI_ENABLED) ?? DEFAULT_PREFERENCES.aiEnabled,
+    showEditPrediction: get<boolean>(KEY_SHOW_EDIT_PREDICTION) ?? DEFAULT_PREFERENCES.showEditPrediction,
+    aiMaxAgentSteps: get<number>(KEY_AI_MAX_AGENT_STEPS) ?? DEFAULT_PREFERENCES.aiMaxAgentSteps,
     aiTerminalContextLines:
       get<number>(KEY_AI_TERMINAL_CONTEXT_LINES) ?? DEFAULT_PREFERENCES.aiTerminalContextLines,
-    aiTemperature:
-      get<number>(KEY_AI_TEMPERATURE) ?? DEFAULT_PREFERENCES.aiTemperature,
+    aiTemperature: get<number>(KEY_AI_TEMPERATURE) ?? DEFAULT_PREFERENCES.aiTemperature,
     aiWarnDestructiveCommands:
       get<boolean>(KEY_AI_WARN_DESTRUCTIVE) ?? DEFAULT_PREFERENCES.aiWarnDestructiveCommands,
     terminalCopyOnSelect:
@@ -758,29 +650,25 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalScrollSensitivity:
       get<number>(KEY_TERMINAL_SCROLL_SENSITIVITY) ?? DEFAULT_PREFERENCES.terminalScrollSensitivity,
     terminalFastScrollModifier:
-      get<"none" | "alt" | "ctrl" | "shift">(KEY_TERMINAL_FAST_SCROLL_MODIFIER) ?? DEFAULT_PREFERENCES.terminalFastScrollModifier,
-    reduceMotion:
-      get<boolean>(KEY_REDUCE_MOTION) ?? DEFAULT_PREFERENCES.reduceMotion,
-    newTabInheritsCwd:
-      get<boolean>(KEY_NEW_TAB_INHERITS_CWD) ?? DEFAULT_PREFERENCES.newTabInheritsCwd,
+      get<"none" | "alt" | "ctrl" | "shift">(KEY_TERMINAL_FAST_SCROLL_MODIFIER) ??
+      DEFAULT_PREFERENCES.terminalFastScrollModifier,
+    reduceMotion: get<boolean>(KEY_REDUCE_MOTION) ?? DEFAULT_PREFERENCES.reduceMotion,
+    newTabInheritsCwd: get<boolean>(KEY_NEW_TAB_INHERITS_CWD) ?? DEFAULT_PREFERENCES.newTabInheritsCwd,
     confirmCloseTerminalTab:
       get<boolean>(KEY_CONFIRM_CLOSE_TERMINAL_TAB) ?? DEFAULT_PREFERENCES.confirmCloseTerminalTab,
-    confirmQuitWithSsh:
-      get<boolean>(KEY_CONFIRM_QUIT_WITH_SSH) ?? DEFAULT_PREFERENCES.confirmQuitWithSsh,
+    confirmQuitWithSsh: get<boolean>(KEY_CONFIRM_QUIT_WITH_SSH) ?? DEFAULT_PREFERENCES.confirmQuitWithSsh,
 
     titlebarsIconsPosition:
-      get<"auto" | "left" | "right">(KEY_TITLEBAR_ICONS_POSITION) ?? DEFAULT_PREFERENCES.titlebarsIconsPosition,
+      get<"auto" | "left" | "right">(KEY_TITLEBAR_ICONS_POSITION) ??
+      DEFAULT_PREFERENCES.titlebarsIconsPosition,
 
-    tabsLocation:
-      get<"titlebar" | "sidebar">(KEY_TABS_LOCATION) ?? DEFAULT_PREFERENCES.tabsLocation,
+    tabsLocation: get<"titlebar" | "sidebar">(KEY_TABS_LOCATION) ?? DEFAULT_PREFERENCES.tabsLocation,
 
-    zenModeShowHeader:
-      get<boolean>(KEY_ZEN_MODE_SHOW_HEADER) ?? DEFAULT_PREFERENCES.zenModeShowHeader,
+    zenModeShowHeader: get<boolean>(KEY_ZEN_MODE_SHOW_HEADER) ?? DEFAULT_PREFERENCES.zenModeShowHeader,
     zenModeShowStatusbar:
       get<boolean>(KEY_ZEN_MODE_SHOW_STATUSBAR) ?? DEFAULT_PREFERENCES.zenModeShowStatusbar,
 
-    sshAutoReconnect:
-      get<boolean>(KEY_SSH_AUTO_RECONNECT) ?? DEFAULT_PREFERENCES.sshAutoReconnect,
+    sshAutoReconnect: get<boolean>(KEY_SSH_AUTO_RECONNECT) ?? DEFAULT_PREFERENCES.sshAutoReconnect,
     sshAutoReconnectDelay:
       get<number>(KEY_SSH_AUTO_RECONNECT_DELAY) ?? DEFAULT_PREFERENCES.sshAutoReconnectDelay,
     sshAutoReconnectMaxAttempts:
@@ -791,7 +679,8 @@ export async function loadPreferences(): Promise<Preferences> {
     statusBarShowSnippetsButton:
       get<boolean>(KEY_STATUSBAR_SHOW_SNIPPETS_BUTTON) ?? DEFAULT_PREFERENCES.statusBarShowSnippetsButton,
     statusBarShowSourceControlButton:
-      get<boolean>(KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON) ?? DEFAULT_PREFERENCES.statusBarShowSourceControlButton,
+      get<boolean>(KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON) ??
+      DEFAULT_PREFERENCES.statusBarShowSourceControlButton,
     statusBarShowTabsButton:
       get<boolean>(KEY_STATUSBAR_SHOW_TABS_BUTTON) ?? DEFAULT_PREFERENCES.statusBarShowTabsButton,
     statusBarShowCwdBreadcrumb:
@@ -838,9 +727,7 @@ export async function setAutocompleteEnabled(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setAutocompleteProvider(
-  value: AutocompleteProviderId,
-): Promise<void> {
+export async function setAutocompleteProvider(value: AutocompleteProviderId): Promise<void> {
   await (await getStore()).set(KEY_AUTOCOMPLETE_PROVIDER, value);
   await (await getStore()).save();
 }
@@ -895,9 +782,7 @@ export async function setVimMode(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setDefaultStartupTab(
-  value: "terminal" | "host-manager",
-): Promise<void> {
+export async function setDefaultStartupTab(value: "terminal" | "host-manager"): Promise<void> {
   await (await getStore()).set(KEY_DEFAULT_STARTUP_TAB, value);
   await (await getStore()).save();
 }
@@ -962,9 +847,7 @@ export async function setAppCornerRadius(value: number): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setAppDensity(
-  value: "compact" | "default" | "relaxed",
-): Promise<void> {
+export async function setAppDensity(value: "compact" | "default" | "relaxed"): Promise<void> {
   await (await getStore()).set(KEY_APP_DENSITY, value);
   await (await getStore()).save();
 }
@@ -985,9 +868,7 @@ export async function setTerminalCursorBlinkInterval(value: number): Promise<voi
   await (await getStore()).save();
 }
 
-export async function setTerminalCursorStyle(
-  value: "block" | "underline" | "bar",
-): Promise<void> {
+export async function setTerminalCursorStyle(value: "block" | "underline" | "bar"): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_CURSOR_STYLE, value);
   await (await getStore()).save();
 }
@@ -1017,9 +898,7 @@ export async function setTerminalLineHeight(value: number): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setTerminalFontWeight(
-  value: "normal" | "medium" | "bold",
-): Promise<void> {
+export async function setTerminalFontWeight(value: "normal" | "medium" | "bold"): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_FONT_WEIGHT, value);
   await (await getStore()).save();
 }
@@ -1084,9 +963,7 @@ export async function setEditorFontSize(value: number): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setEditorAutoSave(
-  value: "off" | "afterDelay" | "onFocusChange",
-): Promise<void> {
+export async function setEditorAutoSave(value: "off" | "afterDelay" | "onFocusChange"): Promise<void> {
   await (await getStore()).set(KEY_EDITOR_AUTO_SAVE, value);
   await (await getStore()).save();
 }
@@ -1167,16 +1044,12 @@ export async function setCommandPaletteOpacity(value: number): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setCommandPalettePosition(
-  value: "top" | "center" | "high",
-): Promise<void> {
+export async function setCommandPalettePosition(value: "top" | "center" | "high"): Promise<void> {
   await (await getStore()).set(KEY_COMMAND_PALETTE_POSITION, value);
   await (await getStore()).save();
 }
 
-export async function setCommandPaletteAnimation(
-  value: "fast" | "normal" | "slow" | "none",
-): Promise<void> {
+export async function setCommandPaletteAnimation(value: "fast" | "normal" | "slow" | "none"): Promise<void> {
   await (await getStore()).set(KEY_COMMAND_PALETTE_ANIMATION, value);
   await (await getStore()).save();
 }
@@ -1191,9 +1064,7 @@ export async function setCommandPaletteHistorySize(value: number): Promise<void>
   await (await getStore()).save();
 }
 
-export async function setCommandPaletteSearchMode(
-  value: "contains" | "startsWith" | "fuzzy",
-): Promise<void> {
+export async function setCommandPaletteSearchMode(value: "contains" | "startsWith" | "fuzzy"): Promise<void> {
   await (await getStore()).set(KEY_COMMAND_PALETTE_SEARCH_MODE, value);
   await (await getStore()).save();
 }
@@ -1203,9 +1074,7 @@ export async function setCommandPaletteCloseOnOverlayClick(value: boolean): Prom
   await (await getStore()).save();
 }
 
-export async function setSidebarPosition(
-  value: "left" | "right",
-): Promise<void> {
+export async function setSidebarPosition(value: "left" | "right"): Promise<void> {
   await (await getStore()).set(KEY_SIDEBAR_POSITION, value);
   await (await getStore()).save();
 }
@@ -1215,9 +1084,7 @@ export async function setSidebarOpen(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setSidebarActivePanel(
-  value: "explorer" | "snippets" | "tabs",
-): Promise<void> {
+export async function setSidebarActivePanel(value: "explorer" | "snippets" | "tabs"): Promise<void> {
   await (await getStore()).set(KEY_SIDEBAR_ACTIVE_PANEL, value);
   await (await getStore()).save();
 }
@@ -1297,9 +1164,7 @@ export async function setTerminalScrollSensitivity(value: number): Promise<void>
   await (await getStore()).save();
 }
 
-export async function setTerminalFastScrollModifier(
-  value: "none" | "alt" | "ctrl" | "shift",
-): Promise<void> {
+export async function setTerminalFastScrollModifier(value: "none" | "alt" | "ctrl" | "shift"): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_FAST_SCROLL_MODIFIER, value);
   await (await getStore()).save();
 }
@@ -1324,9 +1189,7 @@ export async function setConfirmQuitWithSsh(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setTitlebarsIconsPosition(
-  value: "auto" | "left" | "right",
-): Promise<void> {
+export async function setTitlebarsIconsPosition(value: "auto" | "left" | "right"): Promise<void> {
   await (await getStore()).set(KEY_TITLEBAR_ICONS_POSITION, value);
   await (await getStore()).save();
 }
@@ -1431,9 +1294,7 @@ export async function setStatusBarShowAiControls(value: boolean): Promise<void> 
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
-export async function onPreferencesChange(
-  cb: (key: PrefKey, value: unknown) => void,
-): Promise<UnlistenFn> {
+export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => void): Promise<UnlistenFn> {
   const map: Record<string, PrefKey> = {
     [KEY_THEME]: "theme",
     [KEY_DEFAULT_MODEL]: "defaultModelId",

@@ -1,11 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-  PlusSignIcon,
-  MinusSignIcon,
-} from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, ArrowRight01Icon, PlusSignIcon, MinusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { useSourceControlStore } from "../store/sourceControlStore";
@@ -50,8 +45,7 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
 
   const label = SECTION_LABELS[section];
 
-  const isSectionSelected =
-    selectionMode?.type === 'section' && selectionMode.section === section;
+  const isSectionSelected = selectionMode?.type === "section" && selectionMode.section === section;
 
   async function handleSectionAction(e: React.MouseEvent) {
     e.stopPropagation();
@@ -74,7 +68,7 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
       <div
         className={cn(
           "group/hdr flex h-6 cursor-pointer items-center gap-1.5 px-3 transition-colors",
-          isSectionSelected ? "bg-accent/15" : "hover:bg-muted/15"
+          isSectionSelected ? "bg-accent/15" : "hover:bg-muted/15",
         )}
       >
         {/* Collapse chevron */}
@@ -111,14 +105,12 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
               "select-none text-[10px] font-semibold uppercase tracking-widest",
               isSectionSelected
                 ? "text-foreground/75"
-                : "text-muted-foreground/50 group-hover/hdr:text-muted-foreground/70"
+                : "text-muted-foreground/50 group-hover/hdr:text-muted-foreground/70",
             )}
           >
             {label}
           </span>
-          <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">
-            {files.length}
-          </span>
+          <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">{files.length}</span>
           {(sectionStats.added > 0 || sectionStats.removed > 0) && (
             <span className="flex items-center gap-1 text-[9px] tabular-nums">
               {sectionStats.added > 0 && (

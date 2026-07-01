@@ -1,8 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  SourceCodeIcon,
-  Edit02Icon,
-} from "@hugeicons/core-free-icons";
+import { SourceCodeIcon, Edit02Icon } from "@hugeicons/core-free-icons";
 import { createElement } from "react";
 import { useEditorMetaStore } from "@/modules/editor/lib/editorMetaStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";

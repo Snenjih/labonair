@@ -1,14 +1,7 @@
 import { Command as CommandPrimitive } from "cmdk";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { AnimatePresence, motion } from "motion/react";
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Search01Icon, ArrowLeft01Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
@@ -96,13 +89,16 @@ export function CommandPalette({
     setHighlightedValue("");
   }, [pages.length, currentPage]);
 
-  const goBackToIndex = useCallback((index: number) => {
-    currentPage?.onLeave?.();
-    setSlideDir("back");
-    setPages((prev) => prev.slice(0, index + 1));
-    setSearch("");
-    setHighlightedValue("");
-  }, [currentPage]);
+  const goBackToIndex = useCallback(
+    (index: number) => {
+      currentPage?.onLeave?.();
+      setSlideDir("back");
+      setPages((prev) => prev.slice(0, index + 1));
+      setSearch("");
+      setHighlightedValue("");
+    },
+    [currentPage],
+  );
 
   const handleClose = useCallback(() => {
     currentPage?.onLeave?.();
@@ -163,10 +159,7 @@ export function CommandPalette({
     [navigateTo, handleClose, pushRecent],
   );
 
-  const groupedActions = useMemo(
-    () => groupBySection(currentPage?.actions ?? []),
-    [currentPage],
-  );
+  const groupedActions = useMemo(() => groupBySection(currentPage?.actions ?? []), [currentPage]);
 
   const recentActions = useMemo(() => {
     if (search || activePage !== "root") return [];
@@ -184,12 +177,15 @@ export function CommandPalette({
     return map;
   }, [currentPage, recentActions]);
 
-  const handleValueChange = useCallback((value: string) => {
-    setHighlightedValue(value);
-    // Values are formatted as "<searchable text> §<action.id>" — extract the id.
-    const match = /§(\S+)$/.exec(value);
-    if (match) actionById.get(match[1])?.onPreview?.();
-  }, [actionById]);
+  const handleValueChange = useCallback(
+    (value: string) => {
+      setHighlightedValue(value);
+      // Values are formatted as "<searchable text> §<action.id>" — extract the id.
+      const match = /§(\S+)$/.exec(value);
+      if (match) actionById.get(match[1])?.onPreview?.();
+    },
+    [actionById],
+  );
 
   const visibleCount = useMemo(() => {
     const actions = currentPage?.actions ?? [];
@@ -212,21 +208,15 @@ export function CommandPalette({
 
   const cycleSearchMode = useCallback(() => {
     const modes = ["contains", "startsWith", "fuzzy"] as const;
-    const idx = modes.indexOf(searchMode as typeof modes[number]);
+    const idx = modes.indexOf(searchMode as (typeof modes)[number]);
     void setCommandPaletteSearchMode(modes[(idx + 1) % modes.length]);
   }, [searchMode]);
 
   const animDuration =
-    animation === "none" ? "0ms" :
-    animation === "fast" ? "70ms" :
-    animation === "slow" ? "220ms" :
-    "130ms";
+    animation === "none" ? "0ms" : animation === "fast" ? "70ms" : animation === "slow" ? "220ms" : "130ms";
 
   const motionDuration =
-    animation === "none" ? 0 :
-    animation === "fast" ? 0.07 :
-    animation === "slow" ? 0.22 :
-    0.13;
+    animation === "none" ? 0 : animation === "fast" ? 0.07 : animation === "slow" ? 0.22 : 0.13;
 
   const positionStyle: React.CSSProperties = {
     top: position === "high" ? "8%" : position === "center" ? "50%" : "15%",
@@ -267,7 +257,10 @@ export function CommandPalette({
             filter={(value: string, search: string) => {
               if (!search) return 1;
               // Strip decorators before matching: "__recent__:" prefix and " §<id>" suffix
-              const v = value.replace(/^__recent__:/, "").replace(/\s*§\S+$/, "").toLowerCase();
+              const v = value
+                .replace(/^__recent__:/, "")
+                .replace(/\s*§\S+$/, "")
+                .toLowerCase();
               const s = search.toLowerCase();
               if (searchMode === "startsWith") return v.startsWith(s) ? 1 : 0;
               if (searchMode === "fuzzy") {
@@ -364,11 +357,7 @@ export function CommandPalette({
                       className="overflow-hidden **:[[cmdk-group-heading]]:px-3 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-[10px] **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-heading]]:tracking-widest **:[[cmdk-group-heading]]:text-muted-foreground/70"
                     >
                       {sectionActions.map((action) => (
-                        <PaletteItem
-                          key={action.id}
-                          action={action}
-                          onExecute={executeAction}
-                        />
+                        <PaletteItem key={action.id} action={action} onExecute={executeAction} />
                       ))}
                     </CommandPrimitive.Group>
                   ))}
@@ -439,9 +428,7 @@ function PaletteItem({ action, onExecute, isRecent }: PaletteItemProps) {
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium leading-tight">
-          {action.title}
-        </span>
+        <span className="block truncate text-[13px] font-medium leading-tight">{action.title}</span>
         {action.subtitle && (
           <span className="block truncate text-[11px] leading-tight text-muted-foreground mt-0.5">
             {action.subtitle}

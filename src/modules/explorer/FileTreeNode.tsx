@@ -11,11 +11,7 @@ import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { memo, useCallback, useState } from "react";
 import { InlineInput } from "./InlineInput";
-import {
-  copyToClipboard,
-  relativePath,
-  revealInFinder,
-} from "./lib/contextActions";
+import { copyToClipboard, relativePath, revealInFinder } from "./lib/contextActions";
 import { explorerDrag } from "./lib/explorerDrag";
 import type { FileEntry } from "./lib/fsProvider";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
@@ -24,9 +20,7 @@ import type { useFileTree } from "./lib/useFileTree";
 
 type Tree = ReturnType<typeof useFileTree>;
 
-export const PREVIEW_EXTENSIONS = new Set([
-  "html", "htm", "png", "jpg", "jpeg", "gif", "webp", "svg", "pdf",
-]);
+export const PREVIEW_EXTENSIONS = new Set(["html", "htm", "png", "jpg", "jpeg", "gif", "webp", "svg", "pdf"]);
 
 type Props = {
   path: string;
@@ -73,9 +67,7 @@ function FileTreeNodeImpl({
 
   const [isConfirming, setIsConfirming] = useState(false);
 
-  const iconUrl = isDir
-    ? folderIconUrl(entry.name, isExpanded)
-    : fileIconUrl(entry.name);
+  const iconUrl = isDir ? folderIconUrl(entry.name, isExpanded) : fileIconUrl(entry.name);
 
   const handleClick = useCallback(() => {
     if (tree.renaming) return;
@@ -104,11 +96,7 @@ function FileTreeNodeImpl({
             ) : (
               <span className="size-4 shrink-0" />
             )}
-            <InlineInput
-              initial={entry.name}
-              onCommit={tree.commitRename}
-              onCancel={tree.cancelRename}
-            />
+            <InlineInput initial={entry.name} onCommit={tree.commitRename} onCancel={tree.cancelRename} />
           </div>
         ) : (
           <button
@@ -136,8 +124,10 @@ function FileTreeNodeImpl({
                     if (nativeDragStarted) return;
                     const el = document.documentElement;
                     if (
-                      nev.clientX < 0 || nev.clientY < 0 ||
-                      nev.clientX > el.clientWidth || nev.clientY > el.clientHeight
+                      nev.clientX < 0 ||
+                      nev.clientY < 0 ||
+                      nev.clientX > el.clientWidth ||
+                      nev.clientY > el.clientHeight
                     ) {
                       nativeDragStarted = true;
                       document.removeEventListener("pointermove", onMoveForNative);
@@ -187,10 +177,7 @@ function FileTreeNodeImpl({
                   icon={ArrowRight01Icon}
                   size={12}
                   strokeWidth={2.25}
-                  className={cn(
-                    "transition-transform",
-                    isExpanded && "rotate-90",
-                  )}
+                  className={cn("transition-transform", isExpanded && "rotate-90")}
                 />
               ) : null}
             </span>
@@ -205,55 +192,34 @@ function FileTreeNodeImpl({
       </ContextMenuTrigger>
       <ContextMenuContent className={COMPACT_CONTENT}>
         {!isDir && (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => onOpenFile(path)}
-          >
+          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onOpenFile(path)}>
             Open
           </ContextMenuItem>
         )}
         {canPreview && onOpenPreview && (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => onOpenPreview(path)}
-          >
+          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onOpenPreview(path)}>
             Open in Preview
           </ContextMenuItem>
         )}
         {isDir && onRevealInTerminal && (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => onRevealInTerminal(path)}
-          >
+          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onRevealInTerminal(path)}>
             Open in Terminal
           </ContextMenuItem>
         )}
         {tree.capabilities.supportsReveal && (
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => void revealInFinder(path)}
-          >
+          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => void revealInFinder(path)}>
             Reveal in Finder
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => tree.beginCreate(createTarget, "file")}
-        >
+        <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginCreate(createTarget, "file")}>
           New File
         </ContextMenuItem>
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => tree.beginCreate(createTarget, "dir")}
-        >
+        <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginCreate(createTarget, "dir")}>
           New Folder
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => void copyToClipboard(path)}
-        >
+        <ContextMenuItem className={COMPACT_ITEM} onSelect={() => void copyToClipboard(path)}>
           Copy Path
         </ContextMenuItem>
         <ContextMenuItem
@@ -263,17 +229,11 @@ function FileTreeNodeImpl({
           Copy Relative Path
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => onAttachToAgent?.(path)}
-        >
+        <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onAttachToAgent?.(path)}>
           Attach to Agent
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className={COMPACT_ITEM}
-          onSelect={() => tree.beginRename(path)}
-        >
+        <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginRename(path)}>
           Rename
         </ContextMenuItem>
         <ContextMenuItem
@@ -303,7 +263,8 @@ function makeDragImage(name: string): string {
   canvas.width = 220;
   canvas.height = 36;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+  if (!ctx)
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
   ctx.fillStyle = "rgba(30, 30, 30, 0.88)";
   ctx.beginPath();
   ctx.roundRect(0, 0, 220, 36, 8);

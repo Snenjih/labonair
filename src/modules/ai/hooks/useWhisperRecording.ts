@@ -4,12 +4,7 @@ import { experimental_transcribe as transcribe } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStore } from "../store/chatStore";
 
-const MIME_CANDIDATES = [
-  "audio/webm;codecs=opus",
-  "audio/webm",
-  "audio/ogg;codecs=opus",
-  "audio/mp4",
-];
+const MIME_CANDIDATES = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
 
 function pickMime(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
@@ -31,11 +26,7 @@ async function transcribeBlob(blob: Blob, apiKey: string): Promise<string> {
 
 type State = "idle" | "recording" | "transcribing";
 
-export function useWhisperRecording({
-  onResult,
-}: {
-  onResult: (text: string) => void;
-}) {
+export function useWhisperRecording({ onResult }: { onResult: (text: string) => void }) {
   const apiKey = useChatStore((s) => s.apiKeys.openai);
   const [state, setState] = useState<State>("idle");
   const recRef = useRef<MediaRecorder | null>(null);
@@ -48,7 +39,7 @@ export function useWhisperRecording({
     typeof MediaRecorder !== "undefined";
 
   const teardownStream = useCallback(() => {
-    for (const track of (streamRef.current?.getTracks() ?? [])) track.stop();
+    for (const track of streamRef.current?.getTracks() ?? []) track.stop();
     streamRef.current = null;
   }, []);
 

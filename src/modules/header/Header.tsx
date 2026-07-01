@@ -171,10 +171,7 @@ export const Header = React.memo(function Header({
         </>
       )}
 
-      <div
-        className="flex min-w-0 flex-1 items-center gap-2"
-        data-tauri-drag-region
-      >
+      <div className="flex min-w-0 flex-1 items-center gap-2" data-tauri-drag-region>
         {tabsLocation === "titlebar" && (
           <TabBar
             onSelect={onSelect}

@@ -1,13 +1,7 @@
 import { handleApiError } from "@/lib/errors";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useWhisperRecording } from "../hooks/useWhisperRecording";
 import { expandDirectiveTokens, type Directive } from "../lib/directives";
 import { tryRunSlashCommand, type SlashCommandMeta } from "./slashCommands";
@@ -68,8 +62,7 @@ const Ctx = createContext<ComposerCtx | null>(null);
 
 export function useComposer(): ComposerCtx {
   const ctx = useContext(Ctx);
-  if (!ctx)
-    throw new Error("useComposer must be used inside <AiComposerProvider>");
+  if (!ctx) throw new Error("useComposer must be used inside <AiComposerProvider>");
   return ctx;
 }
 
@@ -127,10 +120,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
         if (existing.has(sel.id)) continue;
         next.push({
           id: sel.id,
-          name:
-            sel.source === "editor"
-              ? "Editor selection"
-              : "Terminal selection",
+          name: sel.source === "editor" ? "Editor selection" : "Terminal selection",
           kind: "selection",
           mediaType: "text/plain",
           text: sel.text,
@@ -159,22 +149,15 @@ export function AiComposerProvider({ children }: ProviderProps) {
     if (next.length) setFiles((prev) => [...prev, ...next]);
   };
 
-  const removeFile = (id: string) =>
-    setFiles((prev) => prev.filter((f) => f.id !== id));
+  const removeFile = (id: string) => setFiles((prev) => prev.filter((f) => f.id !== id));
 
   const addDirective = (d: Directive) =>
-    setPickedDirectives((prev) =>
-      prev.some((p) => p.id === d.id) ? prev : [...prev, d],
-    );
-  const removeDirective = (id: string) =>
-    setPickedDirectives((prev) => prev.filter((d) => d.id !== id));
+    setPickedDirectives((prev) => (prev.some((p) => p.id === d.id) ? prev : [...prev, d]));
+  const removeDirective = (id: string) => setPickedDirectives((prev) => prev.filter((d) => d.id !== id));
 
   const addCommand = (cmd: SlashCommandMeta) =>
-    setPickedCommands((prev) =>
-      prev.some((p) => p.name === cmd.name) ? prev : [...prev, cmd],
-    );
-  const removeCommand = (name: string) =>
-    setPickedCommands((prev) => prev.filter((c) => c.name !== name));
+    setPickedCommands((prev) => (prev.some((p) => p.name === cmd.name) ? prev : [...prev, cmd]));
+  const removeCommand = (name: string) => setPickedCommands((prev) => prev.filter((c) => c.name !== name));
 
   const attachFileByPath = async (path: string) => {
     try {
@@ -229,10 +212,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
     const id = `ref-${path}`;
     setFiles((prev) => {
       if (prev.some((f) => f.id === id)) return prev;
-      return [
-        ...prev,
-        { id, name, kind: "ref", mediaType: "text/plain", path, size: 0 },
-      ];
+      return [...prev, { id, name, kind: "ref", mediaType: "text/plain", path, size: 0 }];
     });
     useChatStore.getState().focusInput();
   };
@@ -240,12 +220,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
   const submit = () => {
     if (isBusy) return;
     const trimmed = value.trim();
-    if (
-      !trimmed &&
-      files.length === 0 &&
-      pickedDirectives.length === 0 &&
-      pickedCommands.length === 0
-    )
+    if (!trimmed && files.length === 0 && pickedDirectives.length === 0 && pickedCommands.length === 0)
       return;
 
     useChatStore.getState().openMini();
@@ -276,19 +251,13 @@ export function AiComposerProvider({ children }: ProviderProps) {
     const parts: MessagePart[] = [];
     const fileBlocks = files
       .filter((f) => f.kind === "text")
-      .map(
-        (f) =>
-          `<file name="${f.name}" mediaType="${f.mediaType}">\n${f.text ?? ""}\n</file>`,
-      );
+      .map((f) => `<file name="${f.name}" mediaType="${f.mediaType}">\n${f.text ?? ""}\n</file>`);
     const refBlocks = files
       .filter((f) => f.kind === "ref")
       .map((f) => `<file-ref name="${f.name}" path="${f.path ?? f.name}" />`);
     const selectionBlocks = files
       .filter((f) => f.kind === "selection")
-      .map(
-        (f) =>
-          `<selection source="${f.source ?? "terminal"}">\n${f.text ?? ""}\n</selection>`,
-      );
+      .map((f) => `<selection source="${f.source ?? "terminal"}">\n${f.text ?? ""}\n</selection>`);
     const { body: bodyAfterTokens, blocks: directiveBlocks } = expandDirectiveTokens(
       effectiveText,
       useDirectivesStore.getState().directives,
@@ -298,9 +267,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
     for (const d of pickedDirectives) {
       if (seenHandles.has(d.handle)) continue;
       seenHandles.add(d.handle);
-      allDirectiveBlocks.push(
-        `<directive name="${d.handle}">\n${d.content}\n</directive>`,
-      );
+      allDirectiveBlocks.push(`<directive name="${d.handle}">\n${d.content}\n</directive>`);
     }
     for (const block of directiveBlocks) {
       const m = block.match(/^<directive name="([^"]+)"/);
@@ -333,9 +300,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
 
     if (!sessionId) return;
     const chat = getOrCreateChat(sessionId);
-    void chat.sendMessage({ role: "user", parts } as Parameters<
-      typeof chat.sendMessage
-    >[0]);
+    void chat.sendMessage({ role: "user", parts } as Parameters<typeof chat.sendMessage>[0]);
     setValue("");
     setFiles([]);
     setPickedDirectives([]);
@@ -365,10 +330,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
 
   const canSend =
     !isBusy &&
-    (value.trim().length > 0 ||
-      files.length > 0 ||
-      pickedDirectives.length > 0 ||
-      pickedCommands.length > 0);
+    (value.trim().length > 0 || files.length > 0 || pickedDirectives.length > 0 || pickedCommands.length > 0);
 
   const ctx: ComposerCtx = {
     textareaRef,

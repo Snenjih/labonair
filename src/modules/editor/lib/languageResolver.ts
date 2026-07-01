@@ -14,18 +14,11 @@ type LanguageLoader = () => Promise<LoaderResult>;
 const loaders: Record<string, LanguageLoader> = {
   // JavaScript / TypeScript family
   js: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
-  jsx: () =>
-    import("@codemirror/lang-javascript").then((m) => m.javascript({ jsx: true })),
+  jsx: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ jsx: true })),
   mjs: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
   cjs: () => import("@codemirror/lang-javascript").then((m) => m.javascript()),
-  ts: () =>
-    import("@codemirror/lang-javascript").then((m) =>
-      m.javascript({ typescript: true }),
-    ),
-  tsx: () =>
-    import("@codemirror/lang-javascript").then((m) =>
-      m.javascript({ jsx: true, typescript: true }),
-    ),
+  ts: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ typescript: true })),
+  tsx: () => import("@codemirror/lang-javascript").then((m) => m.javascript({ jsx: true, typescript: true })),
 
   rs: () => import("@codemirror/lang-rust").then((m) => m.rust()),
   py: () => import("@codemirror/lang-python").then((m) => m.python()),
@@ -58,8 +51,7 @@ const loaders: Record<string, LanguageLoader> = {
   toml: () => import("@codemirror/legacy-modes/mode/toml").then((m) => m.toml),
   yaml: () => import("@codemirror/legacy-modes/mode/yaml").then((m) => m.yaml),
   yml: () => import("@codemirror/legacy-modes/mode/yaml").then((m) => m.yaml),
-  dockerfile: () =>
-    import("@codemirror/legacy-modes/mode/dockerfile").then((m) => m.dockerFile),
+  dockerfile: () => import("@codemirror/legacy-modes/mode/dockerfile").then((m) => m.dockerFile),
   rb: () => import("@codemirror/legacy-modes/mode/ruby").then((m) => m.ruby),
   swift: () => import("@codemirror/legacy-modes/mode/swift").then((m) => m.swift),
   kt: () => import("@codemirror/legacy-modes/mode/clike").then((m) => m.kotlin),
@@ -79,16 +71,10 @@ function extOf(name: string): string | null {
 }
 
 function isStreamParser(v: unknown): boolean {
-  return (
-    typeof v === "object" &&
-    v !== null &&
-    typeof (v as { token?: unknown }).token === "function"
-  );
+  return typeof v === "object" && v !== null && typeof (v as { token?: unknown }).token === "function";
 }
 
-export async function resolveLanguage(
-  filename: string,
-): Promise<Extension | null> {
+export async function resolveLanguage(filename: string): Promise<Extension | null> {
   const lower = filename.toLowerCase();
   const base = lower.split("/").pop() ?? lower;
 
@@ -99,9 +85,7 @@ export async function resolveLanguage(
   const result = await loader();
   if (isStreamParser(result)) {
     const { StreamLanguage } = await import("@codemirror/language");
-    return StreamLanguage.define(
-      result as Parameters<typeof StreamLanguage.define>[0],
-    );
+    return StreamLanguage.define(result as Parameters<typeof StreamLanguage.define>[0]);
   }
   return result as Extension;
 }

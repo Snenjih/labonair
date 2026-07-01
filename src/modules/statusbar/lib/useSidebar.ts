@@ -43,7 +43,7 @@ export function useSidebar(): SidebarReturn {
     const p = sidebarRef.current;
     if (p && !storedOpen) p.collapse();
     // storedOpen === true: defaultSize="225px" already renders the panel open
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefsHydrated]);
 
   // When tabs location changes away from sidebar, switch panel away from "tabs"
@@ -72,22 +72,25 @@ export function useSidebar(): SidebarReturn {
     else p.collapse();
   }, []);
 
-  const handlePanelToggle = useCallback((panel: SidebarPanel) => {
-    const p = sidebarRef.current;
-    if (!p) return;
-    if (activePanel === panel) {
-      if (p.getSize().asPercentage <= 0) {
-        p.expand();
+  const handlePanelToggle = useCallback(
+    (panel: SidebarPanel) => {
+      const p = sidebarRef.current;
+      if (!p) return;
+      if (activePanel === panel) {
+        if (p.getSize().asPercentage <= 0) {
+          p.expand();
+        } else {
+          p.collapse();
+          setActivePanel(null);
+        }
       } else {
-        p.collapse();
-        setActivePanel(null);
+        if (panel) lastActivePanelRef.current = panel;
+        setActivePanel(panel);
+        if (p.getSize().asPercentage <= 0) p.expand();
       }
-    } else {
-      if (panel) lastActivePanelRef.current = panel;
-      setActivePanel(panel);
-      if (p.getSize().asPercentage <= 0) p.expand();
-    }
-  }, [activePanel]);
+    },
+    [activePanel],
+  );
 
   const onSidebarResize = useCallback((size: { asPercentage: number }) => {
     if (size.asPercentage <= 0) {

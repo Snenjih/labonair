@@ -37,13 +37,11 @@ export function newQueuedEditId(): string {
 export const usePlanStore = create<PlanState>((set, get) => ({
   active: false,
   queue: [],
-  toggle: () =>
-    set((s) => ({ active: !s.active, queue: s.active ? [] : s.queue })),
+  toggle: () => set((s) => ({ active: !s.active, queue: s.active ? [] : s.queue })),
   enable: () => set({ active: true }),
   disable: () => set({ active: false, queue: [] }),
   enqueue: (q) => set((s) => ({ queue: [...s.queue, q] })),
-  removeOne: (id) =>
-    set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
+  removeOne: (id) => set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
   clear: () => set({ queue: [] }),
   async applyAll() {
     const items = get().queue;

@@ -26,9 +26,7 @@ import type { Tab, WorkspaceTab } from "../types";
 
 export function useRecentHosts(limit = 5) {
   const hosts = useHostsStore((s) => s.hosts);
-  return [...hosts]
-    .sort((a, b) => (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0))
-    .slice(0, limit);
+  return [...hosts].sort((a, b) => (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0)).slice(0, limit);
 }
 
 // --- Shared label function ---
@@ -60,9 +58,7 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
     return url ? <img src={url} alt="" className="size-3.5 shrink-0" /> : null;
   }
   if (tab.kind === "preview") {
-    return (
-      <HugeiconsIcon icon={Globe02Icon} size={14} strokeWidth={1.75} className="shrink-0" />
-    );
+    return <HugeiconsIcon icon={Globe02Icon} size={14} strokeWidth={1.75} className="shrink-0" />;
   }
   if (tab.kind === "ai-diff") {
     return (
@@ -70,19 +66,13 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
     );
   }
   if (tab.kind === "home") {
-    return (
-      <HugeiconsIcon icon={Home03Icon} size={14} strokeWidth={1.75} className="shrink-0" />
-    );
+    return <HugeiconsIcon icon={Home03Icon} size={14} strokeWidth={1.75} className="shrink-0" />;
   }
   if (tab.kind === "sftp") {
-    return (
-      <HugeiconsIcon icon={CloudServerIcon} size={14} strokeWidth={1.75} className="shrink-0" />
-    );
+    return <HugeiconsIcon icon={CloudServerIcon} size={14} strokeWidth={1.75} className="shrink-0" />;
   }
   if (tab.kind === "git-graph") {
-    return (
-      <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} className="shrink-0" />
-    );
+    return <HugeiconsIcon icon={GitBranchIcon} size={14} strokeWidth={1.75} className="shrink-0" />;
   }
   if (tab.kind === "git-diff") {
     return (
@@ -97,13 +87,8 @@ export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
   if (tab.kind === "workspace") {
     const wt = tab as WorkspaceTab;
     const activeSession = wt.sessions[wt.activePaneId];
-    const icon =
-      activeSession?.kind === "ssh"
-        ? ComputerTerminal02Icon
-        : TerminalIcon;
-    return (
-      <HugeiconsIcon icon={icon} size={14} strokeWidth={1.75} className="shrink-0" />
-    );
+    const icon = activeSession?.kind === "ssh" ? ComputerTerminal02Icon : TerminalIcon;
+    return <HugeiconsIcon icon={icon} size={14} strokeWidth={1.75} className="shrink-0" />;
   }
   return (
     <HugeiconsIcon

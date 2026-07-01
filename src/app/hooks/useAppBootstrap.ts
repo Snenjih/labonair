@@ -39,7 +39,9 @@ export function useAppBootstrap(): AppBootstrapReturn {
 
   // Home directory
   useEffect(() => {
-    homeDir().then(setHome).catch(() => setHome(null));
+    homeDir()
+      .then(setHome)
+      .catch(() => setHome(null));
   }, []);
 
   // API keys loading + live listener
@@ -61,10 +63,14 @@ export function useAppBootstrap(): AppBootstrapReturn {
   }, [setApiKeys]);
 
   // Preferences init
-  useEffect(() => { void initPrefs(); }, [initPrefs]);
+  useEffect(() => {
+    void initPrefs();
+  }, [initPrefs]);
 
   // Keybinds init
-  useEffect(() => { void initKeybinds(); }, [initKeybinds]);
+  useEffect(() => {
+    void initKeybinds();
+  }, [initKeybinds]);
 
   // Theme engine (owns its own effects internally)
   useThemeEngine();
@@ -96,10 +102,16 @@ export function useAppBootstrap(): AppBootstrapReturn {
     const store = useProvidersStore.getState();
     void store.init();
     let unlisten: (() => void) | null = null;
-    void store.onProvidersChanged(() => {
-      void useProvidersStore.getState().reload();
-    }).then((fn) => { unlisten = fn; });
-    return () => { unlisten?.(); };
+    void store
+      .onProvidersChanged(() => {
+        void useProvidersStore.getState().reload();
+      })
+      .then((fn) => {
+        unlisten = fn;
+      });
+    return () => {
+      unlisten?.();
+    };
   }, []);
 
   // Defer non-critical hydrations until the browser is idle
@@ -118,10 +130,14 @@ export function useAppBootstrap(): AppBootstrapReturn {
   }, []);
 
   // Bootstrap SFTP transfer listeners
-  useEffect(() => { void bootstrapTransferListeners(); }, []);
+  useEffect(() => {
+    void bootstrapTransferListeners();
+  }, []);
 
   // Bootstrap SFTP connection-lost listener (dead sessions → reconnect banner)
-  useEffect(() => { void bootstrapSftpConnectionListener(); }, []);
+  useEffect(() => {
+    void bootstrapSftpConnectionListener();
+  }, []);
 
   // Global unhandled error handlers
   useEffect(() => {

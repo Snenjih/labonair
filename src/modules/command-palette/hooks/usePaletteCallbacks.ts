@@ -3,11 +3,7 @@ import type React from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 import { invoke } from "@tauri-apps/api/core";
 import { useChatStore } from "@/modules/ai";
-import {
-  useTabsStore,
-  selectActivePaneId,
-  type WorkspaceTab,
-} from "@/modules/tabs";
+import { useTabsStore, selectActivePaneId, type WorkspaceTab } from "@/modules/tabs";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { openSettingsWindow, type SettingsTab } from "@/modules/settings/openSettingsWindow";
 import type { RegistryCallbacks } from "@/modules/command-palette";
@@ -148,7 +144,9 @@ export function usePaletteCallbacks({
       },
       closeOtherTabs: () => {
         const { tabs: storeTabs, activeId: aid } = useTabsStore.getState();
-        storeTabs.forEach((t) => { if (t.id !== aid) handleClose(t.id); });
+        storeTabs.forEach((t) => {
+          if (t.id !== aid) handleClose(t.id);
+        });
       },
       disconnectCurrentSsh: () => {
         const { tabs: storeTabs, activeId: aid } = useTabsStore.getState();

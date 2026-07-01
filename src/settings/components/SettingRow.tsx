@@ -37,19 +37,12 @@ export function SettingRow({ title, description, hint, children, className }: Pr
   const hintStyle = hint ? hintStyles[hint.variant ?? "info"] : null;
 
   return (
-    <div
-      className={cn(
-        "flex flex-col rounded-lg border border-border/60 bg-card/60",
-        className,
-      )}
-    >
+    <div className={cn("flex flex-col rounded-lg border border-border/60 bg-card/60", className)}>
       <div className="flex items-start justify-between gap-4 px-3 py-[var(--ui-row-py)]">
         <div className="flex min-w-0 flex-col gap-0.5">
           <span className="text-[12.5px] font-medium">{title}</span>
           {description ? (
-            <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-              {description}
-            </span>
+            <span className="text-[10.5px] leading-relaxed text-muted-foreground">{description}</span>
           ) : null}
         </div>
         <div className="flex shrink-0 items-center">{children}</div>
@@ -57,9 +50,7 @@ export function SettingRow({ title, description, hint, children, className }: Pr
       {hint && hintStyle && (
         <div className={cn("mx-2.5 mb-2 flex items-center gap-2 rounded px-2.5 py-1.5", hintStyle.bar)}>
           <span className={cn("mt-px h-1 w-1 shrink-0 rounded-full", hintStyle.dot)} />
-          <span className={cn("text-[10px] leading-snug tracking-wide", hintStyle.text)}>
-            {hint.text}
-          </span>
+          <span className={cn("text-[10px] leading-snug tracking-wide", hintStyle.text)}>{hint.text}</span>
         </div>
       )}
     </div>

@@ -6,13 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -42,12 +36,7 @@ import {
   setOpenaiCompatibleBaseURL,
   setOpenaiCompatibleModelId,
 } from "@/modules/settings/store";
-import {
-  Cancel01Icon,
-  ArrowDown01Icon,
-  Settings01Icon,
-  ComputerIcon,
-} from "@hugeicons/core-free-icons";
+import { Cancel01Icon, ArrowDown01Icon, Settings01Icon, ComputerIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { ProviderIcon } from "../components/ProviderIcon";
@@ -82,9 +71,7 @@ export function ModelsSection() {
 
   const defaultModelInfo = getModel(defaultModel);
 
-  const keyedProviders = PROVIDERS.filter(
-    (p) => providerNeedsKey(p.id) && p.id !== "openai-compatible",
-  );
+  const keyedProviders = PROVIDERS.filter((p) => providerNeedsKey(p.id) && p.id !== "openai-compatible");
   const configuredCount = keyedProviders.filter((p) => !!keys[p.id]).length;
 
   return (
@@ -99,19 +86,12 @@ export function ModelsSection() {
         <Label>Default model</Label>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              className="h-9 justify-between gap-2 px-2.5 text-[12px]"
-            >
+            <Button variant="outline" className="h-9 justify-between gap-2 px-2.5 text-[12px]">
               <span className="flex items-center gap-2">
                 {defaultModelInfo.provider === "lmstudio" ||
                 defaultModelInfo.provider === "openai-compatible" ? (
                   <HugeiconsIcon
-                    icon={
-                      defaultModelInfo.provider === "openai-compatible"
-                        ? Settings01Icon
-                        : ComputerIcon
-                    }
+                    icon={defaultModelInfo.provider === "openai-compatible" ? Settings01Icon : ComputerIcon}
                     size={14}
                     strokeWidth={1.75}
                     className="text-muted-foreground"
@@ -120,46 +100,32 @@ export function ModelsSection() {
                   <ProviderIcon provider={defaultModelInfo.provider} size={14} />
                 )}
                 <span>{defaultModelInfo.label}</span>
-                <span className="text-muted-foreground">
-                  · {defaultModelInfo.hint}
-                </span>
+                <span className="text-muted-foreground">· {defaultModelInfo.hint}</span>
               </span>
-              <HugeiconsIcon
-                icon={ArrowDown01Icon}
-                size={12}
-                strokeWidth={2}
-                className="opacity-70"
-              />
+              <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="opacity-70" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="min-w-[260px]">
             {PROVIDERS.map((p) => {
               const models = MODELS.filter((m) => m.provider === p.id);
               const hasKey = providerNeedsKey(p.id) ? !!keys[p.id] : true;
-              const isEnabled =
-                p.id === "openai-compatible" || p.id === "lmstudio"
-                  ? true
-                  : hasKey;
+              const isEnabled = p.id === "openai-compatible" || p.id === "lmstudio" ? true : hasKey;
               return (
                 <div key={p.id} className="px-1 pt-1.5">
                   <div className="mb-1 flex items-center gap-1.5 px-2 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                     <ProviderIcon provider={p.id} size={11} />
                     <span>{p.label}</span>
-                    {!hasKey &&
-                      p.id !== "lmstudio" &&
-                      p.id !== "openai-compatible" && (
-                        <span className="ml-auto text-[9.5px] normal-case tracking-normal text-muted-foreground/70">
-                          no key
-                        </span>
-                      )}
+                    {!hasKey && p.id !== "lmstudio" && p.id !== "openai-compatible" && (
+                      <span className="ml-auto text-[9.5px] normal-case tracking-normal text-muted-foreground/70">
+                        no key
+                      </span>
+                    )}
                   </div>
                   {models.map((m) => (
                     <DropdownMenuItem
                       key={m.id}
                       disabled={!isEnabled}
-                      onSelect={() =>
-                        isEnabled && void setDefaultModel(m.id as ModelId)
-                      }
+                      onSelect={() => isEnabled && void setDefaultModel(m.id as ModelId)}
                       className={cn(
                         "flex items-center justify-between gap-2 text-[12px]",
                         m.id === defaultModel && "bg-accent/50",
@@ -167,9 +133,7 @@ export function ModelsSection() {
                     >
                       <span className="flex flex-col">
                         <span>{m.label}</span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {m.hint}
-                        </span>
+                        <span className="text-[10px] text-muted-foreground">{m.hint}</span>
                       </span>
                     </DropdownMenuItem>
                   ))}
@@ -216,18 +180,10 @@ export function ModelsSection() {
 
 /* ── Row layout helper for local provider cards ───────────────────── */
 
-function FieldRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="w-[72px] shrink-0 text-[11px] text-muted-foreground">
-        {label}
-      </span>
+      <span className="w-[72px] shrink-0 text-[11px] text-muted-foreground">{label}</span>
       <div className="flex flex-1 items-center gap-1.5">{children}</div>
     </div>
   );
@@ -277,8 +233,8 @@ function LmStudioChatBlock() {
       <div className="flex flex-col gap-0.5">
         <Label>Local — LM Studio</Label>
         <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-          Run any GGUF model on your machine via LM Studio's HTTP server. Enable
-          the server in LM Studio → Developer tab.
+          Run any GGUF model on your machine via LM Studio's HTTP server. Enable the server in LM Studio →
+          Developer tab.
         </span>
       </div>
       <div className="flex flex-col gap-0 divide-y divide-border/50 rounded-lg border border-border/50 bg-card/50 px-3 py-0 overflow-hidden">
@@ -298,11 +254,7 @@ function LmStudioChatBlock() {
               disabled={!urlDraft.trim() || testStatus === "testing"}
               className="h-8 shrink-0 px-2.5 text-[11px]"
             >
-              {testStatus === "testing" ? (
-                <Spinner className="size-3" />
-              ) : (
-                "Test"
-              )}
+              {testStatus === "testing" ? <Spinner className="size-3" /> : "Test"}
             </Button>
             <Button
               size="sm"
@@ -327,9 +279,7 @@ function LmStudioChatBlock() {
         </div>
         <div className="py-2">
           {testStatus === "ok" && (
-            <span className="text-[10.5px] text-success">
-              Connected — server responded.
-            </span>
+            <span className="text-[10.5px] text-success">Connected — server responded.</span>
           )}
           {testStatus === "fail" && (
             <span className="text-[10.5px] text-destructive">
@@ -338,8 +288,8 @@ function LmStudioChatBlock() {
           )}
           {testStatus === "idle" && (
             <span className="text-[10.5px] text-warning">
-              Enter the model ID that's loaded in LM Studio — e.g. the one shown on
-              the server's /v1/models page.
+              Enter the model ID that's loaded in LM Studio — e.g. the one shown on the server's /v1/models
+              page.
             </span>
           )}
         </div>
@@ -419,8 +369,7 @@ function OpenAICompatibleBlock({
       <div className="flex flex-col gap-0.5">
         <Label>OpenAI-compatible endpoint</Label>
         <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-          Any OpenAI-compatible HTTPS endpoint — vLLM, Z.AI, Fireworks, hosted
-          Ollama, etc.
+          Any OpenAI-compatible HTTPS endpoint — vLLM, Z.AI, Fireworks, hosted Ollama, etc.
         </span>
       </div>
       <div className="flex flex-col gap-0 divide-y divide-border/50 rounded-lg border border-border/50 bg-card/50 px-3 py-0 overflow-hidden">
@@ -440,11 +389,7 @@ function OpenAICompatibleBlock({
               disabled={!urlDraft.trim() || testStatus === "testing"}
               className="h-8 shrink-0 px-2.5 text-[11px]"
             >
-              {testStatus === "testing" ? (
-                <Spinner className="size-3" />
-              ) : (
-                "Test"
-              )}
+              {testStatus === "testing" ? <Spinner className="size-3" /> : "Test"}
             </Button>
             <Button
               size="sm"
@@ -487,11 +432,7 @@ function OpenAICompatibleBlock({
                 className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
                 title="Clear API key"
               >
-                <HugeiconsIcon
-                  icon={Cancel01Icon}
-                  size={14}
-                  strokeWidth={1.75}
-                />
+                <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.75} />
               </button>
             )}
           </FieldRow>
@@ -499,9 +440,7 @@ function OpenAICompatibleBlock({
         {(testStatus === "ok" || testStatus === "fail") && (
           <div className="py-2">
             {testStatus === "ok" && (
-              <span className="text-[10.5px] text-success">
-                Connected — endpoint responded.
-              </span>
+              <span className="text-[10.5px] text-success">Connected — endpoint responded.</span>
             )}
             {testStatus === "fail" && (
               <span className="text-[10.5px] text-destructive">
@@ -559,23 +498,17 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
         <div className="flex flex-col gap-0.5">
           <Label>Editor autocomplete</Label>
           <span className="text-[10.5px] leading-relaxed text-muted-foreground">
-            Inline ghost-text suggestions in the code editor. Powered by
-            ultra-fast inference (Cerebras / Groq) or a local LM Studio server.
+            Inline ghost-text suggestions in the code editor. Powered by ultra-fast inference (Cerebras /
+            Groq) or a local LM Studio server.
           </span>
         </div>
-        <Switch
-          checked={enabled}
-          onCheckedChange={(v) => void setAutocompleteEnabled(v)}
-        />
+        <Switch checked={enabled} onCheckedChange={(v) => void setAutocompleteEnabled(v)} />
       </div>
 
       <div className="flex flex-col gap-0 divide-y divide-border/50 rounded-lg border border-border/50 bg-card/50 px-3 py-0 overflow-hidden">
         <div className="py-2.5">
           <FieldRow label="Provider">
-            <Select
-              value={provider}
-              onValueChange={(v) => onProviderChange(v as AutocompleteProviderId)}
-            >
+            <Select value={provider} onValueChange={(v) => onProviderChange(v as AutocompleteProviderId)}>
               <SelectTrigger className="h-8 flex-1 text-[11.5px]">
                 <SelectValue>
                   <span className="flex items-center gap-1.5">
@@ -646,9 +579,7 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
               </Button>
             </FieldRow>
             {testStatus === "ok" && (
-              <p className="mt-1.5 pl-[84px] text-[10.5px] text-success">
-                Connected — server responded.
-              </p>
+              <p className="mt-1.5 pl-[84px] text-[10.5px] text-success">Connected — server responded.</p>
             )}
             {testStatus === "fail" && (
               <p className="mt-1.5 pl-[84px] text-[10.5px] text-destructive">
@@ -663,9 +594,5 @@ function AutocompleteBlock({ keys }: { keys: KeysMap }) {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="text-[11px] font-medium tracking-tight text-muted-foreground">{children}</span>;
 }

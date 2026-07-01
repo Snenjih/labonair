@@ -114,10 +114,7 @@ export function SidebarContent({
         ) : activePanel === "snippets" ? (
           <SnippetsPanel onRun={onSnippetRun} />
         ) : activePanel === "source-control" ? (
-          <SourceControlPanel
-            rootPath={explorerRoot}
-            onOpenGitGraph={onOpenGitGraph}
-          />
+          <SourceControlPanel rootPath={explorerRoot} onOpenGitGraph={onOpenGitGraph} />
         ) : (
           <FileExplorer
             explorerTarget={explorerTarget}

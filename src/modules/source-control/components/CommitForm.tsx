@@ -47,21 +47,28 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
   const { generate: generateAiMessage, isGenerating } = useAiCommitMessage(repoRoot);
 
   useEffect(() => {
-    if (!repoRoot) { setLastCommit(null); return; }
+    if (!repoRoot) {
+      setLastCommit(null);
+      return;
+    }
     let cancelled = false;
-    git.getLog(repoRoot, 1, false)
-      .then((commits) => { if (!cancelled) setLastCommit(commits[0] ?? null); })
-      .catch(() => { if (!cancelled) setLastCommit(null); });
-    return () => { cancelled = true; };
+    git
+      .getLog(repoRoot, 1, false)
+      .then((commits) => {
+        if (!cancelled) setLastCommit(commits[0] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setLastCommit(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [repoRoot, status]);
 
   const canCommit =
-    commitMessage.trim().length > 0 &&
-    (status?.staged.length ?? 0) > 0 &&
-    operationInProgress === null;
+    commitMessage.trim().length > 0 && (status?.staged.length ?? 0) > 0 && operationInProgress === null;
 
-  const inSpecialState =
-    (status?.mergeInProgress ?? false) || (status?.rebaseInProgress ?? false);
+  const inSpecialState = (status?.mergeInProgress ?? false) || (status?.rebaseInProgress ?? false);
 
   async function handleCommit() {
     if (!canCommit) return;
@@ -72,10 +79,14 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
       addRecentMessage(commitMessage);
       setCommitMessage("");
       onRefresh();
-      useNotificationStore.getState().addNotification({ type: "success", title: "Committed", message: commitMessage.trim().slice(0, 80) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "success", title: "Committed", message: commitMessage.trim().slice(0, 80) });
     } catch (e) {
       setError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Commit Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Commit Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -90,10 +101,14 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
       addRecentMessage(commitMessage);
       setCommitMessage("");
       onRefresh();
-      useNotificationStore.getState().addNotification({ type: "success", title: "Amended", message: "Last commit amended" });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "success", title: "Amended", message: "Last commit amended" });
     } catch (e) {
       setError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Amend Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Amend Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -183,9 +198,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
         <div
           className={cn(
             "flex h-[26px] shrink-0 items-stretch overflow-hidden rounded border text-[11px] transition-all",
-            canCommit
-              ? "border-primary/50 bg-primary/10"
-              : "border-muted-foreground/20 opacity-50"
+            canCommit ? "border-primary/50 bg-primary/10" : "border-muted-foreground/20 opacity-50",
           )}
         >
           <button
@@ -270,10 +283,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
           strokeWidth={2}
           className="shrink-0 text-muted-foreground/35"
         />
-        <span
-          className="flex-1 truncate text-[10px] text-muted-foreground/55"
-          title={lastCommit?.subject}
-        >
+        <span className="flex-1 truncate text-[10px] text-muted-foreground/55" title={lastCommit?.subject}>
           {lastCommit?.subject ?? "No recent commits"}
         </span>
         <button

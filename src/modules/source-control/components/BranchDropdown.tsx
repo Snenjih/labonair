@@ -67,7 +67,7 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
         repoRoot,
         trimmedName,
         newTagMessage.trim() || undefined,
-        newTagFrom.trim() || undefined
+        newTagFrom.trim() || undefined,
       );
       setNewTagName("");
       setNewTagMessage("");
@@ -76,7 +76,9 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
       onRefresh();
     } catch (e) {
       setTagError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Create Tag Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Create Tag Failed", message: String(e) });
     } finally {
       setTagLoading(null);
     }
@@ -89,7 +91,9 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
       onRefresh();
     } catch (e) {
       setTagError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Push Tag Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Push Tag Failed", message: String(e) });
     } finally {
       setTagLoading(null);
     }
@@ -103,7 +107,9 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
       onRefresh();
     } catch (e) {
       setTagError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Delete Tag Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Delete Tag Failed", message: String(e) });
     } finally {
       setTagLoading(null);
     }
@@ -268,8 +274,7 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete tag?</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete tag{" "}
-              <span className="font-mono text-foreground">'{deleteTagName}'</span>? This cannot be
+              Delete tag <span className="font-mono text-foreground">'{deleteTagName}'</span>? This cannot be
               undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -303,7 +308,7 @@ function BranchRow({ branch, isCurrent, onCheckout, onDelete, isCheckingOut }: B
     <div
       className={cn(
         "group/branch flex h-[22px] cursor-pointer items-center gap-1 rounded px-1.5 transition-colors",
-        isCurrent ? "bg-accent/60" : "hover:bg-foreground/6"
+        isCurrent ? "bg-accent/60" : "hover:bg-foreground/6",
       )}
       onClick={() => !isCurrent && onCheckout(branch.name)}
       title={branch.name}
@@ -311,19 +316,14 @@ function BranchRow({ branch, isCurrent, onCheckout, onDelete, isCheckingOut }: B
       {/* Checkmark for current branch */}
       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
         {isCurrent && (
-          <HugeiconsIcon
-            icon={Tick02Icon}
-            size={10}
-            strokeWidth={2.5}
-            className="text-success"
-          />
+          <HugeiconsIcon icon={Tick02Icon} size={10} strokeWidth={2.5} className="text-success" />
         )}
       </span>
 
       <span
         className={cn(
           "flex-1 truncate text-[11px]",
-          isCurrent ? "font-medium text-foreground" : "text-foreground/80"
+          isCurrent ? "font-medium text-foreground" : "text-foreground/80",
         )}
       >
         {branch.name}
@@ -342,9 +342,7 @@ function BranchRow({ branch, isCurrent, onCheckout, onDelete, isCheckingOut }: B
       )}
 
       {/* Spinner when checking out this branch */}
-      {isCheckingOut && (
-        <Spinner className="size-3 shrink-0 text-muted-foreground" />
-      )}
+      {isCheckingOut && <Spinner className="size-3 shrink-0 text-muted-foreground" />}
 
       {/* Delete button */}
       {!isCheckingOut && (
@@ -354,7 +352,7 @@ function BranchRow({ branch, isCurrent, onCheckout, onDelete, isCheckingOut }: B
             "flex h-4 w-4 shrink-0 items-center justify-center rounded opacity-0 transition-opacity group-hover/branch:opacity-100",
             isCurrent
               ? "cursor-not-allowed text-muted-foreground/30"
-              : "text-muted-foreground hover:bg-error/20 hover:text-error"
+              : "text-muted-foreground hover:bg-error/20 hover:text-error",
           )}
           onClick={(e) => {
             e.stopPropagation();
@@ -392,14 +390,8 @@ export function BranchDropdown({
   const [forceDeleteBranch, setForceDeleteBranch] = useState<string | null>(null);
   const [remotesCollapsed, setRemotesCollapsed] = useState(true);
 
-  const localBranches = useMemo(
-    () => branchList.filter((b) => !b.isRemote),
-    [branchList]
-  );
-  const remoteBranches = useMemo(
-    () => branchList.filter((b) => b.isRemote),
-    [branchList]
-  );
+  const localBranches = useMemo(() => branchList.filter((b) => !b.isRemote), [branchList]);
+  const remoteBranches = useMemo(() => branchList.filter((b) => b.isRemote), [branchList]);
 
   const filteredLocal = useMemo(() => {
     if (!filter.trim()) return localBranches;
@@ -427,7 +419,9 @@ export function BranchDropdown({
         displayMsg = `Could not checkout: uncommitted changes would be overwritten. Stash your changes first.`;
       }
       setCheckoutError(displayMsg);
-      useNotificationStore.getState().addNotification({ type: "error", title: "Checkout Failed", message: displayMsg });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Checkout Failed", message: displayMsg });
     } finally {
       setCheckingOut(null);
     }
@@ -447,7 +441,9 @@ export function BranchDropdown({
         return;
       }
       setCheckoutError(`Could not delete branch: ${errMsg}`);
-      useNotificationStore.getState().addNotification({ type: "error", title: "Delete Branch Failed", message: errMsg });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Delete Branch Failed", message: errMsg });
       setDeleteConfirmBranch(null);
       setForceDeleteBranch(null);
     }
@@ -592,17 +588,14 @@ export function BranchDropdown({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete branch?</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete branch{" "}
-              <span className="font-mono text-foreground">'{deleteConfirmBranch}'</span>? This
+              Delete branch <span className="font-mono text-foreground">'{deleteConfirmBranch}'</span>? This
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() =>
-                deleteConfirmBranch && void handleDelete(deleteConfirmBranch, false)
-              }
+              onClick={() => deleteConfirmBranch && void handleDelete(deleteConfirmBranch, false)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
@@ -612,25 +605,19 @@ export function BranchDropdown({
       </AlertDialog>
 
       {/* Force delete — unmerged branch */}
-      <AlertDialog
-        open={forceDeleteBranch !== null}
-        onOpenChange={(o) => !o && setForceDeleteBranch(null)}
-      >
+      <AlertDialog open={forceDeleteBranch !== null} onOpenChange={(o) => !o && setForceDeleteBranch(null)}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Force delete unmerged branch?</AlertDialogTitle>
             <AlertDialogDescription>
-              Branch{" "}
-              <span className="font-mono text-foreground">'{forceDeleteBranch}'</span> is not
-              fully merged. Force deleting will permanently discard its commits.
+              Branch <span className="font-mono text-foreground">'{forceDeleteBranch}'</span> is not fully
+              merged. Force deleting will permanently discard its commits.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() =>
-                forceDeleteBranch && void handleDelete(forceDeleteBranch, true)
-              }
+              onClick={() => forceDeleteBranch && void handleDelete(forceDeleteBranch, true)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Force Delete

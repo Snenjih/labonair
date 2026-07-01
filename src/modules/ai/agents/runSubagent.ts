@@ -61,9 +61,11 @@ export async function runSubagent({
   } as never);
 
   const start = Date.now();
-  const result = await (agent as unknown as {
-    generate: (a: { prompt: string }) => Promise<unknown>;
-  }).generate({ prompt });
+  const result = await (
+    agent as unknown as {
+      generate: (a: { prompt: string }) => Promise<unknown>;
+    }
+  ).generate({ prompt });
   const durationMs = Date.now() - start;
 
   // Best-effort summary extraction across SDK shape variations.
@@ -78,9 +80,7 @@ export async function runSubagent({
   return { summary, stepCount, durationMs };
 }
 
-function extractText(r: {
-  response?: { messages?: { content?: unknown }[] };
-}): string | null {
+function extractText(r: { response?: { messages?: { content?: unknown }[] } }): string | null {
   const msgs = r.response?.messages;
   if (!Array.isArray(msgs)) return null;
   const parts: string[] = [];

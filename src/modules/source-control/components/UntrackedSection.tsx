@@ -24,17 +24,15 @@ export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
     try {
       await git.stageAll(repoRoot);
       onRefresh();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   return (
     <div className="mb-0.5">
       <div className="group/hdr flex h-6 items-center gap-1.5 px-3 transition-colors hover:bg-foreground/6">
-        <button
-          type="button"
-          className="flex shrink-0 items-center"
-          onClick={() => setCollapsed((c) => !c)}
-        >
+        <button type="button" className="flex shrink-0 items-center" onClick={() => setCollapsed((c) => !c)}>
           <HugeiconsIcon
             icon={collapsed ? ArrowRight01Icon : ArrowDown01Icon}
             size={8}
@@ -51,9 +49,7 @@ export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
           <span className="select-none text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 group-hover/hdr:text-muted-foreground/70">
             Untracked
           </span>
-          <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">
-            {files.length}
-          </span>
+          <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">{files.length}</span>
         </button>
 
         <Button

@@ -43,9 +43,7 @@ function useWindowResizing(idleMs: number): boolean {
 }
 
 function useDocumentHidden(): boolean {
-  const [hidden, setHidden] = useState(
-    () => typeof document !== "undefined" && document.hidden,
-  );
+  const [hidden, setHidden] = useState(() => typeof document !== "undefined" && document.hidden);
   useEffect(() => {
     const onChange = () => setHidden(document.hidden);
     document.addEventListener("visibilitychange", onChange);
@@ -113,9 +111,7 @@ export function BackgroundImageLayer() {
 
   const blurActive = backgroundBlur > 0 && !resizing;
   const renderedOpacity =
-    visible && !docHidden && !resizing
-      ? (backgroundOpacity / 100) * BG_OPACITY_RENDER_FACTOR
-      : 0;
+    visible && !docHidden && !resizing ? (backgroundOpacity / 100) * BG_OPACITY_RENDER_FACTOR : 0;
 
   return createPortal(
     <div

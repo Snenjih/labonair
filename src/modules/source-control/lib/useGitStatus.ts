@@ -41,11 +41,7 @@ export function useGitStatus(rootPath: string | null) {
       isRepo = await git.isRepo(rootPath);
     } catch (e) {
       const msg = String(e);
-      if (
-        msg.includes("not installed") ||
-        msg.includes("not in PATH") ||
-        msg.includes("not found")
-      ) {
+      if (msg.includes("not installed") || msg.includes("not in PATH") || msg.includes("not found")) {
         setError("git is not installed or not in PATH");
       }
       setRepoInfo(false, null);
@@ -53,7 +49,10 @@ export function useGitStatus(rootPath: string | null) {
       return;
     }
 
-    if (!isMountedRef.current) { isRefreshingRef.current = false; return; }
+    if (!isMountedRef.current) {
+      isRefreshingRef.current = false;
+      return;
+    }
 
     if (!isRepo) {
       setRepoInfo(false, null);
@@ -70,7 +69,10 @@ export function useGitStatus(rootPath: string | null) {
       return;
     }
 
-    if (!isMountedRef.current) { isRefreshingRef.current = false; return; }
+    if (!isMountedRef.current) {
+      isRefreshingRef.current = false;
+      return;
+    }
 
     // Check if repo root changed and clear stale diff selection
     const prevRoot = useSourceControlStore.getState().repoRoot;
@@ -82,16 +84,18 @@ export function useGitStatus(rootPath: string | null) {
     setIsStatusLoading(true);
     setIsBranchLoading(true);
 
-    const [statusResult, branchesResult, stashResult, tagsResult, statsResult] =
-      await Promise.allSettled([
-        git.getStatus(root),
-        git.getBranches(root),
-        git.stashList(root),
-        git.getTags(root),
-        git.getDiffStats(root),
-      ]);
+    const [statusResult, branchesResult, stashResult, tagsResult, statsResult] = await Promise.allSettled([
+      git.getStatus(root),
+      git.getBranches(root),
+      git.stashList(root),
+      git.getTags(root),
+      git.getDiffStats(root),
+    ]);
 
-    if (!isMountedRef.current) { isRefreshingRef.current = false; return; }
+    if (!isMountedRef.current) {
+      isRefreshingRef.current = false;
+      return;
+    }
 
     if (statusResult.status === "fulfilled") setStatus(statusResult.value);
     setIsStatusLoading(false);
@@ -177,26 +181,31 @@ export function useGitStatus(rootPath: string | null) {
       try {
         let content: string | null = null;
 
-        if (selectionMode!.type === 'file') {
-          content = await git.getDiff(repoRoot!, selectionMode!.path, selectionMode!.staged, ignoreWhitespace);
-        } else if (selectionMode!.type === 'section') {
+        if (selectionMode!.type === "file") {
+          content = await git.getDiff(
+            repoRoot!,
+            selectionMode!.path,
+            selectionMode!.staged,
+            ignoreWhitespace,
+          );
+        } else if (selectionMode!.type === "section") {
           const section = selectionMode!.section;
-          if (section === 'untracked') {
+          if (section === "untracked") {
             // Untracked files don't show in git diff — use sentinel
-            content = '__UNTRACKED_ONLY__';
+            content = "__UNTRACKED_ONLY__";
           } else {
-            const staged = section === 'staged';
-            content = await git.getDiff(repoRoot!, '.', staged, ignoreWhitespace);
+            const staged = section === "staged";
+            content = await git.getDiff(repoRoot!, ".", staged, ignoreWhitespace);
           }
-        } else if (selectionMode!.type === 'all') {
+        } else if (selectionMode!.type === "all") {
           // Fetch staged and unstaged in parallel
           const [staged, unstaged] = await Promise.all([
-            git.getDiff(repoRoot!, '.', true, ignoreWhitespace).catch(() => ''),
-            git.getDiff(repoRoot!, '.', false, ignoreWhitespace).catch(() => ''),
+            git.getDiff(repoRoot!, ".", true, ignoreWhitespace).catch(() => ""),
+            git.getDiff(repoRoot!, ".", false, ignoreWhitespace).catch(() => ""),
           ]);
           const parts = [staged, unstaged].filter(Boolean);
-          content = parts.join('\n');
-        } else if (selectionMode!.type === 'commit') {
+          content = parts.join("\n");
+        } else if (selectionMode!.type === "commit") {
           content = await git.getCommitDiff(selectionMode!.repositoryPath, selectionMode!.hash);
         }
 

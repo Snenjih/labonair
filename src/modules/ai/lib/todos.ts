@@ -26,10 +26,7 @@ export async function loadTodos(sessionId: string): Promise<Todo[]> {
   return (await (await getStore()).get<Todo[]>(todosKey(sessionId))) ?? [];
 }
 
-export async function saveTodos(
-  sessionId: string,
-  todos: Todo[],
-): Promise<void> {
+export async function saveTodos(sessionId: string, todos: Todo[]): Promise<void> {
   await (await getStore()).set(todosKey(sessionId), todos);
 }
 
@@ -53,7 +50,6 @@ export function validateTodos(todos: Todo[]): string | null {
     if (!t.title.trim()) return "todo title cannot be empty";
     if (t.status === "in_progress") inProgress++;
   }
-  if (inProgress > 1)
-    return `only one todo may be in_progress at a time (got ${inProgress})`;
+  if (inProgress > 1) return `only one todo may be in_progress at a time (got ${inProgress})`;
   return null;
 }

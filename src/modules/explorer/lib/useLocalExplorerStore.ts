@@ -45,11 +45,9 @@ export const useLocalExplorerStore = create<LocalExplorerStore>((set) => ({
   setScope: (scopeKey, root) =>
     set((s) => ({ scopeKey, rootPath: root, nodes: {}, expanded: new Set(), generation: s.generation + 1 })),
 
-  toggleShowHidden: () =>
-    set((s) => ({ showHidden: !s.showHidden, nodes: {}, expanded: new Set() })),
+  toggleShowHidden: () => set((s) => ({ showHidden: !s.showHidden, nodes: {}, expanded: new Set() })),
 
-  setNode: (path, state) =>
-    set((s) => ({ nodes: { ...s.nodes, [path]: state } })),
+  setNode: (path, state) => set((s) => ({ nodes: { ...s.nodes, [path]: state } })),
 
   toggleExpanded: (path) =>
     set((s) => {

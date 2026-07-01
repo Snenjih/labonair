@@ -43,9 +43,7 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div
-          className="group relative cursor-default overflow-hidden rounded-md border border-border/40 bg-card shadow-sm transition-all duration-150 hover:border-border/80 hover:bg-card/80"
-        >
+        <div className="group relative cursor-default overflow-hidden rounded-md border border-border/40 bg-card shadow-sm transition-all duration-150 hover:border-border/80 hover:bg-card/80">
           {/* Accent stripe with soft glow */}
           <div
             className="absolute inset-y-0 left-0 w-[3px]"
@@ -104,7 +102,10 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
                   type="button"
                   title="Copy command"
                   className="flex h-[22px] w-[22px] items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-                  onClick={(e) => { e.stopPropagation(); void copyCommand(); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void copyCommand();
+                  }}
                 >
                   <HugeiconsIcon icon={Copy01Icon} size={10} strokeWidth={1.5} />
                 </button>
@@ -112,7 +113,10 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
                   type="button"
                   title="Edit"
                   className="flex h-[22px] w-[22px] items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-                  onClick={(e) => { e.stopPropagation(); onEdit(snippet); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(snippet);
+                  }}
                 >
                   <HugeiconsIcon icon={Edit01Icon} size={10} strokeWidth={1.5} />
                 </button>
@@ -120,7 +124,10 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
                   type="button"
                   title="Delete"
                   className="flex h-[22px] w-[22px] items-center justify-center rounded text-muted-foreground/60 transition-colors hover:bg-destructive/15 hover:text-destructive"
-                  onClick={(e) => { e.stopPropagation(); onDelete(snippet); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(snippet);
+                  }}
                 >
                   <HugeiconsIcon icon={Delete02Icon} size={10} strokeWidth={1.5} />
                 </button>

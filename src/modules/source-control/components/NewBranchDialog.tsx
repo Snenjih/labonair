@@ -3,13 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
@@ -101,14 +95,9 @@ export function NewBranchDialog({
               }}
               onKeyDown={handleKeyDown}
               placeholder="feature/my-branch"
-              className={cn(
-                "h-7 text-[12px]",
-                nameError && "ring-2 ring-error/50 border-error/50"
-              )}
+              className={cn("h-7 text-[12px]", nameError && "ring-2 ring-error/50 border-error/50")}
             />
-            {nameError && (
-              <p className="text-[10px] text-error">Branch name is required.</p>
-            )}
+            {nameError && <p className="text-[10px] text-error">Branch name is required.</p>}
           </div>
 
           {/* From ref */}
@@ -125,14 +114,8 @@ export function NewBranchDialog({
 
           {/* Checkout after create */}
           <div className="flex items-center justify-between">
-            <label className="text-[11px] font-medium text-muted-foreground">
-              Checkout after create
-            </label>
-            <Switch
-              checked={checkout}
-              onCheckedChange={setCheckout}
-              className="scale-90"
-            />
+            <label className="text-[11px] font-medium text-muted-foreground">Checkout after create</label>
+            <Switch checked={checkout} onCheckedChange={setCheckout} className="scale-90" />
           </div>
 
           {/* Error */}
@@ -160,12 +143,7 @@ export function NewBranchDialog({
           >
             Cancel
           </Button>
-          <Button
-            size="sm"
-            onClick={() => void handleCreate()}
-            disabled={isLoading}
-            className="text-xs"
-          >
+          <Button size="sm" onClick={() => void handleCreate()} disabled={isLoading} className="text-xs">
             {isLoading && <Spinner className="mr-1.5 size-3" />}
             Create
           </Button>

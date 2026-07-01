@@ -87,11 +87,7 @@ export function useAiCommitMessage(repoRoot: string | null) {
 
       // 3. Build model and generate commit message
       const key = instanceKeys[selectedInstance.id] ?? null;
-      const model = await buildLanguageModelFromInstance(
-        selectedInstance,
-        key,
-        selectedModelId,
-      );
+      const model = await buildLanguageModelFromInstance(selectedInstance, key, selectedModelId);
 
       const { text } = await generateText({
         model,

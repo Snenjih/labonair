@@ -1,17 +1,25 @@
 import { indentUnit } from "@codemirror/language";
 import { lintGutter } from "@codemirror/lint";
 import { Compartment, EditorState, RangeSetBuilder, type Extension } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView, keymap, ViewPlugin, type ViewUpdate } from "@codemirror/view";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  keymap,
+  ViewPlugin,
+  type ViewUpdate,
+} from "@codemirror/view";
 
 const fullLineDeco = Decoration.line({ class: "cm-line-sel-full" });
 
 const fullWidthLineSelectionPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
-    constructor(view: EditorView) { this.decorations = this.build(view); }
+    constructor(view: EditorView) {
+      this.decorations = this.build(view);
+    }
     update(u: ViewUpdate) {
-      if (u.selectionSet || u.docChanged || u.viewportChanged)
-        this.decorations = this.build(u.view);
+      if (u.selectionSet || u.docChanged || u.viewportChanged) this.decorations = this.build(u.view);
     }
     build(view: EditorView): DecorationSet {
       const builder = new RangeSetBuilder<Decoration>();
@@ -102,8 +110,7 @@ export function buildSharedExtensions(
       ".cm-activeLine": {
         borderTopRightRadius: "5px",
         borderBottomRightRadius: "5px",
-        backgroundColor:
-          "color-mix(in srgb, var(--foreground) 4%, transparent)",
+        backgroundColor: "color-mix(in srgb, var(--foreground) 4%, transparent)",
       },
       ".cm-lineNumbers .cm-activeLineGutter": {
         borderTopLeftRadius: "5px",
@@ -115,25 +122,19 @@ export function buildSharedExtensions(
       },
       // Vim normal-mode block cursor — translucent foreground, no rose hue.
       ".cm-fat-cursor": {
-        background:
-          "color-mix(in srgb, var(--foreground) 35%, transparent) !important",
-        outline:
-          "1px solid color-mix(in srgb, var(--foreground) 55%, transparent) !important",
+        background: "color-mix(in srgb, var(--foreground) 35%, transparent) !important",
+        outline: "1px solid color-mix(in srgb, var(--foreground) 55%, transparent) !important",
         color: "var(--foreground) !important",
       },
       "&:not(.cm-focused) .cm-fat-cursor": {
         background: "transparent !important",
-        outline:
-          "1px solid color-mix(in srgb, var(--foreground) 35%, transparent) !important",
+        outline: "1px solid color-mix(in srgb, var(--foreground) 35%, transparent) !important",
       },
-      ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection":
-        {
-          backgroundColor:
-            "color-mix(in srgb, var(--foreground) 18%, transparent) !important",
-        },
+      ".cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection": {
+        backgroundColor: "color-mix(in srgb, var(--foreground) 18%, transparent) !important",
+      },
       ".cm-line-sel-full": {
-        backgroundColor:
-          "color-mix(in srgb, var(--foreground) 18%, transparent)",
+        backgroundColor: "color-mix(in srgb, var(--foreground) 18%, transparent)",
       },
       ".cm-panels": {
         backgroundColor: "var(--popover)",

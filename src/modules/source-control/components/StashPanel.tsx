@@ -54,10 +54,16 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
       const msg = String(e);
       if (msg.includes("conflict") || msg.includes("CONFLICT")) {
         setError("Conflicts after stash apply — resolve before proceeding");
-        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Apply Failed", message: "Conflicts after stash apply — resolve before proceeding" });
+        useNotificationStore.getState().addNotification({
+          type: "error",
+          title: "Stash Apply Failed",
+          message: "Conflicts after stash apply — resolve before proceeding",
+        });
       } else {
         setError(msg);
-        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Apply Failed", message: msg });
+        useNotificationStore
+          .getState()
+          .addNotification({ type: "error", title: "Stash Apply Failed", message: msg });
       }
     } finally {
       setActionLoading(null);
@@ -74,10 +80,16 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
       const msg = String(e);
       if (msg.includes("conflict") || msg.includes("CONFLICT")) {
         setError("Conflicts after stash apply — resolve before proceeding");
-        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Pop Failed", message: "Conflicts after stash apply — resolve before proceeding" });
+        useNotificationStore.getState().addNotification({
+          type: "error",
+          title: "Stash Pop Failed",
+          message: "Conflicts after stash apply — resolve before proceeding",
+        });
       } else {
         setError(msg);
-        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Pop Failed", message: msg });
+        useNotificationStore
+          .getState()
+          .addNotification({ type: "error", title: "Stash Pop Failed", message: msg });
       }
     } finally {
       setActionLoading(null);
@@ -93,7 +105,9 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
       onRefresh();
     } catch (e) {
       setError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Stash Drop Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Stash Drop Failed", message: String(e) });
     } finally {
       setActionLoading(null);
     }
@@ -127,7 +141,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
         <div
           className={cn(
             "flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/stash:opacity-100",
-            isLoading && "opacity-100"
+            isLoading && "opacity-100",
           )}
         >
           {/* Apply */}
@@ -184,9 +198,11 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
             <AlertDialogTitle>Drop stash?</AlertDialogTitle>
             <AlertDialogDescription>
               Drop{" "}
-              <span className="font-mono text-foreground">stash@{"{"}
-              {entry.index}
-              {"}"}</span>
+              <span className="font-mono text-foreground">
+                stash@{"{"}
+                {entry.index}
+                {"}"}
+              </span>
               ? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -227,7 +243,9 @@ export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
       onRefresh();
     } catch (e) {
       setStashError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Stash Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Stash Failed", message: String(e) });
     } finally {
       setIsStashing(false);
     }
@@ -322,8 +340,8 @@ export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
       )}
 
       {/* Stash entries */}
-      {!collapsed && (
-        stashEntries.length === 0 ? (
+      {!collapsed &&
+        (stashEntries.length === 0 ? (
           <div className="px-3 py-2 text-[11px] text-muted-foreground/50">No stashes</div>
         ) : (
           <div className="px-1 pb-1">
@@ -336,8 +354,7 @@ export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
               />
             ))}
           </div>
-        )
-      )}
+        ))}
     </div>
   );
 }

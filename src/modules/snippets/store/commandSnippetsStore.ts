@@ -1,12 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
-import type {
-  CommandSnippet,
-  SnippetGroup,
-  SnippetReorderItem,
-  SnippetRunLog,
-} from "../types";
+import type { CommandSnippet, SnippetGroup, SnippetReorderItem, SnippetRunLog } from "../types";
 
 interface CommandSnippetsState {
   snippets: CommandSnippet[];
@@ -100,7 +95,7 @@ export const useCommandSnippetsStore = create<CommandSnippetsState>((set, get) =
     set((s) => {
       const orderMap = new Map(items.map((i) => [i.id, i.sortOrder]));
       const updated = s.snippets.map((x) =>
-        orderMap.has(x.id) ? { ...x, sortOrder: orderMap.get(x.id)! } : x
+        orderMap.has(x.id) ? { ...x, sortOrder: orderMap.get(x.id)! } : x,
       );
       return { snippets: updated };
     });
@@ -136,9 +131,7 @@ export const useCommandSnippetsStore = create<CommandSnippetsState>((set, get) =
   appendRunLine: (runId, data, stream) =>
     set((s) => ({
       runLogs: s.runLogs.map((l) =>
-        l.runId === runId
-          ? { ...l, lines: [...l.lines, { data, stream }] }
-          : l
+        l.runId === runId ? { ...l, lines: [...l.lines, { data, stream }] } : l,
       ),
     })),
 

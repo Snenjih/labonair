@@ -1,16 +1,7 @@
-import {
-  hasAnyKey,
-  useChatStore,
-  useAiLiveBridge,
-} from "@/modules/ai";
+import { hasAnyKey, useChatStore, useAiLiveBridge } from "@/modules/ai";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useShortcutHandlers } from "@/modules/shortcuts";
-import {
-  useWorkspaceCwd,
-  useTabManagement,
-  useTabsStore,
-  selectActiveTabKind,
-} from "@/modules/tabs";
+import { useWorkspaceCwd, useTabManagement, useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import { usePaletteCallbacks } from "@/modules/command-palette";
 import { useExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
 import { useMenuBridge } from "@/app/hooks/useMenuBridge";

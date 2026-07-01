@@ -63,7 +63,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
   const isNew = credentialId === "__new__" || credentialId === null;
 
   const cred = useCredentialsStore((s) =>
-    isNew ? null : (s.credentials.find((c) => c.id === credentialId) ?? null)
+    isNew ? null : (s.credentials.find((c) => c.id === credentialId) ?? null),
   );
   const createCredential = useCredentialsStore((s) => s.createCredential);
   const updateCredential = useCredentialsStore((s) => s.updateCredential);
@@ -73,7 +73,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
   const setSelectedCredential = useCredentialsStore((s) => s.setSelectedCredential);
   const fetchData = useHostsStore((s) => s.fetchData);
 
-  const [form, setForm] = useState<FormState>(isNew ? DEFAULT_FORM : (cred ? credToForm(cred) : DEFAULT_FORM));
+  const [form, setForm] = useState<FormState>(isNew ? DEFAULT_FORM : cred ? credToForm(cred) : DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -94,7 +94,9 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
 
   useEffect(() => {
     if (!isNew && credentialId) {
-      getHostsUsing(credentialId).then(setUsedByHosts).catch(() => {});
+      getHostsUsing(credentialId)
+        .then(setUsedByHosts)
+        .catch(() => {});
     }
   }, [credentialId, isNew]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -133,7 +135,8 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
       const newCred = await createCredential({
         name: form.name.trim(),
         credType: form.cred_type,
-        keyPath: form.cred_type === "key" && form.key_source === "filepath" ? form.key_path || undefined : undefined,
+        keyPath:
+          form.cred_type === "key" && form.key_source === "filepath" ? form.key_path || undefined : undefined,
         keyType: form.cred_type === "key" ? form.key_type : undefined,
         publicKey: form.public_key || undefined,
         secret: form.secret || undefined,
@@ -225,9 +228,15 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
             <Input
               placeholder="e.g. Production SSH Key"
               value={form.name}
-              onChange={(e) => { setForm((d) => ({ ...d, name: e.target.value })); if (submittedOnce) setSubmittedOnce(false); }}
+              onChange={(e) => {
+                setForm((d) => ({ ...d, name: e.target.value }));
+                if (submittedOnce) setSubmittedOnce(false);
+              }}
               onBlur={handleBlur}
-              className={cn("h-8 text-sm bg-background", submittedOnce && !form.name.trim() && "border-destructive")}
+              className={cn(
+                "h-8 text-sm bg-background",
+                submittedOnce && !form.name.trim() && "border-destructive",
+              )}
             />
             {submittedOnce && !form.name.trim() && (
               <p className="text-[11px] text-destructive">Name is required</p>
@@ -237,12 +246,17 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
 
         {/* Type */}
         <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Credential Type</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Credential Type
+          </p>
           <div className="flex gap-1.5">
             {(["password", "key"] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => { setForm((d) => ({ ...d, cred_type: t })); setTimeout(handleBlur, 0); }}
+                onClick={() => {
+                  setForm((d) => ({ ...d, cred_type: t }));
+                  setTimeout(handleBlur, 0);
+                }}
                 className={`flex-1 rounded-md border py-1.5 text-xs font-medium transition-all ${
                   form.cred_type === t
                     ? "border-primary bg-primary text-primary-foreground"
@@ -263,7 +277,9 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-muted-foreground">Password</Label>
                 {cred && (
-                  <span className={`text-[11px] ${cred.has_secret ? "text-success" : "text-muted-foreground"}`}>
+                  <span
+                    className={`text-[11px] ${cred.has_secret ? "text-success" : "text-muted-foreground"}`}
+                  >
                     {cred.has_secret ? "Saved" : "Not set"}
                   </span>
                 )}
@@ -319,13 +335,13 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs text-muted-foreground">Passphrase (optional)</Label>
-                    {cred?.has_secret && (
-                      <span className="text-[11px] text-success">Saved</span>
-                    )}
+                    {cred?.has_secret && <span className="text-[11px] text-success">Saved</span>}
                   </div>
                   <Input
                     type="password"
-                    placeholder={cred?.has_secret ? "Enter to update, leave empty to keep" : "Leave empty if none"}
+                    placeholder={
+                      cred?.has_secret ? "Enter to update, leave empty to keep" : "Leave empty if none"
+                    }
                     value={form.secret}
                     onChange={(e) => setForm((d) => ({ ...d, secret: e.target.value }))}
                     onBlur={handleBlur}
@@ -362,9 +378,7 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs text-muted-foreground">Passphrase (optional)</Label>
-                    {cred?.has_secret && (
-                      <span className="text-[11px] text-success">Saved</span>
-                    )}
+                    {cred?.has_secret && <span className="text-[11px] text-success">Saved</span>}
                   </div>
                   <Input
                     type="password"
@@ -441,19 +455,13 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
         )}
 
         {/* Error */}
-        {error && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>
-        )}
+        {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
       </div>
 
       {/* Footer */}
       <div className="border-t border-border px-4 py-3">
         {isNew ? (
-          <Button
-            className="w-full h-8 text-xs"
-            onClick={handleCreate}
-            disabled={!canCreate || submitting}
-          >
+          <Button className="w-full h-8 text-xs" onClick={handleCreate} disabled={!canCreate || submitting}>
             {submitting ? "Adding…" : "Add Credential"}
           </Button>
         ) : (
@@ -478,7 +486,9 @@ export function CredentialFormPanel({ credentialId, onClose }: Props) {
                   lose their credential reference and revert to no auth:
                   <ul className="mt-2 space-y-0.5 text-foreground">
                     {deleteAffected.map((h) => (
-                      <li key={h.id} className="text-sm">• {h.name}</li>
+                      <li key={h.id} className="text-sm">
+                        • {h.name}
+                      </li>
                     ))}
                   </ul>
                   <span className="mt-2 block">This action cannot be undone.</span>

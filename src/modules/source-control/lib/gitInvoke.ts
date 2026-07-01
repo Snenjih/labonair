@@ -23,10 +23,8 @@ export const git = {
   abort: (path: string) => invoke<void>("git_abort", { path }),
   getLog: (path: string, limit?: number, allBranches?: boolean) =>
     invoke<CommitInfo[]>("git_get_log", { path, limit: limit ?? null, allBranches: allBranches ?? true }),
-  getCommitDetail: (path: string, hash: string) =>
-    invoke<string>("git_get_commit_detail", { path, hash }),
-  checkoutBranch: (path: string, branch: string) =>
-    invoke<void>("git_checkout_branch", { path, branch }),
+  getCommitDetail: (path: string, hash: string) => invoke<string>("git_get_commit_detail", { path, hash }),
+  checkoutBranch: (path: string, branch: string) => invoke<void>("git_checkout_branch", { path, branch }),
   createBranch: (path: string, name: string, fromRef?: string, checkout?: boolean) =>
     invoke<void>("git_create_branch", { path, name, fromRef: fromRef ?? null, checkout: checkout ?? true }),
   deleteBranch: (path: string, name: string, force?: boolean) =>
@@ -39,38 +37,26 @@ export const git = {
       message: message ?? null,
       includeUntracked: includeUntracked ?? true,
     }),
-  stashList: (path: string) =>
-    invoke<StashEntry[]>("git_stash_list", { path }),
-  stashPop: (path: string, hash: string) =>
-    invoke<void>("git_stash_pop", { path, hash }),
-  stashApply: (path: string, hash: string) =>
-    invoke<void>("git_stash_apply", { path, hash }),
-  stashDrop: (path: string, hash: string) =>
-    invoke<void>("git_stash_drop", { path, hash }),
-  getCommitDiff: (path: string, hash: string) =>
-    invoke<string>("git_get_commit_diff", { path, hash }),
+  stashList: (path: string) => invoke<StashEntry[]>("git_stash_list", { path }),
+  stashPop: (path: string, hash: string) => invoke<void>("git_stash_pop", { path, hash }),
+  stashApply: (path: string, hash: string) => invoke<void>("git_stash_apply", { path, hash }),
+  stashDrop: (path: string, hash: string) => invoke<void>("git_stash_drop", { path, hash }),
+  getCommitDiff: (path: string, hash: string) => invoke<string>("git_get_commit_diff", { path, hash }),
   pushForceWithLease: (path: string, remote?: string, branch?: string) =>
     invoke<string>("git_push_force_with_lease", { path, remote: remote ?? null, branch: branch ?? null }),
   pushSetUpstream: (path: string, remote: string, branch: string) =>
     invoke<string>("git_push_set_upstream", { path, remote, branch }),
-  cherryPick: (path: string, hash: string) =>
-    invoke<void>("git_cherry_pick", { path, hash }),
-  getTags: (path: string) =>
-    invoke<string[]>("git_get_tags", { path }),
+  cherryPick: (path: string, hash: string) => invoke<void>("git_cherry_pick", { path, hash }),
+  getTags: (path: string) => invoke<string[]>("git_get_tags", { path }),
   createTag: (path: string, name: string, message?: string, hash?: string) =>
     invoke<void>("git_create_tag", { path, name, message: message ?? null, hash: hash ?? null }),
-  deleteTag: (path: string, name: string) =>
-    invoke<void>("git_delete_tag", { path, name }),
+  deleteTag: (path: string, name: string) => invoke<void>("git_delete_tag", { path, name }),
   pushTag: (path: string, name: string, remote?: string) =>
     invoke<string>("git_push_tag", { path, name, remote: remote ?? null }),
-  getDiffStats: (path: string) =>
-    invoke<FileDiffStat[]>("git_get_diff_stats", { path }),
-  getCommitNumstat: (path: string, hash: string) =>
-    invoke<string>("git_get_commit_numstat", { path, hash }),
+  getDiffStats: (path: string) => invoke<FileDiffStat[]>("git_get_diff_stats", { path }),
+  getCommitNumstat: (path: string, hash: string) => invoke<string>("git_get_commit_numstat", { path, hash }),
   getRemoteUrl: (path: string, remote?: string) =>
     invoke<string>("git_get_remote_url", { path, remote: remote ?? null }),
-  addToGitignore: (path: string, file: string) =>
-    invoke<void>("git_add_to_gitignore", { path, file }),
-  addToExclude: (path: string, file: string) =>
-    invoke<void>("git_add_to_exclude", { path, file }),
+  addToGitignore: (path: string, file: string) => invoke<void>("git_add_to_gitignore", { path, file }),
+  addToExclude: (path: string, file: string) => invoke<void>("git_add_to_exclude", { path, file }),
 };

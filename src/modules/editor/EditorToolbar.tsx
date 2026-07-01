@@ -106,7 +106,9 @@ export function EditorToolbar({
   const cursorCol = useEditorCursorStore((s) => s.col);
 
   const effectiveLang = languageOverride ?? detectedLanguage;
-  const langLabel = effectiveLang ? (LANGUAGE_LABELS[effectiveLang] ?? effectiveLang.toUpperCase()) : "Plain Text";
+  const langLabel = effectiveLang
+    ? (LANGUAGE_LABELS[effectiveLang] ?? effectiveLang.toUpperCase())
+    : "Plain Text";
 
   return (
     <div className="h-8 bg-card border-b border-border px-3 flex items-center justify-between shrink-0">

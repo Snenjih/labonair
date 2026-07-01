@@ -9,11 +9,7 @@ import {
   type ProviderId,
   PROVIDERS,
 } from "../config";
-import {
-  getAllKeys,
-  getAllInstanceKeys,
-  setInstanceKey,
-} from "../lib/keyring";
+import { getAllKeys, getAllInstanceKeys, setInstanceKey } from "../lib/keyring";
 import { autoName, renameForDuplicates } from "../lib/modelRef";
 import { useModelCacheStore } from "./modelCacheStore";
 
@@ -36,9 +32,7 @@ function generateId(): string {
 
 /** Migrate from old single-per-provider storage to new instance model.
  *  Reads existing keys and preferences to build a starter instance list. */
-async function migrateFromLegacy(
-  legacyPrefs: LegacyPrefs,
-): Promise<ProviderInstance[]> {
+async function migrateFromLegacy(legacyPrefs: LegacyPrefs): Promise<ProviderInstance[]> {
   const oldKeys = await getAllKeys();
   const instances: ProviderInstance[] = [];
 
@@ -92,21 +86,31 @@ type LegacyPrefs = {
 
 function getLegacyBaseUrl(id: ProviderId, p: LegacyPrefs): string {
   switch (id) {
-    case "lmstudio": return p.lmstudioBaseURL ?? "";
-    case "openai-compatible": return p.openaiCompatibleBaseURL ?? "";
-    case "mlx": return p.mlxBaseURL ?? "";
-    case "ollama": return p.ollamaBaseURL ?? "";
-    default: return "";
+    case "lmstudio":
+      return p.lmstudioBaseURL ?? "";
+    case "openai-compatible":
+      return p.openaiCompatibleBaseURL ?? "";
+    case "mlx":
+      return p.mlxBaseURL ?? "";
+    case "ollama":
+      return p.ollamaBaseURL ?? "";
+    default:
+      return "";
   }
 }
 
 function getLegacyModelId(id: ProviderId, p: LegacyPrefs): string {
   switch (id) {
-    case "lmstudio": return p.lmstudioChatModelId ?? "";
-    case "openai-compatible": return p.openaiCompatibleModelId ?? "";
-    case "mlx": return p.mlxChatModelId ?? "";
-    case "ollama": return p.ollamaChatModelId ?? "";
-    default: return "";
+    case "lmstudio":
+      return p.lmstudioChatModelId ?? "";
+    case "openai-compatible":
+      return p.openaiCompatibleModelId ?? "";
+    case "mlx":
+      return p.mlxChatModelId ?? "";
+    case "ollama":
+      return p.ollamaChatModelId ?? "";
+    default:
+      return "";
   }
 }
 
@@ -225,11 +229,7 @@ async function persist(instances: ProviderInstance[]): Promise<void> {
   await store.save();
 }
 
-async function loadInstanceKeys(
-  instances: ProviderInstance[],
-): Promise<Record<string, string | null>> {
-  const keyedIds = instances
-    .filter((i) => providerNeedsKey(i.providerId))
-    .map((i) => i.id);
+async function loadInstanceKeys(instances: ProviderInstance[]): Promise<Record<string, string | null>> {
+  const keyedIds = instances.filter((i) => providerNeedsKey(i.providerId)).map((i) => i.id);
   return getAllInstanceKeys(keyedIds);
 }

@@ -20,7 +20,7 @@ export interface SourceControlState {
   operationInProgress: "commit" | "push" | "pull" | "fetch" | "abort" | null;
   error: string | null;
   commitMessage: string;
-  diffViewMode: 'unified' | 'split';
+  diffViewMode: "unified" | "split";
   ignoreWhitespace: boolean;
 
   // branch
@@ -48,7 +48,7 @@ export interface SourceControlState {
   setStatus: (status: GitStatus | null) => void;
   setIsStatusLoading: (loading: boolean) => void;
   selectFile: (path: string, staged: boolean) => void;
-  selectSection: (section: 'staged' | 'unstaged' | 'untracked') => void;
+  selectSection: (section: "staged" | "unstaged" | "untracked") => void;
   selectAll: () => void;
   selectCommitDiff: (hash: string, repositoryPath: string) => void;
   clearSelectedFile: () => void;
@@ -57,7 +57,7 @@ export interface SourceControlState {
   setOperationInProgress: (op: SourceControlState["operationInProgress"]) => void;
   setError: (error: string | null) => void;
   setCommitMessage: (msg: string) => void;
-  setDiffViewMode: (mode: 'unified' | 'split') => void;
+  setDiffViewMode: (mode: "unified" | "split") => void;
   setIgnoreWhitespace: (v: boolean) => void;
 
   // branch actions
@@ -89,7 +89,7 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   operationInProgress: null,
   error: null,
   commitMessage: "",
-  diffViewMode: 'unified',
+  diffViewMode: "unified",
   ignoreWhitespace: false,
 
   branchList: [],
@@ -109,10 +109,11 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   setDiffStats: (diffStats) => set({ diffStats }),
   setStatus: (status) => set({ status }),
   setIsStatusLoading: (isStatusLoading) => set({ isStatusLoading }),
-  selectFile: (path, staged) => set({ selectionMode: { type: 'file', path, staged } }),
-  selectSection: (section) => set({ selectionMode: { type: 'section', section } }),
-  selectAll: () => set({ selectionMode: { type: 'all' } }),
-  selectCommitDiff: (hash, repositoryPath) => set({ selectionMode: { type: 'commit', hash, repositoryPath } }),
+  selectFile: (path, staged) => set({ selectionMode: { type: "file", path, staged } }),
+  selectSection: (section) => set({ selectionMode: { type: "section", section } }),
+  selectAll: () => set({ selectionMode: { type: "all" } }),
+  selectCommitDiff: (hash, repositoryPath) =>
+    set({ selectionMode: { type: "commit", hash, repositoryPath } }),
   clearSelectedFile: () => set({ selectionMode: null, diffContent: null }),
   setDiffContent: (diffContent) => set({ diffContent }),
   setIsDiffLoading: (isDiffLoading) => set({ isDiffLoading }),

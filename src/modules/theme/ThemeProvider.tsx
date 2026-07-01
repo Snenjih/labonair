@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   loadPreferences,
   onPreferencesChange,
@@ -48,17 +41,10 @@ function writeFastTheme(t: Theme): void {
   }
 }
 
-export function ThemeProvider({
-  children,
-  defaultTheme = "system",
-}: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<Theme>(() =>
-    readFastTheme(defaultTheme),
-  );
+export function ThemeProvider({ children, defaultTheme = "system" }: ThemeProviderProps) {
+  const [theme, setThemeState] = useState<Theme>(() => readFastTheme(defaultTheme));
   const [systemDark, setSystemDark] = useState<boolean>(() =>
-    typeof window === "undefined"
-      ? true
-      : window.matchMedia("(prefers-color-scheme: dark)").matches,
+    typeof window === "undefined" ? true : window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
 
   // Hydrate from the persistent store (cross-window source of truth).
@@ -88,8 +74,7 @@ export function ThemeProvider({
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  const resolvedTheme: "dark" | "light" =
-    theme === "system" ? (systemDark ? "dark" : "light") : theme;
+  const resolvedTheme: "dark" | "light" = theme === "system" ? (systemDark ? "dark" : "light") : theme;
 
   useEffect(() => {
     // If a custom JSON theme is active, it owns the dark/light class — don't fight it.
@@ -111,11 +96,7 @@ export function ThemeProvider({
     [theme, resolvedTheme, setTheme],
   );
 
-  return (
-    <ThemeProviderContext.Provider value={value}>
-      {children}
-    </ThemeProviderContext.Provider>
-  );
+  return <ThemeProviderContext.Provider value={value}>{children}</ThemeProviderContext.Provider>;
 }
 
 export function useTheme(): ThemeProviderState {

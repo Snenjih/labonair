@@ -1,11 +1,5 @@
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
@@ -35,7 +29,12 @@ function formatDate(unixSecs: number): string {
 // Parse octal string (e.g. "755") → 3×3 boolean matrix [owner,group,public][r,w,x]
 function octalToMatrix(oct: string): boolean[][] {
   const n = parseInt(oct.slice(-3).padStart(3, "0"), 8);
-  if (isNaN(n)) return [[false,false,false],[false,false,false],[false,false,false]];
+  if (isNaN(n))
+    return [
+      [false, false, false],
+      [false, false, false],
+      [false, false, false],
+    ];
   return [
     [!!(n & 0o400), !!(n & 0o200), !!(n & 0o100)],
     [!!(n & 0o040), !!(n & 0o020), !!(n & 0o010)],
@@ -63,13 +62,15 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
   function permStringToOctal(perm: string): string {
     const chars = perm.slice(0, 9).padEnd(9, "-");
     let n = 0;
-    const weights = [0o400,0o200,0o100,0o040,0o020,0o010,0o004,0o002,0o001];
+    const weights = [0o400, 0o200, 0o100, 0o040, 0o020, 0o010, 0o004, 0o002, 0o001];
     for (let i = 0; i < 9; i++) if (chars[i] !== "-") n |= weights[i];
-    return n.toString(8).padStart(3,"0");
+    return n.toString(8).padStart(3, "0");
   }
 
   const [octalInput, setOctalInput] = useState(() => permStringToOctal(file.permissions ?? ""));
-  const [matrix, setMatrix] = useState<boolean[][]>(() => octalToMatrix(permStringToOctal(file.permissions ?? "")));
+  const [matrix, setMatrix] = useState<boolean[][]>(() =>
+    octalToMatrix(permStringToOctal(file.permissions ?? "")),
+  );
   const [owner, setOwner] = useState("");
   const [group, setGroup] = useState("");
   const [applyError, setApplyError] = useState<string | null>(null);
@@ -151,21 +152,32 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
     }
   }
 
-  const fileType = file.is_dir ? "Directory" : file.is_symlink ? `Symlink → ${file.symlink_target ?? "?"}` : "File";
+  const fileType = file.is_dir
+    ? "Directory"
+    : file.is_symlink
+      ? `Symlink → ${file.symlink_target ?? "?"}`
+      : "File";
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="w-[480px] max-w-full">
         <DialogHeader>
-          <DialogTitle className="text-sm font-semibold truncate">
-            Properties — {file.name}
-          </DialogTitle>
+          <DialogTitle className="text-sm font-semibold truncate">Properties — {file.name}</DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="general" className="mt-1">
           <TabsList className="w-full">
-            <TabsTrigger value="general" className="flex-1 text-xs">General</TabsTrigger>
-            <TabsTrigger value="permissions" className="flex-1 text-xs">Permissions</TabsTrigger>
+            <TabsTrigger value="general" className="flex-1 text-xs">
+              General
+            </TabsTrigger>
+            <TabsTrigger value="permissions" className="flex-1 text-xs">
+              Permissions
+            </TabsTrigger>
           </TabsList>
 
           {/* GENERAL TAB */}
@@ -173,14 +185,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
             <InfoRow label="Name" value={file.name} mono />
             <InfoRow label="Path" value={file.path} mono />
             <InfoRow label="Type" value={fileType} />
-            <InfoRow
-              label="Size"
-              value={
-                file.is_dir
-                  ? calculatedSize ?? "—"
-                  : formatBytes(file.size)
-              }
-            />
+            <InfoRow label="Size" value={file.is_dir ? (calculatedSize ?? "—") : formatBytes(file.size)} />
             {file.is_dir && (
               <div className="flex items-center gap-2 pl-24">
                 <button
@@ -190,9 +195,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
                 >
                   {isCalculating ? "Calculating…" : calculatedSize ? "Recalculate" : "Calculate Size"}
                 </button>
-                {sizeError && (
-                  <span className="text-xs text-destructive truncate">{sizeError}</span>
-                )}
+                {sizeError && <span className="text-xs text-destructive truncate">{sizeError}</span>}
               </div>
             )}
             <InfoRow label="Modified" value={formatDate(file.modified_at)} />
@@ -214,9 +217,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
                   placeholder="755"
                   className="w-20 h-7 px-2 text-sm font-mono rounded bg-muted/30 border border-border text-foreground focus:outline-none focus:border-primary"
                 />
-                {octalWarning && (
-                  <p className="text-[10px] text-warning/80 max-w-52">{octalWarning}</p>
-                )}
+                {octalWarning && <p className="text-[10px] text-warning/80 max-w-52">{octalWarning}</p>}
               </div>
             </div>
 
@@ -227,10 +228,12 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
                 <span className="text-center font-semibold">Read</span>
                 <span className="text-center font-semibold">Write</span>
                 <span className="text-center font-semibold">Execute</span>
-                {(["Owner","Group","Public"] as const).map((label, row) => (
+                {(["Owner", "Group", "Public"] as const).map((label, row) => (
                   <>
-                    <span key={`lbl-${row}`} className="flex items-center text-foreground">{label}</span>
-                    {[0,1,2].map((col) => (
+                    <span key={`lbl-${row}`} className="flex items-center text-foreground">
+                      {label}
+                    </span>
+                    {[0, 1, 2].map((col) => (
                       <div key={`cb-${row}-${col}`} className="flex justify-center items-center">
                         <Checkbox
                           checked={matrix[row]?.[col] ?? false}
@@ -266,12 +269,8 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
               </div>
             </div>
 
-            {applyError && (
-              <p className="text-xs text-destructive">{applyError}</p>
-            )}
-            {applySuccess && (
-              <p className="text-xs text-primary">Applied successfully.</p>
-            )}
+            {applyError && <p className="text-xs text-destructive">{applyError}</p>}
+            {applySuccess && <p className="text-xs text-primary">Applied successfully.</p>}
           </TabsContent>
         </Tabs>
 

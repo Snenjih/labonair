@@ -33,31 +33,19 @@ export function buildSearchTools(ctx: ToolContext) {
       inputSchema: z.object({
         pattern: z
           .string()
-          .describe(
-            "Regex pattern (Rust ripgrep dialect). Anchor and escape literal characters as needed.",
-          ),
+          .describe("Regex pattern (Rust ripgrep dialect). Anchor and escape literal characters as needed."),
         root: z
           .string()
           .optional()
-          .describe(
-            "Root to search under. Defaults to workspace root, then active cwd.",
-          ),
+          .describe("Root to search under. Defaults to workspace root, then active cwd."),
         glob: z
           .array(z.string())
           .optional()
-          .describe(
-            "Optional include-globs over relative paths, e.g. ['**/*.ts', 'src/**/*.tsx'].",
-          ),
+          .describe("Optional include-globs over relative paths, e.g. ['**/*.ts', 'src/**/*.tsx']."),
         case_insensitive: z.boolean().optional(),
         max_results: z.number().int().min(1).max(2000).optional(),
       }),
-      execute: async ({
-        pattern,
-        root,
-        glob,
-        case_insensitive,
-        max_results,
-      }) => {
+      execute: async ({ pattern, root, glob, case_insensitive, max_results }) => {
         const r = resolveRoot(root, ctx);
         if (!r.ok) return { error: r.error };
         const safety = checkReadable(r.path);

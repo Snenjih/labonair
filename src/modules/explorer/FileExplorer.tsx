@@ -103,11 +103,7 @@ export function FileExplorer({
   // Nothing is fetched until a remote session is actually ready — the tree
   // is fed a null root in the meantime (same "no root" idle state as local).
   const rootPath =
-    explorerTarget.type === "local"
-      ? explorerTarget.path
-      : activeSessionId
-        ? explorerTarget.path
-        : null;
+    explorerTarget.type === "local" ? explorerTarget.path : activeSessionId ? explorerTarget.path : null;
 
   const tree = useFileTree(provider, rootPath, { onPathRenamed, onPathDeleted });
   const [query, setQuery] = useState("");
@@ -144,7 +140,8 @@ export function FileExplorer({
   // navigation — `flat` is the entry-only subset `treeRows` already implies
   // (loading/error/pending-create rows aren't navigable targets).
   const treeRows = useMemo(
-    () => (rootPath ? buildTreeRows(rootPath, tree.nodes, tree.expanded, tree.joinPath, tree.pendingCreate) : []),
+    () =>
+      rootPath ? buildTreeRows(rootPath, tree.nodes, tree.expanded, tree.joinPath, tree.pendingCreate) : [],
     [rootPath, tree.nodes, tree.expanded, tree.joinPath, tree.pendingCreate],
   );
   type FlatItem = { path: string; isDir: boolean };
@@ -213,15 +210,8 @@ export function FileExplorer({
   if (!rootPath) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-        <HugeiconsIcon
-          icon={Folder01Icon}
-          size={24}
-          strokeWidth={1.5}
-          className="text-muted-foreground"
-        />
-        <div className="text-xs text-muted-foreground">
-          No current directory
-        </div>
+        <HugeiconsIcon icon={Folder01Icon} size={24} strokeWidth={1.5} className="text-muted-foreground" />
+        <div className="text-xs text-muted-foreground">No current directory</div>
       </div>
     );
   }
@@ -229,17 +219,10 @@ export function FileExplorer({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (tree.renaming || tree.pendingCreate || query.trim()) return;
     const target = e.target as HTMLElement;
-    if (
-      target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.isContentEditable
-    )
-      return;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
     if (flat.length === 0) return;
 
-    const currentIdx = selectedPath
-      ? flat.findIndex((f) => f.path === selectedPath)
-      : -1;
+    const currentIdx = selectedPath ? flat.findIndex((f) => f.path === selectedPath) : -1;
 
     const move = (next: number) => {
       const clamped = Math.max(0, Math.min(flat.length - 1, next));
@@ -293,16 +276,9 @@ export function FileExplorer({
   };
 
   return (
-    <div
-      className="flex h-full flex-col outline-none"
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-    >
+    <div className="flex h-full flex-col outline-none" tabIndex={0} onKeyDown={handleKeyDown}>
       <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-2">
-        <span
-          className="flex-1 flex truncate text-xs font-medium text-foreground/80"
-          title={rootPath}
-        >
+        <span className="flex-1 flex truncate text-xs font-medium text-foreground/80" title={rootPath}>
           <img
             src={folderIconUrl(basename(rootPath), false)}
             alt=""
@@ -360,11 +336,7 @@ export function FileExplorer({
           }}
           title={tree.showHidden ? "Hide hidden files" : "Show hidden files"}
         >
-          <HugeiconsIcon
-            icon={tree.showHidden ? ViewIcon : ViewOffSlashIcon}
-            size={13}
-            strokeWidth={2}
-          />
+          <HugeiconsIcon icon={tree.showHidden ? ViewIcon : ViewOffSlashIcon} size={13} strokeWidth={2} />
         </Button>
       </div>
 
@@ -403,13 +375,9 @@ export function FileExplorer({
         <ScrollArea className="min-h-0 flex-1">
           <div className="py-1">
             {searching && results.length === 0 ? (
-              <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                Searching…
-              </div>
+              <div className="px-3 py-2 text-[11px] text-muted-foreground">Searching…</div>
             ) : results.length === 0 ? (
-              <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                No matches
-              </div>
+              <div className="px-3 py-2 text-[11px] text-muted-foreground">No matches</div>
             ) : (
               results.map((hit) => {
                 const url = hit.is_dir ? null : fileIconUrl(hit.name);
@@ -434,9 +402,7 @@ export function FileExplorer({
                       />
                     )}
                     <span className="truncate">{hit.name}</span>
-                    <span className="ml-auto truncate text-[10px] text-muted-foreground">
-                      {hit.rel}
-                    </span>
+                    <span className="ml-auto truncate text-[10px] text-muted-foreground">{hit.rel}</span>
                   </button>
                 );
               })
@@ -474,37 +440,22 @@ export function FileExplorer({
               </ContextMenuItem>
             )}
             {tree.capabilities.supportsReveal && (
-              <ContextMenuItem
-                className={COMPACT_ITEM}
-                onSelect={() => void revealInFinder(rootPath)}
-              >
+              <ContextMenuItem className={COMPACT_ITEM} onSelect={() => void revealInFinder(rootPath)}>
                 Reveal in Finder
               </ContextMenuItem>
             )}
             <ContextMenuSeparator />
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => tree.beginCreate(rootPath, "file")}
-            >
+            <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginCreate(rootPath, "file")}>
               New File
             </ContextMenuItem>
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => tree.beginCreate(rootPath, "dir")}
-            >
+            <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginCreate(rootPath, "dir")}>
               New Folder
             </ContextMenuItem>
             <ContextMenuSeparator />
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => void copyToClipboard(rootPath)}
-            >
+            <ContextMenuItem className={COMPACT_ITEM} onSelect={() => void copyToClipboard(rootPath)}>
               Copy Path
             </ContextMenuItem>
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => tree.refresh(rootPath)}
-            >
+            <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.refresh(rootPath)}>
               Refresh
             </ContextMenuItem>
           </ContextMenuContent>

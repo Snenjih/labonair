@@ -11,12 +11,7 @@ export type SettingCategory =
   | "Directives"
   | "About";
 
-export type ControlType =
-  | "Switch"
-  | "Select"
-  | "Input"
-  | "NumberInput"
-  | "Custom";
+export type ControlType = "Switch" | "Select" | "Input" | "NumberInput" | "Custom";
 
 export type SelectOption = { value: string; label: string };
 
@@ -261,7 +256,8 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "terminalCursorBlinkInterval",
     label: "Cursor blink interval",
-    description: "Duration of one blink cycle in milliseconds (200–2000 ms). Only applies when cursor blink is enabled.",
+    description:
+      "Duration of one blink cycle in milliseconds (200–2000 ms). Only applies when cursor blink is enabled.",
     category: "Terminal",
     controlType: "NumberInput",
   },
@@ -462,14 +458,16 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "sftpRemoteEditShowTransfers",
     label: "Show remote edit transfers",
-    description: "Display temporary download and upload operations when editing remote files in the transfers panel.",
+    description:
+      "Display temporary download and upload operations when editing remote files in the transfers panel.",
     category: "File Manager",
     controlType: "Switch",
   },
   {
     id: "hostPingInterval",
     label: "Ping interval",
-    description: "How often to check whether each host is reachable. Set to Never to disable availability checks.",
+    description:
+      "How often to check whether each host is reachable. Set to Never to disable availability checks.",
     category: "General",
     controlType: "Select",
     options: [

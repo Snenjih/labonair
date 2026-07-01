@@ -5,12 +5,7 @@ import type { AiDiffStatus } from "@/modules/tabs";
 import { native } from "../lib/native";
 import { checkReadable } from "../lib/security";
 import { resolvePath } from "../tools/tools";
-import {
-  flushPersist,
-  getOrCreateChat,
-  useChatStore,
-  type AgentRunStatus,
-} from "../store/chatStore";
+import { flushPersist, getOrCreateChat, useChatStore, type AgentRunStatus } from "../store/chatStore";
 
 /**
  * Headless bridge that mirrors chat lifecycle into the store, so the status
@@ -53,11 +48,7 @@ type ToolPartLike = ToolUIPart & {
 
 type AnyPart = UIMessagePart<Record<string, never>, Record<string, never>>;
 
-function Bridge({
-  sessionId,
-  openAiDiffTab,
-  setAiDiffStatus,
-}: { sessionId: string } & Props) {
+function Bridge({ sessionId, openAiDiffTab, setAiDiffStatus }: { sessionId: string } & Props) {
   const chat = useMemo(() => getOrCreateChat(sessionId), [sessionId]);
   const { status, messages, addToolApprovalResponse } = useChat<UIMessage>({
     chat,
@@ -71,9 +62,7 @@ function Bridge({
   // Expose the approval responder so the diff tab can resolve approvals.
   // We keep it in a ref-stable closure so identity is stable per render.
   useEffect(() => {
-    setApprovalResponder((id, approved) =>
-      addToolApprovalResponse({ id, approved }),
-    );
+    setApprovalResponder((id, approved) => addToolApprovalResponse({ id, approved }));
     return () => setApprovalResponder(null);
   }, [setApprovalResponder, addToolApprovalResponse]);
 
@@ -113,9 +102,7 @@ function Bridge({
     patch({
       status: runStatus,
       approvalsPending,
-      ...(runStatus === "idle" || runStatus === "error"
-        ? { step: null }
-        : {}),
+      ...(runStatus === "idle" || runStatus === "error" ? { step: null } : {}),
       ...(runStatus === "idle" ? { error: null } : {}),
     });
 
@@ -124,9 +111,7 @@ function Bridge({
     const prevRunStatus = runStatusRef.current;
     runStatusRef.current = runStatus;
     const wasBusy =
-      prevRunStatus === "thinking" ||
-      prevRunStatus === "streaming" ||
-      prevRunStatus === "awaiting-approval";
+      prevRunStatus === "thinking" || prevRunStatus === "streaming" || prevRunStatus === "awaiting-approval";
     if (runStatus === "idle" && wasBusy) {
       const queued = useChatStore.getState().dequeueMessage(sessionId);
       if (queued) {
@@ -163,14 +148,9 @@ function Bridge({
       if (m.role !== "assistant") continue;
       for (const p of m.parts as AnyPart[]) {
         const t = (p as { type?: string }).type;
-        if (
-          t === "tool-write_file" ||
-          t === "tool-edit" ||
-          t === "tool-multi_edit"
-        ) {
+        if (t === "tool-write_file" || t === "tool-edit" || t === "tool-multi_edit") {
           const state = (p as { state?: string }).state ?? "";
-          const id =
-            (p as { approval?: { id?: string } }).approval?.id ?? "";
+          const id = (p as { approval?: { id?: string } }).approval?.id ?? "";
           fp += `${id}:${state}|`;
         }
       }
@@ -186,9 +166,7 @@ function Bridge({
        * Either a literal proposed content (write_file), or a function that
        * derives proposed content from the on-disk original (edit/multi_edit).
        */
-      derive:
-        | { kind: "literal"; content: string }
-        | { kind: "edits"; edits: EditOp[] };
+      derive: { kind: "literal"; content: string } | { kind: "edits"; edits: EditOp[] };
     };
     type StatusUpdate = { approvalId: string; status: AiDiffStatus };
 
@@ -215,8 +193,7 @@ function Bridge({
           // Response may carry an `approved` bit; if not present, leave the
           // tab in pending — the next state transition (output-* below) will
           // settle it.
-          const approved = (part as { approval?: { approved?: boolean } })
-            .approval?.approved;
+          const approved = (part as { approval?: { approved?: boolean } }).approval?.approved;
           if (typeof approved === "boolean") {
             statusUpdates.push({
               approvalId,
@@ -353,14 +330,10 @@ function extractFileMutation(part: AnyPart): FileMutation | null {
   return null;
 }
 
-function applyEditsLocally(
-  original: string,
-  edits: EditOp[],
-): { ok: true; content: string } | { ok: false } {
+function applyEditsLocally(original: string, edits: EditOp[]): { ok: true; content: string } | { ok: false } {
   let content = original;
   for (const e of edits) {
-    if (e.old_string === e.new_string || e.old_string.length === 0)
-      return { ok: false };
+    if (e.old_string === e.new_string || e.old_string.length === 0) return { ok: false };
     if (e.replace_all) {
       if (!content.includes(e.old_string)) return { ok: false };
       content = content.split(e.old_string).join(e.new_string);
@@ -369,18 +342,13 @@ function applyEditsLocally(
       if (first === -1) return { ok: false };
       const second = content.indexOf(e.old_string, first + 1);
       if (second !== -1) return { ok: false };
-      content =
-        content.slice(0, first) +
-        e.new_string +
-        content.slice(first + e.old_string.length);
+      content = content.slice(0, first) + e.new_string + content.slice(first + e.old_string.length);
     }
   }
   return { ok: true, content };
 }
 
-async function readOriginal(
-  abs: string,
-): Promise<{ content: string; isNewFile: boolean }> {
+async function readOriginal(abs: string): Promise<{ content: string; isNewFile: boolean }> {
   // The fs guard rejects sensitive paths even on read; mirror that here so
   // the user sees an empty "before" rather than an error tab.
   const safety = checkReadable(abs);
@@ -393,10 +361,7 @@ async function readOriginal(
     return { content: "", isNewFile: false };
   } catch (e) {
     const msg = String(e).toLowerCase();
-    const notFound =
-      msg.includes("no such file") ||
-      msg.includes("not found") ||
-      msg.includes("os error 2");
+    const notFound = msg.includes("no such file") || msg.includes("not found") || msg.includes("os error 2");
     return { content: "", isNewFile: notFound };
   }
 }

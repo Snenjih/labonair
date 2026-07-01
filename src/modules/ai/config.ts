@@ -383,18 +383,18 @@ export type ModelPricing = {
 };
 
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  "gpt-5.4-mini": { input: 0.15, output: 0.60 },
-  "gpt-5.5": { input: 2.50, output: 10.00 },
-  "gpt-5.3-codex": { input: 3.00, output: 15.00 },
+  "gpt-5.4-mini": { input: 0.15, output: 0.6 },
+  "gpt-5.5": { input: 2.5, output: 10.0 },
+  "gpt-5.3-codex": { input: 3.0, output: 15.0 },
   "claude-haiku-4-5": { input: 0.25, output: 1.25, cacheRead: 0.03 },
-  "claude-sonnet-4-6": { input: 3.00, output: 15.00, cacheRead: 0.30 },
-  "claude-opus-4-7": { input: 15.00, output: 75.00, cacheRead: 1.50 },
-  "gemini-3.1-pro": { input: 3.50, output: 10.50 },
-  "gemini-3-flash": { input: 0.075, output: 0.30 },
-  "deepseek-chat": { input: 0.27, output: 1.10 },
+  "claude-sonnet-4-6": { input: 3.0, output: 15.0, cacheRead: 0.3 },
+  "claude-opus-4-7": { input: 15.0, output: 75.0, cacheRead: 1.5 },
+  "gemini-3.1-pro": { input: 3.5, output: 10.5 },
+  "gemini-3-flash": { input: 0.075, output: 0.3 },
+  "deepseek-chat": { input: 0.27, output: 1.1 },
   "deepseek-reasoner": { input: 0.55, output: 2.19 },
-  "mistral-large-latest": { input: 2.00, output: 6.00 },
-  "mistral-small-latest": { input: 0.10, output: 0.30 },
+  "mistral-large-latest": { input: 2.0, output: 6.0 },
+  "mistral-small-latest": { input: 0.1, output: 0.3 },
 };
 
 export function estimateCost(
@@ -419,11 +419,7 @@ export function providerNeedsKey(id: ProviderId): boolean {
 }
 
 /** Providers eligible for the editor's inline autocomplete (latency-critical). */
-export type AutocompleteProviderId =
-  | "cerebras"
-  | "groq"
-  | "lmstudio"
-  | "openai-compatible";
+export type AutocompleteProviderId = "cerebras" | "groq" | "lmstudio" | "openai-compatible";
 
 export const AUTOCOMPLETE_PROVIDERS: readonly AutocompleteProviderId[] = [
   "cerebras",
@@ -432,10 +428,7 @@ export const AUTOCOMPLETE_PROVIDERS: readonly AutocompleteProviderId[] = [
   "openai-compatible",
 ] as const;
 
-export const DEFAULT_AUTOCOMPLETE_MODEL: Record<
-  AutocompleteProviderId,
-  string
-> = {
+export const DEFAULT_AUTOCOMPLETE_MODEL: Record<AutocompleteProviderId, string> = {
   cerebras: "gpt-oss-120b",
   groq: "openai/gpt-oss-20b",
   lmstudio: "qwen2.5-coder-7b-instruct",
@@ -449,21 +442,37 @@ export const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434/v1";
 
 /** Provider IDs that belong to the "cloud" group in the Add Provider dropdown. */
 export const CLOUD_PROVIDER_IDS: readonly ProviderId[] = [
-  "openai", "anthropic", "google", "xai", "cerebras", "groq", "deepseek", "mistral", "openrouter",
+  "openai",
+  "anthropic",
+  "google",
+  "xai",
+  "cerebras",
+  "groq",
+  "deepseek",
+  "mistral",
+  "openrouter",
 ] as const;
 
 /** Provider IDs that belong to the "local & custom" group. */
 export const LOCAL_PROVIDER_IDS: readonly ProviderId[] = [
-  "openai-compatible", "lmstudio", "mlx", "ollama",
+  "openai-compatible",
+  "lmstudio",
+  "mlx",
+  "ollama",
 ] as const;
 
 export function getProviderDefaultBaseUrl(id: ProviderId): string {
   switch (id) {
-    case "lmstudio": return LMSTUDIO_DEFAULT_BASE_URL;
-    case "mlx": return MLX_DEFAULT_BASE_URL;
-    case "ollama": return OLLAMA_DEFAULT_BASE_URL;
-    case "openai-compatible": return OPENAI_COMPATIBLE_DEFAULT_BASE_URL;
-    default: return "";
+    case "lmstudio":
+      return LMSTUDIO_DEFAULT_BASE_URL;
+    case "mlx":
+      return MLX_DEFAULT_BASE_URL;
+    case "ollama":
+      return OLLAMA_DEFAULT_BASE_URL;
+    case "openai-compatible":
+      return OPENAI_COMPATIBLE_DEFAULT_BASE_URL;
+    default:
+      return "";
   }
 }
 

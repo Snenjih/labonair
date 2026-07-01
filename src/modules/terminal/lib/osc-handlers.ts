@@ -1,9 +1,6 @@
 import type { IDisposable, IMarker, Terminal } from "@xterm/xterm";
 
-export function registerCwdHandler(
-  term: Terminal,
-  onCwd: (cwd: string) => void,
-): () => void {
+export function registerCwdHandler(term: Terminal, onCwd: (cwd: string) => void): () => void {
   const d = term.parser.registerOscHandler(7, (data) => {
     const cwd = parseOsc7(data);
     if (cwd) onCwd(cwd);
@@ -78,9 +75,7 @@ export function registerTerminalQueryHandlers(
   handles.push(
     term.parser.registerOscHandler(10, (data) => {
       if (data !== "?") return false;
-      const fg =
-        (term.options.theme as Record<string, string | undefined>)?.foreground ??
-        "#cccccc";
+      const fg = (term.options.theme as Record<string, string | undefined>)?.foreground ?? "#cccccc";
       writeToProcess(`\x1b]10;${hexToOscRgb(fg)}\x07`);
       return true;
     }),
@@ -90,9 +85,7 @@ export function registerTerminalQueryHandlers(
   handles.push(
     term.parser.registerOscHandler(11, (data) => {
       if (data !== "?") return false;
-      const bg =
-        (term.options.theme as Record<string, string | undefined>)?.background ??
-        "#000000";
+      const bg = (term.options.theme as Record<string, string | undefined>)?.background ?? "#000000";
       writeToProcess(`\x1b]11;${hexToOscRgb(bg)}\x07`);
       return true;
     }),

@@ -120,7 +120,16 @@ export type CommitDiffTab = {
   hash: string;
 };
 
-export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | GitGraphTab | GitDiffTab | CommitDiffTab;
+export type Tab =
+  | WorkspaceTab
+  | EditorTab
+  | PreviewTab
+  | AiDiffTab
+  | HomeTab
+  | SftpTab
+  | GitGraphTab
+  | GitDiffTab
+  | CommitDiffTab;
 
 export type TabPatch = Partial<{
   title: string;

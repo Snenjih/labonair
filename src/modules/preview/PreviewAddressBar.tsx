@@ -6,20 +6,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  ArrowReloadHorizontalIcon,
-  Globe02Icon,
-  LinkSquare02Icon,
-} from "@hugeicons/core-free-icons";
+import { ArrowReloadHorizontalIcon, Globe02Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useRef,
-  useState,
-} from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 type PortPreset = {
   port: number;
@@ -57,60 +47,62 @@ type Props = {
   onReload: () => void;
 };
 
-export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
-  function PreviewAddressBar({ url, onSubmit, onReload }, ref) {
-    const [draft, setDraft] = useState(url);
-    const inputRef = useRef<HTMLInputElement>(null);
+export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(function PreviewAddressBar(
+  { url, onSubmit, onReload },
+  ref,
+) {
+  const [draft, setDraft] = useState(url);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-    // Keep draft in sync when the parent updates the URL externally
-    // (AI tool, detected localhost chip, etc.).
-    useEffect(() => {
-      setDraft(url);
-    }, [url]);
+  // Keep draft in sync when the parent updates the URL externally
+  // (AI tool, detected localhost chip, etc.).
+  useEffect(() => {
+    setDraft(url);
+  }, [url]);
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        focus: () => {
-          const el = inputRef.current;
-          if (!el) return;
-          el.focus();
-          el.select();
-        },
-      }),
-      [],
-    );
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.focus();
+        el.select();
+      },
+    }),
+    [],
+  );
 
-    const [notice, setNotice] = useState<string | null>(null);
-    const [checkingPort, setCheckingPort] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [checkingPort, setCheckingPort] = useState<number | null>(null);
 
-    const submit = () => {
-      const next = normalizeUrl(draft);
-      if (!next) {
-        setNotice("Enter a URL or pick a port preset.");
-        return;
-      }
-      setNotice(null);
-      if (next !== url) onSubmit(next);
-      else onReload();
-    };
+  const submit = () => {
+    const next = normalizeUrl(draft);
+    if (!next) {
+      setNotice("Enter a URL or pick a port preset.");
+      return;
+    }
+    setNotice(null);
+    if (next !== url) onSubmit(next);
+    else onReload();
+  };
 
-    const tryPort = async (port: number) => {
-      setNotice(null);
-      setCheckingPort(port);
-      const url = `http://localhost:${port}`;
-      const ok = await probeUrl(url);
-      setCheckingPort(null);
-      if (!ok) {
-        setNotice(`No server listening on :${port}.`);
-        return;
-      }
-      setDraft(url);
-      onSubmit(url);
-    };
+  const tryPort = async (port: number) => {
+    setNotice(null);
+    setCheckingPort(port);
+    const url = `http://localhost:${port}`;
+    const ok = await probeUrl(url);
+    setCheckingPort(null);
+    if (!ok) {
+      setNotice(`No server listening on :${port}.`);
+      return;
+    }
+    setDraft(url);
+    onSubmit(url);
+  };
 
-    return (
-      <div className="shrink-0 border-b border-border/60">
+  return (
+    <div className="shrink-0 border-b border-border/60">
       <div className="flex h-9 items-center gap-1 bg-card/40 px-1.5">
         <Button
           type="button"
@@ -120,11 +112,7 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
           title="Reload"
           className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
         >
-          <HugeiconsIcon
-            icon={ArrowReloadHorizontalIcon}
-            size={14}
-            strokeWidth={1.75}
-          />
+          <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} strokeWidth={1.75} />
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -135,18 +123,11 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
               title="Common dev-server ports"
               className="h-7 shrink-0 gap-1 rounded-md px-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
             >
-              <HugeiconsIcon
-                icon={Globe02Icon}
-                size={13}
-                strokeWidth={1.75}
-              />
+              <HugeiconsIcon icon={Globe02Icon} size={13} strokeWidth={1.75} />
               <span className="hidden sm:inline">Ports</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="start"
-            className="max-h-80 min-w-56 overflow-y-auto"
-          >
+          <DropdownMenuContent align="start" className="max-h-80 min-w-56 overflow-y-auto">
             {PORT_PRESETS.map((p) => (
               <DropdownMenuItem
                 key={p.port}
@@ -195,11 +176,7 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
           className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           disabled={!url}
         >
-          <HugeiconsIcon
-            icon={LinkSquare02Icon}
-            size={14}
-            strokeWidth={1.75}
-          />
+          <HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={1.75} />
         </Button>
       </div>
       {notice ? (
@@ -214,10 +191,9 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
           </button>
         </div>
       ) : null}
-      </div>
-    );
-  },
-);
+    </div>
+  );
+});
 
 async function probeUrl(url: string): Promise<boolean> {
   try {

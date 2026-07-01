@@ -65,9 +65,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
 
   const isRename = !!file.originalPath;
   const fileName = basename(file.path);
-  const displayName = isRename
-    ? `${basename(file.path)} ← ${basename(file.originalPath!)}`
-    : fileName;
+  const displayName = isRename ? `${basename(file.path)} ← ${basename(file.originalPath!)}` : fileName;
 
   async function handleStage(e?: React.MouseEvent) {
     e?.stopPropagation();
@@ -76,7 +74,9 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
       await git.stageFile(repoRoot, file.path);
       onRefresh();
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
@@ -87,7 +87,9 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
       await git.unstageFile(repoRoot, file.path);
       onRefresh();
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
@@ -97,7 +99,9 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
       await git.discardFile(repoRoot, file.path);
       onRefresh();
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
@@ -107,7 +111,9 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
       await git.addToGitignore(repoRoot, file.path);
       onRefresh();
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
@@ -116,7 +122,9 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     try {
       await git.addToExclude(repoRoot, file.path);
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
@@ -158,12 +166,8 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
             {/* Diff stats — always visible */}
             {stat && (stat.added > 0 || stat.removed > 0) && (
               <span className="flex shrink-0 items-center gap-1 text-[10px] tabular-nums">
-                {stat.added > 0 && (
-                  <span className="font-medium text-success">+{stat.added}</span>
-                )}
-                {stat.removed > 0 && (
-                  <span className="font-medium text-error">−{stat.removed}</span>
-                )}
+                {stat.added > 0 && <span className="font-medium text-success">+{stat.added}</span>}
+                {stat.removed > 0 && <span className="font-medium text-error">−{stat.removed}</span>}
               </span>
             )}
 
@@ -205,10 +209,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
             </ContextMenuItem>
           )}
           {section === "unstaged" && (
-            <ContextMenuItem
-              variant="destructive"
-              onSelect={() => setShowDiscard(true)}
-            >
+            <ContextMenuItem variant="destructive" onSelect={() => setShowDiscard(true)}>
               Discard Changes
               <ContextMenuShortcut>⌫</ContextMenuShortcut>
             </ContextMenuItem>
@@ -216,9 +217,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
 
           <ContextMenuSeparator />
 
-          <ContextMenuItem onSelect={() => void handleAddToGitignore()}>
-            Add to .gitignore
-          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => void handleAddToGitignore()}>Add to .gitignore</ContextMenuItem>
           <ContextMenuItem onSelect={() => void handleAddToExclude()}>
             Add to .git/info/exclude
           </ContextMenuItem>
@@ -243,8 +242,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
             <AlertDialogTitle>Discard changes?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently discard all changes to{" "}
-              <span className="font-mono text-foreground">{fileName}</span>. This cannot be
-              undone.
+              <span className="font-mono text-foreground">{fileName}</span>. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

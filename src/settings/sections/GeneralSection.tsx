@@ -1,13 +1,7 @@
 import { handleApiError } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setAutostart,
@@ -26,11 +20,7 @@ import {
   setConfirmQuitWithSsh,
 } from "@/modules/settings/store";
 import { useUpdater } from "@/modules/updater";
-import {
-  AlertDiamondIcon,
-  GithubIcon,
-  Globe02Icon,
-} from "@hugeicons/core-free-icons";
+import { AlertDiamondIcon, GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { getName, getVersion } from "@tauri-apps/api/app";
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
@@ -189,10 +179,7 @@ export function GeneralSection() {
 
   return (
     <div className="flex flex-col gap-[var(--ui-section-gap)]">
-      <SectionHeader
-        title="General"
-        description="Editor, startup, and security."
-      />
+      <SectionHeader title="General" description="Editor, startup, and security." />
 
       {/* About hero */}
       <div className="flex items-start gap-8 rounded-xl border border-border/60 bg-card/40 px-5 py-5">
@@ -201,12 +188,8 @@ export function GeneralSection() {
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="" className="size-14" draggable={false} />
             <div className="flex flex-col">
-              <span className="text-[21px] font-semibold tracking-tight leading-tight">
-                {name}
-              </span>
-              <span className="font-mono text-[10.5px] text-muted-foreground mt-0.5">
-                {buildString}
-              </span>
+              <span className="text-[21px] font-semibold tracking-tight leading-tight">{name}</span>
+              <span className="font-mono text-[10.5px] text-muted-foreground mt-0.5">{buildString}</span>
             </div>
           </div>
           <div className="flex flex-col gap-1">
@@ -219,17 +202,11 @@ export function GeneralSection() {
               {checkLabel}
             </Button>
             {status.kind === "error" && (
-              <p className="font-mono text-[10.5px] break-all text-destructive/80">
-                {status.message}
-              </p>
+              <p className="font-mono text-[10.5px] break-all text-destructive/80">{status.message}</p>
             )}
             {downloading && status.contentLength ? (
               <p className="text-[11px] text-muted-foreground">
-                {Math.min(
-                  100,
-                  Math.round((status.downloaded / status.contentLength) * 100),
-                )}
-                %
+                {Math.min(100, Math.round((status.downloaded / status.contentLength) * 100))}%
               </p>
             ) : null}
           </div>
@@ -251,12 +228,8 @@ export function GeneralSection() {
                 className="shrink-0 text-muted-foreground"
               />
               <div className="flex flex-col">
-                <span className="text-[12px] font-medium leading-tight">
-                  {link.label}
-                </span>
-                <span className="text-[10.5px] text-muted-foreground leading-tight">
-                  {link.description}
-                </span>
+                <span className="text-[12px] font-medium leading-tight">{link.label}</span>
+                <span className="text-[10.5px] text-muted-foreground leading-tight">{link.description}</span>
               </div>
             </button>
           ))}
@@ -265,46 +238,28 @@ export function GeneralSection() {
 
       <div className="flex flex-col gap-2">
         <Label>Editor</Label>
-        <SettingRow
-          title="Vim mode"
-          description="Enable Vim keybindings in the code editor."
-        >
-          <Switch
-            checked={vimMode}
-            onCheckedChange={(v) => void setVimMode(v)}
-          />
+        <SettingRow title="Vim mode" description="Enable Vim keybindings in the code editor.">
+          <Switch checked={vimMode} onCheckedChange={(v) => void setVimMode(v)} />
         </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">
         <Label>Startup</Label>
         <div className="flex flex-col gap-2">
-          <SettingRow
-            title="Launch at login"
-            description="Open Labonair automatically when you sign in."
-          >
-            <Switch
-              checked={autostart}
-              onCheckedChange={(v) => void onToggleAutostart(v)}
-            />
+          <SettingRow title="Launch at login" description="Open Labonair automatically when you sign in.">
+            <Switch checked={autostart} onCheckedChange={(v) => void onToggleAutostart(v)} />
           </SettingRow>
           <SettingRow
             title="Restore window position & size"
             description="Reopen the main window where you left it. Applies on next launch."
           >
-            <Switch
-              checked={restoreWindowState}
-              onCheckedChange={(v) => void setRestoreWindowState(v)}
-            />
+            <Switch checked={restoreWindowState} onCheckedChange={(v) => void setRestoreWindowState(v)} />
           </SettingRow>
           <SettingRow
             title="Session restore"
             description="Reopen all tabs, SSH connections, SFTP paths, and editor files on the next launch. Periodically auto-saved."
           >
-            <Switch
-              checked={sessionRestore}
-              onCheckedChange={(v) => void setSessionRestore(v)}
-            />
+            <Switch checked={sessionRestore} onCheckedChange={(v) => void setSessionRestore(v)} />
           </SettingRow>
           {sessionRestore && (
             <SettingRow
@@ -333,10 +288,7 @@ export function GeneralSection() {
             title="Check for updates on launch"
             description="Show an update button in the titlebar when a new version is available."
           >
-            <Switch
-              checked={checkForUpdates}
-              onCheckedChange={(v) => void setCheckForUpdates(v)}
-            />
+            <Switch checked={checkForUpdates} onCheckedChange={(v) => void setCheckForUpdates(v)} />
           </SettingRow>
           <SettingRow
             title="Default opening tab"
@@ -344,9 +296,7 @@ export function GeneralSection() {
           >
             <Select
               value={defaultStartupTab}
-              onValueChange={(v) =>
-                void setDefaultStartupTab(v as "terminal" | "host-manager")
-              }
+              onValueChange={(v) => void setDefaultStartupTab(v as "terminal" | "host-manager")}
             >
               <SelectTrigger className="h-7 w-40 text-[11.5px]">
                 <SelectValue />
@@ -364,9 +314,7 @@ export function GeneralSection() {
             >
               <Select
                 value={String(startupTerminalCount)}
-                onValueChange={(v) =>
-                  void setStartupTerminalCount(Number(v) as 1 | 2 | 3)
-                }
+                onValueChange={(v) => void setStartupTerminalCount(Number(v) as 1 | 2 | 3)}
               >
                 <SelectTrigger className="h-7 w-20 text-[11.5px]">
                   <SelectValue />
@@ -388,10 +336,7 @@ export function GeneralSection() {
           title="Ping interval"
           description="How often to check whether each host is reachable. Set to Never to disable availability checks."
         >
-          <Select
-            value={String(hostPingInterval)}
-            onValueChange={(v) => void setHostPingInterval(Number(v))}
-          >
+          <Select value={String(hostPingInterval)} onValueChange={(v) => void setHostPingInterval(Number(v))}>
             <SelectTrigger className="h-7 w-44 text-[11.5px]">
               <SelectValue />
             </SelectTrigger>
@@ -422,10 +367,7 @@ export function GeneralSection() {
           title="Confirm quit with active SSH connections"
           description="Show a confirmation dialog before closing the app when SSH sessions are open."
         >
-          <Switch
-            checked={confirmQuitWithSsh}
-            onCheckedChange={(v) => void setConfirmQuitWithSsh(v)}
-          />
+          <Switch checked={confirmQuitWithSsh} onCheckedChange={(v) => void setConfirmQuitWithSsh(v)} />
         </SettingRow>
       </div>
 
@@ -435,10 +377,7 @@ export function GeneralSection() {
           title="New tab inherits current directory"
           description="Open new terminal tabs in the working directory of the active tab instead of the home directory."
         >
-          <Switch
-            checked={newTabInheritsCwd}
-            onCheckedChange={(v) => void setNewTabInheritsCwd(v)}
-          />
+          <Switch checked={newTabInheritsCwd} onCheckedChange={(v) => void setNewTabInheritsCwd(v)} />
         </SettingRow>
         <SettingRow
           title="Confirm before closing terminal tab"
@@ -457,10 +396,7 @@ export function GeneralSection() {
           title="Reduce motion"
           description="Disable all UI animations. Useful for motion sensitivity or older hardware."
         >
-          <Switch
-            checked={reduceMotion}
-            onCheckedChange={(v) => void setReduceMotion(v)}
-          />
+          <Switch checked={reduceMotion} onCheckedChange={(v) => void setReduceMotion(v)} />
         </SettingRow>
       </div>
     </div>
@@ -468,9 +404,5 @@ export function GeneralSection() {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="text-[11px] font-medium tracking-tight text-muted-foreground">{children}</span>;
 }

@@ -28,8 +28,7 @@ type Options = {
 
 // Matches dev-server-style local URLs (vite, next dev, webpack, …). Anchors
 // on a word boundary so we don't catch substrings of longer paths.
-const LOCAL_URL_RE =
-  /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d{1,5})?(?:\/[^\s\x1b]*)?/g;
+const LOCAL_URL_RE = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d{1,5})?(?:\/[^\s\x1b]*)?/g;
 
 const FONT_WEIGHT_MAP: Record<string, string | number> = {
   normal: "normal",
@@ -43,7 +42,11 @@ const FONT_WEIGHT_MAP: Record<string, string | number> = {
 // after WebGL re-attaches corrects dimensions.
 function safeFit(fit: FitAddon | null | undefined): void {
   if (!fit) return;
-  try { fit.fit(); } catch { /* renderer not ready */ }
+  try {
+    fit.fit();
+  } catch {
+    /* renderer not ready */
+  }
 }
 
 let _bellAudioCtx: AudioContext | null = null;
@@ -138,9 +141,7 @@ export function useTerminalSession({
       if (state.terminalFastScrollModifier !== prev.terminalFastScrollModifier) {
         // fastScrollModifier exists at runtime in xterm v6 but is not in the public types
         (term.options as Record<string, unknown>).fastScrollModifier =
-          state.terminalFastScrollModifier === "none"
-            ? undefined
-            : state.terminalFastScrollModifier;
+          state.terminalFastScrollModifier === "none" ? undefined : state.terminalFastScrollModifier;
       }
     });
     return unsub;
@@ -188,9 +189,7 @@ export function useTerminalSession({
         // fastScrollModifier is a runtime option in xterm v6 but not in public types
         ...({
           fastScrollModifier:
-            prefs.terminalFastScrollModifier === "none"
-              ? undefined
-              : prefs.terminalFastScrollModifier,
+            prefs.terminalFastScrollModifier === "none" ? undefined : prefs.terminalFastScrollModifier,
         } as Record<string, unknown>),
         // OSC 8 hyperlinks — open in the system browser, not the Tauri webview
         linkHandler: {
@@ -232,7 +231,9 @@ export function useTerminalSession({
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
           osc.start(ctx.currentTime);
           osc.stop(ctx.currentTime + 0.15);
-        } catch { /* ignore AudioContext errors */ }
+        } catch {
+          /* ignore AudioContext errors */
+        }
       });
 
       const fit = new FitAddon();
@@ -241,9 +242,7 @@ export function useTerminalSession({
 
       const search = new SearchAddon();
       term.loadAddon(search);
-      term.loadAddon(
-        new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)),
-      );
+      term.loadAddon(new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)));
       term.loadAddon(new ImageAddon({ storageLimit: 32 }));
 
       term.open(container.current);
@@ -265,7 +264,9 @@ export function useTerminalSession({
             const sepLen = Math.max(20, term.cols - 20);
             term.write(`\r\n\x1b[2m\x1b[90m${"─".repeat(sepLen)} session restored \x1b[0m\r\n\r\n`);
           }
-        } catch { /* graceful degradation — terminal starts normally */ }
+        } catch {
+          /* graceful degradation — terminal starts normally */
+        }
       }
 
       if (prefs.terminalUseWebGL) {
@@ -340,7 +341,9 @@ export function useTerminalSession({
 
       if (initialCommand) {
         const cmd = initialCommand.endsWith("\n") ? initialCommand : initialCommand + "\n";
-        setTimeout(() => { if (!disposed) pty.write(cmd); }, 150);
+        setTimeout(() => {
+          if (!disposed) pty.write(cmd);
+        }, 150);
       }
 
       term.onData((data) => pty.write(data));

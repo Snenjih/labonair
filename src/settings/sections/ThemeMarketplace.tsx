@@ -7,7 +7,15 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { Add01Icon, AlertCircleIcon, Cancel01Icon, FolderOpenIcon, GithubIcon, Tick02Icon, Upload02Icon } from "@hugeicons/core-free-icons";
+import {
+  Add01Icon,
+  AlertCircleIcon,
+  Cancel01Icon,
+  FolderOpenIcon,
+  GithubIcon,
+  Tick02Icon,
+  Upload02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { AnimatePresence, motion } from "motion/react";
@@ -115,10 +123,7 @@ export function ThemeMarketplace() {
 
   // Build filtered lists per tab
   const filteredInstalled = allInstalled.filter(
-    (t) =>
-      !q ||
-      t.name.toLowerCase().includes(q) ||
-      t.author.toLowerCase().includes(q),
+    (t) => !q || t.name.toLowerCase().includes(q) || t.author.toLowerCase().includes(q),
   );
 
   // Community: exclude themes whose id already appears in installedThemes
@@ -138,16 +143,16 @@ export function ThemeMarketplace() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-[15px] font-semibold">Themes</h1>
-          <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-            Install and manage color themes.
-          </p>
+          <p className="mt-0.5 text-[11.5px] text-muted-foreground">Install and manage color themes.</p>
         </div>
         <div className="flex items-center gap-1.5">
           <Button
             variant="ghost"
             size="sm"
             className="h-7 gap-1.5 px-2.5 text-[11.5px]"
-            onClick={() => void openUrl("https://github.com/Snenjih/labonair-themes?tab=contributing-ov-file")}
+            onClick={() =>
+              void openUrl("https://github.com/Snenjih/labonair-themes?tab=contributing-ov-file")
+            }
           >
             <HugeiconsIcon icon={GithubIcon} size={12} strokeWidth={2} />
             Contribute
@@ -274,12 +279,7 @@ export function ThemeMarketplace() {
         {tab === "installed" && (
           <>
             {filteredInstalled.map((t) => (
-              <ThemeCard
-                key={t.id}
-                kind="installed"
-                meta={t}
-                isBuiltin={t.id === "default"}
-              />
+              <ThemeCard key={t.id} kind="installed" meta={t} isBuiltin={t.id === "default"} />
             ))}
             {filteredInstalled.length === 0 && <EmptyState query={q} />}
           </>
@@ -290,17 +290,10 @@ export function ThemeMarketplace() {
             {/* Show installed community themes first */}
             {communityThemes
               .filter((r) => installedIds.has(r.id))
-              .filter(
-                (r) =>
-                  !q ||
-                  r.name.toLowerCase().includes(q) ||
-                  r.author.toLowerCase().includes(q),
-              )
+              .filter((r) => !q || r.name.toLowerCase().includes(q) || r.author.toLowerCase().includes(q))
               .map((r) => {
                 const meta = installedThemes.find((t) => t.id === r.id);
-                return (
-                  <ThemeCard key={r.id} kind="community" remote={r} installedMeta={meta} />
-                );
+                return <ThemeCard key={r.id} kind="community" remote={r} installedMeta={meta} />;
               })}
             {communityOnly.map((r) => (
               <ThemeCard key={r.id} kind="community" remote={r} />

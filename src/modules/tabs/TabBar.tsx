@@ -6,18 +6,10 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import {
-  Cancel01Icon,
-  PencilEdit02Icon,
-  PlusSignIcon,
-} from "@hugeicons/core-free-icons";
+import { Cancel01Icon, PencilEdit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DndContext,
@@ -27,19 +19,9 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  horizontalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
+import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTabsStore } from "./store/tabsStore";
 import { TabIconFor, labelFor, NewTabDropdownItems } from "./lib/tabUtils";
@@ -84,9 +66,7 @@ export function TabBar({
   const listRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -175,14 +155,8 @@ export function TabBar({
       className="min-w-0 shrink overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <div className="flex w-max items-center gap-0.5">
-        <Tabs
-          value={String(activeId)}
-          onValueChange={(v) => onSelect(Number(v))}
-        >
-          <TabsList
-            ref={listRef}
-            className="relative h-7 w-max gap-0.5 bg-transparent p-0"
-          >
+        <Tabs value={String(activeId)} onValueChange={(v) => onSelect(Number(v))}>
+          <TabsList ref={listRef} className="relative h-7 w-max gap-0.5 bg-transparent p-0">
             {/* Sliding pill — sits behind all triggers via z-[1] on triggers */}
             <span
               aria-hidden
@@ -200,15 +174,8 @@ export function TabBar({
               }
             />
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={tabs.map((t) => t.id)}
-                strategy={horizontalListSortingStrategy}
-              >
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={tabs.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
                 {tabs.map((t) => {
                   const isActive = t.id === activeId;
                   const isNew = !firstRender && !seen!.has(t.id);
@@ -262,11 +229,7 @@ export function TabBar({
                         isActive
                           ? "text-foreground dark:text-foreground"
                           : "text-muted-foreground hover:text-foreground/80",
-                        compact
-                          ? "px-1.5!"
-                          : tabs.length === 1
-                            ? "px-2!"
-                            : "ps-2! pe-1!",
+                        compact ? "px-1.5!" : tabs.length === 1 ? "px-2!" : "ps-2! pe-1!",
                       )}
                     >
                       <span
@@ -338,21 +301,15 @@ export function TabBar({
                         <ContextMenuContent>
                           {t.kind !== "home" && (
                             <>
-                              <ContextMenuItem onSelect={() => onClose(t.id)}>
-                                Close Tab
-                              </ContextMenuItem>
+                              <ContextMenuItem onSelect={() => onClose(t.id)}>Close Tab</ContextMenuItem>
                               <ContextMenuItem onSelect={() => onDuplicate(t.id)}>
                                 Duplicate Tab
                               </ContextMenuItem>
                               <ContextMenuSeparator />
                             </>
                           )}
-                          <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>
-                            Close Others
-                          </ContextMenuItem>
-                          <ContextMenuItem onSelect={onCloseAll}>
-                            Close All
-                          </ContextMenuItem>
+                          <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>Close Others</ContextMenuItem>
+                          <ContextMenuItem onSelect={onCloseAll}>Close All</ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
                     </SortableTabWrapper>
@@ -399,8 +356,10 @@ function SortableTabWrapper({
   disabled: boolean;
   children: ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id, disabled });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled,
+  });
 
   return (
     <div

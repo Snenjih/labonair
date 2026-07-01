@@ -38,7 +38,13 @@ export type TabsState = {
   // Actions
   setActiveId: (id: number) => void;
   newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
-  newSshTab: (hostId: string, title: string, cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newSshTab: (
+    hostId: string,
+    title: string,
+    cwd?: string,
+    initialCommand?: string,
+    sessionId?: string,
+  ) => number;
   newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
   openDefaultTab: () => void;
   openHomeTab: () => void;
@@ -60,7 +66,12 @@ export type TabsState = {
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
   openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
-  openGitDiffTab: (repoRoot: string, filePath: string, staged: boolean, section: "staged" | "unstaged" | "untracked") => number;
+  openGitDiffTab: (
+    repoRoot: string,
+    filePath: string,
+    staged: boolean,
+    section: "staged" | "unstaged" | "untracked",
+  ) => number;
   openCommitDiffTab: (repositoryPath: string, hash: string) => number;
   renameTab: (id: number, label: string) => void;
   reorderTabs: (activeTabId: number, overTabId: number) => void;
@@ -72,8 +83,7 @@ export type TabsState = {
 
 // ─── Selectors (exported for component use) ───────────────────────────────────
 
-export const selectActiveTab = (s: TabsState): Tab | undefined =>
-  s.tabs.find((t) => t.id === s.activeId);
+export const selectActiveTab = (s: TabsState): Tab | undefined => s.tabs.find((t) => t.id === s.activeId);
 
 export const selectActiveTabKind = (s: TabsState): Tab["kind"] | null =>
   s.tabs.find((t) => t.id === s.activeId)?.kind ?? null;
@@ -234,10 +244,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }
     const id = get()._nextId;
     set((s) => ({
-      tabs: [
-        ...s.tabs,
-        { id, kind: "editor" as const, title: basename(path), path, dirty: false },
-      ],
+      tabs: [...s.tabs, { id, kind: "editor" as const, title: basename(path), path, dirty: false }],
       activeId: id,
       _nextId: s._nextId + 1,
     }));
@@ -245,9 +252,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   },
 
   openAiDiffTab: (input) => {
-    const existing = get().tabs.find(
-      (t) => t.kind === "ai-diff" && t.approvalId === input.approvalId,
-    );
+    const existing = get().tabs.find((t) => t.kind === "ai-diff" && t.approvalId === input.approvalId);
     if (existing) {
       set({ activeId: existing.id });
       return existing.id;
@@ -277,9 +282,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   setAiDiffStatus: (approvalId, status) => {
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.kind === "ai-diff" && t.approvalId === approvalId ? { ...t, status } : t,
-      ),
+      tabs: s.tabs.map((t) => (t.kind === "ai-diff" && t.approvalId === approvalId ? { ...t, status } : t)),
     }));
   },
 
@@ -296,9 +299,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   renameTab: (id, label) => {
     set((s) => ({
       tabs: s.tabs.map((t) =>
-        t.id === id && t.kind === "workspace"
-          ? { ...t, customTitle: label.trim() || undefined }
-          : t,
+        t.id === id && t.kind === "workspace" ? { ...t, customTitle: label.trim() || undefined } : t,
       ),
     }));
   },
@@ -363,9 +364,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   updateSftpPaths: (tabId, remotePath, localPath) => {
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.kind === "sftp" && t.id === tabId ? { ...t, remotePath, localPath } : t,
-      ),
+      tabs: s.tabs.map((t) => (t.kind === "sftp" && t.id === tabId ? { ...t, remotePath, localPath } : t)),
     }));
   },
 
@@ -470,9 +469,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   openGitGraphTab: (repositoryPath, initialBranch) => {
     const existing = get().tabs.find(
       (t) =>
-        t.kind === "git-graph" &&
-        t.repositoryPath === repositoryPath &&
-        t.initialBranch === initialBranch,
+        t.kind === "git-graph" && t.repositoryPath === repositoryPath && t.initialBranch === initialBranch,
     );
     if (existing) {
       set({ activeId: existing.id });
@@ -499,10 +496,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   openGitDiffTab: (repoRoot, filePath, staged, section) => {
     const existing = get().tabs.find(
       (t) =>
-        t.kind === "git-diff" &&
-        t.repoRoot === repoRoot &&
-        t.filePath === filePath &&
-        t.staged === staged,
+        t.kind === "git-diff" && t.repoRoot === repoRoot && t.filePath === filePath && t.staged === staged,
     );
     if (existing) {
       set({ activeId: existing.id });
@@ -632,8 +626,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (t.layout.type === "pane") {
       if (tabs.length <= 1) return;
       const next = tabs.filter((x) => x.id !== tabId);
-      const newActiveId =
-        activeId === tabId ? next[Math.max(0, tabIdx - 1)].id : activeId;
+      const newActiveId = activeId === tabId ? next[Math.max(0, tabIdx - 1)].id : activeId;
       set({ tabs: next, activeId: newActiveId });
       return;
     }

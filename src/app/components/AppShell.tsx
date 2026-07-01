@@ -13,7 +13,12 @@ import type { PaletteCallbacksReturn } from "@/modules/command-palette";
 import { UpdaterDialog } from "@/modules/updater";
 import { MotionConfig } from "motion/react";
 import { ThemeProvider } from "@/modules/theme";
-import { type TabManagementReturn, type AiDiffStatus, useTabsStore, selectActiveTabKind } from "@/modules/tabs";
+import {
+  type TabManagementReturn,
+  type AiDiffStatus,
+  useTabsStore,
+  selectActiveTabKind,
+} from "@/modules/tabs";
 import type { AiLiveBridgeReturn } from "@/modules/ai";
 import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
 import { AiOverlays, CloseDialogs, SidebarContent, WorkspaceArea } from "@/app/components";
@@ -209,7 +214,10 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 }}
                 activePanel={sidebar.activePanel}
                 onPanelToggle={(panel) => {
-                  if (panel === "hosts") { actions.openHomeTab(); return; }
+                  if (panel === "hosts") {
+                    actions.openHomeTab();
+                    return;
+                  }
                   sidebar.handlePanelToggle(panel);
                 }}
               />

@@ -33,9 +33,7 @@ function collectMutationPaths(messages: UIMessage[]): Set<string> {
     for (const p of m.parts) {
       if (
         typeof p.type === "string" &&
-        (p.type === "tool-write_file" ||
-          p.type === "tool-edit" ||
-          p.type === "tool-multi_edit")
+        (p.type === "tool-write_file" || p.type === "tool-edit" || p.type === "tool-multi_edit")
       ) {
         const tp = p as unknown as { input?: { path?: string } };
         if (tp.input?.path) paths.add(tp.input.path);

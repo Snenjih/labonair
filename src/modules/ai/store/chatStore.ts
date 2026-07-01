@@ -1,16 +1,7 @@
 import { Chat, type UIMessage } from "@ai-sdk/react";
-import {
-  type ChatTransport,
-  lastAssistantMessageIsCompleteWithApprovalResponses,
-} from "ai";
+import { type ChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { create } from "zustand";
-import {
-  DEFAULT_MODEL_ID,
-  getModel,
-  providerNeedsKey,
-  type ModelId,
-  type ProviderId,
-} from "../config";
+import { DEFAULT_MODEL_ID, getModel, providerNeedsKey, type ModelId, type ProviderId } from "../config";
 import { useProvidersStore } from "./providersStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { BUILTIN_AGENTS } from "../lib/agents";
@@ -46,12 +37,7 @@ type Live = {
   injectIntoTerminal: (tabId: string, command: string) => void;
 };
 
-export type AgentRunStatus =
-  | "idle"
-  | "thinking"
-  | "streaming"
-  | "awaiting-approval"
-  | "error";
+export type AgentRunStatus = "idle" | "thinking" | "streaming" | "awaiting-approval" | "error";
 
 export type QueuedMessage = { id: string; text: string; createdAt: number };
 
@@ -103,10 +89,7 @@ export type PendingSelection = {
   source: "terminal" | "editor";
 };
 
-export type ApprovalResponder = (
-  approvalId: string,
-  approved: boolean,
-) => void;
+export type ApprovalResponder = (approvalId: string, approved: boolean) => void;
 
 type StoreState = {
   live: Live;
@@ -216,10 +199,7 @@ const seedMessages = new Map<string, UIMessage[]>();
 // full message array and round-trip to the store plugin per token, which
 // stalls the UI. Flush on idle (status transition) via `flushPersist`.
 const PERSIST_DEBOUNCE_MS = 300;
-const pendingPersist = new Map<
-  string,
-  { latest: UIMessage[]; timer: ReturnType<typeof setTimeout> }
->();
+const pendingPersist = new Map<string, { latest: UIMessage[]; timer: ReturnType<typeof setTimeout> }>();
 
 function flushPersistEntry(id: string) {
   const entry = pendingPersist.get(id);
@@ -243,22 +223,17 @@ function makeChat(sessionId: string): Chat<UIMessage> {
   const readCache = new Set<string>();
   const toolContext: ToolContext = {
     getCwd: () => useChatStore.getState().live.getCwd(),
-    getWorkspaceRoot: () =>
-      useChatStore.getState().live.getWorkspaceRoot(),
-    getTerminalContext: () =>
-      useChatStore.getState().live.getTerminalContext(),
-    injectIntoActivePty: (text) =>
-      useChatStore.getState().live.injectIntoActivePty(text),
+    getWorkspaceRoot: () => useChatStore.getState().live.getWorkspaceRoot(),
+    getTerminalContext: () => useChatStore.getState().live.getTerminalContext(),
+    injectIntoActivePty: (text) => useChatStore.getState().live.injectIntoActivePty(text),
     openPreview: (url) => useChatStore.getState().live.openPreview(url),
     readCache,
     getSessionId: () => sessionId,
     getActiveTabKind: () => useChatStore.getState().live.getActiveTabKind(),
     getActiveSshTabId: () => useChatStore.getState().live.getActiveSshTabId(),
     getTerminalTabs: () => useChatStore.getState().live.getTerminalTabs(),
-    openTerminalWithCommand: (command) =>
-      useChatStore.getState().live.openTerminalWithCommand(command),
-    injectIntoTerminal: (tabId, command) =>
-      useChatStore.getState().live.injectIntoTerminal(tabId, command),
+    openTerminalWithCommand: (command) => useChatStore.getState().live.openTerminalWithCommand(command),
+    injectIntoTerminal: (tabId, command) => useChatStore.getState().live.injectIntoTerminal(tabId, command),
   };
 
   const transport = createContextAwareTransport({
@@ -267,8 +242,7 @@ function makeChat(sessionId: string): Chat<UIMessage> {
     getInstanceKeys: () => useProvidersStore.getState().instanceKeys,
     toolContext,
     getModelId: () => useChatStore.getState().selectedModelId,
-    getCustomInstructions: () =>
-      usePreferencesStore.getState().customInstructions,
+    getCustomInstructions: () => usePreferencesStore.getState().customInstructions,
     getAgentPersona: () => {
       const { activeId, customAgents } = useAgentsStore.getState();
       const all = [...BUILTIN_AGENTS, ...customAgents];
@@ -285,19 +259,13 @@ function makeChat(sessionId: string): Chat<UIMessage> {
       };
     },
     getLmstudioBaseURL: () => usePreferencesStore.getState().lmstudioBaseURL,
-    getLmstudioChatModelId: () =>
-      usePreferencesStore.getState().lmstudioChatModelId || undefined,
-    getOpenaiCompatibleBaseURL: () =>
-      usePreferencesStore.getState().openaiCompatibleBaseURL || undefined,
-    getOpenaiCompatibleModelId: () =>
-      usePreferencesStore.getState().openaiCompatibleModelId || undefined,
+    getLmstudioChatModelId: () => usePreferencesStore.getState().lmstudioChatModelId || undefined,
+    getOpenaiCompatibleBaseURL: () => usePreferencesStore.getState().openaiCompatibleBaseURL || undefined,
+    getOpenaiCompatibleModelId: () => usePreferencesStore.getState().openaiCompatibleModelId || undefined,
     getMlxBaseURL: () => usePreferencesStore.getState().mlxBaseURL || undefined,
-    getMlxChatModelId: () =>
-      usePreferencesStore.getState().mlxChatModelId || undefined,
-    getOllamaBaseURL: () =>
-      usePreferencesStore.getState().ollamaBaseURL || undefined,
-    getOllamaChatModelId: () =>
-      usePreferencesStore.getState().ollamaChatModelId || undefined,
+    getMlxChatModelId: () => usePreferencesStore.getState().mlxChatModelId || undefined,
+    getOllamaBaseURL: () => usePreferencesStore.getState().ollamaBaseURL || undefined,
+    getOllamaChatModelId: () => usePreferencesStore.getState().ollamaChatModelId || undefined,
     getPlanMode: () => usePlanStore.getState().active,
     getMaxAgentSteps: () => usePreferencesStore.getState().aiMaxAgentSteps,
     getTemperature: () => usePreferencesStore.getState().aiTemperature,
@@ -372,20 +340,50 @@ export const useChatStore = create<StoreState>((set, get) => ({
     set({ apiKeys: next, agentMeta: IDLE_META });
   },
 
-  selectedModelId: (() => { try { return (localStorage.getItem("labonair-selected-model") as ModelId | null) ?? DEFAULT_MODEL_ID; } catch { return DEFAULT_MODEL_ID; } })(),
+  selectedModelId: (() => {
+    try {
+      return (localStorage.getItem("labonair-selected-model") as ModelId | null) ?? DEFAULT_MODEL_ID;
+    } catch {
+      return DEFAULT_MODEL_ID;
+    }
+  })(),
   setSelectedModelId: (id) => {
     const recents = [id, ...get().recentModelIds.filter((r) => r !== id)].slice(0, 10);
     set({ selectedModelId: id, recentModelIds: recents });
-    try { localStorage.setItem("labonair-selected-model", id); } catch { /* ignore */ }
-    try { localStorage.setItem("labonair-recent-models", JSON.stringify(recents)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem("labonair-selected-model", id);
+    } catch {
+      /* ignore */
+    }
+    try {
+      localStorage.setItem("labonair-recent-models", JSON.stringify(recents));
+    } catch {
+      /* ignore */
+    }
   },
-  favoriteModelIds: (() => { try { return JSON.parse(localStorage.getItem("labonair-favorite-models") ?? "[]") as string[]; } catch { return []; } })(),
-  recentModelIds: (() => { try { return JSON.parse(localStorage.getItem("labonair-recent-models") ?? "[]") as string[]; } catch { return []; } })(),
+  favoriteModelIds: (() => {
+    try {
+      return JSON.parse(localStorage.getItem("labonair-favorite-models") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  })(),
+  recentModelIds: (() => {
+    try {
+      return JSON.parse(localStorage.getItem("labonair-recent-models") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  })(),
   toggleFavoriteModel: (id) => {
     const favs = get().favoriteModelIds;
     const next = favs.includes(id) ? favs.filter((f) => f !== id) : [...favs, id];
     set({ favoriteModelIds: next });
-    try { localStorage.setItem("labonair-favorite-models", JSON.stringify(next)); } catch { /* ignore */ }
+    try {
+      localStorage.setItem("labonair-favorite-models", JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
   },
 
   mini: { open: false },
@@ -430,8 +428,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
   },
 
   agentMeta: IDLE_META,
-  patchAgentMeta: (patch) =>
-    set((s) => ({ agentMeta: { ...s.agentMeta, ...patch } })),
+  patchAgentMeta: (patch) => set((s) => ({ agentMeta: { ...s.agentMeta, ...patch } })),
   resetAgentMeta: () => set({ agentMeta: IDLE_META }),
 
   sessionsHydrated: false,
@@ -546,9 +543,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
   },
 
   renameSession: (id, title) => {
-    const next = get().sessions.map((s) =>
-      s.id === id ? { ...s, title, updatedAt: Date.now() } : s,
-    );
+    const next = get().sessions.map((s) => (s.id === id ? { ...s, title, updatedAt: Date.now() } : s));
     set({ sessions: next });
     void saveSessionsList(next);
   },
@@ -613,9 +608,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
     if (!isUntitled) return;
     const nextTitle = deriveTitle(messages);
     if (nextTitle === meta.title) return;
-    const next = sessions.map((s) =>
-      s.id === id ? { ...s, title: nextTitle, updatedAt: Date.now() } : s,
-    );
+    const next = sessions.map((s) => (s.id === id ? { ...s, title: nextTitle, updatedAt: Date.now() } : s));
     set({ sessions: next });
     void saveSessionsList(next);
   },
@@ -662,8 +655,7 @@ export async function sendMessage(text: string): Promise<boolean> {
   const selectedModel = getModel(state.selectedModelId);
   // Allow keyless (lmstudio) and optional-key (openai-compatible) providers
   const requiresKey =
-    providerNeedsKey(selectedModel.provider) &&
-    selectedModel.provider !== "openai-compatible";
+    providerNeedsKey(selectedModel.provider) && selectedModel.provider !== "openai-compatible";
   if (requiresKey && !getActiveProviderKey()) return false;
   const c = getOrCreateChat(sessionId);
   await c.sendMessage({ text });

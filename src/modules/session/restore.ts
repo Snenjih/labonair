@@ -15,7 +15,13 @@ import type {
 export interface TabActions {
   setActiveId: (id: number) => void;
   newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
-  newSshTab: (hostId: string, title: string, cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newSshTab: (
+    hostId: string,
+    title: string,
+    cwd?: string,
+    initialCommand?: string,
+    sessionId?: string,
+  ) => number;
   newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
   openFileTab: (path: string) => number | null;
   newPreviewTab: (url: string) => number;
@@ -72,7 +78,13 @@ async function restoreWorkspaceTab(
         rootSession.id,
       );
     } else if (rootSession.hostId) {
-      tabId = actions.newSshTab(rootSession.hostId, rootSession.title, rootSession.cwd, rootSession.initialCommand, rootSession.id);
+      tabId = actions.newSshTab(
+        rootSession.hostId,
+        rootSession.title,
+        rootSession.cwd,
+        rootSession.initialCommand,
+        rootSession.id,
+      );
     } else {
       tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id);
     }

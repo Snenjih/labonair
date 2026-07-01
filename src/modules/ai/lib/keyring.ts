@@ -1,11 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import {
-  getProvider,
-  KEYRING_SERVICE,
-  PROVIDERS,
-  providerNeedsKey,
-  type ProviderId,
-} from "../config";
+import { getProvider, KEYRING_SERVICE, PROVIDERS, providerNeedsKey, type ProviderId } from "../config";
 
 export type ProviderKeys = Record<ProviderId, string | null>;
 
@@ -77,9 +71,7 @@ export async function getAllKeys(): Promise<ProviderKeys> {
     });
     return out;
   } catch {
-    const entries = await Promise.all(
-      need.map(async (p) => [p.id, await getKey(p.id)] as const),
-    );
+    const entries = await Promise.all(need.map(async (p) => [p.id, await getKey(p.id)] as const));
     for (const [id, v] of entries) out[id] = v;
     return out;
   }
@@ -125,9 +117,7 @@ export async function clearInstanceKey(instanceId: string): Promise<void> {
   }
 }
 
-export async function getAllInstanceKeys(
-  instanceIds: string[],
-): Promise<Record<string, string | null>> {
+export async function getAllInstanceKeys(instanceIds: string[]): Promise<Record<string, string | null>> {
   if (instanceIds.length === 0) return {};
   try {
     const accounts = instanceIds.map((id) => `inst-${id}`);
@@ -142,9 +132,7 @@ export async function getAllInstanceKeys(
     });
     return out;
   } catch {
-    const entries = await Promise.all(
-      instanceIds.map(async (id) => [id, await getInstanceKey(id)] as const),
-    );
+    const entries = await Promise.all(instanceIds.map(async (id) => [id, await getInstanceKey(id)] as const));
     return Object.fromEntries(entries);
   }
 }
