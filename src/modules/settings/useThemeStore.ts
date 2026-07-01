@@ -7,6 +7,7 @@ import {
 } from "@/lib/useThemeEngine";
 import { setAppTheme } from "./store";
 import { usePreferencesStore } from "./preferences";
+import { handleApiError } from "@/lib/errors";
 
 export type RemoteTheme = {
   id: string;
@@ -82,7 +83,7 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
       const themes = await invoke<ThemeMeta[]>("themes_get_all");
       set({ installedThemes: themes });
     } catch (e) {
-      console.error("fetchInstalled error:", e);
+      handleApiError(e, "Failed to load installed themes", "Themes");
     } finally {
       set({ isLoadingInstalled: false });
     }
@@ -114,6 +115,8 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
     try {
       await invoke("theme_download", { url: remote.rawUrl });
       await get().fetchInstalled();
+    } catch (e) {
+      handleApiError(e, `Failed to install theme "${remote.name}"`, "Themes");
     } finally {
       const next = new Set(get().installingIds);
       next.delete(remote.id);
@@ -122,24 +125,32 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
   },
 
   uninstallTheme: async (id: string) => {
-    const savedTheme = usePreferencesStore.getState().appTheme;
-    await invoke("theme_delete", { id });
-    if (savedTheme === id) {
-      await setAppTheme("default");
-      revertThemeColors();
+    try {
+      const savedTheme = usePreferencesStore.getState().appTheme;
+      await invoke("theme_delete", { id });
+      if (savedTheme === id) {
+        await setAppTheme("default");
+        revertThemeColors();
+      }
+      await get().fetchInstalled();
+    } catch (e) {
+      handleApiError(e, "Failed to uninstall theme", "Themes");
     }
-    await get().fetchInstalled();
   },
 
   applyTheme: async (id: string) => {
-    await setAppTheme(id);
-    if (id === "default") {
-      revertThemeColors();
-    } else {
-      const meta = get().installedThemes.find((t) => t.id === id);
-      if (meta) applyThemeColors(meta);
+    try {
+      await setAppTheme(id);
+      if (id === "default") {
+        revertThemeColors();
+      } else {
+        const meta = get().installedThemes.find((t) => t.id === id);
+        if (meta) applyThemeColors(meta);
+      }
+      set({ previewThemeId: null });
+    } catch (e) {
+      handleApiError(e, "Failed to apply theme", "Themes");
     }
-    set({ previewThemeId: null });
   },
 
   previewTheme: (meta: ThemeMeta | null) => {

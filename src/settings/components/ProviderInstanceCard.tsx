@@ -24,6 +24,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useState } from "react";
 import { ProviderIcon } from "./ProviderIcon";
+import { handleApiError } from "@/lib/errors";
 
 type Props = {
   instance: ProviderInstance;
@@ -87,6 +88,7 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
       await reloadKeys();
     } catch (e) {
       setError(`Failed to save: ${String(e)}`);
+      handleApiError(e, "Failed to save API key", "AI Providers");
     } finally {
       setSaving(false);
     }
@@ -124,6 +126,7 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
       if (Object.keys(patch).length > 0) await update(instance.id, patch);
     } catch (e) {
       setError(`Failed to save: ${String(e)}`);
+      handleApiError(e, "Failed to save provider config", "AI Providers");
     } finally {
       setSaving(false);
     }

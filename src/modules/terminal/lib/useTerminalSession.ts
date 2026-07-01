@@ -13,6 +13,7 @@ import { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { registerCwdHandler, registerPromptTracker, registerTerminalQueryHandlers } from "./osc-handlers";
 import { openPty, type PtySession } from "./pty-bridge";
+import { handleApiError } from "@/lib/errors";
 
 type Options = {
   container: React.RefObject<HTMLDivElement | null>;
@@ -195,7 +196,7 @@ export function useTerminalSession({
         // OSC 8 hyperlinks — open in the system browser, not the Tauri webview
         linkHandler: {
           activate: (_e: MouseEvent, uri: string) => {
-            openUrl(uri).catch(console.error);
+            openUrl(uri).catch((e) => handleApiError(e, "Failed to open URL", "Terminal"));
           },
         },
       });
@@ -242,7 +243,7 @@ export function useTerminalSession({
       const search = new SearchAddon();
       term.loadAddon(search);
       term.loadAddon(
-        new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)),
+        new WebLinksAddon((_e, uri) => openUrl(uri).catch((e) => handleApiError(e, "Failed to open URL", "Terminal"))),
       );
       term.loadAddon(new ImageAddon({ storageLimit: 32 }));
 

@@ -8,6 +8,7 @@ import {
 } from "../keybinds-store";
 import type { KeyBinding, KeyBindingMap, KeyBindingOrDisabled } from "../types";
 import { bindingMatchesEvent } from "./captureKeyBinding";
+import { handleApiError } from "@/lib/errors";
 
 type KeybindsState = {
   overrides: KeyBindingMap;
@@ -50,22 +51,34 @@ export const useKeybindsStore = create<KeybindsState>((set, get) => ({
   },
 
   setKeybind: async (id, binding) => {
-    await saveKeybind(id, binding);
-    set((s) => ({ overrides: { ...s.overrides, [id]: binding } }));
+    try {
+      await saveKeybind(id, binding);
+      set((s) => ({ overrides: { ...s.overrides, [id]: binding } }));
+    } catch (e) {
+      handleApiError(e, "Failed to save keyboard shortcut", "Shortcuts");
+    }
   },
 
   resetKeybind: async (id) => {
-    await resetKeybind(id);
-    set((s) => {
-      const next = { ...s.overrides };
-      delete next[id];
-      return { overrides: next };
-    });
+    try {
+      await resetKeybind(id);
+      set((s) => {
+        const next = { ...s.overrides };
+        delete next[id];
+        return { overrides: next };
+      });
+    } catch (e) {
+      handleApiError(e, "Failed to reset keyboard shortcut", "Shortcuts");
+    }
   },
 
   resetAll: async () => {
-    await resetAllKeybinds();
-    set({ overrides: {} });
+    try {
+      await resetAllKeybinds();
+      set({ overrides: {} });
+    } catch (e) {
+      handleApiError(e, "Failed to reset keyboard shortcuts", "Shortcuts");
+    }
   },
 
   matchesShortcut: (id, defaultMatch, e) => {

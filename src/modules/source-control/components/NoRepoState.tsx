@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { GitBranchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 
 interface NoRepoStateProps {
   rootPath: string | null;
@@ -15,8 +16,8 @@ export function NoRepoState({ rootPath, onRefresh, errorMessage }: NoRepoStatePr
     try {
       await invoke("shell_run_command", { command: "git init", cwd: rootPath });
       onRefresh();
-    } catch {
-      // silently ignore — the next poll cycle will pick up the result
+    } catch (e) {
+      useNotificationStore.getState().addNotification({ type: "error", title: "git init Failed", message: String(e) });
     }
   }
 

@@ -58,6 +58,7 @@ import { useCompartmentEffect } from "./lib/useCompartmentEffect";
 import { useApiKeys } from "./lib/useApiKeys";
 import { useAutoSave } from "./lib/useAutoSave";
 import { EditorToolbar } from "./EditorToolbar";
+import { handleApiError } from "@/lib/errors";
 
 export type EditorPaneHandle = {
   setQuery: (q: string) => void;
@@ -262,8 +263,12 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(
           view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: processed } });
         }
       }
-      await saveRef.current();
-      onSavedRef.current?.();
+      try {
+        await saveRef.current();
+        onSavedRef.current?.();
+      } catch (e) {
+        handleApiError(e, "Failed to save file", "Editor");
+      }
     }, [runFormat]);
     performSaveRef.current = performSave;
 

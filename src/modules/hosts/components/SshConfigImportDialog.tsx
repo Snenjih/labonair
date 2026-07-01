@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useHostsStore } from "../store/hostsStore";
+import { handleApiError } from "@/lib/errors";
 
 interface SshConfigEntry {
   alias: string;
@@ -95,6 +96,7 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
     } catch (e) {
       setError(String(e));
       setImporting(false);
+      handleApiError(e, "Failed to import SSH config entries", "Hosts");
     }
   };
 

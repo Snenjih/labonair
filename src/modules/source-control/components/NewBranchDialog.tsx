@@ -14,6 +14,7 @@ import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { git } from "../lib/gitInvoke";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 
 interface NewBranchDialogProps {
   open: boolean;
@@ -70,6 +71,7 @@ export function NewBranchDialog({
       onOpenChange(false);
     } catch (e) {
       setError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Create Branch Failed", message: String(e) });
     } finally {
       setIsLoading(false);
     }

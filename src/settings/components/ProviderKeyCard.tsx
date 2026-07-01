@@ -11,6 +11,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
 import { ProviderIcon } from "./ProviderIcon";
+import { handleApiError } from "@/lib/errors";
 
 type Props = {
   provider: ProviderInfo;
@@ -50,6 +51,7 @@ export function ProviderKeyCard({ provider, currentKey, onSave }: Props) {
       setReveal(false);
     } catch (e) {
       setError(`Failed to save: ${String(e)}`);
+      handleApiError(e, `Failed to save ${provider.label} API key`, "AI Providers");
     } finally {
       setSaving(false);
     }

@@ -108,6 +108,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
       onRefresh();
     } catch (e) {
       setError(String(e));
+      useNotificationStore.getState().addNotification({ type: "error", title: "Abort Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -166,6 +167,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
               if (msg) setCommitMessage(msg);
             } catch (e) {
               setError(String(e));
+              useNotificationStore.getState().addNotification({ type: "error", title: "Commit Message Generation Failed", message: String(e) });
             }
           }}
           className="flex h-[26px] items-center gap-1 rounded px-2 text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6 disabled:cursor-not-allowed disabled:opacity-40"
