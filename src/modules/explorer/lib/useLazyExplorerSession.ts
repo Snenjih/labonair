@@ -1,0 +1,216 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { isLabonairError } from "@/types";
+import { useEffect } from "react";
+import { create } from "zustand";
+
+export type LazySessionStatus = "connecting" | "connected" | "auth_required" | "error";
+
+interface LazySessionEntry {
+  status: LazySessionStatus;
+  error: string | null;
+}
+
+interface LazySessionStore {
+  sessions: Record<string, LazySessionEntry>;
+  setStatus: (sessionId: string, status: LazySessionStatus, error?: string | null) => void;
+  clear: (sessionId: string) => void;
+}
+
+const useLazySessionStore = create<LazySessionStore>((set) => ({
+  sessions: {},
+  setStatus: (sessionId, status, error = null) =>
+    set((s) => ({ sessions: { ...s.sessions, [sessionId]: { status, error } } })),
+  clear: (sessionId) =>
+    set((s) => {
+      const { [sessionId]: _drop, ...rest } = s.sessions;
+      return { sessions: rest };
+    }),
+}));
+
+// --- module-level lifecycle bookkeeping (ref-counting, idle timers — not
+// reactive state, deliberately kept outside the store so re-renders only
+// happen for the status field consumers actually read). ---
+
+const IDLE_DISCONNECT_MS = 5 * 60_000;
+const MAX_IDLE_SESSIONS = 3;
+
+interface Lifecycle {
+  refCount: number;
+  hostId: string;
+  idleTimer: ReturnType<typeof setTimeout> | null;
+  releasedAt: number | null;
+  connectPromise: Promise<void> | null;
+}
+
+const lifecycles = new Map<string, Lifecycle>();
+
+function sessionIdFor(hostId: string): string {
+  return `explorer:${hostId}`;
+}
+
+function disconnect(sessionId: string) {
+  const lifecycle = lifecycles.get(sessionId);
+  if (lifecycle?.idleTimer) clearTimeout(lifecycle.idleTimer);
+  lifecycles.delete(sessionId);
+  useLazySessionStore.getState().clear(sessionId);
+  void invoke("sftp_disconnect", { sessionId }).catch(() => {});
+}
+
+export interface IdleCandidate {
+  sessionId: string;
+  refCount: number;
+  releasedAt: number | null;
+}
+
+/** Pure ordering logic, split out so it's unit-testable without touching the
+ *  live `lifecycles` map or timers: given the current idle/active sessions,
+ *  returns the session ids to evict (oldest-released-first) to bring the
+ *  idle count back down to `maxIdle`. */
+export function selectEvictionCandidates(entries: IdleCandidate[], maxIdle: number): string[] {
+  const idle = entries
+    .filter((e) => e.refCount === 0 && e.releasedAt !== null)
+    .sort((a, b) => (a.releasedAt ?? 0) - (b.releasedAt ?? 0));
+  const overflow = Math.max(0, idle.length - maxIdle);
+  return idle.slice(0, overflow).map((e) => e.sessionId);
+}
+
+/** Keeps at most MAX_IDLE_SESSIONS connections alive with no active consumer
+ *  — evicts the least-recently-released one immediately instead of waiting
+ *  for its idle timer, so hopping across many hosts can't accumulate
+ *  unbounded zombie SFTP connections. */
+function evictIdleIfOverCap() {
+  const entries: IdleCandidate[] = [...lifecycles.entries()].map(([sessionId, l]) => ({
+    sessionId,
+    refCount: l.refCount,
+    releasedAt: l.releasedAt,
+  }));
+  for (const sessionId of selectEvictionCandidates(entries, MAX_IDLE_SESSIONS)) {
+    disconnect(sessionId);
+  }
+}
+
+async function connect(sessionId: string, hostId: string): Promise<void> {
+  useLazySessionStore.getState().setStatus(sessionId, "connecting");
+  try {
+    // sftp_connect is idempotent (Phase 1) — safe to call even if a previous
+    // acquire() for this sessionId is still in flight or already connected.
+    await invoke("sftp_connect", { sessionId, hostId });
+    useLazySessionStore.getState().setStatus(sessionId, "connected");
+  } catch (e) {
+    const message = isLabonairError(e) ? e.message : String(e);
+    const isAuth = isLabonairError(e) && e.code === "AuthFailed";
+    useLazySessionStore.getState().setStatus(sessionId, isAuth ? "auth_required" : "error", message);
+    throw e;
+  }
+}
+
+function acquire(hostId: string): string {
+  const sessionId = sessionIdFor(hostId);
+  let lifecycle = lifecycles.get(sessionId);
+  if (!lifecycle) {
+    lifecycle = { refCount: 0, hostId, idleTimer: null, releasedAt: null, connectPromise: null };
+    lifecycles.set(sessionId, lifecycle);
+  }
+  lifecycle.refCount += 1;
+  lifecycle.releasedAt = null;
+  if (lifecycle.idleTimer) {
+    clearTimeout(lifecycle.idleTimer);
+    lifecycle.idleTimer = null;
+  }
+  if (!lifecycle.connectPromise) {
+    lifecycle.connectPromise = connect(sessionId, hostId).catch(() => {
+      // Leave connectPromise cleared so a later acquire() or manual
+      // reconnect() can retry instead of being stuck on the first failure.
+      lifecycle!.connectPromise = null;
+    });
+  }
+  return sessionId;
+}
+
+function release(hostId: string) {
+  const sessionId = sessionIdFor(hostId);
+  const lifecycle = lifecycles.get(sessionId);
+  if (!lifecycle) return;
+  lifecycle.refCount = Math.max(0, lifecycle.refCount - 1);
+  if (lifecycle.refCount > 0) return;
+  lifecycle.releasedAt = Date.now();
+  lifecycle.idleTimer = setTimeout(() => disconnect(sessionId), IDLE_DISCONNECT_MS);
+  evictIdleIfOverCap();
+}
+
+function reconnect(hostId: string) {
+  const sessionId = sessionIdFor(hostId);
+  const lifecycle = lifecycles.get(sessionId);
+  if (!lifecycle) return;
+  lifecycle.connectPromise = connect(sessionId, hostId).catch(() => {
+    lifecycle.connectPromise = null;
+  });
+}
+
+/** Drops a session's bookkeeping without disconnecting — used when the host
+ *  itself no longer exists (deleted from the host manager), where a graceful
+ *  sftp_disconnect would just fail against a host row that's already gone. */
+export function forgetLazySession(hostId: string) {
+  const sessionId = sessionIdFor(hostId);
+  const lifecycle = lifecycles.get(sessionId);
+  if (lifecycle?.idleTimer) clearTimeout(lifecycle.idleTimer);
+  lifecycles.delete(sessionId);
+  useLazySessionStore.getState().clear(sessionId);
+}
+
+let _listenersBootstrapped = false;
+
+function bootstrapLazySessionListeners() {
+  if (_listenersBootstrapped) return;
+  _listenersBootstrapped = true;
+
+  void listen<{ session_id: string; reason: string }>("ssh_connection_lost", (event) => {
+    const { session_id, reason } = event.payload;
+    const lifecycle = lifecycles.get(session_id);
+    if (!lifecycle) return;
+    useLazySessionStore.getState().setStatus(session_id, "error", reason);
+    lifecycle.connectPromise = null;
+  });
+
+  void listen<{ session_id: string }>("session_established", (event) => {
+    const { session_id } = event.payload;
+    if (!lifecycles.has(session_id)) return;
+    useLazySessionStore.getState().setStatus(session_id, "connected");
+  });
+}
+
+export interface LazyExplorerSession {
+  sessionId: string;
+  status: LazySessionStatus;
+  error: string | null;
+  reconnect: () => void;
+}
+
+/**
+ * Acquires (ref-counted) a lazy SFTP session for `hostId` for as long as the
+ * calling component is mounted with a non-null hostId, releasing it on
+ * unmount/hostId change. Idempotent against React StrictMode's double-invoke
+ * of effects — acquire()/release() only touch a plain refcount, and the
+ * underlying sftp_connect call itself is idempotent (Phase 1).
+ */
+export function useLazyExplorerSession(hostId: string | null): LazyExplorerSession | null {
+  bootstrapLazySessionListeners();
+
+  const sessionId = hostId ? sessionIdFor(hostId) : null;
+  const entry = useLazySessionStore((s) => (sessionId ? s.sessions[sessionId] : undefined));
+
+  useEffect(() => {
+    if (!hostId) return;
+    acquire(hostId);
+    return () => release(hostId);
+  }, [hostId]);
+
+  if (!hostId || !sessionId) return null;
+  return {
+    sessionId,
+    status: entry?.status ?? "connecting",
+    error: entry?.error ?? null,
+    reconnect: () => reconnect(hostId),
+  };
+}

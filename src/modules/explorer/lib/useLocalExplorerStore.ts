@@ -19,6 +19,12 @@ type LocalExplorerStore = {
   nodes: TreeState;
   expanded: Set<string>;
   showHidden: boolean;
+  /** Bumped on every scope/root change. `useFileTree` captures this before an
+   *  in-flight `readDir` and discards the response if it no longer matches
+   *  when the request resolves — otherwise a slow remote fetch from a scope
+   *  the user has since navigated away from could write stale entries into
+   *  whatever scope is active by the time it lands. */
+  generation: number;
 
   setScope: (scopeKey: string, root: string | null) => void;
   setNode: (path: string, state: ChildrenState) => void;
@@ -34,9 +40,10 @@ export const useLocalExplorerStore = create<LocalExplorerStore>((set) => ({
   nodes: {},
   expanded: new Set(),
   showHidden: false,
+  generation: 0,
 
   setScope: (scopeKey, root) =>
-    set({ scopeKey, rootPath: root, nodes: {}, expanded: new Set() }),
+    set((s) => ({ scopeKey, rootPath: root, nodes: {}, expanded: new Set(), generation: s.generation + 1 })),
 
   toggleShowHidden: () =>
     set((s) => ({ showHidden: !s.showHidden, nodes: {}, expanded: new Set() })),

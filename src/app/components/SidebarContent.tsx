@@ -3,6 +3,7 @@ import type { PanelImperativeHandle } from "react-resizable-panels";
 import { ResizablePanel } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 import { FileExplorer } from "@/modules/explorer";
+import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
 import { SnippetsPanel } from "@/modules/snippets";
 import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets";
 import { SourceControlPanel } from "@/modules/source-control";
@@ -16,6 +17,7 @@ export interface SidebarContentProps {
   setActivePanel: React.Dispatch<React.SetStateAction<SidebarPanel>>;
   onSidebarResize: (size: { asPercentage: number }) => void;
   explorerRoot: string | null;
+  explorerTarget: ExplorerTarget;
   // Tab list callbacks
   onSelect: (id: number) => void;
   onNew: () => void;
@@ -36,6 +38,8 @@ export interface SidebarContentProps {
   onPathDeleted: (path: string) => void;
   onRevealInTerminal: (path: string) => void;
   onAttachToAgent: (path: string) => void;
+  onOpenRemoteFile?: (sessionId: string, path: string) => void;
+  onOpenSftpTab?: (hostId: string, title: string) => void;
   // Snippet
   onSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
   // Source control
@@ -49,6 +53,7 @@ export function SidebarContent({
   activePanel,
   onSidebarResize,
   explorerRoot,
+  explorerTarget,
   onSelect,
   onNew,
   onNewPreview,
@@ -67,6 +72,8 @@ export function SidebarContent({
   onPathDeleted,
   onRevealInTerminal,
   onAttachToAgent,
+  onOpenRemoteFile,
+  onOpenSftpTab,
   onSnippetRun,
   onOpenGitGraph,
   onNewGitGraph,
@@ -113,13 +120,15 @@ export function SidebarContent({
           />
         ) : (
           <FileExplorer
-            rootPath={explorerRoot}
+            explorerTarget={explorerTarget}
             onOpenFile={onOpenFile}
+            onOpenRemoteFile={onOpenRemoteFile}
             onOpenPreview={onOpenPreview}
             onPathRenamed={onPathRenamed}
             onPathDeleted={onPathDeleted}
             onRevealInTerminal={onRevealInTerminal}
             onAttachToAgent={onAttachToAgent}
+            onOpenSftpTab={onOpenSftpTab}
           />
         )}
       </div>

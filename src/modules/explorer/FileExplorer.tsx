@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useHostsStore } from "@/modules/hosts";
 import {
   Cancel01Icon,
   FileAddIcon,
@@ -22,24 +23,37 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { handleApiError } from "@/lib/errors";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ExplorerAuthPrompt } from "./components/ExplorerAuthPrompt";
 import { FileTreeNode } from "./FileTreeNode";
 import { InlineInput } from "./InlineInput";
 import { copyToClipboard, revealInFinder } from "./lib/contextActions";
+import type { ExplorerTarget } from "./lib/useExplorerTarget";
 import type { SearchHit } from "./lib/fsProvider";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
+import { useLazyExplorerSession } from "./lib/useLazyExplorerSession";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { createLocalFsProvider } from "./lib/providers/localFsProvider";
+import { createRemoteFsProvider } from "./lib/providers/remoteFsProvider";
 import { useFileTree } from "./lib/useFileTree";
 import { useOsFileDrop } from "./lib/useOsFileDrop";
 
 type Props = {
-  rootPath: string | null;
+  explorerTarget: ExplorerTarget;
   onOpenFile: (path: string) => void;
+  /** Opens a remote path via the same prepare_remote_edit flow the SFTP dual-pane
+   *  tab already uses. Required for remote browsing to do anything useful on
+   *  file click — `onOpenFile` alone would try to open the (nonexistent) local
+   *  path. */
+  onOpenRemoteFile?: (sessionId: string, path: string) => void;
   onOpenPreview?: (path: string) => void;
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string) => void;
+  /** Escape hatch from the auth-required state — opens a full SFTP tab, which
+   *  has the interactive credential/2FA/host-key UI this narrow sidebar
+   *  deliberately doesn't duplicate. */
+  onOpenSftpTab?: (hostId: string, title: string) => void;
 };
 
 function basename(path: string): string {
@@ -48,17 +62,53 @@ function basename(path: string): string {
 }
 
 export function FileExplorer({
-  rootPath,
+  explorerTarget,
   onOpenFile,
+  onOpenRemoteFile,
   onOpenPreview,
   onPathRenamed,
   onPathDeleted,
   onRevealInTerminal,
   onAttachToAgent,
+  onOpenSftpTab,
 }: Props) {
-  // Phase 0 keeps the sidebar explorer local-only — a remote-aware `provider`
-  // prop lands in Phase 3 without touching this construction site further.
-  const provider = useMemo(() => createLocalFsProvider(), []);
+  const hosts = useHostsStore((s) => s.hosts);
+
+  // Only "lazy-session" targets (an SSH workspace tab with no SFTP tab open
+  // for that host) need us to manage a connection's lifecycle — an "sftp-tab"
+  // target already owns a live session via its own tab.
+  const lazyHostId =
+    explorerTarget.type === "remote" && explorerTarget.source === "lazy-session"
+      ? explorerTarget.hostId
+      : null;
+  const lazySession = useLazyExplorerSession(lazyHostId);
+
+  const activeSessionId =
+    explorerTarget.type === "remote"
+      ? explorerTarget.source === "sftp-tab"
+        ? explorerTarget.sessionId
+        : lazySession?.status === "connected"
+          ? lazySession.sessionId
+          : null
+      : null;
+
+  const localProvider = useMemo(() => createLocalFsProvider(), []);
+  const provider = useMemo(() => {
+    if (explorerTarget.type === "remote" && activeSessionId) {
+      return createRemoteFsProvider(activeSessionId, explorerTarget.hostId);
+    }
+    return localProvider;
+  }, [explorerTarget, activeSessionId, localProvider]);
+
+  // Nothing is fetched until a remote session is actually ready — the tree
+  // is fed a null root in the meantime (same "no root" idle state as local).
+  const rootPath =
+    explorerTarget.type === "local"
+      ? explorerTarget.path
+      : activeSessionId
+        ? explorerTarget.path
+        : null;
+
   const tree = useFileTree(provider, rootPath, { onPathRenamed, onPathDeleted });
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
@@ -67,11 +117,29 @@ export function FileExplorer({
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  // Native OS drag-drop needs a real local file handle to hand the OS — never
+  // wired up for a remote target (see remoteFsProvider's supportsNativeDrag).
   const { dropTargetPath } = useOsFileDrop(
-    rootPath,
+    explorerTarget.type === "local" ? rootPath : null,
     !!query.trim(),
     (destDir) => tree.refresh(destDir),
   );
+
+  const handleOpenFile = (path: string) => {
+    if (explorerTarget.type === "remote" && activeSessionId) {
+      onOpenRemoteFile?.(activeSessionId, path);
+    } else {
+      onOpenFile(path);
+    }
+  };
+
+  // These affordances assume a local path (local terminal cwd, local AI file
+  // read, local preview URL) — meaningless for a remote path, so they're
+  // simply not passed down for a remote target. FileTreeNode already renders
+  // each of these conditionally on the callback being defined.
+  const effectiveOnRevealInTerminal = explorerTarget.type === "local" ? onRevealInTerminal : undefined;
+  const effectiveOnAttachToAgent = explorerTarget.type === "local" ? onAttachToAgent : undefined;
+  const effectiveOnOpenPreview = explorerTarget.type === "local" ? onOpenPreview : undefined;
 
   type FlatItem = { path: string; isDir: boolean };
   const flat = useMemo<FlatItem[]>(() => {
@@ -128,6 +196,22 @@ export function FileExplorer({
       clearTimeout(handle);
     };
   }, [query, rootPath, provider]);
+
+  // A lazy remote session that isn't connected yet gets its own compact
+  // state instead of the tree — deliberately not a full-screen loading
+  // screen (see ExplorerAuthPrompt's doc comment).
+  if (lazyHostId && (!lazySession || lazySession.status !== "connected")) {
+    const host = hosts.find((h) => h.id === lazyHostId);
+    return (
+      <ExplorerAuthPrompt
+        status={lazySession?.status ?? "connecting"}
+        error={lazySession?.error ?? null}
+        hostLabel={host?.name ?? lazyHostId}
+        onReconnect={() => lazySession?.reconnect()}
+        onOpenSftpTab={() => onOpenSftpTab?.(lazyHostId, host?.name ?? "SSH")}
+      />
+    );
+  }
 
   if (!rootPath) {
     return (
@@ -213,7 +297,7 @@ export function FileExplorer({
         {
           const item = flat[currentIdx];
           if (item.isDir) tree.toggle(item.path);
-          else onOpenFile(item.path);
+          else handleOpenFile(item.path);
         }
         break;
     }
@@ -345,7 +429,7 @@ export function FileExplorer({
                     key={hit.path}
                     type="button"
                     onClick={() => {
-                      if (!hit.is_dir) onOpenFile(hit.path);
+                      if (!hit.is_dir) handleOpenFile(hit.path);
                     }}
                     className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs hover:bg-accent"
                     title={hit.path}
@@ -415,10 +499,10 @@ export function FileExplorer({
                       rootPath={rootPath}
                       depth={0}
                       tree={tree}
-                      onOpenFile={onOpenFile}
-                      onOpenPreview={onOpenPreview}
-                      onRevealInTerminal={onRevealInTerminal}
-                      onAttachToAgent={onAttachToAgent}
+                      onOpenFile={handleOpenFile}
+                      onOpenPreview={effectiveOnOpenPreview}
+                      onRevealInTerminal={effectiveOnRevealInTerminal}
+                      onAttachToAgent={effectiveOnAttachToAgent}
                       selectedPath={selectedPath}
                       onSelectPath={setSelectedPath}
                       dropTargetPath={dropTargetPath}
@@ -429,10 +513,10 @@ export function FileExplorer({
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className={COMPACT_CONTENT}>
-            {onRevealInTerminal && (
+            {effectiveOnRevealInTerminal && (
               <ContextMenuItem
                 className={COMPACT_ITEM}
-                onSelect={() => onRevealInTerminal(rootPath)}
+                onSelect={() => effectiveOnRevealInTerminal(rootPath)}
               >
                 Open in Terminal
               </ContextMenuItem>

@@ -15,6 +15,7 @@ import { MotionConfig } from "motion/react";
 import { ThemeProvider } from "@/modules/theme";
 import { type TabManagementReturn, type AiDiffStatus, useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import type { AiLiveBridgeReturn } from "@/modules/ai";
+import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
 import { AiOverlays, CloseDialogs, SidebarContent, WorkspaceArea } from "@/app/components";
 import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
 
@@ -51,6 +52,7 @@ export interface AppShellPrefs {
 export interface AppShellControlState {
   home: string | null;
   explorerRoot: string | null;
+  explorerTarget: ExplorerTarget;
   hasComposer: boolean;
   keysLoaded: boolean;
   detectedPreviewUrl: string | null;
@@ -87,6 +89,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     setActivePanel: sidebar.setActivePanel,
     onSidebarResize: sidebar.onSidebarResize,
     explorerRoot: ctrl.explorerRoot,
+    explorerTarget: ctrl.explorerTarget,
     onSelect: actions.setActiveId,
     onNew: tabs.openNewTab,
     onNewPreview: () => tabs.openPreviewTab(""),
@@ -105,6 +108,12 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onPathDeleted: tabs.handlePathDeleted,
     onRevealInTerminal: tabs.cdInNewTab,
     onAttachToAgent: ai.handleAttachFileToAgent,
+    onOpenRemoteFile: (sessionId: string, path: string) => {
+      void actions.openRemoteEditorTab(sessionId, path);
+    },
+    onOpenSftpTab: (hostId: string, title: string) => {
+      actions.newSftpTab(hostId, title);
+    },
     onSnippetRun: tabs.handleSnippetRun,
     onOpenGitGraph: tabs.openGitGraphTab,
     onNewGitGraph,

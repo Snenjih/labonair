@@ -43,11 +43,18 @@ export function useFileTree(
   const fetchChildren = useCallback(
     async (path: string) => {
       const show_hidden = useLocalExplorerStore.getState().showHidden;
+      const requestGeneration = useLocalExplorerStore.getState().generation;
       setNode(path, { status: "loading" });
       try {
         const page = await provider.readDir(path, { showHidden: show_hidden });
+        // Discard a response that outlived a scope change (e.g. the user
+        // switched away from this host/root while the request was in
+        // flight) — applying it now would write into whatever scope is
+        // active by the time it resolves.
+        if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
         setNode(path, { status: "loaded", entries: page.entries, hasMore: page.hasMore });
       } catch (e) {
+        if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
         setNode(path, { status: "error", message: String(e) });
       }
     },

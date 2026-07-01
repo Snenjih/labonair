@@ -12,6 +12,7 @@ import {
   selectActiveTabKind,
 } from "@/modules/tabs";
 import { usePaletteCallbacks } from "@/modules/command-palette";
+import { useExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
 import { useMenuBridge } from "@/app/hooks/useMenuBridge";
 import { useUpdater } from "@/modules/updater";
 import { useAppBootstrap } from "@/app/hooks/useAppBootstrap";
@@ -47,6 +48,7 @@ export default function App() {
 
   // ── useWorkspaceCwd MUST come before useTabManagement ─────────────────────
   const { explorerRoot, inheritedCwdForNewTab } = useWorkspaceCwd(home);
+  const explorerTarget = useExplorerTarget(explorerRoot);
 
   // ── Sidebar hook ──────────────────────────────────────────────────────────
   const sidebar = useSidebar();
@@ -175,6 +177,7 @@ export default function App() {
       ctrl={{
         home,
         explorerRoot,
+        explorerTarget,
         hasComposer,
         keysLoaded,
         detectedPreviewUrl,
