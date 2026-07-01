@@ -4,10 +4,12 @@ import {
   Folder01Icon,
   Add01Icon,
 } from "@hugeicons/core-free-icons";
-import { createElement } from "react";
+import { createElement, useMemo } from "react";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import type { CommandAction, CommandPage } from "../types";
 import type { RegistryCallbacks } from "../types";
+
+const QUICK_CONNECT_LIMIT = 3;
 
 export function useHostCommands(cb: RegistryCallbacks): {
   rootActions: CommandAction[];
@@ -21,6 +23,44 @@ export function useHostCommands(cb: RegistryCallbacks): {
   if (!hasFetched) {
     void fetchData();
   }
+
+  // Most recently connected hosts, shown directly at root level so
+  // "ssh <name>" / "sftp <name>" surfaces them without opening the submenu.
+  const quickConnectHosts = useMemo(
+    () =>
+      [...hosts]
+        .filter((h) => h.last_connected_at)
+        .sort((a, b) => (b.last_connected_at ?? 0) - (a.last_connected_at ?? 0))
+        .slice(0, QUICK_CONNECT_LIMIT),
+    [hosts],
+  );
+
+  const quickConnectActions: CommandAction[] = quickConnectHosts.flatMap((h) => [
+    {
+      id: `host.quick.ssh.${h.id}`,
+      title: `Connect SSH: ${h.name}`,
+      subtitle: `${h.username}@${h.host_address}:${h.port}`,
+      section: "Quick Connect",
+      icon: createElement(HugeiconsIcon, {
+        icon: TerminalIcon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      perform: () => cb.newSshTab(h.id, h.name),
+    },
+    {
+      id: `host.quick.sftp.${h.id}`,
+      title: `Open SFTP: ${h.name}`,
+      subtitle: `${h.username}@${h.host_address}:${h.port}`,
+      section: "Quick Connect",
+      icon: createElement(HugeiconsIcon, {
+        icon: Folder01Icon,
+        strokeWidth: 2,
+        className: "size-4",
+      }),
+      perform: () => cb.newSftpTab(h.id, h.name),
+    },
+  ]);
 
   const sshActions: CommandAction[] = hosts.map((h) => ({
     id: `host.ssh.${h.id}`,
@@ -49,6 +89,7 @@ export function useHostCommands(cb: RegistryCallbacks): {
   }));
 
   const rootActions: CommandAction[] = [
+    ...quickConnectActions,
     {
       id: "hosts.connect-ssh",
       title: "Connect SSH...",

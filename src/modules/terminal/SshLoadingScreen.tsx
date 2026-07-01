@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { handleApiError } from "@/lib/errors";
 import type { QuickConnectParams } from "@/modules/tabs";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion } from "motion/react";
@@ -184,6 +185,12 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
         // Start tunnels on a dedicated background SSH connection (non-blocking).
         if (hostId) {
           invoke("ssh_start_tunnels", { hostId }).catch((e) => handleApiError(e, "Failed to start SSH tunnels", "SSH"));
+          // Mirror the backend's last_connected_at write locally so "Quick Connect"
+          // rankings (e.g. in the command palette) update without a full refetch.
+          const connectedAt = Date.now();
+          useHostsStore.setState((s) => ({
+            hosts: s.hosts.map((h) => (h.id === hostId ? { ...h, last_connected_at: connectedAt } : h)),
+          }));
         }
         onConnected();
       }),
