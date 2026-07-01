@@ -20,23 +20,17 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { handleApiError } from "@/lib/errors";
-import { invoke } from "@tauri-apps/api/core";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FileTreeNode } from "./FileTreeNode";
 import { InlineInput } from "./InlineInput";
 import { copyToClipboard, revealInFinder } from "./lib/contextActions";
+import type { SearchHit } from "./lib/fsProvider";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
+import { createLocalFsProvider } from "./lib/providers/localFsProvider";
 import { useFileTree } from "./lib/useFileTree";
 import { useOsFileDrop } from "./lib/useOsFileDrop";
-
-type SearchHit = {
-  path: string;
-  rel: string;
-  name: string;
-  is_dir: boolean;
-};
 
 type Props = {
   rootPath: string | null;
@@ -62,7 +56,10 @@ export function FileExplorer({
   onRevealInTerminal,
   onAttachToAgent,
 }: Props) {
-  const tree = useFileTree(rootPath, { onPathRenamed, onPathDeleted });
+  // Phase 0 keeps the sidebar explorer local-only — a remote-aware `provider`
+  // prop lands in Phase 3 without touching this construction site further.
+  const provider = useMemo(() => createLocalFsProvider(), []);
+  const tree = useFileTree(provider, rootPath, { onPathRenamed, onPathDeleted });
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -112,9 +109,7 @@ export function FileExplorer({
     let alive = true;
     const handle = setTimeout(async () => {
       try {
-        const hits = await invoke<SearchHit[]>("fs_search", {
-          root: rootPath,
-          query: q,
+        const hits = await provider.search(rootPath, q, {
           limit: 200,
           showHidden: tree.showHidden,
         });
@@ -132,7 +127,7 @@ export function FileExplorer({
       alive = false;
       clearTimeout(handle);
     };
-  }, [query, rootPath]);
+  }, [query, rootPath, provider]);
 
   if (!rootPath) {
     return (
@@ -442,12 +437,14 @@ export function FileExplorer({
                 Open in Terminal
               </ContextMenuItem>
             )}
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => void revealInFinder(rootPath)}
-            >
-              Reveal in Finder
-            </ContextMenuItem>
+            {tree.capabilities.supportsReveal && (
+              <ContextMenuItem
+                className={COMPACT_ITEM}
+                onSelect={() => void revealInFinder(rootPath)}
+              >
+                Reveal in Finder
+              </ContextMenuItem>
+            )}
             <ContextMenuSeparator />
             <ContextMenuItem
               className={COMPACT_ITEM}

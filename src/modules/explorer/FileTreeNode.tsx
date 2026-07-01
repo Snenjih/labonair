@@ -17,9 +17,10 @@ import {
   revealInFinder,
 } from "./lib/contextActions";
 import { explorerDrag } from "./lib/explorerDrag";
+import type { FileEntry } from "./lib/fsProvider";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
-import type { DirEntry, useFileTree } from "./lib/useFileTree";
+import type { useFileTree } from "./lib/useFileTree";
 
 type Tree = ReturnType<typeof useFileTree>;
 
@@ -28,7 +29,7 @@ export const PREVIEW_EXTENSIONS = new Set([
 ]);
 
 type Props = {
-  entry: DirEntry;
+  entry: FileEntry;
   parentPath: string;
   rootPath: string;
   depth: number;
@@ -117,7 +118,7 @@ function FileTreeNodeImpl({
               onClick={handleClick}
               onDoubleClick={() => !isDir && tree.beginRename(path)}
               onPointerDown={(e) => {
-                if (e.button !== 0 || tree.renaming) return;
+                if (e.button !== 0 || tree.renaming || !tree.capabilities.supportsNativeDrag) return;
                 const startX = e.clientX;
                 const startY = e.clientY;
                 let dragging = false;
@@ -176,7 +177,7 @@ function FileTreeNodeImpl({
                 isSelected && "bg-accent text-foreground",
                 dropTargetPath === path && "ring-1 ring-inset ring-primary bg-primary/10",
                 entry.name.startsWith(".") && "opacity-60",
-                entry.is_ignored && "opacity-50",
+                entry.isIgnored && "opacity-50",
               )}
               style={{ paddingLeft: 6 + depth * 12 }}
             >
@@ -227,12 +228,14 @@ function FileTreeNodeImpl({
               Open in Terminal
             </ContextMenuItem>
           )}
-          <ContextMenuItem
-            className={COMPACT_ITEM}
-            onSelect={() => void revealInFinder(path)}
-          >
-            Reveal in Finder
-          </ContextMenuItem>
+          {tree.capabilities.supportsReveal && (
+            <ContextMenuItem
+              className={COMPACT_ITEM}
+              onSelect={() => void revealInFinder(path)}
+            >
+              Reveal in Finder
+            </ContextMenuItem>
+          )}
           <ContextMenuSeparator />
           <ContextMenuItem
             className={COMPACT_ITEM}
