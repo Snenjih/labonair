@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { FileEntry } from "./fsProvider";
 
-type ChildrenState =
+export type ChildrenState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "loaded"; entries: FileEntry[]; hasMore?: boolean }

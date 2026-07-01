@@ -22,11 +22,11 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { handleApiError } from "@/lib/errors";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExplorerAuthPrompt } from "./components/ExplorerAuthPrompt";
-import { FileTreeNode } from "./FileTreeNode";
-import { InlineInput } from "./InlineInput";
+import { VirtualizedTreeList } from "./components/VirtualizedTreeList";
 import { copyToClipboard, revealInFinder } from "./lib/contextActions";
+import { buildTreeRows } from "./lib/buildTreeRows";
 import type { ExplorerTarget } from "./lib/useExplorerTarget";
 import type { SearchHit } from "./lib/fsProvider";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
@@ -115,7 +115,6 @@ export function FileExplorer({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
 
   // Native OS drag-drop needs a real local file handle to hand the OS — never
   // wired up for a remote target (see remoteFsProvider's supportsNativeDrag).
@@ -141,23 +140,21 @@ export function FileExplorer({
   const effectiveOnAttachToAgent = explorerTarget.type === "local" ? onAttachToAgent : undefined;
   const effectiveOnOpenPreview = explorerTarget.type === "local" ? onOpenPreview : undefined;
 
+  // Single flattening pass feeds both the virtualized render and keyboard
+  // navigation — `flat` is the entry-only subset `treeRows` already implies
+  // (loading/error/pending-create rows aren't navigable targets).
+  const treeRows = useMemo(
+    () => (rootPath ? buildTreeRows(rootPath, tree.nodes, tree.expanded, tree.joinPath, tree.pendingCreate) : []),
+    [rootPath, tree.nodes, tree.expanded, tree.joinPath, tree.pendingCreate],
+  );
   type FlatItem = { path: string; isDir: boolean };
-  const flat = useMemo<FlatItem[]>(() => {
-    if (!rootPath) return [];
-    const out: FlatItem[] = [];
-    const walk = (parent: string) => {
-      const node = tree.nodes[parent];
-      if (!node || node.status !== "loaded") return;
-      for (const e of node.entries) {
-        const p = tree.joinPath(parent, e.name);
-        const isDir = e.kind === "dir";
-        out.push({ path: p, isDir });
-        if (isDir && tree.expanded.has(p)) walk(p);
-      }
-    };
-    walk(rootPath);
-    return out;
-  }, [rootPath, tree.nodes, tree.expanded, tree.joinPath]);
+  const flat = useMemo<FlatItem[]>(
+    () =>
+      treeRows
+        .filter((r) => r.kind === "entry")
+        .map((r) => ({ path: r.path, isDir: r.entry.kind === "dir" })),
+    [treeRows],
+  );
 
   useEffect(() => {
     if (selectedPath && !flat.some((f) => f.path === selectedPath)) {
@@ -229,10 +226,6 @@ export function FileExplorer({
     );
   }
 
-  const root = tree.nodes[rootPath];
-  const pendingAtRoot =
-    tree.pendingCreate?.parentPath === rootPath ? tree.pendingCreate : null;
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (tree.renaming || tree.pendingCreate || query.trim()) return;
     const target = e.target as HTMLElement;
@@ -250,14 +243,10 @@ export function FileExplorer({
 
     const move = (next: number) => {
       const clamped = Math.max(0, Math.min(flat.length - 1, next));
-      const path = flat[clamped].path;
-      setSelectedPath(path);
-      requestAnimationFrame(() => {
-        const el = listRef.current?.querySelector<HTMLElement>(
-          `[data-fs-path="${CSS.escape(path)}"]`,
-        );
-        el?.scrollIntoView({ block: "nearest" });
-      });
+      // VirtualizedTreeList scrolls the new selection into view reactively
+      // (via useVirtualizer's index-based scrollToIndex) once selectedPath
+      // changes — no DOM query needed here.
+      setSelectedPath(flat[clamped].path);
     };
 
     switch (e.key) {
@@ -461,55 +450,18 @@ export function FileExplorer({
               {dropTargetPath === rootPath && (
                 <div className="pointer-events-none absolute inset-0 z-10 rounded-sm ring-2 ring-inset ring-primary/60 bg-primary/5" />
               )}
-              <ScrollArea className="h-full">
-              <div className="py-1" ref={listRef}>
-                {pendingAtRoot && (
-                  <div
-                    className="flex w-full items-center gap-1.5 px-1.5 py-0.5 text-xs"
-                    style={{ paddingLeft: 6 }}
-                  >
-                    <span className="size-3 shrink-0" />
-                    <span className="size-4 shrink-0" />
-                    <InlineInput
-                      initial=""
-                      placeholder={
-                        pendingAtRoot.kind === "dir" ? "New folder" : "New file"
-                      }
-                      onCommit={tree.commitCreate}
-                      onCancel={tree.cancelCreate}
-                    />
-                  </div>
-                )}
-                {root?.status === "loading" && (
-                  <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                    Loading…
-                  </div>
-                )}
-                {root?.status === "error" && (
-                  <div className="px-3 py-2 text-[11px] text-destructive">
-                    {root.message}
-                  </div>
-                )}
-                {root?.status === "loaded" &&
-                  root.entries.map((entry) => (
-                    <FileTreeNode
-                      key={entry.name}
-                      entry={entry}
-                      parentPath={rootPath}
-                      rootPath={rootPath}
-                      depth={0}
-                      tree={tree}
-                      onOpenFile={handleOpenFile}
-                      onOpenPreview={effectiveOnOpenPreview}
-                      onRevealInTerminal={effectiveOnRevealInTerminal}
-                      onAttachToAgent={effectiveOnAttachToAgent}
-                      selectedPath={selectedPath}
-                      onSelectPath={setSelectedPath}
-                      dropTargetPath={dropTargetPath}
-                    />
-                  ))}
-              </div>
-              </ScrollArea>
+              <VirtualizedTreeList
+                rows={treeRows}
+                rootPath={rootPath}
+                tree={tree}
+                onOpenFile={handleOpenFile}
+                onOpenPreview={effectiveOnOpenPreview}
+                onRevealInTerminal={effectiveOnRevealInTerminal}
+                onAttachToAgent={effectiveOnAttachToAgent}
+                selectedPath={selectedPath}
+                onSelectPath={setSelectedPath}
+                dropTargetPath={dropTargetPath}
+              />
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className={COMPACT_CONTENT}>
