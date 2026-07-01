@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useHostsStore } from "@/modules/hosts";
 import { isLabonairError } from "@/types";
 import { useEffect } from "react";
 import { create } from "zustand";
@@ -148,15 +149,18 @@ function reconnect(hostId: string) {
   });
 }
 
-/** Drops a session's bookkeeping without disconnecting — used when the host
- *  itself no longer exists (deleted from the host manager), where a graceful
- *  sftp_disconnect would just fail against a host row that's already gone. */
-export function forgetLazySession(hostId: string) {
+/** Forcibly disconnects a lazy session because the host itself was deleted
+ *  from the host manager while it was in use. Unlike a normal `disconnect`,
+ *  this deliberately leaves the store entry in an "error" state (instead of
+ *  clearing it) so a still-mounted consumer shows a clear "host no longer
+ *  exists" message instead of reverting to a perpetual "connecting" spinner. */
+function evictForDeletedHost(hostId: string) {
   const sessionId = sessionIdFor(hostId);
   const lifecycle = lifecycles.get(sessionId);
   if (lifecycle?.idleTimer) clearTimeout(lifecycle.idleTimer);
   lifecycles.delete(sessionId);
-  useLazySessionStore.getState().clear(sessionId);
+  useLazySessionStore.getState().setStatus(sessionId, "error", "This host no longer exists.");
+  void invoke("sftp_disconnect", { sessionId }).catch(() => {});
 }
 
 let _listenersBootstrapped = false;
@@ -177,6 +181,18 @@ function bootstrapLazySessionListeners() {
     const { session_id } = event.payload;
     if (!lifecycles.has(session_id)) return;
     useLazySessionStore.getState().setStatus(session_id, "connected");
+  });
+
+  // A host deleted from the host manager mid-browse must not leave its lazy
+  // session connected forever — nothing else would ever call disconnect for
+  // it once its bookkeeping has no host row to reference.
+  useHostsStore.subscribe((state) => {
+    const liveHostIds = new Set(state.hosts.map((h) => h.id));
+    for (const lifecycle of lifecycles.values()) {
+      if (!liveHostIds.has(lifecycle.hostId)) {
+        evictForDeletedHost(lifecycle.hostId);
+      }
+    }
   });
 }
 
