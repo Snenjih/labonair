@@ -1,6 +1,6 @@
 import { GitBranchIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,8 +12,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { NewBranchDialog } from "@/modules/source-control/components/NewBranchDialog";
+import { isSessionLostError } from "@/modules/source-control/lib/gitErrors";
 import { git } from "@/modules/source-control/lib/gitInvoke";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { GitGraphTab } from "@/modules/tabs/types";
@@ -71,7 +73,35 @@ function NoRepoState({ path }: { path: string }) {
   );
 }
 
+/** Distinct from `NoRepoState`/`ErrorState` — the repo is fine, the SSH
+ *  session backing it died. Offers a working reconnect when this tab was
+ *  opened against a lazy session (see `lazyEligible` below); otherwise
+ *  points the user at re-establishing the connection manually, since the
+ *  tab was pinned to a specific SFTP tab's session that can't be
+ *  auto-recreated here. */
+function SessionLostState({ error, onReconnect }: { error: string; onReconnect?: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+      <p className="text-sm font-medium text-destructive">Connection Lost</p>
+      <p className="max-w-xs text-xs text-muted-foreground">{error}</p>
+      {onReconnect ? (
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onReconnect}>
+          Reconnect
+        </Button>
+      ) : (
+        <p className="max-w-xs text-[11px] text-muted-foreground/60">
+          Reopen an SSH terminal or SFTP tab for this host, then refresh.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function isNoRepoError(error: string): boolean {
+  // A dead SSH session is not "no repo" — it needs a distinct
+  // reconnect-aware error state (see `SessionLostState` below), not the
+  // "open a folder with a git repo" empty state.
+  if (isSessionLostError(error)) return false;
   const lower = error.toLowerCase();
   return (
     lower.includes("not a git repo") ||
@@ -121,6 +151,24 @@ function GitGraphPaneContent({ tab }: Props) {
   const [checkoutConfirmCommit, setCheckoutConfirmCommit] = useState<LayoutCommit | null>(null);
   const [cherryPickConfirmCommit, setCherryPickConfirmCommit] = useState<LayoutCommit | null>(null);
   const [createBranchFromCommit, setCreateBranchFromCommit] = useState<string | null>(null);
+
+  // Only re-acquire via useLazyExplorerSession when this tab's sessionId was
+  // actually sourced from one — an sftp-tab-sourced session is pinned to a
+  // *specific* SFTP tab and re-acquiring here would stand up an unrelated
+  // second session instead of reconnecting the real one.
+  const lazyHostId = tab.hostId && tab.sessionId === `explorer:${tab.hostId}` ? tab.hostId : null;
+  const lazySession = useLazyExplorerSession(lazyHostId);
+  const prevLazyStatus = useRef(lazySession?.status);
+  useEffect(() => {
+    if (
+      prevLazyStatus.current &&
+      prevLazyStatus.current !== "connected" &&
+      lazySession?.status === "connected"
+    ) {
+      reload();
+    }
+    prevLazyStatus.current = lazySession?.status;
+  }, [lazySession?.status, reload]);
 
   // Auto-dismiss error after 8 seconds
   useEffect(() => {
@@ -178,6 +226,9 @@ function GitGraphPaneContent({ tab }: Props) {
   }
 
   if (error) {
+    if (isSessionLostError(error)) {
+      return <SessionLostState error={error} onReconnect={lazySession?.reconnect} />;
+    }
     if (isNoRepoError(error)) {
       return <NoRepoState path={tab.repositoryPath} />;
     }

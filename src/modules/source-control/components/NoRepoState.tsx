@@ -1,6 +1,8 @@
 import { GitBranchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Button } from "@/components/ui/button";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { isSessionLostError } from "../lib/gitErrors";
 import { git } from "../lib/gitInvoke";
 
 interface NoRepoStateProps {
@@ -8,24 +10,37 @@ interface NoRepoStateProps {
   sessionId?: string;
   onRefresh: () => void;
   errorMessage?: string;
+  /** Set when a lazy SSH session backs this target — lets a session-lost
+   *  error offer a working "Reconnect" button instead of a dead end. */
+  onReconnect?: () => void;
 }
 
-export function NoRepoState({ rootPath, sessionId, onRefresh, errorMessage }: NoRepoStateProps) {
+export function NoRepoState({ rootPath, sessionId, onRefresh, errorMessage, onReconnect }: NoRepoStateProps) {
   async function handleGitInit() {
     if (!rootPath) return;
     try {
       await git.init(rootPath, sessionId);
       onRefresh();
-    } catch {
-      // silently ignore — the next poll cycle will pick up the result
+    } catch (e) {
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Init Failed", message: String(e) });
     }
   }
 
   if (errorMessage) {
+    const sessionLost = isSessionLostError(errorMessage);
     return (
       <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-        <p className="text-sm font-medium text-destructive">Git Error</p>
+        <p className="text-sm font-medium text-destructive">
+          {sessionLost ? "Connection Lost" : "Git Error"}
+        </p>
         <p className="text-xs text-muted-foreground">{errorMessage}</p>
+        {sessionLost && onReconnect && (
+          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onReconnect}>
+            Reconnect
+          </Button>
+        )}
       </div>
     );
   }

@@ -107,21 +107,10 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     }
   }
 
-  // .gitignore / info/exclude writes go straight to the filesystem (not through
-  // git), so they're local-only for now — guard with a clear message instead of
-  // letting a remote path fail canonicalize() with a confusing local IO error.
   async function handleAddToGitignore() {
     if (!repoRoot) return;
-    if (sessionId) {
-      useNotificationStore.getState().addNotification({
-        type: "error",
-        title: "Not Supported",
-        message: "Adding to .gitignore isn't supported for remote repositories yet.",
-      });
-      return;
-    }
     try {
-      await git.addToGitignore(repoRoot, file.path);
+      await git.addToGitignore(repoRoot, file.path, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
       useNotificationStore
@@ -132,16 +121,8 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
 
   async function handleAddToExclude() {
     if (!repoRoot) return;
-    if (sessionId) {
-      useNotificationStore.getState().addNotification({
-        type: "error",
-        title: "Not Supported",
-        message: "Adding to .git/info/exclude isn't supported for remote repositories yet.",
-      });
-      return;
-    }
     try {
-      await git.addToExclude(repoRoot, file.path);
+      await git.addToExclude(repoRoot, file.path, sessionId ?? undefined);
     } catch (e) {
       useNotificationStore
         .getState()

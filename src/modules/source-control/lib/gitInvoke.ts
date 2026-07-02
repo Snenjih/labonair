@@ -133,8 +133,10 @@ export const git = {
     invoke<string>("git_get_commit_numstat", { path, hash, sessionId: sessionId ?? null }),
   getRemoteUrl: (path: string, remote?: string, sessionId?: string) =>
     invoke<string>("git_get_remote_url", { path, remote: remote ?? null, sessionId: sessionId ?? null }),
-  addToGitignore: (path: string, file: string) => invoke<void>("git_add_to_gitignore", { path, file }),
-  addToExclude: (path: string, file: string) => invoke<void>("git_add_to_exclude", { path, file }),
+  addToGitignore: (path: string, file: string, sessionId?: string) =>
+    invoke<void>("git_add_to_gitignore", { path, file, sessionId: sessionId ?? null }),
+  addToExclude: (path: string, file: string, sessionId?: string) =>
+    invoke<void>("git_add_to_exclude", { path, file, sessionId: sessionId ?? null }),
   init: (path: string, sessionId?: string) =>
     invoke<void>("git_init", { path, sessionId: sessionId ?? null }),
 };

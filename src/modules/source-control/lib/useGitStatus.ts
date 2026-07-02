@@ -59,10 +59,12 @@ export function useGitStatus(target: ExplorerTarget) {
     try {
       isRepo = await git.isRepo(rootPath, targetSessionId);
     } catch (e) {
-      const msg = String(e);
-      if (msg.includes("not installed") || msg.includes("not in PATH") || msg.includes("not found")) {
-        setError(msg);
-      }
+      // Any exception here (not just the "not installed" case) is a real
+      // failure — `git_is_repo` returning `false` is the normal "no repo"
+      // signal, so reaching a catch at all means something else went wrong
+      // (dead SSH session, transport error, ...). Always surface it instead
+      // of silently rendering the generic "not a git repository" state.
+      setError(String(e));
       setRepoInfo(false, null);
       isRefreshingRef.current = false;
       return;
@@ -82,7 +84,8 @@ export function useGitStatus(target: ExplorerTarget) {
     let root: string;
     try {
       root = await git.getRepoRoot(rootPath, targetSessionId);
-    } catch {
+    } catch (e) {
+      setError(String(e));
       setRepoInfo(false, null);
       isRefreshingRef.current = false;
       return;
@@ -117,10 +120,7 @@ export function useGitStatus(target: ExplorerTarget) {
       setTags(state.tags);
       setDiffStats(state.diffStats);
     } catch (e) {
-      const msg = String(e);
-      if (msg.includes("not installed") || msg.includes("not in PATH")) {
-        setError(msg);
-      }
+      setError(String(e));
     } finally {
       setIsStatusLoading(false);
       setIsBranchLoading(false);

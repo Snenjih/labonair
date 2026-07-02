@@ -2,6 +2,7 @@ import { ArrowDown01Icon, ArrowRight01Icon, MinusSignIcon, PlusSignIcon } from "
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { git } from "../lib/gitInvoke";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import type { FileStatus } from "../types";
@@ -27,8 +28,10 @@ export function TrackedSection({ staged, unstaged, onRefresh }: TrackedSectionPr
     try {
       await git.stageAll(repoRoot, sessionId ?? undefined);
       onRefresh();
-    } catch {
-      /* ignore */
+    } catch (e) {
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
@@ -38,8 +41,10 @@ export function TrackedSection({ staged, unstaged, onRefresh }: TrackedSectionPr
     try {
       await git.unstageAll(repoRoot, sessionId ?? undefined);
       onRefresh();
-    } catch {
-      /* ignore */
+    } catch (e) {
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
