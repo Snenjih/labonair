@@ -1,12 +1,9 @@
 use crate::modules::sftp::SftpState;
 use crate::modules::sftp::net_error::is_network_error;
 use crate::modules::errors::LabonairError;
+use crate::modules::ssh::shell::shell_quote;
 use std::io::{Read as _, Write as _};
 use std::sync::Arc;
-
-fn shell_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
-}
 
 /// Classifies a raw SFTP/exec error. Network-level failures remove the dead
 /// session from `SftpState` and emit `ssh_connection_lost` — the same event
