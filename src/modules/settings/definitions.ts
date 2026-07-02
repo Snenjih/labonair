@@ -7,6 +7,7 @@ export type SettingCategory =
   | "Editor"
   | "Command Palette"
   | "File Manager"
+  | "Source Control"
   | "AI"
   | "Directives"
   | "About";
@@ -232,6 +233,15 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Terminal font size",
     description: "Font size used in the terminal (in px).",
     category: "Terminal",
+    controlType: "NumberInput",
+  },
+  // --- Source Control ---
+  {
+    id: "gitStatusPollIntervalMs",
+    label: "Refresh interval",
+    description:
+      "How often Source Control polls for status changes (in ms). Remote repositories over SSH automatically use a longer effective interval since each check is a network round-trip.",
+    category: "Source Control",
     controlType: "NumberInput",
   },
   {
@@ -557,6 +567,7 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Editor",
   "Command Palette",
   "File Manager",
+  "Source Control",
   "AI",
   "Directives",
   "About",

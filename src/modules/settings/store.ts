@@ -92,6 +92,9 @@ export type Preferences = {
   terminalFontWeight: "normal" | "medium" | "bold";
   terminalShowPaneHeader: boolean;
   terminalShowPaneFooter: boolean;
+
+  // --- Source Control ---
+  gitStatusPollIntervalMs: number;
   terminalUseWebGL: boolean;
   terminalBell: boolean;
 
@@ -252,6 +255,7 @@ const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
 const KEY_TERMINAL_LETTER_SPACING = "terminalLetterSpacing";
 const KEY_TERMINAL_LINE_HEIGHT = "terminalLineHeight";
 const KEY_TERMINAL_FONT_WEIGHT = "terminalFontWeight";
+const KEY_GIT_STATUS_POLL_INTERVAL_MS = "gitStatusPollIntervalMs";
 const KEY_TERMINAL_SHOW_PANE_HEADER = "terminalShowPaneHeader";
 const KEY_TERMINAL_SHOW_PANE_FOOTER = "terminalShowPaneFooter";
 const KEY_TERMINAL_USE_WEBGL = "terminalUseWebGL";
@@ -375,6 +379,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
   terminalShell: "",
   terminalDefaultPath: "",
+  gitStatusPollIntervalMs: 5000,
   terminalCursorBlink: true,
   terminalCursorBlinkInterval: 1000,
   terminalCursorStyle: "bar",
@@ -551,6 +556,8 @@ export async function loadPreferences(): Promise<Preferences> {
     terminalCursorStyle:
       get<"block" | "underline" | "bar">(KEY_TERMINAL_CURSOR_STYLE) ??
       DEFAULT_PREFERENCES.terminalCursorStyle,
+    gitStatusPollIntervalMs:
+      get<number>(KEY_GIT_STATUS_POLL_INTERVAL_MS) ?? DEFAULT_PREFERENCES.gitStatusPollIntervalMs,
     terminalFontFamily: get<string>(KEY_TERMINAL_FONT_FAMILY) ?? DEFAULT_PREFERENCES.terminalFontFamily,
     terminalFontSize: get<number>(KEY_TERMINAL_FONT_SIZE) ?? DEFAULT_PREFERENCES.terminalFontSize,
     terminalScrollback: get<number>(KEY_TERMINAL_SCROLLBACK) ?? DEFAULT_PREFERENCES.terminalScrollback,
@@ -907,6 +914,11 @@ export async function setTerminalCursorBlinkInterval(value: number): Promise<voi
 
 export async function setTerminalCursorStyle(value: "block" | "underline" | "bar"): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_CURSOR_STYLE, value);
+  await (await getStore()).save();
+}
+
+export async function setGitStatusPollIntervalMs(value: number): Promise<void> {
+  await (await getStore()).set(KEY_GIT_STATUS_POLL_INTERVAL_MS, value);
   await (await getStore()).save();
 }
 
@@ -1395,6 +1407,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_APP_CORNER_RADIUS]: "appCornerRadius",
     [KEY_APP_DENSITY]: "appDensity",
 
+    [KEY_GIT_STATUS_POLL_INTERVAL_MS]: "gitStatusPollIntervalMs",
     [KEY_TERMINAL_SHELL]: "terminalShell",
     [KEY_TERMINAL_DEFAULT_PATH]: "terminalDefaultPath",
     [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",

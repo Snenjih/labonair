@@ -1,45 +1,46 @@
-import { Input } from "@/components/ui/input";
-import { WindowControls } from "@/components/WindowControls";
-import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
-import { cn } from "@/lib/utils";
-import { useThemeEngine } from "@/lib/useThemeEngine";
-import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
-import { SETTING_DEFINITIONS, type SettingCategory } from "@/modules/settings/definitions";
 import {
   AiScanIcon,
   File01Icon,
+  GitBranchIcon,
   KeyboardIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
+  Search01Icon,
   Settings01Icon,
   SourceCodeIcon,
   TerminalIcon,
-  Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { WindowControls } from "@/components/WindowControls";
 import { getStoragePaths } from "@/lib/paths";
-import * as store from "@/modules/settings/store";
+import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
+import { useThemeEngine } from "@/lib/useThemeEngine";
+import { cn } from "@/lib/utils";
+import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
+import { SETTING_DEFINITIONS, type SettingCategory } from "@/modules/settings/definitions";
+import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
+import { usePreferencesStore, usePreferencesStore as usePrefs } from "@/modules/settings/preferences";
 import type { PrefKey } from "@/modules/settings/store";
+import * as store from "@/modules/settings/store";
+import { useKeybindsStore } from "@/modules/shortcuts";
+import { SettingRow } from "./components/SettingRow";
 import { AgentsSection } from "./sections/AgentsSection";
+import { AiSection } from "./sections/AiSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { CommandPaletteSection } from "./sections/CommandPaletteSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { KeyboardShortcutsSection } from "./sections/KeyboardShortcutsSection";
 import { ModelsSection } from "./sections/ModelsSection";
+import { SourceControlSection } from "./sections/SourceControlSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemeMarketplace } from "./sections/ThemeMarketplace";
-import { AiSection } from "./sections/AiSection";
-import { SettingRow } from "./components/SettingRow";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { usePreferencesStore as usePrefs } from "@/modules/settings/preferences";
-import { useKeybindsStore } from "@/modules/shortcuts";
 
 type SidebarItem = {
   id: SettingsTab;
@@ -55,6 +56,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
+  { id: "source-control", category: "Source Control", label: "Source Control", icon: GitBranchIcon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
   { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
 ];
@@ -191,6 +193,7 @@ export function SettingsApp() {
                 {active === "terminal" && <TerminalSection />}
                 {active === "editor" && <EditorSection />}
                 {active === "command-palette" && <CommandPaletteSection />}
+                {active === "source-control" && <SourceControlSection />}
                 {active === "shortcuts" && <KeyboardShortcutsSection />}
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
@@ -301,6 +304,9 @@ function applySettingChange(id: PrefKey, value: unknown): void {
       break;
     case "explorerMaxIdleSessions":
       void store.setExplorerMaxIdleSessions(Number(value));
+      break;
+    case "gitStatusPollIntervalMs":
+      void store.setGitStatusPollIntervalMs(Number(value));
       break;
   }
 }
