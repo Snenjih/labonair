@@ -1,7 +1,7 @@
-import { cn } from "@/lib/utils";
-import type { CommitDiffTab } from "@/modules/tabs/types";
-import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import { useShallow } from "zustand/react/shallow";
+import { cn } from "@/lib/utils";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import type { CommitDiffTab } from "@/modules/tabs/types";
 import { CommitDiffTabPane } from "./CommitDiffTabPane";
 
 export function CommitDiffStack() {
@@ -22,7 +22,7 @@ export function CommitDiffStack() {
             className={cn("absolute inset-0", !visible && "invisible pointer-events-none")}
             aria-hidden={!visible}
           >
-            <CommitDiffTabPane repositoryPath={t.repositoryPath} hash={t.hash} />
+            <CommitDiffTabPane repositoryPath={t.repositoryPath} hash={t.hash} sessionId={t.sessionId} />
           </div>
         );
       })}

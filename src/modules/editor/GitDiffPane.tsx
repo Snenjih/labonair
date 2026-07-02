@@ -1,9 +1,9 @@
+import { FilterIcon, GitCompareIcon, SourceCodeIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { FilterIcon, GitCompareIcon, SourceCodeIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { git } from "@/modules/source-control/lib/gitInvoke";
 
@@ -12,6 +12,7 @@ interface Props {
   filePath: string;
   staged: boolean;
   section: "staged" | "unstaged" | "untracked";
+  sessionId?: string;
 }
 
 interface DiffLineProps {
@@ -80,7 +81,7 @@ const SECTION_LABEL: Record<Props["section"], string> = {
   untracked: "Untracked",
 };
 
-export function GitDiffPane({ repoRoot, filePath, staged, section }: Props) {
+export function GitDiffPane({ repoRoot, filePath, staged, section, sessionId }: Props) {
   const [diff, setDiff] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +95,7 @@ export function GitDiffPane({ repoRoot, filePath, staged, section }: Props) {
     setDiff(null);
 
     git
-      .getDiff(repoRoot, filePath, staged, ignoreWhitespace)
+      .getDiff(repoRoot, filePath, staged, ignoreWhitespace, sessionId)
       .then((content) => {
         if (!cancelRef.current) setDiff(content);
       })
@@ -108,7 +109,7 @@ export function GitDiffPane({ repoRoot, filePath, staged, section }: Props) {
     return () => {
       cancelRef.current = true;
     };
-  }, [repoRoot, filePath, staged, ignoreWhitespace]);
+  }, [repoRoot, filePath, staged, ignoreWhitespace, sessionId]);
 
   const stats = diff ? computeStats(diff) : null;
   const lines = diff ? diff.split("\n") : [];

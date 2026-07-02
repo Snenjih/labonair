@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { git } from "@/modules/source-control/lib/gitInvoke";
 import { cn } from "@/lib/utils";
+import { git } from "@/modules/source-control/lib/gitInvoke";
 
 interface Props {
   repositoryPath: string;
   hash: string;
+  sessionId?: string;
 }
 
 function DiffLine({ line, isInOurs, isInTheirs }: { line: string; isInOurs: boolean; isInTheirs: boolean }) {
@@ -59,7 +60,7 @@ function basename(path: string): string {
   return parts.length ? parts[parts.length - 1] : path;
 }
 
-export function CommitDiffTabPane({ repositoryPath, hash }: Props) {
+export function CommitDiffTabPane({ repositoryPath, hash, sessionId }: Props) {
   const [diffContent, setDiffContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -68,11 +69,11 @@ export function CommitDiffTabPane({ repositoryPath, hash }: Props) {
     setDiffContent(null);
     setIsLoading(true);
     git
-      .getCommitDiff(repositoryPath, hash)
+      .getCommitDiff(repositoryPath, hash, sessionId)
       .then((content) => setDiffContent(content))
       .catch(() => setDiffContent(null))
       .finally(() => setIsLoading(false));
-  }, [repositoryPath, hash]);
+  }, [repositoryPath, hash, sessionId]);
 
   const filePaths = useMemo(() => {
     if (!diffContent) return [];

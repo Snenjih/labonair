@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { git } from "@/modules/source-control/lib/gitInvoke";
+import { cn } from "@/lib/utils";
 import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
+import { git } from "@/modules/source-control/lib/gitInvoke";
 import { getAvatarUrl, getCached, setCached } from "../lib/avatarCache";
 import { getAvatarColor } from "../lib/laneColors";
-import { cn } from "@/lib/utils";
 import type { LayoutCommit } from "../types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -261,6 +261,7 @@ interface CommitDetailPanelProps {
   commit: LayoutCommit;
   onClose: () => void;
   repositoryPath: string;
+  sessionId?: string;
   onViewChanges?: (hash: string) => void;
 }
 
@@ -268,6 +269,7 @@ export function CommitDetailPanel({
   commit,
   onClose,
   repositoryPath,
+  sessionId,
   onViewChanges,
 }: CommitDetailPanelProps) {
   const [numstatRaw, setNumstatRaw] = useState<string | null>(null);
@@ -299,14 +301,14 @@ export function CommitDetailPanel({
   useEffect(() => {
     setNumstatRaw(null);
     void git
-      .getCommitNumstat(repositoryPath, commit.hash)
+      .getCommitNumstat(repositoryPath, commit.hash, sessionId)
       .then(setNumstatRaw)
       .catch(() => setNumstatRaw(""));
     void git
-      .getRemoteUrl(repositoryPath)
+      .getRemoteUrl(repositoryPath, undefined, sessionId)
       .then(setRemoteUrl)
       .catch(() => setRemoteUrl(null));
-  }, [repositoryPath, commit.hash]);
+  }, [repositoryPath, commit.hash, sessionId]);
 
   const githubCommitUrl = remoteUrl ? buildGithubCommitUrl(remoteUrl, commit.hash) : null;
 
