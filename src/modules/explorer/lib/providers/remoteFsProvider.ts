@@ -76,6 +76,7 @@ export function createRemoteFsProvider(sessionId: string, hostId: string): FsPro
         sessionId,
         path,
         offset: opts?.offset ?? 0,
+        showHidden: opts?.showHidden ?? false,
       });
       const page: ReadDirPage = { entries: raw.entries.map(toFileEntry), hasMore: raw.has_more };
       return page;

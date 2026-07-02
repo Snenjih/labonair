@@ -212,6 +212,7 @@ pub async fn sftp_read_dir_page(
     path: String,
     offset: Option<usize>,
     limit: Option<usize>,
+    show_hidden: Option<bool>,
     state: tauri::State<'_, SftpState>,
     app: tauri::AppHandle,
 ) -> Result<SftpReadDirPage, LabonairError> {
@@ -219,12 +220,21 @@ pub async fn sftp_read_dir_page(
     let session_id_for_err = session_id.clone();
     let offset = offset.unwrap_or(0);
     let limit = limit.unwrap_or(DEFAULT_PAGE_LIMIT);
+    // list_dir_entries never filters (sftp_read_dir's dual-pane-tab caller
+    // wants everything and filters client-side itself) — dotfiles are
+    // stripped here, before pagination, so offset/has_more stay correct
+    // relative to what's actually visible. Mirrors fs_read_dir's local
+    // filter-before-collect behavior.
+    let show_hidden = show_hidden.unwrap_or(false);
 
     tokio::task::spawn_blocking(move || {
         let sftp_arc: Arc<std::sync::Mutex<crate::modules::ssh::SftpHandle>> =
             get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-        let files = list_dir_entries(&sftp, &path)?;
+        let mut files = list_dir_entries(&sftp, &path)?;
+        if !show_hidden {
+            files.retain(|f| !f.name.starts_with('.'));
+        }
         Ok(paginate_entries(files, offset, limit))
     })
     .await
