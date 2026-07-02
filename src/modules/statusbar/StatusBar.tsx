@@ -1,22 +1,12 @@
-import React from "react";
-import { AgentStatusPill } from "@/modules/ai/components/AgentStatusPill";
-import { AiOpenButton, AiStatusBarControls } from "@/modules/ai/components/AiStatusBarControls";
-import { useChatStore } from "@/modules/ai";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import {
-  FolderTreeIcon,
   FlashIcon,
+  FolderTreeIcon,
   GitBranchIcon,
   Globe02Icon,
   LayoutTopIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { cn } from "@/lib/utils";
-import { CwdBreadcrumb } from "./CwdBreadcrumb";
-import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
-import { useTabsStore } from "@/modules/tabs/store/tabsStore";
-import type { WorkspaceTab } from "@/modules/tabs/types";
+import React from "react";
 import {
   ContextMenu,
   ContextMenuCheckboxItem,
@@ -26,6 +16,17 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { cn } from "@/lib/utils";
+import { useChatStore } from "@/modules/ai";
+import { AgentStatusPill } from "@/modules/ai/components/AgentStatusPill";
+import { AiOpenButton, AiStatusBarControls } from "@/modules/ai/components/AiStatusBarControls";
+import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
+import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
+import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import type { WorkspaceTab } from "@/modules/tabs/types";
+import { CwdBreadcrumb } from "./CwdBreadcrumb";
 import {
   STATUSBAR_ITEM_REGISTRY,
   STATUSBAR_ITEM_SETTERS,
@@ -110,8 +111,24 @@ export const StatusBar = React.memo(function StatusBar({
     if (tab?.kind !== "workspace") return null;
     const wt = tab as WorkspaceTab;
     const session = wt.sessions[wt.activePaneId];
-    return session?.kind === "local" ? (session.cwd ?? null) : null;
+    if (session?.kind === "local") return session.cwd ?? null;
+    if (session?.kind === "ssh") return session.cwd ?? null;
+    return null;
   });
+  // Same {hostId} the sidebar tree's ExplorerTarget resolves to for an SSH
+  // workspace pane — acquiring it here (ref-counted, idempotent) reuses the
+  // sidebar's already-open session when there is one, or lazily connects a
+  // shared one otherwise, instead of the breadcrumb standing up its own.
+  const sshHostId = useTabsStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    if (tab?.kind !== "workspace") return null;
+    const wt = tab as WorkspaceTab;
+    const session = wt.sessions[wt.activePaneId];
+    return session?.kind === "ssh" ? (session.hostId ?? null) : null;
+  });
+  const lazySession = useLazyExplorerSession(sshHostId);
+  const remoteTarget =
+    sshHostId && lazySession ? { hostId: sshHostId, sessionId: lazySession.sessionId } : null;
   const filePath = useTabsStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId);
     if (tab?.kind !== "editor") return null;
@@ -171,6 +188,7 @@ export const StatusBar = React.memo(function StatusBar({
                     cwd={cwd}
                     filePath={filePath}
                     home={home}
+                    remoteTarget={remoteTarget}
                     onCd={onCd}
                     onCdInNewTab={onCdInNewTab}
                   />

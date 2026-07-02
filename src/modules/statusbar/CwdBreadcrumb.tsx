@@ -1,9 +1,12 @@
+import { ArrowDown01Icon, Folder01Icon, Home03Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbList,
   BreadcrumbLink,
+  BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -21,20 +24,36 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowDown01Icon, Folder01Icon, Home03Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useState } from "react";
-import { relativePath, segmentsFromCwd } from "./lib/pathUtils";
+import type { FsProvider } from "@/modules/explorer/lib/fsProvider";
+import { createLocalFsProvider } from "@/modules/explorer/lib/providers/localFsProvider";
+import { createRemoteFsProvider } from "@/modules/explorer/lib/providers/remoteFsProvider";
 import type { Segment } from "./lib/pathUtils";
+import { relativePath, segmentsFromCwd } from "./lib/pathUtils";
+
+/** Identifies the SSH session backing the active pane, when it's remote —
+ *  same {hostId, sessionId} shape `ExplorerTarget` uses, so the breadcrumb
+ *  reads/browses through the identical session the sidebar tree already has
+ *  open instead of standing up a second one. */
+export type BreadcrumbRemoteTarget = { hostId: string; sessionId: string };
 
 type Props = {
   cwd: string | null;
   filePath?: string | null;
   home: string | null;
+  remoteTarget?: BreadcrumbRemoteTarget | null;
   onCd: (path: string) => void;
   onCdInNewTab?: (path: string) => void;
 };
+
+const localProvider = createLocalFsProvider();
+
+/** Exported for testability — picks the same provider abstraction the
+ *  explorer sidebar tree uses, keyed off the target resolved for the active
+ *  tab's session, so local/remote directory listing goes through one shared
+ *  code path instead of the breadcrumb reimplementing its own. */
+export function resolveProvider(remoteTarget: BreadcrumbRemoteTarget | null | undefined): FsProvider {
+  return remoteTarget ? createRemoteFsProvider(remoteTarget.sessionId, remoteTarget.hostId) : localProvider;
+}
 
 function dirname(path: string): string {
   const i = path.lastIndexOf("/");
@@ -47,7 +66,7 @@ function basename(path: string): string {
   return i === -1 ? path : path.slice(i + 1);
 }
 
-export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props) {
+export function CwdBreadcrumb({ cwd, filePath, home, remoteTarget, onCd, onCdInNewTab }: Props) {
   // File mode: dir segments navigate; filename is the terminal leaf.
   if (filePath) {
     const dir = dirname(filePath);
@@ -102,7 +121,13 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props
           </span>
         ))}
         <BreadcrumbItem>
-          <CurrentSegmentWithContextMenu seg={current} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+          <CurrentSegmentWithContextMenu
+            seg={current}
+            cwd={cwd}
+            remoteTarget={remoteTarget}
+            onCd={onCd}
+            onCdInNewTab={onCdInNewTab}
+          />
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
@@ -182,12 +207,23 @@ function SegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuPro
   );
 }
 
-function CurrentSegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuProps) {
+function CurrentSegmentWithContextMenu({
+  seg,
+  cwd,
+  remoteTarget,
+  onCd,
+  onCdInNewTab,
+}: SegmentMenuProps & { remoteTarget?: BreadcrumbRemoteTarget | null }) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <span>
-          <CurrentSegmentDropdown label={seg.label} path={seg.fullPath} onCd={onCd} />
+          <CurrentSegmentDropdown
+            label={seg.label}
+            path={seg.fullPath}
+            remoteTarget={remoteTarget}
+            onCd={onCd}
+          />
         </span>
       </ContextMenuTrigger>
       <SegmentContextMenuContent seg={seg} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
@@ -198,10 +234,12 @@ function CurrentSegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: Segment
 function CurrentSegmentDropdown({
   label,
   path,
+  remoteTarget,
   onCd,
 }: {
   label: string;
   path: string;
+  remoteTarget?: BreadcrumbRemoteTarget | null;
   onCd: (p: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -211,13 +249,15 @@ function CurrentSegmentDropdown({
   const load = useCallback(async () => {
     setError(null);
     try {
-      const dirs = await invoke<string[]>("list_subdirs", { path });
+      const provider = resolveProvider(remoteTarget);
+      const page = await provider.readDir(path);
+      const dirs = page.entries.filter((e) => e.kind === "dir").map((e) => e.name);
       setChildren(dirs);
     } catch (e) {
       setError(String(e));
       setChildren([]);
     }
-  }, [path]);
+  }, [path, remoteTarget]);
 
   useEffect(() => {
     if (open) load();
