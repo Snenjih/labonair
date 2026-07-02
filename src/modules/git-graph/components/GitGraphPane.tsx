@@ -1,4 +1,4 @@
-import { GitBranchIcon, Refresh01Icon } from "@hugeicons/core-free-icons";
+import { ComputerIcon, GitBranchIcon, Refresh01Icon, ServerStack01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
+import { useHostsStore } from "@/modules/hosts";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { NewBranchDialog } from "@/modules/source-control/components/NewBranchDialog";
 import { isSessionLostError } from "@/modules/source-control/lib/gitErrors";
@@ -152,6 +153,12 @@ function GitGraphPaneContent({ tab }: Props) {
   const [cherryPickConfirmCommit, setCherryPickConfirmCommit] = useState<LayoutCommit | null>(null);
   const [createBranchFromCommit, setCreateBranchFromCommit] = useState<string | null>(null);
 
+  const isRemote = !!tab.hostId;
+  const host = useHostsStore((s) => (tab.hostId ? s.hosts.find((h) => h.id === tab.hostId) : undefined));
+  const hostLabel = host?.name ?? tab.hostId ?? "";
+  const repoName = tab.repositoryPath.split("/").pop() || tab.repositoryPath;
+  const parentPath = tab.repositoryPath.slice(0, tab.repositoryPath.length - repoName.length);
+
   // Only re-acquire via useLazyExplorerSession when this tab's sessionId was
   // actually sourced from one — an sftp-tab-sourced session is pinned to a
   // *specific* SFTP tab and re-acquiring here would stand up an unrelated
@@ -244,11 +251,32 @@ function GitGraphPaneContent({ tab }: Props) {
       {/* Graph canvas */}
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Toolbar */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-1">
-          <span className="truncate text-[11px] text-muted-foreground">
-            {tab.repositoryPath.split("/").pop()}
-          </span>
-          <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 px-3 py-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0 truncate text-[11px]" title={tab.repositoryPath}>
+              <span className="text-muted-foreground/40">{parentPath}</span>
+              <span className="font-medium text-foreground/80">{repoName}</span>
+            </span>
+            <span
+              className="flex shrink-0 items-center gap-1 rounded border border-border/60 px-1.5 py-px font-mono text-[9px] leading-none text-muted-foreground"
+              title={
+                isRemote
+                  ? host
+                    ? `Remote — ${host.username}@${host.host_address}:${host.port}`
+                    : `Remote — ${hostLabel}`
+                  : "Local repository"
+              }
+            >
+              <HugeiconsIcon
+                icon={isRemote ? ServerStack01Icon : ComputerIcon}
+                size={9}
+                strokeWidth={1.75}
+                className="shrink-0"
+              />
+              {isRemote ? hostLabel : "Local"}
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
             {lastRefreshedAt && <RefreshAge date={lastRefreshedAt} />}
             <button
               type="button"
