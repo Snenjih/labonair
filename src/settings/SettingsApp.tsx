@@ -305,6 +305,9 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "explorerMaxIdleSessions":
       void store.setExplorerMaxIdleSessions(Number(value));
       break;
+    case "explorerMaxCachedRemoteScopes":
+      void store.setExplorerMaxCachedRemoteScopes(Number(value));
+      break;
     case "gitStatusPollIntervalMs":
       void store.setGitStatusPollIntervalMs(Number(value));
       break;

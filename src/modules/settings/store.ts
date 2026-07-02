@@ -207,6 +207,7 @@ export type Preferences = {
   explorerAutoReconnect: boolean;
   explorerIdleSessionTimeoutMin: number;
   explorerMaxIdleSessions: number;
+  explorerMaxCachedRemoteScopes: number;
 };
 
 const KEY_THEME = "theme";
@@ -333,6 +334,7 @@ const KEY_EXPLORER_REMOTE_POLL_INTERVAL = "explorerRemotePollInterval";
 const KEY_EXPLORER_AUTO_RECONNECT = "explorerAutoReconnect";
 const KEY_EXPLORER_IDLE_SESSION_TIMEOUT_MIN = "explorerIdleSessionTimeoutMin";
 const KEY_EXPLORER_MAX_IDLE_SESSIONS = "explorerMaxIdleSessions";
+const KEY_EXPLORER_MAX_CACHED_REMOTE_SCOPES = "explorerMaxCachedRemoteScopes";
 const KEY_STATUSBAR_SHOW_EXPLORER_BUTTON = "statusBarShowExplorerButton";
 const KEY_STATUSBAR_SHOW_SNIPPETS_BUTTON = "statusBarShowSnippetsButton";
 const KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON = "statusBarShowSourceControlButton";
@@ -483,6 +485,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   explorerAutoReconnect: false,
   explorerIdleSessionTimeoutMin: 5,
   explorerMaxIdleSessions: 3,
+  explorerMaxCachedRemoteScopes: 5,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -716,6 +719,14 @@ export async function loadPreferences(): Promise<Preferences> {
     explorerMaxIdleSessions: Math.min(
       10,
       Math.max(1, get<number>(KEY_EXPLORER_MAX_IDLE_SESSIONS) ?? DEFAULT_PREFERENCES.explorerMaxIdleSessions),
+    ),
+    explorerMaxCachedRemoteScopes: Math.min(
+      20,
+      Math.max(
+        1,
+        get<number>(KEY_EXPLORER_MAX_CACHED_REMOTE_SCOPES) ??
+          DEFAULT_PREFERENCES.explorerMaxCachedRemoteScopes,
+      ),
     ),
 
     statusBarShowExplorerButton:
@@ -1021,6 +1032,12 @@ export async function setExplorerIdleSessionTimeoutMin(value: number): Promise<v
 export async function setExplorerMaxIdleSessions(value: number): Promise<void> {
   const clamped = Math.min(10, Math.max(1, Math.round(value)));
   await (await getStore()).set(KEY_EXPLORER_MAX_IDLE_SESSIONS, clamped);
+  await (await getStore()).save();
+}
+
+export async function setExplorerMaxCachedRemoteScopes(value: number): Promise<void> {
+  const clamped = Math.min(20, Math.max(1, Math.round(value)));
+  await (await getStore()).set(KEY_EXPLORER_MAX_CACHED_REMOTE_SCOPES, clamped);
   await (await getStore()).save();
 }
 
@@ -1494,6 +1511,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_EXPLORER_AUTO_RECONNECT]: "explorerAutoReconnect",
     [KEY_EXPLORER_IDLE_SESSION_TIMEOUT_MIN]: "explorerIdleSessionTimeoutMin",
     [KEY_EXPLORER_MAX_IDLE_SESSIONS]: "explorerMaxIdleSessions",
+    [KEY_EXPLORER_MAX_CACHED_REMOTE_SCOPES]: "explorerMaxCachedRemoteScopes",
     [KEY_STATUSBAR_SHOW_EXPLORER_BUTTON]: "statusBarShowExplorerButton",
     [KEY_STATUSBAR_SHOW_SNIPPETS_BUTTON]: "statusBarShowSnippetsButton",
     [KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON]: "statusBarShowSourceControlButton",

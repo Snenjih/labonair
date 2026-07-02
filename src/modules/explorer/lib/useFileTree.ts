@@ -50,11 +50,19 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
   const inFlightRef = useRef<Map<string, Promise<void>>>(new Map());
 
   const fetchChildren = useCallback(
-    (path: string, opts?: { append?: boolean }): Promise<void> => {
+    (path: string, opts?: { append?: boolean; silent?: boolean }): Promise<void> => {
       const append = opts?.append ?? false;
       // Dedupe only applies to plain re-fetches — a `loadMore` (append) call
       // is a distinct request even if a base fetch for the same path happens
-      // to be in flight.
+      // to be in flight. NOTE: dedup is keyed on `path` alone, not
+      // `(path, silent)` — if a silent background revalidation is already
+      // in flight when a caller requests a non-silent fetch for the same
+      // path, the caller piggybacks the silent one's promise/behavior (no
+      // loading state, a toast instead of an inline error on failure). This
+      // is a rare, cosmetic-only edge case (requires landing inside the same
+      // sub-second window as a poll/revalidation for the exact same path)
+      // — not worth a compound dedup key.
+      const silent = opts?.silent ?? false;
       if (!append) {
         const inFlight = inFlightRef.current.get(path);
         if (inFlight) return inFlight;
@@ -66,7 +74,7 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
         const existing = useLocalExplorerStore.getState().nodes[path];
         const offset = append && existing?.status === "loaded" ? existing.entries.length : 0;
 
-        if (!append) setNode(path, { status: "loading" });
+        if (!append && !silent) setNode(path, { status: "loading" });
         try {
           const page = await provider.readDir(path, { showHidden: show_hidden, offset });
           // Discard a response that outlived a scope change (e.g. the user
@@ -83,7 +91,12 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
           });
         } catch (e) {
           if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
-          if (!append)
+          if (silent) {
+            // A silent (background/revalidation) fetch must never destroy
+            // already-good cached data — surface the problem as a toast and
+            // leave the last-known-good `status:"loaded"` node in place.
+            handleApiError(e, "Failed to refresh directory", "File Tree");
+          } else if (!append) {
             setNode(path, {
               status: "error",
               // Remote (SFTP) commands reject with a LabonairError object
@@ -93,7 +106,9 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
               // string, where this is a no-op.
               message: isLabonairError(e) ? e.message : String(e),
             });
-          else handleApiError(e, "Failed to load more entries", "File Tree");
+          } else {
+            handleApiError(e, "Failed to load more entries", "File Tree");
+          }
         }
       });
 
@@ -131,7 +146,19 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
       setScope(provider.id, rootPath);
       setPendingCreate(null);
       setRenaming(null);
-      void fetchChildren(rootPath);
+      // setScope may have just hydrated `nodes`/`expanded` from a cached
+      // remote snapshot (see useLocalExplorerStore.ts) — if so, the tree is
+      // already rendering the cached view instantly; kick off a silent
+      // background revalidation instead of a blocking fetch. A cache miss
+      // (or a local scope, which is never cached) falls back to the
+      // original blocking behavior.
+      const afterScope = useLocalExplorerStore.getState();
+      if (afterScope.nodes[rootPath]?.status === "loaded") {
+        void fetchChildren(rootPath, { silent: true });
+        for (const p of afterScope.expanded) void fetchChildren(p, { silent: true });
+      } else {
+        void fetchChildren(rootPath);
+      }
     } else if (!current.nodes[rootPath]) {
       // Store is fresh (e.g. first mount after store reset) — still fetch root.
       void fetchChildren(rootPath);
@@ -187,9 +214,13 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
       // Scope may have moved on since this interval was scheduled (e.g. the
       // sidebar target changed) — a stale poll must not resurrect it.
       if (state.scopeKey !== provider.id || state.rootPath !== rootPath) return;
-      void fetchChildren(rootPath);
+      // Silent — a background poll must never flash a "loading" state over
+      // already-good data (this was a pre-existing wart independent of
+      // caching: every poll tick used to blow away loaded entries with a
+      // transient "loading" placeholder).
+      void fetchChildren(rootPath, { silent: true });
       for (const path of state.expanded) {
-        void fetchChildren(path);
+        void fetchChildren(path, { silent: true });
       }
     }, remotePollIntervalMs);
     return () => clearInterval(interval);

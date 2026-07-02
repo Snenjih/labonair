@@ -520,6 +520,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "NumberInput",
   },
   {
+    id: "explorerMaxCachedRemoteScopes",
+    label: "Explorer: Max cached remote folders",
+    description:
+      "How many recently-viewed SSH host directory trees the sidebar keeps in memory for instant tab-switching (1–20). Higher uses more memory; lower re-fetches more often.",
+    category: "File Manager",
+    controlType: "NumberInput",
+  },
+  {
     id: "hostPingInterval",
     label: "Ping interval",
     description:
