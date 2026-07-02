@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { PlusSignIcon, MinusSignIcon } from "@hugeicons/core-free-icons";
+import { MinusSignIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,11 +19,12 @@ import {
   ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { useTabsStore } from "@/modules/tabs/store/tabsStore";
-import { useSourceControlStore } from "../store/sourceControlStore";
-import { git } from "../lib/gitInvoke";
-import type { FileStatus } from "../types";
+import { cn } from "@/lib/utils";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import { git } from "../lib/gitInvoke";
+import { useSourceControlStore } from "../store/sourceControlStore";
+import type { FileStatus } from "../types";
 
 interface FileChangeItemProps {
   file: FileStatus;
@@ -49,6 +49,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps) {
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
+  const hostId = useSourceControlStore((s) => s.hostId);
   const diffStats = useSourceControlStore((s) => s.diffStats);
   const openGitDiffTab = useTabsStore((s) => s.openGitDiffTab);
   const setDiffViewMode = useSourceControlStore((s) => s.setDiffViewMode);
@@ -71,7 +73,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     e?.stopPropagation();
     if (!repoRoot) return;
     try {
-      await git.stageFile(repoRoot, file.path);
+      await git.stageFile(repoRoot, file.path, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
       useNotificationStore
@@ -84,7 +86,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     e?.stopPropagation();
     if (!repoRoot) return;
     try {
-      await git.unstageFile(repoRoot, file.path);
+      await git.unstageFile(repoRoot, file.path, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
       useNotificationStore
@@ -96,7 +98,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
   async function handleDiscard() {
     if (!repoRoot) return;
     try {
-      await git.discardFile(repoRoot, file.path);
+      await git.discardFile(repoRoot, file.path, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
       useNotificationStore
@@ -105,8 +107,19 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     }
   }
 
+  // .gitignore / info/exclude writes go straight to the filesystem (not through
+  // git), so they're local-only for now — guard with a clear message instead of
+  // letting a remote path fail canonicalize() with a confusing local IO error.
   async function handleAddToGitignore() {
     if (!repoRoot) return;
+    if (sessionId) {
+      useNotificationStore.getState().addNotification({
+        type: "error",
+        title: "Not Supported",
+        message: "Adding to .gitignore isn't supported for remote repositories yet.",
+      });
+      return;
+    }
     try {
       await git.addToGitignore(repoRoot, file.path);
       onRefresh();
@@ -119,6 +132,14 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
 
   async function handleAddToExclude() {
     if (!repoRoot) return;
+    if (sessionId) {
+      useNotificationStore.getState().addNotification({
+        type: "error",
+        title: "Not Supported",
+        message: "Adding to .git/info/exclude isn't supported for remote repositories yet.",
+      });
+      return;
+    }
     try {
       await git.addToExclude(repoRoot, file.path);
     } catch (e) {
@@ -130,13 +151,13 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
 
   function handleOpenDiff() {
     if (!repoRoot) return;
-    openGitDiffTab(repoRoot, file.path, isStaged, section);
+    openGitDiffTab(repoRoot, file.path, isStaged, section, hostId ?? undefined, sessionId ?? undefined);
   }
 
   function handleOpenDiffSplit() {
     if (!repoRoot) return;
     setDiffViewMode("split");
-    openGitDiffTab(repoRoot, file.path, isStaged, section);
+    openGitDiffTab(repoRoot, file.path, isStaged, section, hostId ?? undefined, sessionId ?? undefined);
   }
 
   return (

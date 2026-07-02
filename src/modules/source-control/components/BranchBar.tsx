@@ -1,12 +1,6 @@
-import { useState, useMemo } from "react";
-import { Spinner } from "@/components/ui/spinner";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { ArrowDown01Icon, ArrowUp01Icon, Cancel01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useMemo, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,13 +11,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { GitBranchIcon, ArrowDown01Icon, ArrowUp01Icon, Cancel01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { useSourceControlStore } from "../store/sourceControlStore";
-import { git } from "../lib/gitInvoke";
-import { BranchDropdown } from "./BranchDropdown";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { git } from "../lib/gitInvoke";
+import { useSourceControlStore } from "../store/sourceControlStore";
+import { BranchDropdown } from "./BranchDropdown";
 
 interface BranchBarProps {
   onRefresh: () => void;
@@ -31,6 +31,7 @@ interface BranchBarProps {
 
 export function BranchBar({ onRefresh }: BranchBarProps) {
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
   const status = useSourceControlStore((s) => s.status);
   const operationInProgress = useSourceControlStore((s) => s.operationInProgress);
   const setOperationInProgress = useSourceControlStore((s) => s.setOperationInProgress);
@@ -59,7 +60,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setError(null);
     setShowSetUpstreamPrompt(false);
     try {
-      await git.push(repoRoot);
+      await git.push(repoRoot, undefined, undefined, sessionId ?? undefined);
       onRefresh();
       useNotificationStore.getState().addNotification({
         type: "success",
@@ -90,7 +91,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setOperationInProgress("pull");
     setError(null);
     try {
-      await git.pull(repoRoot);
+      await git.pull(repoRoot, sessionId ?? undefined);
       onRefresh();
       useNotificationStore
         .getState()
@@ -110,7 +111,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setOperationInProgress("fetch");
     setError(null);
     try {
-      await git.fetch(repoRoot);
+      await git.fetch(repoRoot, sessionId ?? undefined);
       onRefresh();
       useNotificationStore
         .getState()
@@ -131,7 +132,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setOperationInProgress("push");
     setError(null);
     try {
-      await git.pushForceWithLease(repoRoot);
+      await git.pushForceWithLease(repoRoot, undefined, undefined, sessionId ?? undefined);
       onRefresh();
       useNotificationStore.getState().addNotification({
         type: "success",
@@ -154,7 +155,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setError(null);
     setShowSetUpstreamPrompt(false);
     try {
-      await git.pushSetUpstream(repoRoot, "origin", currentBranch);
+      await git.pushSetUpstream(repoRoot, "origin", currentBranch, sessionId ?? undefined);
       onRefresh();
       useNotificationStore.getState().addNotification({
         type: "success",
@@ -207,6 +208,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
             onOpenChange={setDropdownOpen}
             trigger={branchTrigger}
             repoRoot={repoRoot}
+            sessionId={sessionId ?? undefined}
             currentBranch={localBranch}
             onRefresh={onRefresh}
           />

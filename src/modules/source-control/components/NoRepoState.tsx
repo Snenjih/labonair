@@ -1,19 +1,20 @@
-import { invoke } from "@tauri-apps/api/core";
-import { Button } from "@/components/ui/button";
 import { GitBranchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Button } from "@/components/ui/button";
+import { git } from "../lib/gitInvoke";
 
 interface NoRepoStateProps {
   rootPath: string | null;
+  sessionId?: string;
   onRefresh: () => void;
   errorMessage?: string;
 }
 
-export function NoRepoState({ rootPath, onRefresh, errorMessage }: NoRepoStateProps) {
+export function NoRepoState({ rootPath, sessionId, onRefresh, errorMessage }: NoRepoStateProps) {
   async function handleGitInit() {
     if (!rootPath) return;
     try {
-      await invoke("shell_run_command", { command: "git init", cwd: rootPath });
+      await git.init(rootPath, sessionId);
       onRefresh();
     } catch {
       // silently ignore — the next poll cycle will pick up the result

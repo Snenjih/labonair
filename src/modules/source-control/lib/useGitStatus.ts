@@ -1,14 +1,30 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "./gitInvoke";
 
-const POLL_INTERVAL_MS = 3000;
+/** Remote polling is inherently slower per round-trip (the SSH session's
+ *  underlying channel is serialized), so it backs off from whatever the
+ *  user configured for local instead of adding a second, redundant setting. */
+const REMOTE_POLL_MULTIPLIER = 2.5;
+
+/** Pure so it's testable without mounting the hook — see useGitStatus.test.ts. */
+export function effectivePollIntervalMs(pollIntervalMs: number, target: ExplorerTarget): number {
+  return target.type === "remote" ? Math.round(pollIntervalMs * REMOTE_POLL_MULTIPLIER) : pollIntervalMs;
+}
 
 // Polling stops automatically when the panel unmounts (SidebarContent conditionally renders
 // SourceControlPanel only when activePanel === "source-control"). No extra active-panel
 // check is needed here — the useEffect cleanup handles it on unmount.
-export function useGitStatus(rootPath: string | null) {
+export function useGitStatus(target: ExplorerTarget) {
+  const rootPath = target.path;
+  const targetSessionId = target.type === "remote" ? target.sessionId : undefined;
+  const targetHostId = target.type === "remote" ? target.hostId : undefined;
+  const pollIntervalMs = usePreferencesStore((s) => s.gitStatusPollIntervalMs);
+
   const setRepoInfo = useSourceControlStore((s) => s.setRepoInfo);
+  const setTarget = useSourceControlStore((s) => s.setTarget);
   const setStatus = useSourceControlStore((s) => s.setStatus);
   const setIsStatusLoading = useSourceControlStore((s) => s.setIsStatusLoading);
   const setDiffContent = useSourceControlStore((s) => s.setDiffContent);
@@ -17,6 +33,7 @@ export function useGitStatus(rootPath: string | null) {
   const selectionMode = useSourceControlStore((s) => s.selectionMode);
   const ignoreWhitespace = useSourceControlStore((s) => s.ignoreWhitespace);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
   const setStashEntries = useSourceControlStore((s) => s.setStashEntries);
   const setBranchList = useSourceControlStore((s) => s.setBranchList);
   const setIsBranchLoading = useSourceControlStore((s) => s.setIsBranchLoading);
@@ -31,18 +48,20 @@ export function useGitStatus(rootPath: string | null) {
   const doRefresh = useCallback(async () => {
     if (!rootPath) {
       setRepoInfo(false, null);
+      setTarget(null, null);
       return;
     }
     if (isRefreshingRef.current) return;
     isRefreshingRef.current = true;
+    setTarget(targetHostId ?? null, targetSessionId ?? null);
 
     let isRepo: boolean;
     try {
-      isRepo = await git.isRepo(rootPath);
+      isRepo = await git.isRepo(rootPath, targetSessionId);
     } catch (e) {
       const msg = String(e);
       if (msg.includes("not installed") || msg.includes("not in PATH") || msg.includes("not found")) {
-        setError("git is not installed or not in PATH");
+        setError(msg);
       }
       setRepoInfo(false, null);
       isRefreshingRef.current = false;
@@ -62,7 +81,7 @@ export function useGitStatus(rootPath: string | null) {
 
     let root: string;
     try {
-      root = await git.getRepoRoot(rootPath);
+      root = await git.getRepoRoot(rootPath, targetSessionId);
     } catch {
       setRepoInfo(false, null);
       isRefreshingRef.current = false;
@@ -76,6 +95,7 @@ export function useGitStatus(rootPath: string | null) {
 
     // Check if repo root changed and clear stale diff selection
     const prevRoot = useSourceControlStore.getState().repoRoot;
+    setError(null);
     setRepoInfo(true, root);
     if (prevRoot !== null && prevRoot !== root) {
       useSourceControlStore.getState().clearSelectedFile();
@@ -84,37 +104,35 @@ export function useGitStatus(rootPath: string | null) {
     setIsStatusLoading(true);
     setIsBranchLoading(true);
 
-    const [statusResult, branchesResult, stashResult, tagsResult, statsResult] = await Promise.allSettled([
-      git.getStatus(root),
-      git.getBranches(root),
-      git.stashList(root),
-      git.getTags(root),
-      git.getDiffStats(root),
-    ]);
-
-    if (!isMountedRef.current) {
-      isRefreshingRef.current = false;
-      return;
+    try {
+      const state = await git.getWorkspaceState(root, targetSessionId);
+      if (!isMountedRef.current) {
+        isRefreshingRef.current = false;
+        return;
+      }
+      setStatus(state.status);
+      setBranchList(state.branches);
+      setCurrentBranch(state.currentBranch);
+      setStashEntries(state.stash);
+      setTags(state.tags);
+      setDiffStats(state.diffStats);
+    } catch (e) {
+      const msg = String(e);
+      if (msg.includes("not installed") || msg.includes("not in PATH")) {
+        setError(msg);
+      }
+    } finally {
+      setIsStatusLoading(false);
+      setIsBranchLoading(false);
     }
-
-    if (statusResult.status === "fulfilled") setStatus(statusResult.value);
-    setIsStatusLoading(false);
-
-    if (branchesResult.status === "fulfilled") {
-      setBranchList(branchesResult.value);
-      const current = branchesResult.value.find((b) => b.isCurrent)?.name ?? "";
-      setCurrentBranch(current);
-    }
-    setIsBranchLoading(false);
-
-    if (stashResult.status === "fulfilled") setStashEntries(stashResult.value);
-    if (tagsResult.status === "fulfilled") setTags(tagsResult.value);
-    if (statsResult.status === "fulfilled") setDiffStats(statsResult.value);
 
     isRefreshingRef.current = false;
   }, [
     rootPath,
+    targetSessionId,
+    targetHostId,
     setRepoInfo,
+    setTarget,
     setStatus,
     setIsStatusLoading,
     setStashEntries,
@@ -126,14 +144,16 @@ export function useGitStatus(rootPath: string | null) {
     setError,
   ]);
 
+  const effectiveIntervalMs = effectivePollIntervalMs(pollIntervalMs, target);
+
   const startPolling = useCallback(() => {
     if (intervalRef.current !== null) return;
     intervalRef.current = setInterval(() => {
       if (document.visibilityState === "visible") {
         void doRefresh();
       }
-    }, POLL_INTERVAL_MS);
-  }, [doRefresh]);
+    }, effectiveIntervalMs);
+  }, [doRefresh, effectiveIntervalMs]);
 
   const stopPolling = useCallback(() => {
     if (intervalRef.current !== null) {
@@ -187,6 +207,7 @@ export function useGitStatus(rootPath: string | null) {
             selectionMode!.path,
             selectionMode!.staged,
             ignoreWhitespace,
+            sessionId ?? undefined,
           );
         } else if (selectionMode!.type === "section") {
           const section = selectionMode!.section;
@@ -195,18 +216,22 @@ export function useGitStatus(rootPath: string | null) {
             content = "__UNTRACKED_ONLY__";
           } else {
             const staged = section === "staged";
-            content = await git.getDiff(repoRoot!, ".", staged, ignoreWhitespace);
+            content = await git.getDiff(repoRoot!, ".", staged, ignoreWhitespace, sessionId ?? undefined);
           }
         } else if (selectionMode!.type === "all") {
           // Fetch staged and unstaged in parallel
           const [staged, unstaged] = await Promise.all([
-            git.getDiff(repoRoot!, ".", true, ignoreWhitespace).catch(() => ""),
-            git.getDiff(repoRoot!, ".", false, ignoreWhitespace).catch(() => ""),
+            git.getDiff(repoRoot!, ".", true, ignoreWhitespace, sessionId ?? undefined).catch(() => ""),
+            git.getDiff(repoRoot!, ".", false, ignoreWhitespace, sessionId ?? undefined).catch(() => ""),
           ]);
           const parts = [staged, unstaged].filter(Boolean);
           content = parts.join("\n");
         } else if (selectionMode!.type === "commit") {
-          content = await git.getCommitDiff(selectionMode!.repositoryPath, selectionMode!.hash);
+          content = await git.getCommitDiff(
+            selectionMode!.repositoryPath,
+            selectionMode!.hash,
+            selectionMode!.sessionId,
+          );
         }
 
         if (!cancelled) {
@@ -228,7 +253,7 @@ export function useGitStatus(rootPath: string | null) {
     return () => {
       cancelled = true;
     };
-  }, [selectionMode, repoRoot, ignoreWhitespace, setDiffContent, setIsDiffLoading]);
+  }, [selectionMode, repoRoot, sessionId, ignoreWhitespace, setDiffContent, setIsDiffLoading]);
 
   return { refresh: () => void doRefresh() };
 }

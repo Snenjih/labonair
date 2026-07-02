@@ -1,6 +1,13 @@
-import { useState, useRef, useEffect } from "react";
-import { Textarea } from "@/components/ui/textarea";
-import { Spinner } from "@/components/ui/spinner";
+import {
+  ArrowDown01Icon,
+  Cancel01Icon,
+  GitCommitIcon,
+  GitForkIcon,
+  Refresh01Icon,
+  SparklesIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useRef, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,29 +15,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  GitCommitIcon,
-  SparklesIcon,
-  Cancel01Icon,
-  Refresh01Icon,
-  GitForkIcon,
-  ArrowDown01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { useSourceControlStore } from "../store/sourceControlStore";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { git } from "../lib/gitInvoke";
 import { useAiCommitMessage } from "../lib/useAiCommitMessage";
-import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { useSourceControlStore } from "../store/sourceControlStore";
 import type { CommitInfo } from "../types";
 
 interface CommitFormProps {
   repoRoot: string;
   onRefresh: () => void;
-  onOpenGitGraph: (repoPath: string, branch: string) => void;
+  onOpenGitGraph: (repoPath: string, branch: string, hostId?: string, sessionId?: string) => void;
 }
 
 export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormProps) {
+  const sessionId = useSourceControlStore((s) => s.sessionId);
+  const hostId = useSourceControlStore((s) => s.hostId);
   const commitMessage = useSourceControlStore((s) => s.commitMessage);
   const setCommitMessage = useSourceControlStore((s) => s.setCommitMessage);
   const status = useSourceControlStore((s) => s.status);
@@ -44,7 +46,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [lastCommit, setLastCommit] = useState<CommitInfo | null>(null);
 
-  const { generate: generateAiMessage, isGenerating } = useAiCommitMessage(repoRoot);
+  const { generate: generateAiMessage, isGenerating } = useAiCommitMessage(repoRoot, sessionId ?? undefined);
 
   useEffect(() => {
     if (!repoRoot) {
@@ -53,7 +55,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
     }
     let cancelled = false;
     git
-      .getLog(repoRoot, 1, false)
+      .getLog(repoRoot, 1, false, sessionId ?? undefined)
       .then((commits) => {
         if (!cancelled) setLastCommit(commits[0] ?? null);
       })
@@ -63,7 +65,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
     return () => {
       cancelled = true;
     };
-  }, [repoRoot, status]);
+  }, [repoRoot, status, sessionId]);
 
   const canCommit =
     commitMessage.trim().length > 0 && (status?.staged.length ?? 0) > 0 && operationInProgress === null;
@@ -75,7 +77,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
     setOperationInProgress("commit");
     setError(null);
     try {
-      await git.commit(repoRoot, commitMessage, false);
+      await git.commit(repoRoot, commitMessage, false, sessionId ?? undefined);
       addRecentMessage(commitMessage);
       setCommitMessage("");
       onRefresh();
@@ -97,7 +99,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
     setOperationInProgress("commit");
     setError(null);
     try {
-      await git.commit(repoRoot, commitMessage, true);
+      await git.commit(repoRoot, commitMessage, true, sessionId ?? undefined);
       addRecentMessage(commitMessage);
       setCommitMessage("");
       onRefresh();
@@ -119,7 +121,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
     setOperationInProgress("abort");
     setError(null);
     try {
-      await git.abort(repoRoot);
+      await git.abort(repoRoot, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
       setError(String(e));
@@ -136,7 +138,7 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
 
   function handleOpenGraph() {
     if (repoRoot && currentBranch) {
-      onOpenGitGraph(repoRoot, currentBranch);
+      onOpenGitGraph(repoRoot, currentBranch, hostId ?? undefined, sessionId ?? undefined);
     }
   }
 

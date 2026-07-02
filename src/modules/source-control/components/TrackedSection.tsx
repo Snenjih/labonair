@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { ArrowDown01Icon, ArrowRight01Icon, MinusSignIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useSourceControlStore } from "../store/sourceControlStore";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { git } from "../lib/gitInvoke";
-import { FileChangeItem } from "./FileChangeItem";
+import { useSourceControlStore } from "../store/sourceControlStore";
 import type { FileStatus } from "../types";
+import { FileChangeItem } from "./FileChangeItem";
 
 interface TrackedSectionProps {
   staged: FileStatus[];
@@ -16,6 +16,7 @@ interface TrackedSectionProps {
 export function TrackedSection({ staged, unstaged, onRefresh }: TrackedSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
 
   const totalCount = staged.length + unstaged.length;
   if (totalCount === 0) return null;
@@ -24,7 +25,7 @@ export function TrackedSection({ staged, unstaged, onRefresh }: TrackedSectionPr
     e.stopPropagation();
     if (!repoRoot) return;
     try {
-      await git.stageAll(repoRoot);
+      await git.stageAll(repoRoot, sessionId ?? undefined);
       onRefresh();
     } catch {
       /* ignore */
@@ -35,7 +36,7 @@ export function TrackedSection({ staged, unstaged, onRefresh }: TrackedSectionPr
     e.stopPropagation();
     if (!repoRoot) return;
     try {
-      await git.unstageAll(repoRoot);
+      await git.unstageAll(repoRoot, sessionId ?? undefined);
       onRefresh();
     } catch {
       /* ignore */

@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Spinner } from "@/components/ui/spinner";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { git } from "../lib/gitInvoke";
 
@@ -13,6 +13,7 @@ interface NewBranchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   repoRoot: string;
+  sessionId?: string;
   currentBranch: string;
   fromRef?: string;
   onSuccess: () => void;
@@ -22,6 +23,7 @@ export function NewBranchDialog({
   open,
   onOpenChange,
   repoRoot,
+  sessionId,
   currentBranch,
   fromRef,
   onSuccess,
@@ -59,7 +61,7 @@ export function NewBranchDialog({
     setIsLoading(true);
     setError(null);
     try {
-      await git.createBranch(repoRoot, trimmedName, from.trim() || undefined, checkout);
+      await git.createBranch(repoRoot, trimmedName, from.trim() || undefined, checkout, sessionId);
       onSuccess();
       onOpenChange(false);
     } catch (e) {

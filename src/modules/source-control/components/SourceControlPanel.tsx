@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useSourceControlStore } from "../store/sourceControlStore";
+import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
 import { useGitStatus } from "../lib/useGitStatus";
+import { useSourceControlStore } from "../store/sourceControlStore";
 import { BranchBar } from "./BranchBar";
 import { CommitForm } from "./CommitForm";
 import { NoRepoState } from "./NoRepoState";
@@ -9,15 +10,17 @@ import { TrackedSection } from "./TrackedSection";
 import { UntrackedSection } from "./UntrackedSection";
 
 interface SourceControlPanelProps {
-  rootPath: string | null;
-  onOpenGitGraph: (repoPath: string, branch: string) => void;
+  target: ExplorerTarget;
+  onOpenGitGraph: (repoPath: string, branch: string, hostId?: string, sessionId?: string) => void;
 }
 
-export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPanelProps) {
-  const { refresh } = useGitStatus(rootPath);
+export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPanelProps) {
+  const { refresh } = useGitStatus(target);
+  const rootPath = target.path;
 
   const isRepo = useSourceControlStore((s) => s.isRepo);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
   const status = useSourceControlStore((s) => s.status);
   const diffStats = useSourceControlStore((s) => s.diffStats);
   const error = useSourceControlStore((s) => s.error);
@@ -36,7 +39,14 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
   const totalRemoved = diffStats.reduce((sum, s) => sum + s.removed, 0);
 
   if (!isRepo) {
-    return <NoRepoState rootPath={rootPath} onRefresh={refresh} errorMessage={error ?? undefined} />;
+    return (
+      <NoRepoState
+        rootPath={rootPath}
+        sessionId={sessionId ?? undefined}
+        onRefresh={refresh}
+        errorMessage={error ?? undefined}
+      />
+    );
   }
 
   return (

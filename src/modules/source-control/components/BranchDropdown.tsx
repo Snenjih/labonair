@@ -1,7 +1,15 @@
-import { useState, useMemo } from "react";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Spinner } from "@/components/ui/spinner";
+import {
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  ArrowUp01Icon,
+  Cancel01Icon,
+  Delete01Icon,
+  PlusSignIcon,
+  Tag01Icon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useMemo, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,29 +20,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Tick02Icon,
-  Delete01Icon,
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-  Tag01Icon,
-  PlusSignIcon,
-  Cancel01Icon,
-  ArrowUp01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { useSourceControlStore } from "../store/sourceControlStore";
-import { git } from "../lib/gitInvoke";
-import { NewBranchDialog } from "./NewBranchDialog";
-import type { Branch } from "../types";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { git } from "../lib/gitInvoke";
+import { useSourceControlStore } from "../store/sourceControlStore";
+import type { Branch } from "../types";
+import { NewBranchDialog } from "./NewBranchDialog";
 
 interface BranchDropdownProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   trigger: React.ReactNode;
   repoRoot: string;
+  sessionId?: string;
   currentBranch: string;
   onRefresh: () => void;
 }
@@ -43,11 +44,12 @@ interface BranchDropdownProps {
 
 interface TagSectionProps {
   repoRoot: string;
+  sessionId?: string;
   tags: string[];
   onRefresh: () => void;
 }
 
-function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
+function TagSection({ repoRoot, sessionId, tags, onRefresh }: TagSectionProps) {
   const [collapsed, setCollapsed] = useState(true);
   const [showNewTagForm, setShowNewTagForm] = useState(false);
   const [newTagName, setNewTagName] = useState("");
@@ -68,6 +70,7 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
         trimmedName,
         newTagMessage.trim() || undefined,
         newTagFrom.trim() || undefined,
+        sessionId,
       );
       setNewTagName("");
       setNewTagMessage("");
@@ -87,7 +90,7 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
   async function handlePushTag(name: string) {
     setTagLoading(`push:${name}`);
     try {
-      await git.pushTag(repoRoot, name);
+      await git.pushTag(repoRoot, name, undefined, sessionId);
       onRefresh();
     } catch (e) {
       setTagError(String(e));
@@ -102,7 +105,7 @@ function TagSection({ repoRoot, tags, onRefresh }: TagSectionProps) {
   async function handleDeleteTag(name: string) {
     setTagLoading(`delete:${name}`);
     try {
-      await git.deleteTag(repoRoot, name);
+      await git.deleteTag(repoRoot, name, sessionId);
       setDeleteTagName(null);
       onRefresh();
     } catch (e) {
@@ -375,6 +378,7 @@ export function BranchDropdown({
   onOpenChange,
   trigger,
   repoRoot,
+  sessionId,
   currentBranch,
   onRefresh,
 }: BranchDropdownProps) {
@@ -409,7 +413,7 @@ export function BranchDropdown({
     setCheckoutError(null);
     setCheckingOut(name);
     try {
-      await git.checkoutBranch(repoRoot, name);
+      await git.checkoutBranch(repoRoot, name, sessionId);
       onRefresh();
       onOpenChange(false);
     } catch (e) {
@@ -429,7 +433,7 @@ export function BranchDropdown({
 
   async function handleDelete(name: string, force: boolean) {
     try {
-      await git.deleteBranch(repoRoot, name, force);
+      await git.deleteBranch(repoRoot, name, force, sessionId);
       setDeleteConfirmBranch(null);
       setForceDeleteBranch(null);
       onRefresh();
@@ -572,7 +576,7 @@ export function BranchDropdown({
                 )}
 
                 {/* Tags section */}
-                <TagSection repoRoot={repoRoot} tags={tags} onRefresh={onRefresh} />
+                <TagSection repoRoot={repoRoot} sessionId={sessionId} tags={tags} onRefresh={onRefresh} />
               </>
             )}
           </div>
@@ -631,6 +635,7 @@ export function BranchDropdown({
         open={showNewBranch}
         onOpenChange={setShowNewBranch}
         repoRoot={repoRoot}
+        sessionId={sessionId}
         currentBranch={currentBranch}
         onSuccess={() => {
           onRefresh();

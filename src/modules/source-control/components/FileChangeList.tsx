@@ -1,12 +1,12 @@
+import { ArrowDown01Icon, ArrowRight01Icon, MinusSignIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowDown01Icon, ArrowRight01Icon, PlusSignIcon, MinusSignIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
-import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
-import { FileChangeItem } from "./FileChangeItem";
+import { useSourceControlStore } from "../store/sourceControlStore";
 import type { FileStatus } from "../types";
+import { FileChangeItem } from "./FileChangeItem";
 
 interface FileChangeListProps {
   files: FileStatus[];
@@ -23,6 +23,7 @@ const SECTION_LABELS: Record<FileChangeListProps["section"], string> = {
 export function FileChangeList({ files, section, onRefresh }: FileChangeListProps) {
   const [collapsed, setCollapsed] = useState(false);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
   const diffStats = useSourceControlStore((s) => s.diffStats);
   const selectionMode = useSourceControlStore((s) => s.selectionMode);
   const selectSection = useSourceControlStore((s) => s.selectSection);
@@ -52,9 +53,9 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
     if (!repoRoot) return;
     try {
       if (section === "staged") {
-        await git.unstageAll(repoRoot);
+        await git.unstageAll(repoRoot, sessionId ?? undefined);
       } else {
-        await git.stageAll(repoRoot);
+        await git.stageAll(repoRoot, sessionId ?? undefined);
       }
       onRefresh();
     } catch {

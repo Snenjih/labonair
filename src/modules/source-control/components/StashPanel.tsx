@@ -1,6 +1,13 @@
+import {
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  Cancel01Icon,
+  Delete01Icon,
+  GitBranchIcon,
+  PlusSignIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,23 +18,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-  PlusSignIcon,
-  Delete01Icon,
-  Cancel01Icon,
-  GitBranchIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { useSourceControlStore } from "../store/sourceControlStore";
-import { git } from "../lib/gitInvoke";
-import type { StashEntry } from "../types";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { git } from "../lib/gitInvoke";
+import { useSourceControlStore } from "../store/sourceControlStore";
+import type { StashEntry } from "../types";
 
 interface StashPanelProps {
   repoRoot: string;
+  sessionId?: string;
   onRefresh: () => void;
 }
 
@@ -36,10 +37,11 @@ interface StashPanelProps {
 interface StashEntryRowProps {
   entry: StashEntry;
   repoRoot: string;
+  sessionId?: string;
   onRefresh: () => void;
 }
 
-function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
+function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowProps) {
   const setError = useSourceControlStore((s) => s.setStashError);
   const [actionLoading, setActionLoading] = useState<"apply" | "pop" | "drop" | null>(null);
   const [showDropConfirm, setShowDropConfirm] = useState(false);
@@ -48,7 +50,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
     setActionLoading("apply");
     setError(null);
     try {
-      await git.stashApply(repoRoot, entry.hash);
+      await git.stashApply(repoRoot, entry.hash, sessionId);
       onRefresh();
     } catch (e) {
       const msg = String(e);
@@ -74,7 +76,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
     setActionLoading("pop");
     setError(null);
     try {
-      await git.stashPop(repoRoot, entry.hash);
+      await git.stashPop(repoRoot, entry.hash, sessionId);
       onRefresh();
     } catch (e) {
       const msg = String(e);
@@ -100,7 +102,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
     setActionLoading("drop");
     setError(null);
     try {
-      await git.stashDrop(repoRoot, entry.hash);
+      await git.stashDrop(repoRoot, entry.hash, sessionId);
       setShowDropConfirm(false);
       onRefresh();
     } catch (e) {
@@ -223,7 +225,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
 
 // ─── StashPanel ───────────────────────────────────────────────────────────────
 
-export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
+export function StashPanel({ repoRoot, sessionId, onRefresh }: StashPanelProps) {
   const stashEntries = useSourceControlStore((s) => s.stashEntries);
   const stashError = useSourceControlStore((s) => s.stashError);
   const setStashError = useSourceControlStore((s) => s.setStashError);
@@ -237,7 +239,7 @@ export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
     setIsStashing(true);
     setStashError(null);
     try {
-      await git.stashPush(repoRoot, stashMessage.trim() || undefined);
+      await git.stashPush(repoRoot, stashMessage.trim() || undefined, undefined, sessionId);
       setStashMessage("");
       setShowStashForm(false);
       onRefresh();
@@ -350,6 +352,7 @@ export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
                 key={`stash-${entry.index}-${entry.hash}`}
                 entry={entry}
                 repoRoot={repoRoot}
+                sessionId={sessionId}
                 onRefresh={onRefresh}
               />
             ))}
