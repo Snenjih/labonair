@@ -140,16 +140,54 @@ impl GitExecutor {
         let GitExecutor::Remote { session_id, cwd, sftp_state, app } = self else {
             unreachable!("exec_remote_args called on Local executor");
         };
-        let session_id = session_id.clone();
-        let sftp_state = sftp_state.clone();
-        let app = app.clone();
         let quoted_args: String = args.iter().map(|a| shell_quote(a)).collect::<Vec<_>>().join(" ");
-        let script = format!("LC_ALL=C GIT_TERMINAL_PROMPT=0 git -C {} {}", shell_quote(cwd), quoted_args);
+        let cwd_quoted = shell_quote(cwd);
+        let build_script =
+            |git_bin: &str| format!("LC_ALL=C GIT_TERMINAL_PROMPT=0 {git_bin} -C {cwd_quoted} {quoted_args}");
 
-        tokio::task::spawn_blocking(move || run_remote_script_sync(&sftp_state, &app, &session_id, &script))
-            .await
-            .map_err(|e| e.to_string())?
+        let run = |script: String| {
+            let session_id = session_id.clone();
+            let sftp_state = sftp_state.clone();
+            let app = app.clone();
+            async move {
+                tokio::task::spawn_blocking(move || run_remote_script_sync(&sftp_state, &app, &session_id, &script))
+                    .await
+                    .map_err(|e| e.to_string())?
+            }
+        };
+
+        let result = run(build_script("git")).await?;
+        if !looks_like_missing_git(result.2, &result.1) {
+            return Ok(result);
+        }
+
+        // `git` isn't resolvable even under a login shell — try a short,
+        // fixed list of common absolute install locations before giving up.
+        // Not exhaustive PATH probing, just the handful of cases a
+        // non-standard install is likely to hit.
+        for candidate in GIT_FALLBACK_PATHS {
+            let retry = run(build_script(candidate)).await?;
+            if !looks_like_missing_git(retry.2, &retry.1) {
+                return Ok(retry);
+            }
+        }
+        Ok(result)
     }
+}
+
+/// Fixed, bounded set of common absolute `git` install locations tried when
+/// the bare `git` command isn't resolvable even under a login shell — e.g. a
+/// non-standard install that isn't on the profile's PATH.
+const GIT_FALLBACK_PATHS: &[&str] = &["/usr/bin/git", "/usr/local/bin/git", "/opt/homebrew/bin/git"];
+
+/// Does this look like `git` itself (not some other command) was reported as
+/// missing by the shell? Only meaningful on a 127 exit.
+fn looks_like_missing_git(exit_code: i32, stderr: &[u8]) -> bool {
+    if exit_code != 127 {
+        return false;
+    }
+    let lower = String::from_utf8_lossy(stderr).to_lowercase();
+    lower.contains("git") && (lower.contains("not found") || lower.contains("no such file"))
 }
 
 // ─── Local execution (argv-based, mirrors the pre-existing run_git_sync) ───
@@ -263,11 +301,24 @@ fn run_remote_script_sync(
     session_id: &str,
     script: &str,
 ) -> Result<(Vec<u8>, Vec<u8>, i32), String> {
+    let emit_connection_lost = |reason: &str| {
+        use tauri::Emitter;
+        let _ = app.emit(
+            "ssh_connection_lost",
+            serde_json::json!({ "session_id": session_id, "reason": reason }),
+        );
+    };
+
     let session_arc = {
         let map = sftp_state.0.lock().map_err(|e| e.to_string())?;
-        let entry = map
-            .get(session_id)
-            .ok_or_else(|| "no SSH session for this host — reconnect and try again".to_string())?;
+        let entry = map.get(session_id).ok_or_else(|| {
+            // The session is already confirmed gone here — emit directly
+            // instead of routing through `is_network_error`, which exists to
+            // *classify* an error we don't yet know the nature of.
+            let reason = "no SSH session for this host — reconnect and try again".to_string();
+            emit_connection_lost(&reason);
+            reason
+        })?;
         entry.session.clone()
     };
     let sess = session_arc.lock().map_err(|e| e.to_string())?;
@@ -290,11 +341,7 @@ fn run_remote_script_sync(
             if let Ok(mut map) = sftp_state.0.lock() {
                 map.remove(session_id);
             }
-            use tauri::Emitter;
-            let _ = app.emit(
-                "ssh_connection_lost",
-                serde_json::json!({ "session_id": session_id, "reason": e }),
-            );
+            emit_connection_lost(&e);
         }
         e
     };
@@ -319,11 +366,7 @@ fn shell_missing(stderr: &[u8], shell: &str) -> bool {
 /// codepath produces, so the frontend's existing string-based handling
 /// (`useGitStatus.ts`'s "git not installed" branch) fires unchanged.
 fn normalize_git_error(exit_code: i32, stderr: &str) -> String {
-    let lower = stderr.to_lowercase();
-    let looks_like_missing_git = exit_code == 127
-        && lower.contains("git")
-        && (lower.contains("not found") || lower.contains("no such file"));
-    if looks_like_missing_git {
+    if looks_like_missing_git(exit_code, stderr.as_bytes()) {
         return GIT_NOT_INSTALLED.to_string();
     }
     if stderr.is_empty() {

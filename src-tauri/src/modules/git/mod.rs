@@ -1,6 +1,7 @@
 mod executor;
 
 use crate::modules::sftp::SftpState;
+use crate::modules::ssh::shell::shell_quote;
 use executor::{resolve_executor, GitExecutor, GIT_NOT_INSTALLED};
 use serde::{Deserialize, Serialize};
 
@@ -1122,60 +1123,116 @@ pub async fn git_get_workspace_state(
     Ok(WorkspaceGitState { status, branches, current_branch, stash, tags, diff_stats })
 }
 
-#[tauri::command]
-pub async fn git_add_to_gitignore(path: String, file: String) -> Result<(), String> {
-    use std::fs::OpenOptions;
-    use std::io::Write;
+/// Builds a POSIX-sh script that appends `entry` to a file at relative path
+/// `rel_file` inside the repo (`.gitignore` or `.git/info/exclude`), unless
+/// any of `dedup_against` already matches a line verbatim. Mirrors the local
+/// codepath's "add a leading newline only if the file doesn't already end in
+/// one" behavior. Used by the remote branch of both gitignore commands below
+/// — `GitExecutor::run_shell_script` already handles arbitrary shell scripts
+/// via `bash -lc`/`sh -c`, so no raw SFTP write code is needed here.
+fn build_gitignore_append_script(rel_file: &str, entry: &str, dedup_against: &[&str]) -> String {
+    let f_quoted = shell_quote(rel_file);
+    let entry_quoted = shell_quote(entry);
+    let dedup_checks: Vec<String> = dedup_against
+        .iter()
+        .map(|d| format!("grep -qxF -- {} \"$f\"", shell_quote(d)))
+        .collect();
+    format!(
+        "f={f_quoted}; if [ -f \"$f\" ] && {{ {dedup}; }}; then exit 0; fi; \
+         if [ -s \"$f\" ] && [ -n \"$(tail -c1 \"$f\")\" ]; then printf '\\n' >> \"$f\"; fi; \
+         printf '%s\\n' {entry_quoted} >> \"$f\"",
+        dedup = dedup_checks.join(" || "),
+    )
+}
 
-    let canonical = std::fs::canonicalize(&path).map_err(|e| format!("invalid path: {e}"))?;
-    if !canonical.is_dir() {
-        return Err(format!("not a directory: {path}"));
-    }
+#[tauri::command]
+pub async fn git_add_to_gitignore(
+    path: String,
+    file: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
     let safe_file = file.replace(['\n', '\r', '\0'], "");
     if safe_file.is_empty() {
         return Err("file path cannot be empty".to_string());
     }
-    let gitignore_path = canonical.join(".gitignore");
-    let existing = std::fs::read_to_string(&gitignore_path).unwrap_or_default();
     let entry = format!("/{}", safe_file.trim_start_matches('/'));
 
-    if existing.lines().any(|l| l.trim() == entry.trim() || l.trim() == safe_file.trim()) {
+    if session_id.is_none() {
+        use std::fs::OpenOptions;
+        use std::io::Write;
+
+        let canonical = std::fs::canonicalize(&path).map_err(|e| format!("invalid path: {e}"))?;
+        if !canonical.is_dir() {
+            return Err(format!("not a directory: {path}"));
+        }
+        let gitignore_path = canonical.join(".gitignore");
+        let existing = std::fs::read_to_string(&gitignore_path).unwrap_or_default();
+
+        if existing.lines().any(|l| l.trim() == entry.trim() || l.trim() == safe_file.trim()) {
+            return Ok(());
+        }
+
+        let mut f = OpenOptions::new().create(true).append(true).open(&gitignore_path).map_err(|e| e.to_string())?;
+
+        if !existing.is_empty() && !existing.ends_with('\n') {
+            writeln!(f).map_err(|e| e.to_string())?;
+        }
+        writeln!(f, "{}", entry).map_err(|e| e.to_string())?;
         return Ok(());
     }
 
-    let mut f = OpenOptions::new().create(true).append(true).open(&gitignore_path).map_err(|e| e.to_string())?;
-
-    if !existing.is_empty() && !existing.ends_with('\n') {
-        writeln!(f).map_err(|e| e.to_string())?;
+    let script = build_gitignore_append_script(".gitignore", &entry, &[&entry, &safe_file]);
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let (_, exit_code) = executor.run_shell_script(&script).await?;
+    if exit_code != 0 {
+        return Err(format!("adding .gitignore entry failed (exit code {exit_code})"));
     }
-    writeln!(f, "{}", entry).map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn git_add_to_exclude(path: String, file: String) -> Result<(), String> {
-    use std::fs::OpenOptions;
-    use std::io::Write;
-
-    let canonical = std::fs::canonicalize(&path).map_err(|e| format!("invalid path: {e}"))?;
+pub async fn git_add_to_exclude(
+    path: String,
+    file: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
     let safe_file = file.replace(['\n', '\r', '\0'], "");
     if safe_file.is_empty() {
         return Err("file path cannot be empty".to_string());
     }
-    let exclude_path = canonical.join(".git/info/exclude");
-    let existing = std::fs::read_to_string(&exclude_path).unwrap_or_default();
     let entry = safe_file.trim_start_matches('/').to_string();
 
-    if existing.lines().any(|l| l.trim() == entry.trim()) {
+    if session_id.is_none() {
+        use std::fs::OpenOptions;
+        use std::io::Write;
+
+        let canonical = std::fs::canonicalize(&path).map_err(|e| format!("invalid path: {e}"))?;
+        let exclude_path = canonical.join(".git/info/exclude");
+        let existing = std::fs::read_to_string(&exclude_path).unwrap_or_default();
+
+        if existing.lines().any(|l| l.trim() == entry.trim()) {
+            return Ok(());
+        }
+
+        let mut f = OpenOptions::new().create(true).append(true).open(&exclude_path).map_err(|e| e.to_string())?;
+
+        if !existing.is_empty() && !existing.ends_with('\n') {
+            writeln!(f).map_err(|e| e.to_string())?;
+        }
+        writeln!(f, "{}", entry).map_err(|e| e.to_string())?;
         return Ok(());
     }
 
-    let mut f = OpenOptions::new().create(true).append(true).open(&exclude_path).map_err(|e| e.to_string())?;
-
-    if !existing.is_empty() && !existing.ends_with('\n') {
-        writeln!(f).map_err(|e| e.to_string())?;
+    let script = build_gitignore_append_script(".git/info/exclude", &entry, &[&entry]);
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let (_, exit_code) = executor.run_shell_script(&script).await?;
+    if exit_code != 0 {
+        return Err(format!("adding .git/info/exclude entry failed (exit code {exit_code})"));
     }
-    writeln!(f, "{}", entry).map_err(|e| e.to_string())?;
     Ok(())
 }
 

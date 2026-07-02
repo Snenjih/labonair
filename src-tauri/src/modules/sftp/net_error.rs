@@ -12,6 +12,7 @@ pub(crate) fn is_network_error(e: &str) -> bool {
         || lower.contains("no route to host")
         || lower.contains("network")
         || lower.contains("no sftp session")
+        || lower.contains("no ssh session")
         || lower.contains("sftp_state lock")
 }
 
@@ -42,6 +43,11 @@ mod tests {
     #[test]
     fn detects_missing_session_after_removal() {
         assert!(is_network_error("no SFTP session for tab abc-123"));
+    }
+
+    #[test]
+    fn detects_missing_ssh_session_for_git() {
+        assert!(is_network_error("no SSH session for this host — reconnect and try again"));
     }
 
     #[test]

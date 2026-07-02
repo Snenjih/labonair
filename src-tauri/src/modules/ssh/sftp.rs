@@ -1,9 +1,15 @@
 use crate::modules::sftp::SftpState;
 use crate::modules::sftp::net_error::is_network_error;
 use crate::modules::errors::LabonairError;
+use crate::modules::fs::file::ReadResult;
 use crate::modules::ssh::shell::shell_quote;
 use std::io::{Read as _, Write as _};
 use std::sync::Arc;
+
+/// Same size cap `prepare_remote_edit` uses — shared convention for
+/// "reasonable to pull an entire remote file into memory over SFTP" across
+/// both the remote-edit and one-shot-read (AI attach) code paths.
+const MAX_REMOTE_READ_BYTES: u64 = 5 * 1024 * 1024;
 
 /// Classifies a raw SFTP/exec error. Network-level failures remove the dead
 /// session from `SftpState` and emit `ssh_connection_lost` — the same event
@@ -415,7 +421,7 @@ pub async fn prepare_remote_edit(
                 .stat(std::path::Path::new(&remote_path))
                 .map_err(|e| e.to_string())?;
             let size = stat.size.unwrap_or(0);
-            if size > 5 * 1024 * 1024 {
+            if size > MAX_REMOTE_READ_BYTES {
                 return Err(format!(
                     "File is too large for in-app editing ({size} bytes). Max 5 MB."
                 ));
@@ -444,6 +450,22 @@ pub async fn prepare_remote_edit(
     .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
 }
 
+/// Validates that `local_temp_path` is actually inside the
+/// `labonair_remote_edits` temp dir `prepare_remote_edit` stages files into —
+/// prevents the frontend from pointing this at an arbitrary local file
+/// (upload-back) or deleting one (cleanup). Shared by `save_remote_edit` and
+/// `cleanup_remote_edit_temp`.
+fn validate_remote_edit_temp_path(local_temp_path: &str) -> Result<std::path::PathBuf, String> {
+    let temp_dir = std::fs::canonicalize(std::env::temp_dir().join("labonair_remote_edits"))
+        .unwrap_or_else(|_| std::env::temp_dir().join("labonair_remote_edits"));
+    let canonical =
+        std::fs::canonicalize(local_temp_path).map_err(|e| format!("invalid temp path: {e}"))?;
+    if !canonical.starts_with(&temp_dir) {
+        return Err("temp path is outside the allowed directory".to_string());
+    }
+    Ok(canonical)
+}
+
 #[tauri::command]
 pub async fn save_remote_edit(
     session_id: String,
@@ -455,15 +477,7 @@ pub async fn save_remote_edit(
     let state_inner = state.inner().clone();
     let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
-        // Validate that the path is inside the expected temp directory to prevent
-        // the frontend from reading arbitrary local files and uploading them.
-        let temp_dir = std::fs::canonicalize(std::env::temp_dir().join("labonair_remote_edits"))
-            .unwrap_or_else(|_| std::env::temp_dir().join("labonair_remote_edits"));
-        let canonical = std::fs::canonicalize(&local_temp_path)
-            .map_err(|e| format!("invalid temp path: {e}"))?;
-        if !canonical.starts_with(&temp_dir) {
-            return Err("temp path is outside the allowed directory".to_string());
-        }
+        let canonical = validate_remote_edit_temp_path(&local_temp_path)?;
         let data = std::fs::read(&canonical).map_err(|e| e.to_string())?;
         let sftp_arc = get_sftp_arc!(state_inner, &session_id);
         let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
@@ -471,6 +485,67 @@ pub async fn save_remote_edit(
             .create(std::path::Path::new(&remote_path))
             .map_err(|e| e.to_string())?;
         remote_file.write_all(&data).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(|e| handle_sftp_error(&app, state.inner(), &session_id_for_err, e))
+}
+
+/// Best-effort deletion of a `prepare_remote_edit` temp file, called when the
+/// editor/preview tab backed by it closes. Neither `prepare_remote_edit` nor
+/// `save_remote_edit` previously had a matching cleanup command, so these
+/// temp files accumulated in the OS temp dir for the life of the app.
+#[tauri::command]
+pub async fn cleanup_remote_edit_temp(local_temp_path: String) -> Result<(), LabonairError> {
+    tokio::task::spawn_blocking(move || {
+        let canonical = validate_remote_edit_temp_path(&local_temp_path)?;
+        std::fs::remove_file(&canonical).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| LabonairError::Internal(e.to_string()))?
+    .map_err(LabonairError::Internal)
+}
+
+/// One-shot read of a remote file's content (as opposed to `prepare_remote_edit`,
+/// which stages it into a local temp file for the editor's open/save-back
+/// flow) — used by the AI composer's "Attach to Agent" / "Reference in AI
+/// chat" so remote file content can be attached without a temp file. Mirrors
+/// `fs_read_file`'s `ReadResult` contract (text/binary/too-large + a
+/// null-byte binary sniff) so the frontend can share one attach-handling path.
+#[tauri::command]
+pub async fn sftp_read_file_content(
+    session_id: String,
+    remote_path: String,
+    state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<ReadResult, LabonairError> {
+    let state_inner = state.inner().clone();
+    let session_id_for_err = session_id.clone();
+    tokio::task::spawn_blocking(move || {
+        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
+        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        let stat = sftp.0
+            .stat(std::path::Path::new(&remote_path))
+            .map_err(|e| e.to_string())?;
+        let size = stat.size.unwrap_or(0);
+        if size > MAX_REMOTE_READ_BYTES {
+            return Ok(ReadResult::TooLarge { size, limit: MAX_REMOTE_READ_BYTES });
+        }
+        let mut remote_file = sftp.0
+            .open(std::path::Path::new(&remote_path))
+            .map_err(|e| e.to_string())?;
+        let mut buf = Vec::with_capacity(size as usize);
+        remote_file.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+
+        // Same null-byte sniff `fs_read_file` uses.
+        let sniff_len = buf.len().min(8 * 1024);
+        if buf[..sniff_len].contains(&0) {
+            return Ok(ReadResult::Binary { size });
+        }
+        match String::from_utf8(buf) {
+            Ok(content) => Ok(ReadResult::Text { content, size }),
+            Err(_) => Ok(ReadResult::Binary { size }),
+        }
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
