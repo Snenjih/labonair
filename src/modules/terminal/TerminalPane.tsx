@@ -1,7 +1,5 @@
-import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useChatStore } from "@/modules/ai/store/chatStore";
-import { useTheme } from "@/modules/theme";
+import type { SearchAddon } from "@xterm/addon-search";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -9,8 +7,10 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import type { SearchAddon } from "@xterm/addon-search";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useChatStore } from "@/modules/ai/store/chatStore";
+import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTheme } from "@/modules/theme";
 import { dropPaths } from "./lib/drop-paths";
 import { useTerminalSession } from "./lib/useTerminalSession";
 
@@ -65,13 +65,13 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(function Termi
   useEffect(() => {
     function onUp(e: PointerEvent) {
       if (!visibleRef.current) return;
-      const paths = explorerDrag.get();
-      if (!paths) return;
+      const drag = explorerDrag.get();
+      if (!drag) return;
       const el = containerRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-        session.write(dropPaths(paths));
+        session.write(dropPaths(drag.paths));
         session.focus();
       }
     }

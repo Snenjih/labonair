@@ -57,6 +57,12 @@ export type PreviewTab = {
   kind: "preview";
   title: string;
   url: string;
+  /** Set when previewing a remote file staged via `prepare_remote_edit` —
+   *  mirrors `EditorTab`'s `remoteHostTabId`/`remotePath`, used only to
+   *  clean up the local temp file on tab close (previews are read-only, no
+   *  save-back). */
+  remoteHostTabId?: string;
+  remoteTempPath?: string;
 };
 
 export type AiDiffStatus = "pending" | "approved" | "rejected";

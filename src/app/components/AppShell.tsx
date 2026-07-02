@@ -41,6 +41,7 @@ export interface AppShellStoreActions {
   newSftpTab: (hostId: string, title: string) => number;
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
+  openRemotePreviewTab: (sftpTabId: string, remotePath: string) => Promise<void>;
   openUntitledTab: () => Promise<number>;
   setActiveId: (id: number) => void;
 }
@@ -83,9 +84,17 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
   const activeTabKind = useTabsStore(selectActiveTabKind);
 
   const onNewGitGraph = () => {
-    const { repoRoot, currentBranch, hostId, sessionId } = useSourceControlStore.getState();
-    const path = repoRoot ?? ctrl.explorerRoot ?? "";
-    tabs.openGitGraphTab(path, currentBranch, hostId ?? undefined, sessionId ?? undefined);
+    const { repoRoot, currentBranch } = useSourceControlStore.getState();
+    // hostId/sessionId come from the always-live explorerTarget (derived
+    // from the active tab) rather than the Source Control store, which only
+    // gets populated once that panel has mounted and polled at least once —
+    // otherwise opening Git Graph on a fresh SSH tab silently falls back to
+    // a local executor against a remote path string.
+    const target = ctrl.explorerTarget;
+    const path = repoRoot ?? target.path ?? ctrl.explorerRoot ?? "";
+    const hostId = target.type === "remote" ? target.hostId : undefined;
+    const sessionId = target.type === "remote" ? target.sessionId : undefined;
+    tabs.openGitGraphTab(path, currentBranch, hostId, sessionId);
   };
 
   const sidebarPassthrough = {
@@ -114,6 +123,9 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onAttachToAgent: ai.handleAttachFileToAgent,
     onOpenRemoteFile: (sessionId: string, path: string) => {
       void actions.openRemoteEditorTab(sessionId, path);
+    },
+    onOpenRemotePreview: (sessionId: string, path: string) => {
+      void actions.openRemotePreviewTab(sessionId, path);
     },
     onOpenSftpTab: (hostId: string, title: string) => {
       actions.newSftpTab(hostId, title);

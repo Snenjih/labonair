@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
 import type React from "react";
+import { useCallback, useEffect, useState } from "react";
 import { hasAnyKey, useChatStore } from "@/modules/ai";
-import { useTabsStore, type WorkspaceTab } from "@/modules/tabs";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
-import type { TerminalPaneHandle } from "@/modules/terminal";
+import type { AiAttachFileDetail } from "@/modules/ai/lib/composer";
 import type { EditorPaneHandle } from "@/modules/editor";
+import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { useTabsStore, type WorkspaceTab } from "@/modules/tabs";
+import type { TerminalPaneHandle } from "@/modules/terminal";
 
 export interface UseAiLiveBridgeOptions {
   terminalRefs: React.MutableRefObject<Map<string, TerminalPaneHandle>>;
@@ -21,7 +22,7 @@ export interface AiLiveBridgeReturn {
   askFromSelection: () => void;
   togglePanelAndFocus: () => void;
   captureActiveSelection: () => string | null;
-  handleAttachFileToAgent: (path: string) => void;
+  handleAttachFileToAgent: (path: string, remote?: { sessionId: string; hostId: string }) => void;
 }
 
 export function useAiLiveBridge({
@@ -65,13 +66,14 @@ export function useAiLiveBridge({
   }, [hasComposer, panelOpen]);
 
   const handleAttachFileToAgent = useCallback(
-    (path: string) => {
+    (path: string, remote?: { sessionId: string; hostId: string }) => {
       const { openPanel, focusInput } = useChatStore.getState();
       if (!hasComposer) {
         void openSettingsWindow("models");
         return;
       }
-      window.dispatchEvent(new CustomEvent<string>("labonair:ai-attach-file", { detail: path }));
+      const detail: AiAttachFileDetail = { path, sessionId: remote?.sessionId, hostId: remote?.hostId };
+      window.dispatchEvent(new CustomEvent<AiAttachFileDetail>("labonair:ai-attach-file", { detail }));
       openPanel();
       focusInput(null);
     },

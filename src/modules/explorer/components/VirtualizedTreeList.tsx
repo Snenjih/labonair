@@ -16,10 +16,13 @@ type Props = {
   onOpenFile: (path: string) => void;
   onOpenPreview?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
-  onAttachToAgent?: (path: string) => void;
+  onAttachToAgent?: (path: string, remote?: { sessionId: string; hostId: string }) => void;
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
   dropTargetPath: string | null;
+  /** Set when browsing a remote host — tags drag-to-terminal drops with
+   *  their origin host (see `explorerDrag`'s `DragOrigin`). */
+  dragOriginHostId?: string;
 };
 
 /**
@@ -41,6 +44,7 @@ export function VirtualizedTreeList({
   selectedPath,
   onSelectPath,
   dropTargetPath,
+  dragOriginHostId,
 }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -93,6 +97,7 @@ export function VirtualizedTreeList({
                   selectedPath={selectedPath}
                   onSelectPath={onSelectPath}
                   dropTargetPath={dropTargetPath}
+                  dragOriginHostId={dragOriginHostId}
                 />
               ) : row.kind === "pending-create" ? (
                 <div

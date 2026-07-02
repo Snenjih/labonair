@@ -36,8 +36,9 @@ export interface SidebarContentProps {
   onPathRenamed: (from: string, to: string) => void;
   onPathDeleted: (path: string) => void;
   onRevealInTerminal: (path: string) => void;
-  onAttachToAgent: (path: string) => void;
+  onAttachToAgent: (path: string, remote?: { sessionId: string; hostId: string }) => void;
   onOpenRemoteFile?: (sessionId: string, path: string) => void;
+  onOpenRemotePreview?: (sessionId: string, path: string) => void;
   onOpenSftpTab?: (hostId: string, title: string) => void;
   // Snippet
   onSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
@@ -71,6 +72,7 @@ export function SidebarContent({
   onRevealInTerminal,
   onAttachToAgent,
   onOpenRemoteFile,
+  onOpenRemotePreview,
   onOpenSftpTab,
   onSnippetRun,
   onOpenGitGraph,
@@ -118,6 +120,7 @@ export function SidebarContent({
             explorerTarget={explorerTarget}
             onOpenFile={onOpenFile}
             onOpenRemoteFile={onOpenRemoteFile}
+            onOpenRemotePreview={onOpenRemotePreview}
             onOpenPreview={onOpenPreview}
             onPathRenamed={onPathRenamed}
             onPathDeleted={onPathDeleted}

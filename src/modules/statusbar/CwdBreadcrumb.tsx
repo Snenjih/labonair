@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { AiAttachFileDetail } from "@/modules/ai/lib/composer";
 import type { FsProvider } from "@/modules/explorer/lib/fsProvider";
 import { createLocalFsProvider } from "@/modules/explorer/lib/providers/localFsProvider";
 import { createRemoteFsProvider } from "@/modules/explorer/lib/providers/remoteFsProvider";
@@ -78,14 +79,32 @@ export function CwdBreadcrumb({ cwd, filePath, home, remoteTarget, onCd, onCdInN
       <Breadcrumb>
         <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
           {first ? (
-            <SegmentWithContextMenu seg={first} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+            <SegmentWithContextMenu
+              seg={first}
+              cwd={cwd}
+              remoteTarget={remoteTarget}
+              onCd={onCd}
+              onCdInNewTab={onCdInNewTab}
+            />
           ) : null}
           {middle.length > 0 ? (
-            <CollapsedSegments segments={middle} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+            <CollapsedSegments
+              segments={middle}
+              cwd={cwd}
+              remoteTarget={remoteTarget}
+              onCd={onCd}
+              onCdInNewTab={onCdInNewTab}
+            />
           ) : null}
           {middle.map((s) => (
             <span key={s.fullPath} className="contents max-md:hidden">
-              <SegmentWithContextMenu seg={s} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+              <SegmentWithContextMenu
+                seg={s}
+                cwd={cwd}
+                remoteTarget={remoteTarget}
+                onCd={onCd}
+                onCdInNewTab={onCdInNewTab}
+              />
             </span>
           ))}
           <BreadcrumbItem>
@@ -110,14 +129,32 @@ export function CwdBreadcrumb({ cwd, filePath, home, remoteTarget, onCd, onCdInN
     <Breadcrumb>
       <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
         {firstParent ? (
-          <SegmentWithContextMenu seg={firstParent} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+          <SegmentWithContextMenu
+            seg={firstParent}
+            cwd={cwd}
+            remoteTarget={remoteTarget}
+            onCd={onCd}
+            onCdInNewTab={onCdInNewTab}
+          />
         ) : null}
         {middleParents.length > 0 ? (
-          <CollapsedSegments segments={middleParents} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+          <CollapsedSegments
+            segments={middleParents}
+            cwd={cwd}
+            remoteTarget={remoteTarget}
+            onCd={onCd}
+            onCdInNewTab={onCdInNewTab}
+          />
         ) : null}
         {middleParents.map((s) => (
           <span key={s.fullPath} className="contents max-md:hidden">
-            <SegmentWithContextMenu seg={s} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+            <SegmentWithContextMenu
+              seg={s}
+              cwd={cwd}
+              remoteTarget={remoteTarget}
+              onCd={onCd}
+              onCdInNewTab={onCdInNewTab}
+            />
           </span>
         ))}
         <BreadcrumbItem>
@@ -137,11 +174,12 @@ export function CwdBreadcrumb({ cwd, filePath, home, remoteTarget, onCd, onCdInN
 type SegmentMenuProps = {
   seg: Segment;
   cwd: string | null;
+  remoteTarget?: BreadcrumbRemoteTarget | null;
   onCd: (path: string) => void;
   onCdInNewTab?: (path: string) => void;
 };
 
-function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuProps) {
+function SegmentContextMenuContent({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: SegmentMenuProps) {
   const displayName = seg.isHome ? "Home" : seg.label;
   const rel = cwd ? relativePath(cwd, seg.fullPath) : seg.fullPath;
   return (
@@ -169,9 +207,14 @@ function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenu
       <ContextMenuSeparator />
       <ContextMenuItem
         className="text-[12px]"
-        onSelect={() =>
-          window.dispatchEvent(new CustomEvent<string>("labonair:ai-attach-file", { detail: seg.fullPath }))
-        }
+        onSelect={() => {
+          const detail: AiAttachFileDetail = {
+            path: seg.fullPath,
+            sessionId: remoteTarget?.sessionId,
+            hostId: remoteTarget?.hostId,
+          };
+          window.dispatchEvent(new CustomEvent<AiAttachFileDetail>("labonair:ai-attach-file", { detail }));
+        }}
       >
         Reference in AI chat
       </ContextMenuItem>
@@ -179,7 +222,7 @@ function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenu
   );
 }
 
-function SegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuProps) {
+function SegmentWithContextMenu({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: SegmentMenuProps) {
   return (
     <>
       <ContextMenu>
@@ -200,20 +243,20 @@ function SegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuPro
             </BreadcrumbLink>
           </BreadcrumbItem>
         </ContextMenuTrigger>
-        <SegmentContextMenuContent seg={seg} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+        <SegmentContextMenuContent
+          seg={seg}
+          cwd={cwd}
+          remoteTarget={remoteTarget}
+          onCd={onCd}
+          onCdInNewTab={onCdInNewTab}
+        />
       </ContextMenu>
       <BreadcrumbSeparator className="[&>svg]:size-3" />
     </>
   );
 }
 
-function CurrentSegmentWithContextMenu({
-  seg,
-  cwd,
-  remoteTarget,
-  onCd,
-  onCdInNewTab,
-}: SegmentMenuProps & { remoteTarget?: BreadcrumbRemoteTarget | null }) {
+function CurrentSegmentWithContextMenu({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: SegmentMenuProps) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -226,7 +269,13 @@ function CurrentSegmentWithContextMenu({
           />
         </span>
       </ContextMenuTrigger>
-      <SegmentContextMenuContent seg={seg} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+      <SegmentContextMenuContent
+        seg={seg}
+        cwd={cwd}
+        remoteTarget={remoteTarget}
+        onCd={onCd}
+        onCdInNewTab={onCdInNewTab}
+      />
     </ContextMenu>
   );
 }
@@ -303,11 +352,13 @@ function CurrentSegmentDropdown({
 function CollapsedSegments({
   segments,
   cwd,
+  remoteTarget,
   onCd,
   onCdInNewTab,
 }: {
   segments: Segment[];
   cwd: string | null;
+  remoteTarget?: BreadcrumbRemoteTarget | null;
   onCd: (p: string) => void;
   onCdInNewTab?: (p: string) => void;
 }) {
@@ -337,7 +388,13 @@ function CollapsedSegments({
                     <span className="truncate">{s.isHome ? "Home" : s.label}</span>
                   </DropdownMenuItem>
                 </ContextMenuTrigger>
-                <SegmentContextMenuContent seg={s} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+                <SegmentContextMenuContent
+                  seg={s}
+                  cwd={cwd}
+                  remoteTarget={remoteTarget}
+                  onCd={onCd}
+                  onCdInNewTab={onCdInNewTab}
+                />
               </ContextMenu>
             ))}
           </DropdownMenuContent>

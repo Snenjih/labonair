@@ -1,3 +1,7 @@
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Channel, invoke } from "@tauri-apps/api/core";
+import { memo, useCallback, useState } from "react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -6,10 +10,6 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
-import { Channel, invoke } from "@tauri-apps/api/core";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { memo, useCallback, useState } from "react";
 import { InlineInput } from "./InlineInput";
 import { copyToClipboard, relativePath, revealInFinder } from "./lib/contextActions";
 import { explorerDrag } from "./lib/explorerDrag";
@@ -32,10 +32,13 @@ type Props = {
   onOpenFile: (path: string) => void;
   onOpenPreview?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
-  onAttachToAgent?: (path: string) => void;
+  onAttachToAgent?: (path: string, remote?: { sessionId: string; hostId: string }) => void;
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
   dropTargetPath: string | null;
+  /** Set when browsing a remote host — tags drag-to-terminal drops with
+   *  their origin host. */
+  dragOriginHostId?: string;
 };
 
 /**
@@ -58,6 +61,7 @@ function FileTreeNodeImpl({
   selectedPath,
   onSelectPath,
   dropTargetPath,
+  dragOriginHostId,
 }: Props) {
   const isDir = entry.kind === "dir";
   const isExpanded = isDir && tree.expanded.has(path);
@@ -106,7 +110,7 @@ function FileTreeNodeImpl({
             onClick={handleClick}
             onDoubleClick={() => !isDir && tree.beginRename(path)}
             onPointerDown={(e) => {
-              if (e.button !== 0 || tree.renaming || !tree.capabilities.supportsNativeDrag) return;
+              if (e.button !== 0 || tree.renaming || !tree.capabilities.supportsInternalDrag) return;
               const startX = e.clientX;
               const startY = e.clientY;
               let dragging = false;
@@ -116,7 +120,14 @@ function FileTreeNodeImpl({
                 if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 6) {
                   dragging = true;
                   document.removeEventListener("pointermove", onMove);
-                  explorerDrag.start([path]);
+                  explorerDrag.start([path], dragOriginHostId ? { hostId: dragOriginHostId } : null);
+
+                  // Native OS drag (dragging out to another app) needs a real
+                  // local file handle — never available for a remote row, so
+                  // this branch is entirely skipped there; the internal
+                  // explorerDrag above still lets a remote row be dropped
+                  // onto a terminal pane.
+                  if (!tree.capabilities.supportsNativeDrag) return;
 
                   // Watch for pointer leaving the window — trigger native OS drag
                   let nativeDragStarted = false;

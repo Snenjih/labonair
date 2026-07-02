@@ -9,7 +9,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createElement } from "react";
-import { copyToClipboard } from "@/modules/explorer/lib/contextActions";
 import { reconnectErroredExplorerSessions } from "@/modules/explorer/lib/useLazyExplorerSession";
 import { useLocalExplorerStore } from "@/modules/explorer/lib/useLocalExplorerStore";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
@@ -89,10 +88,12 @@ export function useExplorerCommands(): { rootActions: CommandAction[] } {
         title: "Copy Explorer Root Path",
         section: "Explorer",
         icon: createElement(HugeiconsIcon, { icon: Copy01Icon, strokeWidth: 2, className: "size-4" }),
-        perform: () => {
-          const rootPath = useLocalExplorerStore.getState().rootPath;
-          if (rootPath) void copyToClipboard(rootPath);
-        },
+        // Routed through the same window-event bridge as the other explorer
+        // commands rather than reading `useLocalExplorerStore` directly —
+        // that store never reflects a remote target's root, so this used to
+        // silently no-op for SSH hosts. `FileExplorer.tsx` has the real
+        // (local or remote) `rootPath` in scope and does the actual copy.
+        perform: () => dispatchExplorer("labonair:explorer-copy-root-path"),
       },
     ],
   };

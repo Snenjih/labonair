@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { handleApiError } from "@/lib/errors";
 import { useHostsStore } from "@/modules/hosts";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { ExplorerAuthPrompt } from "./components/ExplorerAuthPrompt";
 import { VirtualizedTreeList } from "./components/VirtualizedTreeList";
 import { buildTreeRows } from "./lib/buildTreeRows";
@@ -45,11 +46,14 @@ type Props = {
    *  file click — `onOpenFile` alone would try to open the (nonexistent) local
    *  path. */
   onOpenRemoteFile?: (sessionId: string, path: string) => void;
+  /** Opens a remote path in a preview tab via the same prepare_remote_edit
+   *  temp-download `onOpenRemoteFile` uses — read-only, no save-back. */
+  onOpenRemotePreview?: (sessionId: string, path: string) => void;
   onOpenPreview?: (path: string) => void;
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
-  onAttachToAgent?: (path: string) => void;
+  onAttachToAgent?: (path: string, remote?: { sessionId: string; hostId: string }) => void;
   /** Escape hatch from the auth-required state — opens a full SFTP tab, which
    *  has the interactive credential/2FA/host-key UI this narrow sidebar
    *  deliberately doesn't duplicate. */
@@ -65,6 +69,7 @@ export function FileExplorer({
   explorerTarget,
   onOpenFile,
   onOpenRemoteFile,
+  onOpenRemotePreview,
   onOpenPreview,
   onPathRenamed,
   onPathDeleted,
@@ -128,13 +133,24 @@ export function FileExplorer({
     }
   };
 
-  // These affordances assume a local path (local terminal cwd, local AI file
-  // read, local preview URL) — meaningless for a remote path, so they're
-  // simply not passed down for a remote target. FileTreeNode already renders
-  // each of these conditionally on the callback being defined.
+  // "Open in Terminal" assumes a local terminal cwd — meaningless for a
+  // remote path, so it's simply not passed down for a remote target.
+  // FileTreeNode already renders it conditionally on the callback being
+  // defined. "Attach to Agent" now works for both (reads over SFTP when
+  // remote — see sftp_read_file_content), so it's threaded through with the
+  // active session/host instead of being suppressed.
   const effectiveOnRevealInTerminal = explorerTarget.type === "local" ? onRevealInTerminal : undefined;
-  const effectiveOnAttachToAgent = explorerTarget.type === "local" ? onAttachToAgent : undefined;
-  const effectiveOnOpenPreview = explorerTarget.type === "local" ? onOpenPreview : undefined;
+  const effectiveOnAttachToAgent =
+    explorerTarget.type === "remote" && activeSessionId
+      ? (path: string) =>
+          onAttachToAgent?.(path, { sessionId: activeSessionId, hostId: explorerTarget.hostId })
+      : onAttachToAgent;
+  const effectiveOnOpenPreview =
+    explorerTarget.type === "remote" && activeSessionId
+      ? onOpenRemotePreview
+        ? (path: string) => onOpenRemotePreview(activeSessionId, path)
+        : undefined
+      : onOpenPreview;
 
   // Single flattening pass feeds both the virtualized render and keyboard
   // navigation — `flat` is the entry-only subset `treeRows` already implies
@@ -194,25 +210,39 @@ export function FileExplorer({
   // Lets the command palette (useExplorerCommands) drive this panel's
   // toolbar actions without threading callbacks through App.tsx/SidebarContent
   // — same window-event pattern as ssh.reconnect's "labonair:ssh-reconnect".
-  // No-ops while a different sidebar panel is mounted instead of this one.
+  // Listeners are registered unconditionally (harmless no-op while a
+  // different sidebar panel is mounted instead of this one) — each handler
+  // checks `rootPath` itself and surfaces a toast instead of silently doing
+  // nothing while a remote session is still connecting/erroring (rootPath
+  // stays null until then, see the ExplorerAuthPrompt branch below).
   useEffect(() => {
-    if (!rootPath) return;
-    const onRefresh = () => tree.refresh(rootPath);
+    const notifyNotReady = () =>
+      useNotificationStore.getState().addNotification({
+        type: "info",
+        title: "Explorer Not Ready",
+        message: "The sidebar file tree isn't connected yet.",
+        source: "Explorer",
+      });
+    const onRefresh = () => (rootPath ? tree.refresh(rootPath) : notifyNotReady());
     const onToggleHidden = () => {
+      if (!rootPath) return notifyNotReady();
       tree.toggleShowHidden();
       tree.refresh(rootPath);
     };
-    const onNewFile = () => tree.beginCreate(rootPath, "file");
-    const onNewFolder = () => tree.beginCreate(rootPath, "dir");
+    const onNewFile = () => (rootPath ? tree.beginCreate(rootPath, "file") : notifyNotReady());
+    const onNewFolder = () => (rootPath ? tree.beginCreate(rootPath, "dir") : notifyNotReady());
+    const onCopyRootPath = () => (rootPath ? void copyToClipboard(rootPath) : notifyNotReady());
     window.addEventListener("labonair:explorer-refresh", onRefresh);
     window.addEventListener("labonair:explorer-toggle-hidden", onToggleHidden);
     window.addEventListener("labonair:explorer-new-file", onNewFile);
     window.addEventListener("labonair:explorer-new-folder", onNewFolder);
+    window.addEventListener("labonair:explorer-copy-root-path", onCopyRootPath);
     return () => {
       window.removeEventListener("labonair:explorer-refresh", onRefresh);
       window.removeEventListener("labonair:explorer-toggle-hidden", onToggleHidden);
       window.removeEventListener("labonair:explorer-new-file", onNewFile);
       window.removeEventListener("labonair:explorer-new-folder", onNewFolder);
+      window.removeEventListener("labonair:explorer-copy-root-path", onCopyRootPath);
     };
   }, [rootPath, tree]);
 
@@ -452,6 +482,7 @@ export function FileExplorer({
                 selectedPath={selectedPath}
                 onSelectPath={setSelectedPath}
                 dropTargetPath={dropTargetPath}
+                dragOriginHostId={explorerTarget.type === "remote" ? explorerTarget.hostId : undefined}
               />
             </div>
           </ContextMenuTrigger>

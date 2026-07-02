@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -158,6 +159,15 @@ export function useTabManagement({
           detectedUrls.current.delete(sessionId);
         }
         workspacePaneRefs.current.delete(id);
+      }
+      // Best-effort cleanup of the local temp file `prepare_remote_edit`
+      // staged for a remote editor/preview tab — fire-and-forget, a
+      // leftover temp file isn't worth blocking or failing a tab close over.
+      if (tab?.kind === "editor" && tab.remoteHostTabId && tab.remotePath) {
+        void invoke("cleanup_remote_edit_temp", { localTempPath: tab.path }).catch(() => {});
+      }
+      if (tab?.kind === "preview" && tab.remoteHostTabId && tab.remoteTempPath) {
+        void invoke("cleanup_remote_edit_temp", { localTempPath: tab.remoteTempPath }).catch(() => {});
       }
       editorRefs.current.delete(id);
       previewRefs.current.delete(id);

@@ -5,6 +5,7 @@ const LOCAL_CAPABILITIES: Capabilities = {
   supportsWatch: true,
   supportsReveal: true,
   supportsNativeDrag: true,
+  supportsInternalDrag: true,
   supportsChmod: false,
   supportsChown: false,
   supportsCalculateSize: false,

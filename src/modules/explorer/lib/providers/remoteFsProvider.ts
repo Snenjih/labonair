@@ -11,6 +11,9 @@ const REMOTE_CAPABILITIES: Capabilities = {
   // Native OS drag needs a real local file handle to hand the OS; remote
   // entries only exist on the far side of the SSH connection.
   supportsNativeDrag: false,
+  // Dropping onto a terminal is just a path string paste — no OS handle
+  // needed, so this works for remote too.
+  supportsInternalDrag: true,
   supportsChmod: true,
   supportsChown: true,
   supportsCalculateSize: true,

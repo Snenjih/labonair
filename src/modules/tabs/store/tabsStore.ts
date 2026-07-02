@@ -65,6 +65,7 @@ export type TabsState = {
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
+  openRemotePreviewTab: (sftpTabId: string, remotePath: string) => Promise<void>;
   openGitGraphTab: (
     repositoryPath: string,
     initialBranch: string,
@@ -99,6 +100,72 @@ export const selectActivePaneId = (s: TabsState): string | null => {
   const tab = s.tabs.find((t) => t.id === s.activeId);
   return tab?.kind === "workspace" ? tab.activePaneId : null;
 };
+
+// ─── Shared remote-file staging ────────────────────────────────────────────────
+
+/** Downloads a remote file into the local `prepare_remote_edit` temp dir,
+ *  optionally surfacing it in the transfer list (same `sftpRemoteEditShowTransfers`
+ *  pref both the editor and preview flows share). Used by `openRemoteEditorTab`
+ *  and `openRemotePreviewTab` — the only difference between the two is what
+ *  kind of tab wraps the resulting local path. */
+async function prepareRemoteFileForTab(
+  sftpTabId: string,
+  remotePath: string,
+  destLabel: string,
+): Promise<string> {
+  const showTransfers = usePreferencesStore.getState().sftpRemoteEditShowTransfers;
+  const jobId = crypto.randomUUID();
+
+  if (showTransfers) {
+    useTransferStore.getState().addJob({
+      id: jobId,
+      session_id: sftpTabId,
+      src_path: remotePath,
+      dest_path: destLabel,
+      direction: "download",
+      status: "running",
+      bytes_total: 0,
+      bytes_transferred: 0,
+      speed_bps: 0,
+    });
+  }
+
+  let localTempPath: string;
+  try {
+    localTempPath = await invoke<string>("prepare_remote_edit", { sessionId: sftpTabId, remotePath });
+  } catch (e) {
+    if (showTransfers) {
+      useTransferStore.getState().updateJob({
+        id: jobId,
+        session_id: sftpTabId,
+        src_path: remotePath,
+        dest_path: destLabel,
+        direction: "download",
+        status: { failed: String(e) },
+        bytes_total: 0,
+        bytes_transferred: 0,
+        speed_bps: 0,
+      });
+    }
+    throw e;
+  }
+
+  if (showTransfers) {
+    useTransferStore.getState().updateJob({
+      id: jobId,
+      session_id: sftpTabId,
+      src_path: remotePath,
+      dest_path: destLabel,
+      direction: "download",
+      status: "completed",
+      bytes_total: 1,
+      bytes_transferred: 1,
+      speed_bps: 0,
+    });
+  }
+
+  return localTempPath;
+}
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
@@ -399,60 +466,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   },
 
   openRemoteEditorTab: async (sftpTabId, remotePath) => {
-    const showTransfers = usePreferencesStore.getState().sftpRemoteEditShowTransfers;
-    const jobId = crypto.randomUUID();
-
-    if (showTransfers) {
-      useTransferStore.getState().addJob({
-        id: jobId,
-        session_id: sftpTabId,
-        src_path: remotePath,
-        dest_path: "(editor)",
-        direction: "download",
-        status: "running",
-        bytes_total: 0,
-        bytes_transferred: 0,
-        speed_bps: 0,
-      });
-    }
-
-    let localTempPath: string;
-    try {
-      localTempPath = await invoke<string>("prepare_remote_edit", {
-        sessionId: sftpTabId,
-        remotePath,
-      });
-    } catch (e) {
-      if (showTransfers) {
-        useTransferStore.getState().updateJob({
-          id: jobId,
-          session_id: sftpTabId,
-          src_path: remotePath,
-          dest_path: "(editor)",
-          direction: "download",
-          status: { failed: String(e) },
-          bytes_total: 0,
-          bytes_transferred: 0,
-          speed_bps: 0,
-        });
-      }
-      throw e;
-    }
-
-    if (showTransfers) {
-      useTransferStore.getState().updateJob({
-        id: jobId,
-        session_id: sftpTabId,
-        src_path: remotePath,
-        dest_path: "(editor)",
-        direction: "download",
-        status: "completed",
-        bytes_total: 1,
-        bytes_transferred: 1,
-        speed_bps: 0,
-      });
-    }
-
+    const localTempPath = await prepareRemoteFileForTab(sftpTabId, remotePath, "(editor)");
     const fileName = remotePath.split("/").pop() ?? "remote-file";
     const id = get()._nextId;
     set((s) => ({
@@ -466,6 +480,31 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           dirty: false,
           remoteHostTabId: sftpTabId,
           remotePath,
+        },
+      ],
+      activeId: id,
+      _nextId: s._nextId + 1,
+    }));
+  },
+
+  openRemotePreviewTab: async (sftpTabId, remotePath) => {
+    // Reuses prepare_remote_edit's temp-download — PreviewPane already
+    // detects a local absolute path and converts it via `convertFileSrc`,
+    // so no remote-specific rendering path is needed. Same 5 MB cap the
+    // editor flow has; not a new limit introduced here.
+    const localTempPath = await prepareRemoteFileForTab(sftpTabId, remotePath, "(preview)");
+    const fileName = remotePath.split("/").pop() ?? "remote-file";
+    const id = get()._nextId;
+    set((s) => ({
+      tabs: [
+        ...s.tabs,
+        {
+          id,
+          kind: "preview" as const,
+          title: `✦ ${fileName}`,
+          url: localTempPath,
+          remoteHostTabId: sftpTabId,
+          remoteTempPath: localTempPath,
         },
       ],
       activeId: id,

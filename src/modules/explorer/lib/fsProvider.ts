@@ -24,7 +24,13 @@ export type SearchHit = {
 export type Capabilities = {
   supportsWatch: boolean;
   supportsReveal: boolean;
+  /** OS-level drag-drop (`plugin:drag|start_drag`) — needs a real local file
+   *  handle to hand the OS, so it's local-only. */
   supportsNativeDrag: boolean;
+  /** Pure-JS drag (via `explorerDrag`) for dropping onto a terminal pane —
+   *  just a path string, no OS handle required, so both providers support
+   *  it. Independent of `supportsNativeDrag`. */
+  supportsInternalDrag: boolean;
   supportsChmod: boolean;
   supportsChown: boolean;
   supportsCalculateSize: boolean;

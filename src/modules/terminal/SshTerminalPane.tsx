@@ -1,9 +1,3 @@
-import { buildTerminalTheme } from "@/styles/terminalTheme";
-import { registerTerminalQueryHandlers } from "@/modules/terminal/lib/osc-handlers";
-import { handleApiError } from "@/lib/errors";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useTheme } from "@/modules/theme";
-import type { TerminalSessionData } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -33,9 +27,15 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { handleApiError } from "@/lib/errors";
 import { useChatStore } from "@/modules/ai/store/chatStore";
-import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { TerminalSessionData } from "@/modules/tabs";
+import { registerTerminalQueryHandlers } from "@/modules/terminal/lib/osc-handlers";
+import { useTheme } from "@/modules/theme";
+import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { dropPaths } from "./lib/drop-paths";
 import { SshLoadingScreen } from "./SshLoadingScreen";
 import { SudoFillPopup } from "./SudoFillPopup";
@@ -303,13 +303,13 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
   useEffect(() => {
     function onUp(e: PointerEvent) {
       if (!tabVisibleRef.current) return;
-      const paths = explorerDrag.get();
-      if (!paths || !isConnected) return;
+      const drag = explorerDrag.get();
+      if (!drag || !isConnected) return;
       const el = wrapperRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-        invoke("ssh_pty_write", { sessionId, data: dropPaths(paths) }).catch(console.error);
+        invoke("ssh_pty_write", { sessionId, data: dropPaths(drag.paths) }).catch(console.error);
         termRef.current?.focus();
       }
     }
