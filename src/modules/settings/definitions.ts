@@ -464,6 +464,52 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "Switch",
   },
   {
+    id: "explorerShowHiddenByDefault",
+    label: "Explorer: Show hidden files by default",
+    description: "Start the sidebar file tree with hidden files visible (applies to local and remote hosts).",
+    category: "File Manager",
+    controlType: "Switch",
+  },
+  {
+    id: "explorerRemotePollInterval",
+    label: "Explorer: Remote refresh interval",
+    description:
+      "How often the sidebar file tree re-polls an SSH host's expanded folders for changes (SFTP has no live watch).",
+    category: "File Manager",
+    controlType: "Select",
+    options: [
+      { value: "10", label: "Every 10 seconds" },
+      { value: "20", label: "Every 20 seconds" },
+      { value: "30", label: "Every 30 seconds" },
+      { value: "60", label: "Every minute" },
+      { value: "0", label: "Never" },
+    ],
+  },
+  {
+    id: "explorerAutoReconnect",
+    label: "Explorer: Auto-reconnect remote sessions",
+    description:
+      "Automatically retry the sidebar's SSH browsing connection when it drops unexpectedly, using the SSH reconnect delay/attempts below.",
+    category: "File Manager",
+    controlType: "Switch",
+  },
+  {
+    id: "explorerIdleSessionTimeoutMin",
+    label: "Explorer: Idle session timeout (min)",
+    description:
+      "Disconnect a background SSH browsing session after it has had no active viewer for this many minutes (1–30).",
+    category: "File Manager",
+    controlType: "NumberInput",
+  },
+  {
+    id: "explorerMaxIdleSessions",
+    label: "Explorer: Max cached remote sessions",
+    description:
+      "How many idle SSH browsing connections the sidebar keeps warm before disconnecting the oldest (1–10).",
+    category: "File Manager",
+    controlType: "NumberInput",
+  },
+  {
     id: "hostPingInterval",
     label: "Ping interval",
     description:

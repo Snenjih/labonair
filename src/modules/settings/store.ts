@@ -2,14 +2,14 @@ import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { getStoragePaths } from "@/lib/paths";
 import {
+  type AutocompleteProviderId,
   DEFAULT_AUTOCOMPLETE_MODEL,
   DEFAULT_MODEL_ID,
   LMSTUDIO_DEFAULT_BASE_URL,
   MLX_DEFAULT_BASE_URL,
+  type ModelId,
   OLLAMA_DEFAULT_BASE_URL,
   OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
-  type AutocompleteProviderId,
-  type ModelId,
 } from "@/modules/ai/config";
 
 export type ThemePref = "system" | "light" | "dark";
@@ -197,6 +197,13 @@ export type Preferences = {
   sshAutoReconnect: boolean;
   sshAutoReconnectDelay: number;
   sshAutoReconnectMaxAttempts: number;
+
+  // --- Explorer (sidebar remote browsing) ---
+  explorerShowHiddenByDefault: boolean;
+  explorerRemotePollInterval: number;
+  explorerAutoReconnect: boolean;
+  explorerIdleSessionTimeoutMin: number;
+  explorerMaxIdleSessions: number;
 };
 
 const KEY_THEME = "theme";
@@ -317,6 +324,11 @@ const KEY_ZEN_MODE_SHOW_STATUSBAR = "zenModeShowStatusbar";
 const KEY_SSH_AUTO_RECONNECT = "sshAutoReconnect";
 const KEY_SSH_AUTO_RECONNECT_DELAY = "sshAutoReconnectDelay";
 const KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS = "sshAutoReconnectMaxAttempts";
+const KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT = "explorerShowHiddenByDefault";
+const KEY_EXPLORER_REMOTE_POLL_INTERVAL = "explorerRemotePollInterval";
+const KEY_EXPLORER_AUTO_RECONNECT = "explorerAutoReconnect";
+const KEY_EXPLORER_IDLE_SESSION_TIMEOUT_MIN = "explorerIdleSessionTimeoutMin";
+const KEY_EXPLORER_MAX_IDLE_SESSIONS = "explorerMaxIdleSessions";
 const KEY_STATUSBAR_SHOW_EXPLORER_BUTTON = "statusBarShowExplorerButton";
 const KEY_STATUSBAR_SHOW_SNIPPETS_BUTTON = "statusBarShowSnippetsButton";
 const KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON = "statusBarShowSourceControlButton";
@@ -460,6 +472,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sshAutoReconnect: false,
   sshAutoReconnectDelay: 5,
   sshAutoReconnectMaxAttempts: 3,
+
+  explorerShowHiddenByDefault: false,
+  explorerRemotePollInterval: 20,
+  explorerAutoReconnect: false,
+  explorerIdleSessionTimeoutMin: 5,
+  explorerMaxIdleSessions: 3,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -673,6 +691,25 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_SSH_AUTO_RECONNECT_DELAY) ?? DEFAULT_PREFERENCES.sshAutoReconnectDelay,
     sshAutoReconnectMaxAttempts:
       get<number>(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS) ?? DEFAULT_PREFERENCES.sshAutoReconnectMaxAttempts,
+
+    explorerShowHiddenByDefault:
+      get<boolean>(KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT) ?? DEFAULT_PREFERENCES.explorerShowHiddenByDefault,
+    explorerRemotePollInterval:
+      get<number>(KEY_EXPLORER_REMOTE_POLL_INTERVAL) ?? DEFAULT_PREFERENCES.explorerRemotePollInterval,
+    explorerAutoReconnect:
+      get<boolean>(KEY_EXPLORER_AUTO_RECONNECT) ?? DEFAULT_PREFERENCES.explorerAutoReconnect,
+    explorerIdleSessionTimeoutMin: Math.min(
+      30,
+      Math.max(
+        1,
+        get<number>(KEY_EXPLORER_IDLE_SESSION_TIMEOUT_MIN) ??
+          DEFAULT_PREFERENCES.explorerIdleSessionTimeoutMin,
+      ),
+    ),
+    explorerMaxIdleSessions: Math.min(
+      10,
+      Math.max(1, get<number>(KEY_EXPLORER_MAX_IDLE_SESSIONS) ?? DEFAULT_PREFERENCES.explorerMaxIdleSessions),
+    ),
 
     statusBarShowExplorerButton:
       get<boolean>(KEY_STATUSBAR_SHOW_EXPLORER_BUTTON) ?? DEFAULT_PREFERENCES.statusBarShowExplorerButton,
@@ -945,6 +982,33 @@ export async function setSshAutoReconnectDelay(value: number): Promise<void> {
 
 export async function setSshAutoReconnectMaxAttempts(value: number): Promise<void> {
   await (await getStore()).set(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS, value);
+  await (await getStore()).save();
+}
+
+export async function setExplorerShowHiddenByDefault(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT, value);
+  await (await getStore()).save();
+}
+
+export async function setExplorerRemotePollInterval(value: number): Promise<void> {
+  await (await getStore()).set(KEY_EXPLORER_REMOTE_POLL_INTERVAL, value);
+  await (await getStore()).save();
+}
+
+export async function setExplorerAutoReconnect(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_EXPLORER_AUTO_RECONNECT, value);
+  await (await getStore()).save();
+}
+
+export async function setExplorerIdleSessionTimeoutMin(value: number): Promise<void> {
+  const clamped = Math.min(30, Math.max(1, Math.round(value)));
+  await (await getStore()).set(KEY_EXPLORER_IDLE_SESSION_TIMEOUT_MIN, clamped);
+  await (await getStore()).save();
+}
+
+export async function setExplorerMaxIdleSessions(value: number): Promise<void> {
+  const clamped = Math.min(10, Math.max(1, Math.round(value)));
+  await (await getStore()).set(KEY_EXPLORER_MAX_IDLE_SESSIONS, clamped);
   await (await getStore()).save();
 }
 
@@ -1412,6 +1476,11 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SSH_AUTO_RECONNECT]: "sshAutoReconnect",
     [KEY_SSH_AUTO_RECONNECT_DELAY]: "sshAutoReconnectDelay",
     [KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS]: "sshAutoReconnectMaxAttempts",
+    [KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT]: "explorerShowHiddenByDefault",
+    [KEY_EXPLORER_REMOTE_POLL_INTERVAL]: "explorerRemotePollInterval",
+    [KEY_EXPLORER_AUTO_RECONNECT]: "explorerAutoReconnect",
+    [KEY_EXPLORER_IDLE_SESSION_TIMEOUT_MIN]: "explorerIdleSessionTimeoutMin",
+    [KEY_EXPLORER_MAX_IDLE_SESSIONS]: "explorerMaxIdleSessions",
     [KEY_STATUSBAR_SHOW_EXPLORER_BUTTON]: "statusBarShowExplorerButton",
     [KEY_STATUSBAR_SHOW_SNIPPETS_BUTTON]: "statusBarShowSnippetsButton",
     [KEY_STATUSBAR_SHOW_SOURCE_CONTROL_BUTTON]: "statusBarShowSourceControlButton",

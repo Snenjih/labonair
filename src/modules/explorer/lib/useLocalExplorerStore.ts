@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { FileEntry } from "./fsProvider";
 
 export type ChildrenState =
@@ -67,3 +68,21 @@ export const useLocalExplorerStore = create<LocalExplorerStore>((set) => ({
 
   reset: () => set({ nodes: {}, expanded: new Set() }),
 }));
+
+// Seeds the initial `showHidden` from the persisted `explorerShowHiddenByDefault`
+// preference exactly once, as soon as preferences finish hydrating. Done here
+// (module scope) rather than in a component effect so it applies before the
+// first tree render regardless of which sidebar panel mounts first, and never
+// re-fires to stomp on an in-session manual toggle.
+let _hiddenSeeded = false;
+function seedShowHiddenFromPreferences() {
+  if (_hiddenSeeded) return;
+  const prefs = usePreferencesStore.getState();
+  if (!prefs.hydrated) return;
+  _hiddenSeeded = true;
+  if (prefs.explorerShowHiddenByDefault) {
+    useLocalExplorerStore.setState({ showHidden: true });
+  }
+}
+seedShowHiddenFromPreferences();
+usePreferencesStore.subscribe(seedShowHiddenFromPreferences);

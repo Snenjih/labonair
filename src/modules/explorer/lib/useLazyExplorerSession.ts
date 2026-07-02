@@ -1,9 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useHostsStore } from "@/modules/hosts";
-import { isLabonairError } from "@/types";
 import { useEffect } from "react";
 import { create } from "zustand";
+import { useHostsStore } from "@/modules/hosts";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { isLabonairError } from "@/types";
+
+function hostLabelFor(hostId: string): string {
+  return useHostsStore.getState().hosts.find((h) => h.id === hostId)?.name ?? hostId;
+}
 
 export type LazySessionStatus = "connecting" | "connected" | "auth_required" | "error";
 
@@ -33,15 +39,18 @@ const useLazySessionStore = create<LazySessionStore>((set) => ({
 // reactive state, deliberately kept outside the store so re-renders only
 // happen for the status field consumers actually read). ---
 
-const IDLE_DISCONNECT_MS = 5 * 60_000;
-const MAX_IDLE_SESSIONS = 3;
-
 interface Lifecycle {
   refCount: number;
   hostId: string;
   idleTimer: ReturnType<typeof setTimeout> | null;
   releasedAt: number | null;
   connectPromise: Promise<void> | null;
+  /** Auto-reconnect attempts made since the last successful connect — reset
+   *  on `acquire()`, manual `reconnect()`, and `session_established`. Caps
+   *  against `sshAutoReconnectMaxAttempts` so a host that's simply offline
+   *  doesn't retry forever in the background. */
+  reconnectAttempts: number;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const lifecycles = new Map<string, Lifecycle>();
@@ -53,6 +62,7 @@ function sessionIdFor(hostId: string): string {
 function disconnect(sessionId: string) {
   const lifecycle = lifecycles.get(sessionId);
   if (lifecycle?.idleTimer) clearTimeout(lifecycle.idleTimer);
+  if (lifecycle?.reconnectTimer) clearTimeout(lifecycle.reconnectTimer);
   lifecycles.delete(sessionId);
   useLazySessionStore.getState().clear(sessionId);
   void invoke("sftp_disconnect", { sessionId }).catch(() => {});
@@ -86,7 +96,8 @@ function evictIdleIfOverCap() {
     refCount: l.refCount,
     releasedAt: l.releasedAt,
   }));
-  for (const sessionId of selectEvictionCandidates(entries, MAX_IDLE_SESSIONS)) {
+  const maxIdle = usePreferencesStore.getState().explorerMaxIdleSessions;
+  for (const sessionId of selectEvictionCandidates(entries, maxIdle)) {
     disconnect(sessionId);
   }
 }
@@ -110,7 +121,15 @@ function acquire(hostId: string): string {
   const sessionId = sessionIdFor(hostId);
   let lifecycle = lifecycles.get(sessionId);
   if (!lifecycle) {
-    lifecycle = { refCount: 0, hostId, idleTimer: null, releasedAt: null, connectPromise: null };
+    lifecycle = {
+      refCount: 0,
+      hostId,
+      idleTimer: null,
+      releasedAt: null,
+      connectPromise: null,
+      reconnectAttempts: 0,
+      reconnectTimer: null,
+    };
     lifecycles.set(sessionId, lifecycle);
   }
   lifecycle.refCount += 1;
@@ -136,7 +155,8 @@ function release(hostId: string) {
   lifecycle.refCount = Math.max(0, lifecycle.refCount - 1);
   if (lifecycle.refCount > 0) return;
   lifecycle.releasedAt = Date.now();
-  lifecycle.idleTimer = setTimeout(() => disconnect(sessionId), IDLE_DISCONNECT_MS);
+  const idleMs = usePreferencesStore.getState().explorerIdleSessionTimeoutMin * 60_000;
+  lifecycle.idleTimer = setTimeout(() => disconnect(sessionId), idleMs);
   evictIdleIfOverCap();
 }
 
@@ -144,9 +164,30 @@ function reconnect(hostId: string) {
   const sessionId = sessionIdFor(hostId);
   const lifecycle = lifecycles.get(sessionId);
   if (!lifecycle) return;
+  if (lifecycle.reconnectTimer) {
+    clearTimeout(lifecycle.reconnectTimer);
+    lifecycle.reconnectTimer = null;
+  }
+  lifecycle.reconnectAttempts = 0;
   lifecycle.connectPromise = connect(sessionId, hostId).catch(() => {
     lifecycle.connectPromise = null;
   });
+}
+
+/** Manually retries every lazy explorer session currently in `error` or
+ *  `auth_required` — the command palette's "Reconnect Explorer Sessions"
+ *  action. Resets the auto-reconnect attempt counter same as a manual
+ *  `reconnect()` from the sidebar's Retry button. */
+export function reconnectErroredExplorerSessions(): number {
+  let count = 0;
+  for (const [sessionId, lifecycle] of lifecycles) {
+    const status = useLazySessionStore.getState().sessions[sessionId]?.status;
+    if (status === "error" || status === "auth_required") {
+      reconnect(lifecycle.hostId);
+      count++;
+    }
+  }
+  return count;
 }
 
 /** Forcibly disconnects a lazy session because the host itself was deleted
@@ -157,9 +198,17 @@ function reconnect(hostId: string) {
 function evictForDeletedHost(hostId: string) {
   const sessionId = sessionIdFor(hostId);
   const lifecycle = lifecycles.get(sessionId);
+  const label = hostLabelFor(hostId);
   if (lifecycle?.idleTimer) clearTimeout(lifecycle.idleTimer);
+  if (lifecycle?.reconnectTimer) clearTimeout(lifecycle.reconnectTimer);
   lifecycles.delete(sessionId);
   useLazySessionStore.getState().setStatus(sessionId, "error", "This host no longer exists.");
+  useNotificationStore.getState().addNotification({
+    type: "warning",
+    title: "Explorer Session Closed",
+    message: `"${label}" was deleted while its file tree was open.`,
+    source: "Explorer",
+  });
   void invoke("sftp_disconnect", { sessionId }).catch(() => {});
 }
 
@@ -175,11 +224,44 @@ function bootstrapLazySessionListeners() {
     if (!lifecycle) return;
     useLazySessionStore.getState().setStatus(session_id, "error", reason);
     lifecycle.connectPromise = null;
+    // Mirrors SshTerminalPane's ssh_connection_lost notification — the sidebar
+    // tree's lazy session can drop while the panel isn't even mounted (e.g.
+    // the user switched sidebar tabs), so the inline ExplorerAuthPrompt error
+    // alone wouldn't be seen. Surface it in the notification bell too.
+    useNotificationStore.getState().addNotification({
+      type: "error",
+      title: "Explorer Connection Lost",
+      message: reason || "The connection was dropped unexpectedly.",
+      source: hostLabelFor(lifecycle.hostId),
+    });
+
+    // Mirrors SshTerminalPane's auto-reconnect gate — reuses the same SSH
+    // reconnect delay/attempt-cap prefs so the two surfaces behave
+    // consistently, rather than introducing a second set of explorer-only
+    // timing settings.
+    const prefs = usePreferencesStore.getState();
+    const isAuthFailure = (reason ?? "").toLowerCase().includes("auth");
+    if (
+      prefs.explorerAutoReconnect &&
+      !isAuthFailure &&
+      lifecycle.reconnectAttempts < prefs.sshAutoReconnectMaxAttempts
+    ) {
+      lifecycle.reconnectAttempts += 1;
+      if (lifecycle.reconnectTimer) clearTimeout(lifecycle.reconnectTimer);
+      lifecycle.reconnectTimer = setTimeout(() => {
+        lifecycle.reconnectTimer = null;
+        lifecycle.connectPromise = connect(session_id, lifecycle.hostId).catch(() => {
+          lifecycle.connectPromise = null;
+        });
+      }, prefs.sshAutoReconnectDelay * 1000);
+    }
   });
 
   void listen<{ session_id: string }>("session_established", (event) => {
     const { session_id } = event.payload;
-    if (!lifecycles.has(session_id)) return;
+    const lifecycle = lifecycles.get(session_id);
+    if (!lifecycle) return;
+    lifecycle.reconnectAttempts = 0;
     useLazySessionStore.getState().setStatus(session_id, "connected");
   });
 

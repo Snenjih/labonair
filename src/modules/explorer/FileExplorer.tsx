@@ -1,14 +1,3 @@
-import { Button } from "@/components/ui/button";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useHostsStore } from "@/modules/hosts";
 import {
   Cancel01Icon,
   FileAddIcon,
@@ -20,21 +9,32 @@ import {
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { handleApiError } from "@/lib/errors";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { handleApiError } from "@/lib/errors";
+import { useHostsStore } from "@/modules/hosts";
 import { ExplorerAuthPrompt } from "./components/ExplorerAuthPrompt";
 import { VirtualizedTreeList } from "./components/VirtualizedTreeList";
-import { copyToClipboard, revealInFinder } from "./lib/contextActions";
 import { buildTreeRows } from "./lib/buildTreeRows";
-import type { ExplorerTarget } from "./lib/useExplorerTarget";
+import { copyToClipboard, revealInFinder } from "./lib/contextActions";
 import type { SearchHit } from "./lib/fsProvider";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
-import { useLazyExplorerSession } from "./lib/useLazyExplorerSession";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { createLocalFsProvider } from "./lib/providers/localFsProvider";
 import { createRemoteFsProvider } from "./lib/providers/remoteFsProvider";
+import type { ExplorerTarget } from "./lib/useExplorerTarget";
 import { useFileTree } from "./lib/useFileTree";
+import { useLazyExplorerSession } from "./lib/useLazyExplorerSession";
 import { useOsFileDrop } from "./lib/useOsFileDrop";
 
 type Props = {
@@ -190,6 +190,31 @@ export function FileExplorer({
       clearTimeout(handle);
     };
   }, [query, rootPath, provider]);
+
+  // Lets the command palette (useExplorerCommands) drive this panel's
+  // toolbar actions without threading callbacks through App.tsx/SidebarContent
+  // — same window-event pattern as ssh.reconnect's "labonair:ssh-reconnect".
+  // No-ops while a different sidebar panel is mounted instead of this one.
+  useEffect(() => {
+    if (!rootPath) return;
+    const onRefresh = () => tree.refresh(rootPath);
+    const onToggleHidden = () => {
+      tree.toggleShowHidden();
+      tree.refresh(rootPath);
+    };
+    const onNewFile = () => tree.beginCreate(rootPath, "file");
+    const onNewFolder = () => tree.beginCreate(rootPath, "dir");
+    window.addEventListener("labonair:explorer-refresh", onRefresh);
+    window.addEventListener("labonair:explorer-toggle-hidden", onToggleHidden);
+    window.addEventListener("labonair:explorer-new-file", onNewFile);
+    window.addEventListener("labonair:explorer-new-folder", onNewFolder);
+    return () => {
+      window.removeEventListener("labonair:explorer-refresh", onRefresh);
+      window.removeEventListener("labonair:explorer-toggle-hidden", onToggleHidden);
+      window.removeEventListener("labonair:explorer-new-file", onNewFile);
+      window.removeEventListener("labonair:explorer-new-folder", onNewFolder);
+    };
+  }, [rootPath, tree]);
 
   // A lazy remote session that isn't connected yet gets its own compact
   // state instead of the tree — deliberately not a full-screen loading

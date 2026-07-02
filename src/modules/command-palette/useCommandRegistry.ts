@@ -1,18 +1,18 @@
 import { useMemo } from "react";
-import type { CommandAction, CommandPage, RegistryCallbacks } from "./types";
-import type { CommandContext } from "./types";
-import { useSystemCommands } from "./hooks/useSystemCommands";
-import { useLayoutCommands } from "./hooks/useLayoutCommands";
-import { useHostCommands } from "./hooks/useHostCommands";
-import { useSettingsCommands } from "./hooks/useSettingsCommands";
-import { useZoomCommands } from "./hooks/useZoomCommands";
-import { useTabCommands } from "./hooks/useTabCommands";
-import { useSnippetCommands } from "./hooks/useSnippetCommands";
 import { useAiSessionCommands } from "./hooks/useAiSessionCommands";
-import { useTerminalCommands } from "./hooks/useTerminalCommands";
-import { useSftpCommands } from "./hooks/useSftpCommands";
 import { useEditorCommands } from "./hooks/useEditorCommands";
+import { useExplorerCommands } from "./hooks/useExplorerCommands";
+import { useHostCommands } from "./hooks/useHostCommands";
+import { useLayoutCommands } from "./hooks/useLayoutCommands";
+import { useSettingsCommands } from "./hooks/useSettingsCommands";
+import { useSftpCommands } from "./hooks/useSftpCommands";
+import { useSnippetCommands } from "./hooks/useSnippetCommands";
 import { useSourceControlCommands } from "./hooks/useSourceControlCommands";
+import { useSystemCommands } from "./hooks/useSystemCommands";
+import { useTabCommands } from "./hooks/useTabCommands";
+import { useTerminalCommands } from "./hooks/useTerminalCommands";
+import { useZoomCommands } from "./hooks/useZoomCommands";
+import type { CommandAction, CommandContext, CommandPage, RegistryCallbacks } from "./types";
 
 type Registry = Record<string, CommandPage>;
 
@@ -39,6 +39,7 @@ export function useCommandRegistry(
   const { rootActions: sftpActionRoots } = useSftpCommands(activeTabId);
   const { rootActions: editorRootActions, outlinePage } = useEditorCommands(cb);
   const { rootActions: scRootActions, branchPage } = useSourceControlCommands(cb);
+  const { rootActions: explorerRootActions } = useExplorerCommands();
 
   return useMemo(() => {
     const filterByContext = (actions: CommandAction[]): CommandAction[] => {
@@ -59,6 +60,7 @@ export function useCommandRegistry(
       ...filterByContext(settingsRootActions),
       ...filterByContext(editorRootActions),
       ...scRootActions,
+      ...explorerRootActions,
     ];
 
     const rootPage: CommandPage = {
@@ -106,5 +108,6 @@ export function useCommandRegistry(
     outlinePage,
     scRootActions,
     branchPage,
+    explorerRootActions,
   ]);
 }

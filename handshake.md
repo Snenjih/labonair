@@ -29,6 +29,26 @@ Branch `feat/explorer-remote-provider` pushed, PR #115 open against `main`, not 
 
 ---
 
+## Follow-up Session: 2026-07-01 (Explorer Settings, Commands, Notification Gap — still on `feat/explorer-remote-provider`, uncommitted)
+
+### What Was Done
+Audited the remote sidebar explorer (PR #115) for missing settings, command-palette coverage, and notification wiring; implemented all three. `tsc --noEmit` ✅ · `vitest run` (266/266) ✅ · `biome check --write` applied to touched files.
+
+- **Notifications** (the actual gap, closed via the `integrate-notifications` skill): `useLazyExplorerSession.ts`'s `ssh_connection_lost` listener and `evictForDeletedHost` now call `useNotificationStore.addNotification`, matching `SshTerminalPane`'s existing pattern. Previously a background lazy session dying while the sidebar panel wasn't mounted was silently invisible.
+- **New settings** (Settings → File Manager, search-only like existing `sftp*` prefs — no new sidebar tab): `explorerShowHiddenByDefault`, `explorerRemotePollInterval` (replaces hardcoded 20s poll in `useFileTree.ts`), `explorerAutoReconnect` (reuses existing `sshAutoReconnectDelay`/`sshAutoReconnectMaxAttempts`, doesn't duplicate them), `explorerIdleSessionTimeoutMin`, `explorerMaxIdleSessions` (replace hardcoded 5min/3-session constants in `useLazyExplorerSession.ts`). Full plumbing: `Preferences` type, `KEY_*` consts, defaults, `loadPreferences`, setters, `onPreferencesChange` map (all in `store.ts`), `definitions.ts` entries, `SettingsApp.tsx` switch cases.
+- **New command palette hook** `useExplorerCommands.ts`: Refresh File Tree, Toggle Hidden Files, New File/Folder, Reconnect Explorer Sessions, Copy Explorer Root Path. The sidebar tree had zero palette commands before. Refresh/toggle/new-file/new-folder reach the mounted `FileExplorer` via a `window.dispatchEvent`/`addEventListener("labonair:explorer-*")` bridge (same pattern as `ssh.reconnect`'s `labonair:ssh-reconnect`), since `useFileTree`'s actions are hook-local closures, not store state.
+- Fixed the `integrate-notifications` skill doc itself (`.claude/skills/integrate-notifications.md`) — still said "Nexum notification system" / `NexumError` from before the 2026-06-25 rename.
+- Found but deliberately did NOT fix (unrelated, out of scope): `useSettingsCommands.ts`'s `settings.hidden-files` command dispatches `labonair:sftp-toggle-hidden` to a listener that doesn't exist anywhere — a pre-existing dead command for the dual-pane SFTP tab.
+
+### Current State
+Still on `feat/explorer-remote-provider`, changes are **uncommitted** (not yet added to PR #115). All checks green.
+
+### What's Next
+- Decide whether these additions go into PR #115 or a separate follow-up PR, then commit
+- Manual testing of the new settings (esp. `explorerAutoReconnect`) and commands still needs a real SSH host + `pnpm tauri dev`
+
+---
+
 ## Previous Session: 2026-06-25 (Full App Rename: Nexum → Labonair)
 
 ### What Was Done

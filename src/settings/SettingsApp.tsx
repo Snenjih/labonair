@@ -287,6 +287,21 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "sshAutoReconnectMaxAttempts":
       void store.setSshAutoReconnectMaxAttempts(Number(value));
       break;
+    case "explorerShowHiddenByDefault":
+      void store.setExplorerShowHiddenByDefault(value as boolean);
+      break;
+    case "explorerRemotePollInterval":
+      void store.setExplorerRemotePollInterval(Number(value));
+      break;
+    case "explorerAutoReconnect":
+      void store.setExplorerAutoReconnect(value as boolean);
+      break;
+    case "explorerIdleSessionTimeoutMin":
+      void store.setExplorerIdleSessionTimeoutMin(Number(value));
+      break;
+    case "explorerMaxIdleSessions":
+      void store.setExplorerMaxIdleSessions(Number(value));
+      break;
   }
 }
 

@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
-import { handleApiError } from "@/lib/errors";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { handleApiError } from "@/lib/errors";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { createAsyncQueue } from "./asyncQueue";
 import type { FsProvider } from "./fsProvider";
 import { useLocalExplorerStore } from "./useLocalExplorerStore";
@@ -28,13 +29,12 @@ export function dirname(path: string): string {
 // instead of piling up blocked on the backend's lock.
 const READDIR_CONCURRENCY = 3;
 
-// Remote providers have no push-based watch — poll expanded directories at
-// a conservative interval instead so browsing doesn't go completely stale
-// during a long session. Local providers use OS watchers (fs:dir-changed)
-// and never hit this path.
-const REMOTE_POLL_INTERVAL_MS = 20_000;
-
 export function useFileTree(provider: FsProvider, rootPath: string | null, options?: Options) {
+  // Remote providers have no push-based watch — poll expanded directories at
+  // a conservative interval instead so browsing doesn't go completely stale
+  // during a long session. Local providers use OS watchers (fs:dir-changed)
+  // and never hit this path. 0 (from the "Never" option) disables polling.
+  const remotePollIntervalMs = usePreferencesStore((s) => s.explorerRemotePollInterval) * 1000;
   const { nodes, expanded, showHidden, setScope, setNode, toggleExpanded, addExpanded, toggleShowHidden } =
     useLocalExplorerStore();
 
@@ -171,7 +171,7 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
   // up requests even if a poll tick lands while a manual fetch is still
   // running. Local providers rely on OS watchers and skip this entirely.
   useEffect(() => {
-    if (provider.capabilities.supportsWatch || !rootPath) return;
+    if (provider.capabilities.supportsWatch || !rootPath || remotePollIntervalMs <= 0) return;
     const interval = setInterval(() => {
       const state = useLocalExplorerStore.getState();
       // Scope may have moved on since this interval was scheduled (e.g. the
@@ -181,9 +181,9 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
       for (const path of state.expanded) {
         void fetchChildren(path);
       }
-    }, REMOTE_POLL_INTERVAL_MS);
+    }, remotePollIntervalMs);
     return () => clearInterval(interval);
-  }, [provider, rootPath, fetchChildren]);
+  }, [provider, rootPath, fetchChildren, remotePollIntervalMs]);
 
   const toggle = useCallback(
     (path: string) => {

@@ -1,6 +1,6 @@
 # Skill: integrate-notifications
 
-Use this skill whenever the user asks to wire a module, feature, or area of the app into the **Nexum notification system** — so errors, warnings, and success events surface in the `NotificationDropdown` in the header.
+Use this skill whenever the user asks to wire a module, feature, or area of the app into the **Labonair notification system** — so errors, warnings, and success events surface in the `NotificationDropdown` in the header.
 
 ---
 
@@ -26,11 +26,11 @@ addNotification({
 ```ts
 import { handleApiError } from "@/lib/errors";
 
-// Wraps any caught value (NexumError or unknown) → addNotification({ type: "error", ... })
+// Wraps any caught value (LabonairError or unknown) → addNotification({ type: "error", ... })
 handleApiError(e, "Descriptive title", "SourceBadge");
 ```
 
-`handleApiError` already handles `NexumError` (Rust-side structured errors with `{ code, message }`) and plain strings/unknowns. **Always prefer this over calling `addNotification` directly for errors.**
+`handleApiError` already handles `LabonairError` (Rust-side structured errors with `{ code, message }`) and plain strings/unknowns. **Always prefer this over calling `addNotification` directly for errors.**
 
 ### UI
 
@@ -125,7 +125,7 @@ Do not duplicate this — it covers any `invoke()` call whose promise was not ex
 | `src/modules/notifications/store/useNotificationStore.ts` | Zustand store, types `AppNotification`, `NotificationType` |
 | `src/modules/notifications/components/NotificationDropdown.tsx` | Bell icon + popover UI in Header |
 | `src/lib/errors.ts` | `handleApiError` helper |
-| `src/types.ts` | `NexumError`, `isNexumError` |
+| `src/types.ts` | `LabonairError`, `isLabonairError` |
 | `src/app/App.tsx` | Global `unhandledrejection` / `error` listeners |
 
 ---
@@ -134,5 +134,5 @@ Do not duplicate this — it covers any `invoke()` call whose promise was not ex
 
 - Do not use `alert()`, browser dialogs, or shadcn `toast()` for async operation errors.
 - Do not swallow errors silently — every user-visible operation should have error reporting.
-- Do not call `addNotification` with raw Rust error strings without sanitizing — use `handleApiError` which applies `isNexumError` first.
+- Do not call `addNotification` with raw Rust error strings without sanitizing — use `handleApiError` which applies `isLabonairError` first.
 - Do not add the notification dropdown to a second place in the UI — it belongs only in `Header`.
