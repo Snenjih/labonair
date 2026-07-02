@@ -1,6 +1,35 @@
 # Handshake — Session State
 
-## Last Session: 2026-07-01 (Sidebar Explorer: SSH Host Browsing via Shared FsProvider)
+## Last Session: 2026-07-02 (Remote Source Control, Git Graph & SSH-aware Path Breadcrumb)
+
+### What Was Done
+Extended the remote-capable sidebar explorer (PR #115) with full local/remote parity for Source Control, Git Graph, and the bottom-bar path breadcrumb — closing the gap `useExplorerTarget.ts` explicitly documented ("SourceControlPanel has no remote story"). Planned via plan-mode (3 Explore agents + 1 Plan agent researching the git module, SC/git-graph frontend, and settings/test conventions before implementation). 7 more sequential commits on `feat/explorer-remote-provider`, PR #115 description extended. `cargo check` ✅ · `cargo clippy` ✅ · `cargo test --lib` (66/66) ✅ · `tsc --noEmit` ✅ · `vitest run` (275/275) ✅. **Not merged — no manual `pnpm tauri dev` testing done (headless sandbox, no display).**
+
+**Commits (see PR #115 for full descriptions):**
+1. `ed0aca4` — `refactor(ssh)`: extract `shell_quote` from `ssh/sftp.rs` into shared `ssh/shell.rs`, add tests
+2. `3768417` — `feat(git)`: `GitExecutor` abstraction (`src-tauri/src/modules/git/executor.rs`) — local stays argv-based `Command::args()`, remote runs the same git subcommand over the target's existing SFTP session via `bash -lc`/`sh -c` fallback; `git_is_repo` fixed to `Result<bool,String>` (was silently swallowing "git not installed"); new bundled `git_get_workspace_state` (status+branches+stash+tags+diffstats+flags in one exec — the real perf fix, since `ssh2::Session` is one-Mutex-per-host so "parallel" polling calls were serializing into 5 round-trips); new `git_init` command
+3. `dec51b1` — `feat(explorer)`: `SourceControlPanel`/Git Graph now consume the shared `ExplorerTarget`; `GitGraphTab`/`GitDiffTab`/`CommitDiffTab` gain snapshotted `hostId`/`sessionId`
+4. `2b67a68` — `feat(source-control)`: every SC component threads `sessionId`; `useGitStatus` switched to the bundled call + configurable/remote-backoff polling; `NoRepoState`'s git-init no longer bypasses the target
+5. `d5dc2b1` — `feat(git-graph)`: `useGitGraph` + context menu actions + diff tab panes thread `sessionId`; remote page size capped lower (200 vs 500)
+6. `3f04dc9` — `feat(statusbar)`: `CwdBreadcrumb` renders for SSH tabs now (was local-only), subfolder dropdown goes through `FsProvider` via the same lazy session the sidebar tree uses (`useLazyExplorerSession`)
+7. `56623c9` — `feat(settings)`: new configurable `gitStatusPollIntervalMs` setting (default 5000ms), new "Source Control" settings tab
+
+**Known, disclosed scope cuts (in PR notes):** `.gitignore`/`.git/info/exclude` writes stay local-only (raw filesystem writes, not git commands) — remote target shows a clear "not supported yet" message instead of a broken local IO error. Non-interactive SSH `$PATH` resolution is a `bash -lc` login-shell heuristic, not exhaustive PATH-probing.
+
+### Current State
+Branch `feat/explorer-remote-provider` pushed (15 commits ahead of `main` total), PR #115 description extended with the new feature set + updated testing checklist. All automated checks green. Manual verification (both the original remote-browsing checklist and the new remote SC/Git Graph/breadcrumb checklist) is in the PR description — still needs a human with `pnpm tauri dev` + a real SSH host.
+
+### What's Next
+- Run the full manual verification checklist in PR #115 against a real SSH host (both old and new sections)
+- If that surfaces issues, fix on the same branch
+- After merge: consider extending `.gitignore`/`.git/info/exclude` writes to remote targets via SFTP if it comes up again
+
+### Blockers
+- None (aside from needing a real SSH host + display for manual verification)
+
+---
+
+## Previous Session: 2026-07-01 (Sidebar Explorer: SSH Host Browsing via Shared FsProvider)
 
 ### What Was Done
 Extended the local-only sidebar file tree to also browse SSH hosts, without replacing the existing dual-pane SFTP transfer tab. Full plan was designed via plan-mode (3 Explore agents + 1 Plan agent researching tab/session model, SSH/SFTP backend architecture, and existing explorer/SFTP components before implementation started). 7 sequential commits on `feat/explorer-remote-provider`, PR #115 opened against `main`. `cargo check` ✅ · `cargo clippy` ✅ · `cargo test --lib` (42/42) ✅ · `tsc --noEmit` ✅ · `vitest run` (266/266) ✅. **Not merged — no manual `pnpm tauri dev` testing done (headless sandbox, no display).**
@@ -29,7 +58,7 @@ Branch `feat/explorer-remote-provider` pushed, PR #115 open against `main`, not 
 
 ---
 
-## Follow-up Session: 2026-07-01 (Explorer Settings, Commands, Notification Gap — still on `feat/explorer-remote-provider`, uncommitted)
+## Session: 2026-07-01 (Explorer Settings, Commands, Notification Gap)
 
 ### What Was Done
 Audited the remote sidebar explorer (PR #115) for missing settings, command-palette coverage, and notification wiring; implemented all three. `tsc --noEmit` ✅ · `vitest run` (266/266) ✅ · `biome check --write` applied to touched files.
@@ -41,10 +70,9 @@ Audited the remote sidebar explorer (PR #115) for missing settings, command-pale
 - Found but deliberately did NOT fix (unrelated, out of scope): `useSettingsCommands.ts`'s `settings.hidden-files` command dispatches `labonair:sftp-toggle-hidden` to a listener that doesn't exist anywhere — a pre-existing dead command for the dual-pane SFTP tab.
 
 ### Current State
-Still on `feat/explorer-remote-provider`, changes are **uncommitted** (not yet added to PR #115). All checks green.
+Committed as `dd597f3` on `feat/explorer-remote-provider`, part of PR #115. All checks green.
 
 ### What's Next
-- Decide whether these additions go into PR #115 or a separate follow-up PR, then commit
 - Manual testing of the new settings (esp. `explorerAutoReconnect`) and commands still needs a real SSH host + `pnpm tauri dev`
 
 ---
