@@ -56,7 +56,13 @@ export function deriveExplorerTarget(
         type: "remote",
         hostId: session.hostId,
         sessionId: `explorer:${session.hostId}`,
-        path: session.cwd ?? host?.default_path_ssh ?? null,
+        // A remote shell without OSC7 shell-integration never reports its
+        // cwd, so `session.cwd` commonly stays unset for the session's whole
+        // lifetime — without this fallback the tree would show "no
+        // directory" forever on a fully connected session. Mirrors
+        // SftpPane's own `host?.default_path_sftp ?? "/"` fallback for the
+        // dual-pane tab.
+        path: session.cwd ?? host?.default_path_ssh ?? (host ? "/" : null),
         source: "lazy-session",
       };
     }

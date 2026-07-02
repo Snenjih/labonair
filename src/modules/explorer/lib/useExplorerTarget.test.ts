@@ -91,6 +91,17 @@ describe("deriveExplorerTarget", () => {
     expect(target).toEqual({ type: "local", path: "/Users/x" });
   });
 
+  it("falls back to \"/\" when a known host has no cwd and no default_path_ssh", () => {
+    const bareHost: Host = { ...HOST, id: "host-2", default_path_ssh: undefined };
+    const tab = workspaceTab({
+      sessions: {
+        "pane-1": { id: "pane-1", kind: "ssh", title: "ssh", hostId: "host-2" },
+      },
+    });
+    const target = deriveExplorerTarget(tab, [HOST, bareHost], "/Users/x");
+    expect(target).toMatchObject({ type: "remote", path: "/" });
+  });
+
   it("falls back to local if the ssh session references an unknown host", () => {
     const tab = workspaceTab({
       sessions: {

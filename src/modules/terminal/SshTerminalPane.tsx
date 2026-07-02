@@ -33,7 +33,7 @@ import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { TerminalSessionData } from "@/modules/tabs";
-import { registerTerminalQueryHandlers } from "@/modules/terminal/lib/osc-handlers";
+import { registerCwdHandler, registerTerminalQueryHandlers } from "@/modules/terminal/lib/osc-handlers";
 import { useTheme } from "@/modules/theme";
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { dropPaths } from "./lib/drop-paths";
@@ -92,10 +92,15 @@ interface Props {
   isActive: boolean;
   tabVisible?: boolean;
   onSearchReady?: (addon: SearchAddon) => void;
+  /** OSC 7 cwd reports from the remote shell — see ssh::shell_integration on
+   *  the Rust side for how the hook gets installed. Lets the sidebar
+   *  explorer / breadcrumb follow `cd` on a remote shell like they already
+   *  do for local terminals. */
+  onCwd?: (cwd: string) => void;
 }
 
 export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function SshTerminalPane(
-  { sessionId, session, isActive, tabVisible = true, onSearchReady },
+  { sessionId, session, isActive, tabVisible = true, onSearchReady, onCwd },
   ref,
 ) {
   const [isConnected, setIsConnected] = useState(false);
@@ -127,6 +132,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
   const searchRef = useRef<SearchAddon | null>(null);
   const onSearchReadyRef = useRef(onSearchReady);
   onSearchReadyRef.current = onSearchReady;
+  const onCwdRef = useRef(onCwd);
+  onCwdRef.current = onCwd;
   const sudoPasswordRef = useRef<string | null>(null);
   const sudoDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const outputTailRef = useRef<string>("");
@@ -657,6 +664,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
           invoke("ssh_pty_write", { sessionId, data: d }).catch(console.error),
         ),
       );
+      cleanups.push(registerCwdHandler(t, (cwd) => onCwdRef.current?.(cwd)));
 
       const FIT_DEBOUNCE_MS = 8;
       const PTY_RESIZE_DEBOUNCE_MS = 256;

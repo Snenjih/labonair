@@ -236,6 +236,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                     tabVisible={tabVisible}
                     ref={(h) => registerHandle(paneId, h)}
                     onSearchReady={(addon) => handleSearchReady(paneId, addon)}
+                    onCwd={(cwd) => onCwd(paneId, cwd)}
                   />
                 )}
               </div>

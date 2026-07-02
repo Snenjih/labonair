@@ -26,11 +26,13 @@ use portable_pty::CommandBuilder;
 // Shell integration scripts live as real files under `scripts/` so editors can
 // lint/highlight them. `include_str!` inlines them at compile time, so the
 // runtime still ships a single binary.
-const ZSHENV: &str = include_str!("scripts/zshenv.zsh");
-const ZPROFILE: &str = include_str!("scripts/zprofile.zsh");
-const ZLOGIN: &str = include_str!("scripts/zlogin.zsh");
-const ZSHRC: &str = include_str!("scripts/zshrc.zsh");
-const BASHRC: &str = include_str!("scripts/bashrc.bash");
+// pub(crate): also reused by ssh::shell_integration to bootstrap the same
+// OSC7/133 hooks on a remote login shell over SSH.
+pub(crate) const ZSHENV: &str = include_str!("scripts/zshenv.zsh");
+pub(crate) const ZPROFILE: &str = include_str!("scripts/zprofile.zsh");
+pub(crate) const ZLOGIN: &str = include_str!("scripts/zlogin.zsh");
+pub(crate) const ZSHRC: &str = include_str!("scripts/zshrc.zsh");
+pub(crate) const BASHRC: &str = include_str!("scripts/bashrc.bash");
 
 pub enum Shell {
     Zsh,
