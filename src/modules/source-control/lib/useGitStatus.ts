@@ -14,6 +14,18 @@ export function effectivePollIntervalMs(pollIntervalMs: number, target: Explorer
   return target.type === "remote" ? Math.round(pollIntervalMs * REMOTE_POLL_MULTIPLIER) : pollIntervalMs;
 }
 
+type GitTargetKey = { rootPath: string | null; sessionId: string | undefined };
+
+/** True when `next` describes a genuinely different git target than `prev`
+ *  (different repo path and/or different remote session). Used to decide
+ *  whether `doRefresh`'s in-flight-request generation should be bumped —
+ *  repeated refreshes of the SAME target (polling, manual refresh) must NOT
+ *  bump it, only an actual target change should. Pure so it's testable
+ *  without mounting the hook — see useGitStatus.test.ts. */
+export function isDifferentGitTarget(prev: GitTargetKey | null, next: GitTargetKey): boolean {
+  return !prev || prev.rootPath !== next.rootPath || prev.sessionId !== next.sessionId;
+}
+
 // Polling stops automatically when the panel unmounts (SidebarContent conditionally renders
 // SourceControlPanel only when activePanel === "source-control"). No extra active-panel
 // check is needed here — the useEffect cleanup handles it on unmount.
@@ -44,8 +56,28 @@ export function useGitStatus(target: ExplorerTarget) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
   const isRefreshingRef = useRef(false);
+  // `isMountedRef`/`isRefreshingRef` are shared across target switches (this
+  // component never remounts — SourceControlPanel is rendered once with a
+  // changing `target` prop, see SidebarContent.tsx). That means a slow
+  // request for a PREVIOUS target can still be in flight when the target
+  // changes; `isMountedRef` alone doesn't catch this because the new
+  // target's mount effect flips it back to `true` before the old request's
+  // await resolves. `generationRef` closes that gap: it's bumped only on a
+  // genuine target change (see isDifferentGitTarget), and every write below
+  // is guarded by `isStale()` so a stale response — success OR error — can
+  // never overwrite a newer target's state.
+  const generationRef = useRef(0);
+  const lastTargetRef = useRef<GitTargetKey | null>(null);
 
   const doRefresh = useCallback(async () => {
+    const targetKey: GitTargetKey = { rootPath, sessionId: targetSessionId };
+    if (isDifferentGitTarget(lastTargetRef.current, targetKey)) {
+      lastTargetRef.current = targetKey;
+      generationRef.current += 1;
+    }
+    const requestGeneration = generationRef.current;
+    const isStale = () => !isMountedRef.current || generationRef.current !== requestGeneration;
+
     if (!rootPath) {
       setRepoInfo(false, null);
       setTarget(null, null);
@@ -63,14 +95,18 @@ export function useGitStatus(target: ExplorerTarget) {
       // failure — `git_is_repo` returning `false` is the normal "no repo"
       // signal, so reaching a catch at all means something else went wrong
       // (dead SSH session, transport error, ...). Always surface it instead
-      // of silently rendering the generic "not a git repository" state.
-      setError(String(e));
-      setRepoInfo(false, null);
+      // of silently rendering the generic "not a git repository" state —
+      // unless this request is already stale, in which case the newer
+      // request's own result (success or failure) is what should be shown.
+      if (!isStale()) {
+        setError(String(e));
+        setRepoInfo(false, null);
+      }
       isRefreshingRef.current = false;
       return;
     }
 
-    if (!isMountedRef.current) {
+    if (isStale()) {
       isRefreshingRef.current = false;
       return;
     }
@@ -85,13 +121,15 @@ export function useGitStatus(target: ExplorerTarget) {
     try {
       root = await git.getRepoRoot(rootPath, targetSessionId);
     } catch (e) {
-      setError(String(e));
-      setRepoInfo(false, null);
+      if (!isStale()) {
+        setError(String(e));
+        setRepoInfo(false, null);
+      }
       isRefreshingRef.current = false;
       return;
     }
 
-    if (!isMountedRef.current) {
+    if (isStale()) {
       isRefreshingRef.current = false;
       return;
     }
@@ -109,7 +147,7 @@ export function useGitStatus(target: ExplorerTarget) {
 
     try {
       const state = await git.getWorkspaceState(root, targetSessionId);
-      if (!isMountedRef.current) {
+      if (isStale()) {
         isRefreshingRef.current = false;
         return;
       }
@@ -120,10 +158,12 @@ export function useGitStatus(target: ExplorerTarget) {
       setTags(state.tags);
       setDiffStats(state.diffStats);
     } catch (e) {
-      setError(String(e));
+      if (!isStale()) setError(String(e));
     } finally {
-      setIsStatusLoading(false);
-      setIsBranchLoading(false);
+      if (!isStale()) {
+        setIsStatusLoading(false);
+        setIsBranchLoading(false);
+      }
     }
 
     isRefreshingRef.current = false;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
-import { effectivePollIntervalMs } from "./useGitStatus";
+import { effectivePollIntervalMs, isDifferentGitTarget } from "./useGitStatus";
 
 function remoteTarget(overrides: Partial<Extract<ExplorerTarget, { type: "remote" }>> = {}): ExplorerTarget {
   return {
@@ -29,5 +29,38 @@ describe("effectivePollIntervalMs", () => {
 
   it("returns the raw interval for a null local path", () => {
     expect(effectivePollIntervalMs(4000, { type: "local", path: null })).toBe(4000);
+  });
+});
+
+describe("isDifferentGitTarget", () => {
+  it("is different when there is no previous target", () => {
+    expect(isDifferentGitTarget(null, { rootPath: "/repo", sessionId: undefined })).toBe(true);
+  });
+
+  it("is not different for the exact same local target (repeated polls/refreshes)", () => {
+    const target = { rootPath: "/repo", sessionId: undefined };
+    expect(isDifferentGitTarget(target, { rootPath: "/repo", sessionId: undefined })).toBe(false);
+  });
+
+  it("is not different for the exact same remote target", () => {
+    const target = { rootPath: "/srv/app", sessionId: "explorer:host-1" };
+    expect(isDifferentGitTarget(target, { rootPath: "/srv/app", sessionId: "explorer:host-1" })).toBe(false);
+  });
+
+  it("is different when the root path changes on the same session", () => {
+    const prev = { rootPath: "/srv/app", sessionId: "explorer:host-1" };
+    expect(isDifferentGitTarget(prev, { rootPath: "/srv/other", sessionId: "explorer:host-1" })).toBe(true);
+  });
+
+  it("is different when the session changes for the same root path", () => {
+    // e.g. switching from an SFTP-tab session to a lazy-session for the same
+    // host, or between two different hosts that happen to share a path.
+    const prev = { rootPath: "/srv/app", sessionId: "explorer:host-1" };
+    expect(isDifferentGitTarget(prev, { rootPath: "/srv/app", sessionId: "explorer:host-2" })).toBe(true);
+  });
+
+  it("is different when switching from remote back to local", () => {
+    const prev = { rootPath: "/srv/app", sessionId: "explorer:host-1" };
+    expect(isDifferentGitTarget(prev, { rootPath: "/srv/app", sessionId: undefined })).toBe(true);
   });
 });
