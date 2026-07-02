@@ -49,6 +49,7 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
       newPreviewTab: actions.newPreviewTab,
       openHomeTab: actions.openHomeTab,
       newSftpTab: actions.newSftpTab,
+      updateSftpPaths: actions.updateSftpPaths,
       splitPane: actions.splitPane,
       setActivePaneId: actions.setActivePaneId,
     }).then((result) => {
