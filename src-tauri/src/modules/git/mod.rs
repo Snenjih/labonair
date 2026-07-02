@@ -1,6 +1,8 @@
+mod executor;
+
+use crate::modules::sftp::SftpState;
+use executor::{resolve_executor, GitExecutor, GIT_NOT_INSTALLED};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,7 +70,32 @@ pub struct StashEntry {
     pub hash: String,
 }
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDiffStat {
+    pub path: String,
+    pub added: u32,
+    pub removed: u32,
+    pub staged: bool,
+}
+
+/// Bundles the 5-6 read-heavy queries `useGitStatus.ts` polls on an interval
+/// into a single round-trip. Locally this trades 5 process spawns for 1;
+/// remotely it's the difference between 5 serialized SSH round-trips (the
+/// underlying `ssh2::Session` is guarded by one Mutex, so "parallel" calls
+/// actually queue) and 1 — the single biggest lever for remote responsiveness.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceGitState {
+    pub status: GitStatus,
+    pub branches: Vec<Branch>,
+    pub current_branch: String,
+    pub stash: Vec<StashEntry>,
+    pub tags: Vec<String>,
+    pub diff_stats: Vec<FileDiffStat>,
+}
+
+// ─── Pure parsers (shared by the standalone commands and the bundle) ──────────
 
 fn parse_shortstat(s: &str) -> (u32, u32, u32) {
     let mut files = 0u32;
@@ -87,182 +114,10 @@ fn parse_shortstat(s: &str) -> (u32, u32, u32) {
     (files, ins, del)
 }
 
-/// Truncates a byte slice at a UTF-8 character boundary at or before `max` bytes.
-fn safe_truncate_utf8(bytes: &[u8], max: usize) -> &[u8] {
-    if bytes.len() <= max {
-        return bytes;
-    }
-    let mut end = max;
-    // Walk backwards past any continuation bytes (0x80..0xBF)
-    while end > 0 && (bytes[end] & 0xC0) == 0x80 {
-        end -= 1;
-    }
-    &bytes[..end]
-}
-
-/// Synchronous helper: validate cwd, run git with the given args, return trimmed stdout.
-/// Returns Err(stderr) on non-zero exit or if git is not found.
-fn run_git_sync(args: &[&str], cwd: &str) -> Result<String, String> {
-    let cwd_path = PathBuf::from(cwd);
-    if !cwd_path.is_dir() {
-        return Err(format!("not a directory: {cwd}"));
-    }
-
-    let output = Command::new("git")
-        .env("LC_ALL", "C")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .args(args)
-        .current_dir(&cwd_path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "git is not installed or not in PATH".to_string()
-            } else {
-                e.to_string()
-            }
-        })?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout)
-            .trim_end()
-            .to_string())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim_end().to_string();
-        Err(if stderr.is_empty() {
-            format!(
-                "git exited with code {}",
-                output.status.code().unwrap_or(-1)
-            )
-        } else {
-            stderr
-        })
-    }
-}
-
-/// Same as run_git_sync but also captures stderr merged into a single string (useful
-/// for push/pull/fetch where git writes progress to stderr).
-fn run_git_merged_sync(args: &[&str], cwd: &str) -> Result<String, String> {
-    let cwd_path = PathBuf::from(cwd);
-    if !cwd_path.is_dir() {
-        return Err(format!("not a directory: {cwd}"));
-    }
-
-    let output = Command::new("git")
-        .env("LC_ALL", "C")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .args(args)
-        .current_dir(&cwd_path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| {
-            if e.kind() == std::io::ErrorKind::NotFound {
-                "git is not installed or not in PATH".to_string()
-            } else {
-                e.to_string()
-            }
-        })?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim_end().to_string();
-
-    if output.status.success() {
-        Ok(format!("{stdout}{stderr}"))
-    } else {
-        Err(if stderr.is_empty() {
-            format!("git exited with code {}", output.status.code().unwrap_or(-1))
-        } else {
-            stderr
-        })
-    }
-}
-
-/// Async wrapper around run_git_sync — offloads blocking I/O to spawn_blocking.
-async fn run_git(args: Vec<String>, cwd: String) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
-        let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        run_git_sync(&arg_refs, &cwd)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-/// Async wrapper around run_git_merged_sync — offloads blocking I/O to spawn_blocking.
-async fn run_git_merged(args: Vec<String>, cwd: String) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
-        let arg_refs: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-        run_git_merged_sync(&arg_refs, &cwd)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-// ─── Commands ─────────────────────────────────────────────────────────────────
-
-/// Returns true if the given path is inside a git repository.
-#[tauri::command]
-pub async fn git_is_repo(path: String) -> bool {
-    let cwd_path = PathBuf::from(&path);
-    if !cwd_path.is_dir() {
-        return false;
-    }
-    tokio::task::spawn_blocking(move || {
-        Command::new("git")
-            .env("LC_ALL", "C")
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .args(["rev-parse", "--git-dir"])
-            .current_dir(&cwd_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-    })
-    .await
-    .unwrap_or(false)
-}
-
-/// Returns the repository root path.
-#[tauri::command]
-pub async fn git_get_repo_root(path: String) -> Result<String, String> {
-    run_git(vec!["rev-parse".to_string(), "--show-toplevel".to_string()], path).await
-}
-
-// ─── git_get_status sync body ─────────────────────────────────────────────────
-
-fn git_get_status_sync(path: String) -> Result<GitStatus, String> {
-    // Resolve the actual repo root so .git dir checks are accurate.
-    let repo_root = run_git_sync(&["rev-parse", "--show-toplevel"], &path)?;
-
-    // ── porcelain v1 with NUL terminators ────────────────────────────────────
-    let raw_output = {
-        let cwd_path = PathBuf::from(&repo_root);
-        let output = Command::new("git")
-            .env("LC_ALL", "C")
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .args(["status", "--porcelain=v1", "-z"])
-            .current_dir(&cwd_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .map_err(|e| e.to_string())?;
-        if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).into_owned());
-        }
-        output.stdout
-    };
-
-    // The output is NUL-separated. We split on NUL and parse tokens.
-    // Each status entry is: "XY filename\0" for regular files, or
-    // "R  new_name\0orig_name\0" for renames (two tokens consumed).
-    let raw_str = String::from_utf8_lossy(&raw_output);
-    // Split by NUL — last element may be empty because the stream ends with NUL.
+/// Parses `git status --porcelain=v1 -z` NUL-terminated output into the
+/// staged/unstaged/untracked buckets `GitStatus` exposes.
+fn parse_porcelain_status(raw: &[u8]) -> (Vec<FileStatus>, Vec<FileStatus>, Vec<FileStatus>, bool) {
+    let raw_str = String::from_utf8_lossy(raw);
     let tokens: Vec<&str> = raw_str.split('\0').collect();
 
     let mut staged: Vec<FileStatus> = Vec::new();
@@ -273,26 +128,19 @@ fn git_get_status_sync(path: String) -> Result<GitStatus, String> {
     let mut i = 0;
     while i < tokens.len() {
         let token = tokens[i];
-        // Each entry token is "XY filename" (at least 3 chars: 2 status + space + 1 char name).
         if token.len() < 3 {
             i += 1;
             continue;
         }
         let mut chars = token.chars();
-        let x = chars.next().unwrap_or(' '); // index status
-        let y = chars.next().unwrap_or(' '); // worktree status
-        // Skip the space separator
+        let x = chars.next().unwrap_or(' ');
+        let y = chars.next().unwrap_or(' ');
         let _ = chars.next();
         let filename: String = chars.collect();
 
-        // Consume original path for renames/copies (next NUL token).
-        // Format: "XY new_path\0old_path\0" — after parsing "XY new_path" at tokens[i],
-        // tokens[i+1] is the old_path. We read it at the current i (after i += 1 below)
-        // but we must NOT double-increment — so read tokens[i] first, then increment.
         let original_path: Option<String> = if x == 'R' || x == 'C' || y == 'R' || y == 'C' {
-            // Peek at the next token without incrementing yet; we'll increment after reading.
             let orig = tokens.get(i + 1).map(|s| s.to_string()).filter(|s| !s.is_empty());
-            i += 1; // consume the old_path token so the loop's i += 1 moves past it
+            i += 1;
             orig
         } else {
             None
@@ -310,14 +158,11 @@ fn git_get_status_sync(path: String) -> Result<GitStatus, String> {
         };
 
         if x == '?' && y == '?' {
-            // Untracked
             untracked.push(fs);
         } else {
-            // Staged: index has a change (not space, not '?')
             if x != ' ' && x != '?' {
                 staged.push(fs.clone());
             }
-            // Unstaged: worktree has a change (not space, not '?'), and it's not a pure untracked
             if y != ' ' && y != '?' {
                 unstaged.push(fs);
             }
@@ -326,100 +171,43 @@ fn git_get_status_sync(path: String) -> Result<GitStatus, String> {
         i += 1;
     }
 
-    // ── Ahead / behind ───────────────────────────────────────────────────────
-    let (ahead, behind) = {
-        let cwd_path = PathBuf::from(&repo_root);
-        let out = Command::new("git")
-            .env("LC_ALL", "C")
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .args(["rev-list", "--count", "--left-right", "@{upstream}...HEAD"])
-            .current_dir(&cwd_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .output();
-        match out {
-            Ok(o) if o.status.success() => {
-                let s = String::from_utf8_lossy(&o.stdout);
-                let s = s.trim();
-                // Output: "<behind>\t<ahead>"
-                // (left side = upstream = behind, right side = HEAD = ahead)
-                let parts: Vec<&str> = s.split('\t').collect();
-                if parts.len() == 2 {
-                    let behind: u32 = parts[0].parse().unwrap_or(0);
-                    let ahead: u32 = parts[1].parse().unwrap_or(0);
-                    (ahead, behind)
-                } else {
-                    (0, 0)
-                }
-            }
-            _ => (0, 0),
-        }
-    };
-
-    // ── Merge / rebase / cherry-pick state ───────────────────────────────────
-    let git_dir = {
-        // `git rev-parse --git-dir` gives us the .git directory path (relative or absolute).
-        let raw = run_git_sync(&["rev-parse", "--git-dir"], &repo_root).unwrap_or_default();
-        if raw.starts_with('/') {
-            PathBuf::from(&raw)
-        } else {
-            PathBuf::from(&repo_root).join(&raw)
-        }
-    };
-
-    let merge_in_progress = git_dir.join("MERGE_HEAD").exists();
-    let rebase_in_progress =
-        git_dir.join("rebase-merge").is_dir() || git_dir.join("rebase-apply").is_dir();
-    let cherry_pick_in_progress = git_dir.join("CHERRY_PICK_HEAD").exists();
-
-    Ok(GitStatus {
-        staged,
-        unstaged,
-        untracked,
-        has_conflicts,
-        merge_in_progress,
-        rebase_in_progress,
-        cherry_pick_in_progress,
-        ahead,
-        behind,
-    })
+    (staged, unstaged, untracked, has_conflicts)
 }
 
-/// Returns the full working tree status.
-#[tauri::command]
-pub async fn git_get_status(path: String) -> Result<GitStatus, String> {
-    tokio::task::spawn_blocking(move || git_get_status_sync(path))
-        .await
-        .map_err(|e| e.to_string())?
-}
-
-/// Returns the current branch name, or "HEAD detached at <hash>" if detached.
-#[tauri::command]
-pub async fn git_get_current_branch(path: String) -> Result<String, String> {
-    let branch = run_git(vec!["branch".to_string(), "--show-current".to_string()], path.clone()).await?;
-    if branch.is_empty() {
-        // Detached HEAD
-        let hash = run_git(vec!["rev-parse".to_string(), "--short".to_string(), "HEAD".to_string()], path).await?;
-        Ok(format!("HEAD detached at {hash}"))
+/// Parses `<behind>\t<ahead>` from `git rev-list --count --left-right`.
+fn parse_ahead_behind(s: &str) -> (u32, u32) {
+    let s = s.trim();
+    let parts: Vec<&str> = s.split('\t').collect();
+    if parts.len() == 2 {
+        let behind: u32 = parts[0].parse().unwrap_or(0);
+        let ahead: u32 = parts[1].parse().unwrap_or(0);
+        (ahead, behind)
     } else {
-        Ok(branch)
+        (0, 0)
     }
 }
 
-/// Returns all branches (local and remote).
-#[tauri::command]
-pub async fn git_get_branches(path: String) -> Result<Vec<Branch>, String> {
-    // %(HEAD) outputs '*' for current, ' ' otherwise.
-    let output = run_git(
-        vec![
-            "branch".to_string(),
-            "-a".to_string(),
-            "--format=%(refname:short)|%(HEAD)|%(upstream:short)|%(upstream:track,nobracket)".to_string(),
-        ],
-        path,
-    ).await?;
+/// Parses the three `1`/`0` marker-check lines (MERGE_HEAD, rebase-merge or
+/// rebase-apply, CHERRY_PICK_HEAD) emitted by the shared marker-check script.
+fn parse_state_flags(s: &str) -> (bool, bool, bool) {
+    let mut lines = s.lines().map(|l| l.trim() == "1");
+    let merge = lines.next().unwrap_or(false);
+    let rebase = lines.next().unwrap_or(false);
+    let cherry = lines.next().unwrap_or(false);
+    (merge, rebase, cherry)
+}
 
+/// The shell snippet used to answer "is a merge/rebase/cherry-pick in
+/// progress" — expressed as `test -f`/`test -d` marker checks so it works
+/// identically whether run locally (direct filesystem access) or on a
+/// remote host (no `Path::exists()` available there, only shell tests).
+const STATE_FLAGS_SCRIPT: &str = r#"GITDIR=$(git rev-parse --git-dir 2>/dev/null)
+test -f "$GITDIR/MERGE_HEAD" && echo 1 || echo 0
+test -d "$GITDIR/rebase-merge" -o -d "$GITDIR/rebase-apply" && echo 1 || echo 0
+test -f "$GITDIR/CHERRY_PICK_HEAD" && echo 1 || echo 0"#;
+
+/// Parses `git branch -a --format=%(refname:short)|%(HEAD)|%(upstream:short)|%(upstream:track,nobracket)`.
+fn parse_branches(output: &str) -> Vec<Branch> {
     let mut branches: Vec<Branch> = Vec::new();
 
     for line in output.lines() {
@@ -436,17 +224,14 @@ pub async fn git_get_branches(path: String) -> Result<Vec<Branch>, String> {
         let upstream_raw = parts.get(2).copied().unwrap_or("").to_string();
         let track_info = parts.get(3).copied().unwrap_or("");
 
-        // Parse ahead/behind from track info like "ahead 2, behind 1", "ahead 3", "behind 1"
         let mut ahead: u32 = 0;
         let mut behind: u32 = 0;
         if !track_info.is_empty() {
-            // ahead N
             if let Some(pos) = track_info.find("ahead ") {
                 let rest = &track_info[pos + 6..];
                 let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
                 ahead = num_str.parse().unwrap_or(0);
             }
-            // behind N
             if let Some(pos) = track_info.find("behind ") {
                 let rest = &track_info[pos + 7..];
                 let num_str: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
@@ -455,117 +240,288 @@ pub async fn git_get_branches(path: String) -> Result<Vec<Branch>, String> {
         }
 
         let is_remote = name.starts_with("remotes/");
-        let upstream = if upstream_raw.is_empty() {
-            None
-        } else {
-            Some(upstream_raw)
-        };
+        let upstream = if upstream_raw.is_empty() { None } else { Some(upstream_raw) };
 
-        branches.push(Branch {
-            name,
-            is_current,
-            is_remote,
-            upstream,
-            ahead,
-            behind,
-        });
+        branches.push(Branch { name, is_current, is_remote, upstream, ahead, behind });
     }
 
-    Ok(branches)
+    branches
 }
 
-// ─── git_get_diff sync body ───────────────────────────────────────────────────
+const BRANCH_FORMAT: &str = "%(refname:short)|%(HEAD)|%(upstream:short)|%(upstream:track,nobracket)";
 
-fn git_get_diff_sync(path: String, file: String, staged: bool, ignore_whitespace: bool) -> Result<String, String> {
-    const MAX_DIFF_BYTES: usize = 200 * 1024; // 200 KB
-
-    let mut args: Vec<String> = if staged {
-        vec!["diff".to_string(), "--cached".to_string()]
+/// Parses the `%gs` format field into (branch, message).
+fn parse_stash_gs(gs: &str) -> (String, String) {
+    let rest = if let Some(r) = gs.strip_prefix("WIP on ") {
+        r
+    } else if let Some(r) = gs.strip_prefix("On ") {
+        r
     } else {
-        vec!["diff".to_string()]
+        return (String::new(), gs.to_string());
     };
-    if ignore_whitespace {
-        args.push("-w".to_string());
-    }
-    args.push("--".to_string());
-    args.push(file);
-
-    let cwd_path = PathBuf::from(&path);
-    if !cwd_path.is_dir() {
-        return Err(format!("not a directory: {path}"));
-    }
-
-    let output = Command::new("git")
-        .env("LC_ALL", "C")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .args(&args)
-        .current_dir(&cwd_path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
-    }
-
-    let stdout = output.stdout;
-    if stdout.len() > MAX_DIFF_BYTES {
-        let truncated = String::from_utf8_lossy(safe_truncate_utf8(&stdout, MAX_DIFF_BYTES)).into_owned();
-        Ok(format!(
-            "{truncated}\n\n[diff truncated — output exceeded 200 KB]"
-        ))
+    if let Some(colon_pos) = rest.find(": ") {
+        (rest[..colon_pos].to_string(), rest[colon_pos + 2..].to_string())
     } else {
-        Ok(String::from_utf8_lossy(&stdout).into_owned())
+        (rest.to_string(), String::new())
     }
+}
+
+/// Parses `git stash list --format=%gd%x00%gs%x00%H%x1e`.
+fn parse_stash_list(output: &str) -> Vec<StashEntry> {
+    let mut entries: Vec<StashEntry> = Vec::new();
+    for record in output.split('\x1e') {
+        let record = record.trim();
+        if record.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = record.splitn(3, '\x00').collect();
+        if parts.len() < 3 {
+            continue;
+        }
+        let ref_part = parts[0].trim();
+        let index: u32 = ref_part
+            .trim_start_matches("stash@{")
+            .trim_end_matches('}')
+            .parse()
+            .unwrap_or(0);
+        let (branch, message) = parse_stash_gs(parts[1]);
+        let hash = parts[2].trim().to_string();
+        entries.push(StashEntry { index, message, branch, hash });
+    }
+    entries
+}
+
+const STASH_FORMAT: &str = "%gd%x00%gs%x00%H%x1e";
+
+fn parse_tags(output: &str) -> Vec<String> {
+    output.lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect()
+}
+
+fn parse_numstat(output: &str, staged: bool) -> Vec<FileDiffStat> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.splitn(3, '\t').collect();
+            if parts.len() < 3 {
+                return None;
+            }
+            let added = parts[0].parse::<u32>().unwrap_or(0);
+            let removed = parts[1].parse::<u32>().unwrap_or(0);
+            let path = parts[2].to_string();
+            Some(FileDiffStat { path, added, removed, staged })
+        })
+        .collect()
+}
+
+/// Truncates a byte slice at a UTF-8 character boundary at or before `max` bytes.
+fn safe_truncate_utf8(bytes: &[u8], max: usize) -> &[u8] {
+    if bytes.len() <= max {
+        return bytes;
+    }
+    let mut end = max;
+    while end > 0 && (bytes[end] & 0xC0) == 0x80 {
+        end -= 1;
+    }
+    &bytes[..end]
+}
+
+// ─── Commands ─────────────────────────────────────────────────────────────────
+
+/// Returns true if the given path is inside a git repository. `Err` is
+/// reserved for the "git binary missing" case (both locally and remotely) —
+/// "not a git repo" is a normal `Ok(false)`, not an error.
+#[tauri::command]
+pub async fn git_is_repo(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<bool, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    match executor.run(&["rev-parse", "--git-dir"]).await {
+        Ok(_) => Ok(true),
+        Err(e) if e == GIT_NOT_INSTALLED => Err(e),
+        Err(_) => Ok(false),
+    }
+}
+
+/// Returns the repository root path.
+#[tauri::command]
+pub async fn git_get_repo_root(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["rev-parse", "--show-toplevel"]).await
+}
+
+/// Returns the full working tree status.
+#[tauri::command]
+pub async fn git_get_status(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<GitStatus, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let script = format!(
+        "git status --porcelain=v1 -z\nprintf '\\x1d'\ngit rev-list --count --left-right '@{{upstream}}...HEAD' 2>/dev/null\nprintf '\\x1d'\n{STATE_FLAGS_SCRIPT}"
+    );
+    let (raw, _exit) = executor.run_shell_script(&script).await?;
+    let sections: Vec<&[u8]> = raw.split(|b| *b == 0x1d).collect();
+    let porcelain = sections.first().copied().unwrap_or(&[]);
+    let ahead_behind_str = sections.get(1).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let flags_str = sections.get(2).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+
+    let (staged, unstaged, untracked, has_conflicts) = parse_porcelain_status(porcelain);
+    let (ahead, behind) = parse_ahead_behind(&ahead_behind_str);
+    let (merge_in_progress, rebase_in_progress, cherry_pick_in_progress) = parse_state_flags(&flags_str);
+
+    Ok(GitStatus {
+        staged,
+        unstaged,
+        untracked,
+        has_conflicts,
+        merge_in_progress,
+        rebase_in_progress,
+        cherry_pick_in_progress,
+        ahead,
+        behind,
+    })
+}
+
+/// Returns the current branch name, or "HEAD detached at <hash>" if detached.
+#[tauri::command]
+pub async fn git_get_current_branch(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let branch = executor.run(&["branch", "--show-current"]).await?;
+    if branch.is_empty() {
+        let hash = executor.run(&["rev-parse", "--short", "HEAD"]).await?;
+        Ok(format!("HEAD detached at {hash}"))
+    } else {
+        Ok(branch)
+    }
+}
+
+/// Returns all branches (local and remote).
+#[tauri::command]
+pub async fn git_get_branches(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<Vec<Branch>, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let output = executor.run(&["branch", "-a", &format!("--format={BRANCH_FORMAT}")]).await?;
+    Ok(parse_branches(&output))
 }
 
 /// Returns the diff for a specific file, either staged or unstaged.
 #[tauri::command]
-pub async fn git_get_diff(path: String, file: String, staged: bool, ignore_whitespace: Option<bool>) -> Result<String, String> {
-    let iw = ignore_whitespace.unwrap_or(false);
-    tokio::task::spawn_blocking(move || git_get_diff_sync(path, file, staged, iw))
-        .await
-        .map_err(|e| e.to_string())?
+pub async fn git_get_diff(
+    path: String,
+    file: String,
+    staged: bool,
+    ignore_whitespace: Option<bool>,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    const MAX_DIFF_BYTES: usize = 200 * 1024;
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+
+    let mut args: Vec<&str> = if staged { vec!["diff", "--cached"] } else { vec!["diff"] };
+    if ignore_whitespace.unwrap_or(false) {
+        args.push("-w");
+    }
+    args.push("--");
+    args.push(&file);
+
+    let stdout = executor.run_raw(&args).await?;
+    Ok(truncate_diff(&stdout, MAX_DIFF_BYTES))
+}
+
+fn truncate_diff(stdout: &[u8], max: usize) -> String {
+    if stdout.len() > max {
+        let truncated = String::from_utf8_lossy(safe_truncate_utf8(stdout, max)).into_owned();
+        format!("{truncated}\n\n[diff truncated — output exceeded 200 KB]")
+    } else {
+        String::from_utf8_lossy(stdout).into_owned()
+    }
 }
 
 /// Stages a specific file.
 #[tauri::command]
-pub async fn git_stage_file(path: String, file: String) -> Result<(), String> {
-    run_git(vec!["add".to_string(), "--".to_string(), file], path).await.map(|_| ())
+pub async fn git_stage_file(
+    path: String,
+    file: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["add", "--", &file]).await.map(|_| ())
 }
 
 /// Unstages a specific file.
 #[tauri::command]
-pub async fn git_unstage_file(path: String, file: String) -> Result<(), String> {
-    run_git(vec!["restore".to_string(), "--staged".to_string(), "--".to_string(), file], path).await.map(|_| ())
+pub async fn git_unstage_file(
+    path: String,
+    file: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["restore", "--staged", "--", &file]).await.map(|_| ())
 }
 
 /// Stages all changes (equivalent to `git add -A`).
 #[tauri::command]
-pub async fn git_stage_all(path: String) -> Result<(), String> {
-    run_git(vec!["add".to_string(), "-A".to_string()], path).await.map(|_| ())
+pub async fn git_stage_all(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["add", "-A"]).await.map(|_| ())
 }
 
-/// Unstages all staged changes.
-/// Uses `git reset HEAD` which is the canonical way to unstage everything.
-/// Falls back to `git rm --cached -r .` for repositories with no commits yet.
+/// Unstages all staged changes. Falls back to `git rm --cached -r .` for
+/// repositories with no commits yet.
 #[tauri::command]
-pub async fn git_unstage_all(path: String) -> Result<(), String> {
-    match run_git(vec!["reset".to_string(), "HEAD".to_string()], path.clone()).await {
+pub async fn git_unstage_all(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    match executor.run(&["reset", "HEAD"]).await {
         Ok(_) => Ok(()),
-        Err(_) => {
-            // No commits yet — use rm --cached to unstage everything
-            run_git(vec!["rm".to_string(), "--cached".to_string(), "-r".to_string(), ".".to_string()], path).await.map(|_| ())
-        }
+        Err(_) => executor.run(&["rm", "--cached", "-r", "."]).await.map(|_| ()),
     }
 }
 
 /// Discards worktree changes for a specific file.
 #[tauri::command]
-pub async fn git_discard_file(path: String, file: String) -> Result<(), String> {
-    run_git(vec!["restore".to_string(), "--".to_string(), file], path).await.map(|_| ())
+pub async fn git_discard_file(
+    path: String,
+    file: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["restore", "--", &file]).await.map(|_| ())
 }
 
 /// Creates a commit with the given message. Supports `--amend`.
@@ -574,18 +530,21 @@ pub async fn git_commit(
     path: String,
     message: String,
     amend: bool,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<CommitResult, String> {
-    let mut args = vec!["commit".to_string()];
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+
+    let mut args: Vec<&str> = vec!["commit"];
     if amend {
-        args.push("--amend".to_string());
+        args.push("--amend");
     }
-    args.push("-m".to_string());
-    args.push(message);
+    args.push("-m");
+    args.push(&message);
+    executor.run(&args).await?;
 
-    run_git(args, path.clone()).await?;
-
-    // Fetch hash + subject of the resulting commit.
-    let log = run_git(vec!["log".to_string(), "-1".to_string(), "--format=%H|%s".to_string()], path).await?;
+    let log = executor.run(&["log", "-1", "--format=%H|%s"]).await?;
     let mut parts = log.splitn(2, '|');
     let hash = parts.next().unwrap_or("").to_string();
     let subject = parts.next().unwrap_or("").to_string();
@@ -599,48 +558,64 @@ pub async fn git_push(
     path: String,
     remote: Option<String>,
     branch: Option<String>,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
     let remote_str = remote.unwrap_or_else(|| "origin".to_string());
-    let mut args = vec!["push".to_string(), remote_str];
-
-    if let Some(b) = branch {
+    let mut args: Vec<&str> = vec!["push", &remote_str];
+    if let Some(ref b) = branch {
         args.push(b);
     }
-
-    run_git_merged(args, path).await
+    executor.run_merged(&args).await
 }
 
 /// Pulls from the configured upstream.
 #[tauri::command]
-pub async fn git_pull(path: String) -> Result<String, String> {
-    run_git_merged(vec!["pull".to_string()], path).await
+pub async fn git_pull(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run_merged(&["pull"]).await
 }
 
 /// Fetches from all remotes.
 #[tauri::command]
-pub async fn git_fetch(path: String) -> Result<String, String> {
-    run_git_merged(vec!["fetch".to_string(), "--all".to_string()], path).await
+pub async fn git_fetch(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run_merged(&["fetch", "--all"]).await
 }
 
 /// Aborts an in-progress merge, rebase, or cherry-pick.
 #[tauri::command]
-pub async fn git_abort(path: String) -> Result<(), String> {
-    let repo_root = run_git(vec!["rev-parse".to_string(), "--show-toplevel".to_string()], path.clone()).await?;
-    let git_dir_raw = run_git(vec!["rev-parse".to_string(), "--git-dir".to_string()], repo_root.clone()).await.unwrap_or_default();
-    let git_dir = if git_dir_raw.starts_with('/') {
-        PathBuf::from(&git_dir_raw)
-    } else {
-        PathBuf::from(&repo_root).join(&git_dir_raw)
-    };
+pub async fn git_abort(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let (raw, _exit) = executor.run_shell_script(STATE_FLAGS_SCRIPT).await?;
+    let flags_str = String::from_utf8_lossy(&raw).into_owned();
+    let (merge, rebase, cherry) = parse_state_flags(&flags_str);
 
-    if git_dir.join("MERGE_HEAD").exists() {
-        return run_git(vec!["merge".to_string(), "--abort".to_string()], repo_root).await.map(|_| ());
+    if merge {
+        return executor.run(&["merge", "--abort"]).await.map(|_| ());
     }
-    if git_dir.join("rebase-merge").is_dir() || git_dir.join("rebase-apply").is_dir() {
-        return run_git(vec!["rebase".to_string(), "--abort".to_string()], repo_root).await.map(|_| ());
+    if rebase {
+        return executor.run(&["rebase", "--abort"]).await.map(|_| ());
     }
-    if git_dir.join("CHERRY_PICK_HEAD").exists() {
-        return run_git(vec!["cherry-pick".to_string(), "--abort".to_string()], repo_root).await.map(|_| ());
+    if cherry {
+        return executor.run(&["cherry-pick", "--abort"]).await.map(|_| ());
     }
     Err("no merge, rebase, or cherry-pick in progress to abort".to_string())
 }
@@ -651,21 +626,29 @@ pub async fn git_get_log(
     path: String,
     limit: Option<u32>,
     all_branches: bool,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<Vec<CommitInfo>, String> {
-    let n = limit.unwrap_or(500).to_string();
-    // %x1e (ASCII record separator) starts each commit; %x00 separates fields.
+    // Remote page size defaults lower than local's 500 — a single exec must
+    // finish within the session's existing 15s timeout, and remote round-trip
+    // + remote CPU cost is higher per commit than a local process.
+    let default_limit = if session_id.is_some() { 200 } else { 500 };
+    let n = limit.unwrap_or(default_limit).to_string();
     let format = "--format=%x1e%H%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D".to_string();
 
-    let mut args = vec!["log".to_string()];
-    if all_branches {
-        args.push("--all".to_string());
-    }
-    args.push("-n".to_string());
-    args.push(n);
-    args.push(format);
-    args.push("--shortstat".to_string());
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
 
-    let raw = run_git(args, path).await?;
+    let mut args: Vec<&str> = vec!["log"];
+    if all_branches {
+        args.push("--all");
+    }
+    args.push("-n");
+    args.push(&n);
+    args.push(&format);
+    args.push("--shortstat");
+
+    let raw = executor.run(&args).await?;
 
     let mut commits: Vec<CommitInfo> = Vec::new();
 
@@ -675,7 +658,6 @@ pub async fn git_get_log(
             continue;
         }
 
-        // First line: NUL-separated fields. Remainder: optional shortstat.
         let (header, stat_part) = record.split_once('\n').unwrap_or((record, ""));
 
         let parts: Vec<&str> = header.splitn(7, '\x00').collect();
@@ -697,14 +679,12 @@ pub async fn git_get_log(
         let timestamp: i64 = parts[4].parse().unwrap_or(0);
         let subject = parts[5].to_string();
 
-        // Refs field: "HEAD -> main, origin/main, tag: v1.0" etc.
         let refs_raw = parts[6];
         let refs: Vec<String> = refs_raw
             .split(',')
             .map(|r| r.trim())
             .filter(|r| !r.is_empty())
             .map(|r| {
-                // Clean up "HEAD -> " and "tag: " prefixes.
                 if let Some(stripped) = r.strip_prefix("HEAD -> ") {
                     stripped.to_string()
                 } else if let Some(stripped) = r.strip_prefix("tag: ") {
@@ -737,28 +717,56 @@ pub async fn git_get_log(
 
 /// Returns the full detail (message + stat) of a single commit.
 #[tauri::command]
-pub async fn git_get_commit_detail(path: String, hash: String) -> Result<String, String> {
-    run_git(vec!["show".to_string(), "--stat".to_string(), "--format=%B".to_string(), hash], path).await
+pub async fn git_get_commit_detail(
+    path: String,
+    hash: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["show", "--stat", "--format=%B", &hash]).await
 }
 
 /// Returns numstat output for a single commit: `additions\tdeletions\tpath` per line.
 #[tauri::command]
-pub async fn git_get_commit_numstat(path: String, hash: String) -> Result<String, String> {
-    run_git(vec!["show".to_string(), "--numstat".to_string(), "--format=".to_string(), hash], path).await
+pub async fn git_get_commit_numstat(
+    path: String,
+    hash: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["show", "--numstat", "--format=", &hash]).await
 }
 
 /// Returns the fetch URL of the given remote (defaults to "origin").
 #[tauri::command]
-pub async fn git_get_remote_url(path: String, remote: Option<String>) -> Result<String, String> {
+pub async fn git_get_remote_url(
+    path: String,
+    remote: Option<String>,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
     let r = remote.unwrap_or_else(|| "origin".to_string());
-    run_git(vec!["remote".to_string(), "get-url".to_string(), r], path).await.map(|s| s.trim().to_string())
+    executor.run(&["remote", "get-url", &r]).await
 }
 
 // ─── Branch Management ────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn git_checkout_branch(path: String, branch: String) -> Result<(), String> {
-    run_git(vec!["checkout".to_string(), branch], path).await.map(|_| ())
+pub async fn git_checkout_branch(
+    path: String,
+    branch: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["checkout", &branch]).await.map(|_| ())
 }
 
 #[tauri::command]
@@ -767,22 +775,30 @@ pub async fn git_create_branch(
     name: String,
     from_ref: Option<String>,
     checkout: bool,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let mut args: Vec<String> = if checkout {
-        vec!["checkout".to_string(), "-b".to_string(), name.clone()]
-    } else {
-        vec!["branch".to_string(), name.clone()]
-    };
-    if let Some(r) = from_ref {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let mut args: Vec<&str> = if checkout { vec!["checkout", "-b", &name] } else { vec!["branch", &name] };
+    if let Some(ref r) = from_ref {
         args.push(r);
     }
-    run_git(args, path).await.map(|_| ())
+    executor.run(&args).await.map(|_| ())
 }
 
 #[tauri::command]
-pub async fn git_delete_branch(path: String, name: String, force: bool) -> Result<(), String> {
-    let flag = if force { "-D".to_string() } else { "-d".to_string() };
-    run_git(vec!["branch".to_string(), flag, name], path).await.map(|_| ())
+pub async fn git_delete_branch(
+    path: String,
+    name: String,
+    force: bool,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let flag = if force { "-D" } else { "-d" };
+    executor.run(&["branch", flag, &name]).await.map(|_| ())
 }
 
 #[tauri::command]
@@ -790,20 +806,19 @@ pub async fn git_rename_branch(
     path: String,
     old_name: String,
     new_name: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
-    run_git(vec!["branch".to_string(), "-m".to_string(), old_name, new_name], path).await.map(|_| ())
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["branch", "-m", &old_name, &new_name]).await.map(|_| ())
 }
 
 // ─── Stash Commands ───────────────────────────────────────────────────────────
 
 /// Resolves a stash commit hash to its current numeric index.
-/// Needed because stash indices shift whenever entries are added or dropped.
-async fn find_stash_index_by_hash(path: &str, hash: &str) -> Result<u32, String> {
-    let output = run_git(
-        vec!["stash".to_string(), "list".to_string(), "--format=%gd|%H".to_string()],
-        path.to_string(),
-    )
-    .await?;
+async fn find_stash_index_by_hash(executor: &GitExecutor, hash: &str) -> Result<u32, String> {
+    let output = executor.run(&["stash", "list", "--format=%gd|%H"]).await?;
     for line in output.lines() {
         let parts: Vec<&str> = line.splitn(2, '|').collect();
         if parts.len() == 2 && parts[1].trim() == hash {
@@ -815,26 +830,7 @@ async fn find_stash_index_by_hash(path: &str, hash: &str) -> Result<u32, String>
             return Ok(idx);
         }
     }
-    Err(format!(
-        "stash entry '{}' no longer exists — it may have already been dropped",
-        hash
-    ))
-}
-
-/// Parses the `%gs` format field into (branch, message).
-fn parse_stash_gs(gs: &str) -> (String, String) {
-    let rest = if let Some(r) = gs.strip_prefix("WIP on ") {
-        r
-    } else if let Some(r) = gs.strip_prefix("On ") {
-        r
-    } else {
-        return (String::new(), gs.to_string());
-    };
-    if let Some(colon_pos) = rest.find(": ") {
-        (rest[..colon_pos].to_string(), rest[colon_pos + 2..].to_string())
-    } else {
-        (rest.to_string(), String::new())
-    }
+    Err(format!("stash entry '{}' no longer exists — it may have already been dropped", hash))
 }
 
 #[tauri::command]
@@ -842,126 +838,87 @@ pub async fn git_stash_push(
     path: String,
     message: Option<String>,
     include_untracked: Option<bool>,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let mut args = vec!["stash".to_string(), "push".to_string()];
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let mut args: Vec<&str> = vec!["stash", "push"];
     if include_untracked.unwrap_or(true) {
-        args.push("--include-untracked".to_string());
+        args.push("--include-untracked");
     }
     if let Some(ref msg) = message {
-        args.push("-m".to_string());
-        args.push(msg.clone());
+        args.push("-m");
+        args.push(msg);
     }
-    run_git(args, path).await.map(|_| ())
+    executor.run(&args).await.map(|_| ())
 }
 
 #[tauri::command]
-pub async fn git_stash_list(path: String) -> Result<Vec<StashEntry>, String> {
-    let output = run_git(
-        vec![
-            "stash".to_string(),
-            "list".to_string(),
-            "--format=%gd%x00%gs%x00%H%x1e".to_string(),
-        ],
-        path,
-    )
-    .await?;
-
-    let mut entries: Vec<StashEntry> = Vec::new();
-    for record in output.split('\x1e') {
-        let record = record.trim();
-        if record.is_empty() {
-            continue;
-        }
-        let parts: Vec<&str> = record.splitn(3, '\x00').collect();
-        if parts.len() < 3 {
-            continue;
-        }
-        let ref_part = parts[0].trim();
-        let index: u32 = ref_part
-            .trim_start_matches("stash@{")
-            .trim_end_matches('}')
-            .parse()
-            .unwrap_or(0);
-        let (branch, message) = parse_stash_gs(parts[1]);
-        let hash = parts[2].trim().to_string();
-        entries.push(StashEntry {
-            index,
-            message,
-            branch,
-            hash,
-        });
-    }
-    Ok(entries)
+pub async fn git_stash_list(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<Vec<StashEntry>, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let output = executor.run(&["stash", "list", &format!("--format={STASH_FORMAT}")]).await?;
+    Ok(parse_stash_list(&output))
 }
 
 #[tauri::command]
-pub async fn git_stash_pop(path: String, hash: String) -> Result<(), String> {
-    let idx = find_stash_index_by_hash(&path, &hash).await?;
-    run_git(
-        vec!["stash".to_string(), "pop".to_string(), format!("stash@{{{}}}", idx)],
-        path,
-    )
-    .await
-    .map(|_| ())
+pub async fn git_stash_pop(
+    path: String,
+    hash: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let idx = find_stash_index_by_hash(&executor, &hash).await?;
+    executor.run(&["stash", "pop", &format!("stash@{{{}}}", idx)]).await.map(|_| ())
 }
 
 #[tauri::command]
-pub async fn git_stash_apply(path: String, hash: String) -> Result<(), String> {
-    let idx = find_stash_index_by_hash(&path, &hash).await?;
-    run_git(
-        vec!["stash".to_string(), "apply".to_string(), format!("stash@{{{}}}", idx)],
-        path,
-    )
-    .await
-    .map(|_| ())
+pub async fn git_stash_apply(
+    path: String,
+    hash: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let idx = find_stash_index_by_hash(&executor, &hash).await?;
+    executor.run(&["stash", "apply", &format!("stash@{{{}}}", idx)]).await.map(|_| ())
 }
 
 #[tauri::command]
-pub async fn git_stash_drop(path: String, hash: String) -> Result<(), String> {
-    let idx = find_stash_index_by_hash(&path, &hash).await?;
-    run_git(
-        vec!["stash".to_string(), "drop".to_string(), format!("stash@{{{}}}", idx)],
-        path,
-    )
-    .await
-    .map(|_| ())
+pub async fn git_stash_drop(
+    path: String,
+    hash: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let idx = find_stash_index_by_hash(&executor, &hash).await?;
+    executor.run(&["stash", "drop", &format!("stash@{{{}}}", idx)]).await.map(|_| ())
 }
 
 // ─── Diff + Push Variants ─────────────────────────────────────────────────────
 
-fn git_get_commit_diff_sync(path: String, hash: String) -> Result<String, String> {
-    const MAX_DIFF_BYTES: usize = 200 * 1024;
-    let cwd_path = PathBuf::from(&path);
-    if !cwd_path.is_dir() {
-        return Err(format!("not a directory: {path}"));
-    }
-    let output = Command::new("git")
-        .env("LC_ALL", "C")
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .args(["show", "--format=", "--patch", &hash])
-        .current_dir(&cwd_path)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
-    }
-    let stdout = output.stdout;
-    if stdout.len() > MAX_DIFF_BYTES {
-        let truncated = String::from_utf8_lossy(safe_truncate_utf8(&stdout, MAX_DIFF_BYTES)).into_owned();
-        Ok(format!("{truncated}\n\n[diff truncated — output exceeded 200 KB]"))
-    } else {
-        Ok(String::from_utf8_lossy(&stdout).into_owned())
-    }
-}
-
 #[tauri::command]
-pub async fn git_get_commit_diff(path: String, hash: String) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || git_get_commit_diff_sync(path, hash))
-        .await
-        .map_err(|e| e.to_string())?
+pub async fn git_get_commit_diff(
+    path: String,
+    hash: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    const MAX_DIFF_BYTES: usize = 200 * 1024;
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let stdout = executor.run_raw(&["show", "--format=", "--patch", &hash]).await?;
+    Ok(truncate_diff(&stdout, MAX_DIFF_BYTES))
 }
 
 #[tauri::command]
@@ -969,13 +926,17 @@ pub async fn git_push_force_with_lease(
     path: String,
     remote: Option<String>,
     branch: Option<String>,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
     let remote_str = remote.unwrap_or_else(|| "origin".to_string());
-    let mut args = vec!["push".to_string(), "--force-with-lease".to_string(), remote_str];
-    if let Some(b) = branch {
+    let mut args: Vec<&str> = vec!["push", "--force-with-lease", &remote_str];
+    if let Some(ref b) = branch {
         args.push(b);
     }
-    run_git_merged(args, path).await
+    executor.run_merged(&args).await
 }
 
 #[tauri::command]
@@ -983,27 +944,40 @@ pub async fn git_push_set_upstream(
     path: String,
     remote: String,
     branch: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
-    run_git_merged(vec!["push".to_string(), "--set-upstream".to_string(), remote, branch], path).await
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run_merged(&["push", "--set-upstream", &remote, &branch]).await
 }
 
 // ─── Cherry-pick ──────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn git_cherry_pick(path: String, hash: String) -> Result<(), String> {
-    run_git(vec!["cherry-pick".to_string(), hash], path).await.map(|_| ())
+pub async fn git_cherry_pick(
+    path: String,
+    hash: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["cherry-pick", &hash]).await.map(|_| ())
 }
 
 // ─── Tag Management ───────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn git_get_tags(path: String) -> Result<Vec<String>, String> {
-    let output = run_git(vec!["tag".to_string(), "--sort=-version:refname".to_string()], path).await?;
-    Ok(output
-        .lines()
-        .filter(|l| !l.is_empty())
-        .map(|l| l.to_string())
-        .collect())
+pub async fn git_get_tags(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<Vec<String>, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let output = executor.run(&["tag", "--sort=-version:refname"]).await?;
+    Ok(parse_tags(&output))
 }
 
 #[tauri::command]
@@ -1012,28 +986,39 @@ pub async fn git_create_tag(
     name: String,
     message: Option<String>,
     hash: Option<String>,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<(), String> {
-    let mut args: Vec<String> = vec!["tag".to_string()];
-    if let Some(msg) = message {
-        args.push("-a".to_string());
-        args.push(name.clone());
-        if let Some(h) = hash {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let mut args: Vec<&str> = vec!["tag"];
+    if let Some(ref msg) = message {
+        args.push("-a");
+        args.push(&name);
+        if let Some(ref h) = hash {
             args.push(h);
         }
-        args.push("-m".to_string());
+        args.push("-m");
         args.push(msg);
     } else {
-        args.push(name.clone());
-        if let Some(h) = hash {
+        args.push(&name);
+        if let Some(ref h) = hash {
             args.push(h);
         }
     }
-    run_git(args, path).await.map(|_| ())
+    executor.run(&args).await.map(|_| ())
 }
 
 #[tauri::command]
-pub async fn git_delete_tag(path: String, name: String) -> Result<(), String> {
-    run_git(vec!["tag".to_string(), "-d".to_string(), name], path).await.map(|_| ())
+pub async fn git_delete_tag(
+    path: String,
+    name: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["tag", "-d", &name]).await.map(|_| ())
 }
 
 #[tauri::command]
@@ -1041,43 +1026,100 @@ pub async fn git_push_tag(
     path: String,
     name: String,
     remote: Option<String>,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
 ) -> Result<String, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
     let remote_str = remote.unwrap_or_else(|| "origin".to_string());
-    run_git_merged(vec!["push".to_string(), remote_str, name], path).await
+    executor.run_merged(&["push", &remote_str, &name]).await
 }
 
 // ─── Diff Stats ───────────────────────────────────────────────────────────────
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct FileDiffStat {
-    pub path: String,
-    pub added: u32,
-    pub removed: u32,
-    pub staged: bool,
-}
-
-fn parse_numstat(output: &str, staged: bool) -> Vec<FileDiffStat> {
-    output
-        .lines()
-        .filter_map(|line| {
-            let parts: Vec<&str> = line.splitn(3, '\t').collect();
-            if parts.len() < 3 { return None; }
-            let added = parts[0].parse::<u32>().unwrap_or(0);
-            let removed = parts[1].parse::<u32>().unwrap_or(0);
-            let path = parts[2].to_string();
-            Some(FileDiffStat { path, added, removed, staged })
-        })
-        .collect()
-}
-
 #[tauri::command]
-pub async fn git_get_diff_stats(path: String) -> Result<Vec<FileDiffStat>, String> {
-    let staged_out = run_git(vec!["diff".to_string(), "--cached".to_string(), "--numstat".to_string()], path.clone()).await.unwrap_or_default();
-    let unstaged_out = run_git(vec!["diff".to_string(), "--numstat".to_string()], path).await.unwrap_or_default();
+pub async fn git_get_diff_stats(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<Vec<FileDiffStat>, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let staged_out = executor.run(&["diff", "--cached", "--numstat"]).await.unwrap_or_default();
+    let unstaged_out = executor.run(&["diff", "--numstat"]).await.unwrap_or_default();
     let mut stats = parse_numstat(&staged_out, true);
     stats.extend(parse_numstat(&unstaged_out, false));
     Ok(stats)
+}
+
+/// Bundles status + branches + stash + tags + diffstats into a single
+/// invocation — see `WorkspaceGitState` for why this exists.
+#[tauri::command]
+pub async fn git_get_workspace_state(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<WorkspaceGitState, String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+
+    let script = format!(
+        "git status --porcelain=v1 -z\n\
+         printf '\\x1d'\n\
+         git branch -a --format='{BRANCH_FORMAT}'\n\
+         printf '\\x1d'\n\
+         git stash list --format='{STASH_FORMAT}'\n\
+         printf '\\x1d'\n\
+         git tag --sort=-version:refname\n\
+         printf '\\x1d'\n\
+         git diff --cached --numstat\n\
+         printf '\\x1c'\n\
+         git diff --numstat\n\
+         printf '\\x1d'\n\
+         git rev-list --count --left-right '@{{upstream}}...HEAD' 2>/dev/null\n\
+         printf '\\x1d'\n\
+         {STATE_FLAGS_SCRIPT}"
+    );
+
+    let (raw, _exit) = executor.run_shell_script(&script).await?;
+    let sections: Vec<&[u8]> = raw.split(|b| *b == 0x1d).collect();
+
+    let porcelain = sections.first().copied().unwrap_or(&[]);
+    let branches_str = sections.get(1).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let stash_str = sections.get(2).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let tags_str = sections.get(3).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let diffstats_raw = sections.get(4).copied().unwrap_or(&[]);
+    let ahead_behind_str = sections.get(5).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let flags_str = sections.get(6).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+
+    let (staged, unstaged, untracked, has_conflicts) = parse_porcelain_status(porcelain);
+    let (ahead, behind) = parse_ahead_behind(&ahead_behind_str);
+    let (merge_in_progress, rebase_in_progress, cherry_pick_in_progress) = parse_state_flags(&flags_str);
+
+    let status = GitStatus {
+        staged,
+        unstaged,
+        untracked,
+        has_conflicts,
+        merge_in_progress,
+        rebase_in_progress,
+        cherry_pick_in_progress,
+        ahead,
+        behind,
+    };
+
+    let branches = parse_branches(&branches_str);
+    let current_branch = branches.iter().find(|b| b.is_current).map(|b| b.name.clone()).unwrap_or_default();
+    let stash = parse_stash_list(&stash_str);
+    let tags = parse_tags(&tags_str);
+
+    let diffstats_parts: Vec<&[u8]> = diffstats_raw.splitn(2, |b| *b == 0x1c).collect();
+    let staged_numstat = diffstats_parts.first().map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let unstaged_numstat = diffstats_parts.get(1).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let mut diff_stats = parse_numstat(&staged_numstat, true);
+    diff_stats.extend(parse_numstat(&unstaged_numstat, false));
+
+    Ok(WorkspaceGitState { status, branches, current_branch, stash, tags, diff_stats })
 }
 
 #[tauri::command]
@@ -1085,12 +1127,10 @@ pub async fn git_add_to_gitignore(path: String, file: String) -> Result<(), Stri
     use std::fs::OpenOptions;
     use std::io::Write;
 
-    // Canonicalize path to prevent directory traversal
     let canonical = std::fs::canonicalize(&path).map_err(|e| format!("invalid path: {e}"))?;
     if !canonical.is_dir() {
         return Err(format!("not a directory: {path}"));
     }
-    // Sanitize file argument — strip control characters that could inject lines
     let safe_file = file.replace(['\n', '\r', '\0'], "");
     if safe_file.is_empty() {
         return Err("file path cannot be empty".to_string());
@@ -1103,11 +1143,7 @@ pub async fn git_add_to_gitignore(path: String, file: String) -> Result<(), Stri
         return Ok(());
     }
 
-    let mut f = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&gitignore_path)
-        .map_err(|e| e.to_string())?;
+    let mut f = OpenOptions::new().create(true).append(true).open(&gitignore_path).map_err(|e| e.to_string())?;
 
     if !existing.is_empty() && !existing.ends_with('\n') {
         writeln!(f).map_err(|e| e.to_string())?;
@@ -1121,9 +1157,7 @@ pub async fn git_add_to_exclude(path: String, file: String) -> Result<(), String
     use std::fs::OpenOptions;
     use std::io::Write;
 
-    // Canonicalize path to prevent directory traversal
     let canonical = std::fs::canonicalize(&path).map_err(|e| format!("invalid path: {e}"))?;
-    // Sanitize file argument — strip control characters that could inject lines
     let safe_file = file.replace(['\n', '\r', '\0'], "");
     if safe_file.is_empty() {
         return Err("file path cannot be empty".to_string());
@@ -1136,15 +1170,145 @@ pub async fn git_add_to_exclude(path: String, file: String) -> Result<(), String
         return Ok(());
     }
 
-    let mut f = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&exclude_path)
-        .map_err(|e| e.to_string())?;
+    let mut f = OpenOptions::new().create(true).append(true).open(&exclude_path).map_err(|e| e.to_string())?;
 
     if !existing.is_empty() && !existing.ends_with('\n') {
         writeln!(f).map_err(|e| e.to_string())?;
     }
     writeln!(f, "{}", entry).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// Initializes a new repository at `path` (local or remote). Replaces the
+/// old direct `shell_run_command("git init", ...)` bypass in
+/// `NoRepoState.tsx`, which only ever ran locally regardless of target.
+#[tauri::command]
+pub async fn git_init(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SftpState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["init"]).await.map(|_| ())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shortstat_parses_all_fields() {
+        assert_eq!(parse_shortstat("3 files changed, 10 insertions(+), 4 deletions(-)"), (3, 10, 4));
+    }
+
+    #[test]
+    fn shortstat_handles_missing_fields() {
+        assert_eq!(parse_shortstat("1 file changed, 1 insertion(+)"), (1, 1, 0));
+        assert_eq!(parse_shortstat(""), (0, 0, 0));
+    }
+
+    #[test]
+    fn stash_gs_parses_wip_form() {
+        assert_eq!(parse_stash_gs("WIP on main: abc123 fix stuff"), ("main".to_string(), "abc123 fix stuff".to_string()));
+    }
+
+    #[test]
+    fn stash_gs_parses_on_form() {
+        assert_eq!(parse_stash_gs("On feature/x: my message"), ("feature/x".to_string(), "my message".to_string()));
+    }
+
+    #[test]
+    fn stash_gs_falls_back_when_unrecognized() {
+        assert_eq!(parse_stash_gs("some custom message"), (String::new(), "some custom message".to_string()));
+    }
+
+    #[test]
+    fn ahead_behind_parses_both() {
+        assert_eq!(parse_ahead_behind("2\t3"), (3, 2));
+    }
+
+    #[test]
+    fn ahead_behind_defaults_when_malformed() {
+        assert_eq!(parse_ahead_behind(""), (0, 0));
+        assert_eq!(parse_ahead_behind("garbage"), (0, 0));
+    }
+
+    #[test]
+    fn state_flags_parses_three_lines() {
+        assert_eq!(parse_state_flags("1\n0\n1"), (true, false, true));
+        assert_eq!(parse_state_flags("0\n0\n0"), (false, false, false));
+    }
+
+    #[test]
+    fn state_flags_defaults_when_short() {
+        assert_eq!(parse_state_flags("1"), (true, false, false));
+        assert_eq!(parse_state_flags(""), (false, false, false));
+    }
+
+    #[test]
+    fn porcelain_status_splits_staged_unstaged_untracked() {
+        let raw = b"M  staged.txt\0 M unstaged.txt\0?? untracked.txt\0";
+        let (staged, unstaged, untracked, conflicts) = parse_porcelain_status(raw);
+        assert_eq!(staged.len(), 1);
+        assert_eq!(unstaged.len(), 1);
+        assert_eq!(untracked.len(), 1);
+        assert!(!conflicts);
+    }
+
+    #[test]
+    fn porcelain_status_detects_conflicts() {
+        let raw = b"UU conflict.txt\0";
+        let (_, _, _, conflicts) = parse_porcelain_status(raw);
+        assert!(conflicts);
+    }
+
+    #[test]
+    fn porcelain_status_handles_rename_with_original_path() {
+        let raw = b"R  new.txt\0old.txt\0";
+        let (staged, _, _, _) = parse_porcelain_status(raw);
+        assert_eq!(staged.len(), 1);
+        assert_eq!(staged[0].original_path.as_deref(), Some("old.txt"));
+    }
+
+    #[test]
+    fn branches_parses_current_and_upstream_tracking() {
+        let raw = "main|*|origin/main|ahead 2, behind 1\nfeature|.|.|";
+        let branches = parse_branches(raw);
+        assert_eq!(branches.len(), 2);
+        assert!(branches[0].is_current);
+        assert_eq!(branches[0].ahead, 2);
+        assert_eq!(branches[0].behind, 1);
+        assert_eq!(branches[0].upstream.as_deref(), Some("origin/main"));
+    }
+
+    #[test]
+    fn stash_list_parses_multiple_entries_separated_by_record_sep() {
+        let raw = "stash@{0}\0WIP on main: abc first\0hash1\x1estash@{1}\0On dev: second\0hash2\x1e";
+        let entries = parse_stash_list(raw);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].index, 0);
+        assert_eq!(entries[0].branch, "main");
+        assert_eq!(entries[1].index, 1);
+        assert_eq!(entries[1].hash, "hash2");
+    }
+
+    #[test]
+    fn numstat_parses_added_removed_path() {
+        let stats = parse_numstat("3\t1\tfoo.txt\n0\t5\tbar.txt", false);
+        assert_eq!(stats.len(), 2);
+        assert_eq!(stats[0].added, 3);
+        assert_eq!(stats[0].removed, 1);
+        assert_eq!(stats[0].path, "foo.txt");
+        assert!(!stats[0].staged);
+    }
+
+    #[test]
+    fn safe_truncate_utf8_backs_off_from_continuation_byte() {
+        let s = "héllo"; // 'é' is 2 bytes in UTF-8
+        let bytes = s.as_bytes();
+        // Truncating at byte 2 lands inside 'é' — must back off to byte 1.
+        let truncated = safe_truncate_utf8(bytes, 2);
+        assert!(std::str::from_utf8(truncated).is_ok());
+    }
 }

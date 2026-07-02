@@ -648,6 +648,8 @@ pub fn run() {
             git::git_get_remote_url,
             git::git_add_to_gitignore,
             git::git_add_to_exclude,
+            git::git_get_workspace_state,
+            git::git_init,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
