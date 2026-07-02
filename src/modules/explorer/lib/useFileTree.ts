@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { handleApiError } from "@/lib/errors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { isLabonairError } from "@/types";
 import { createAsyncQueue } from "./asyncQueue";
 import type { FsProvider } from "./fsProvider";
 import { useLocalExplorerStore } from "./useLocalExplorerStore";
@@ -82,7 +83,16 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
           });
         } catch (e) {
           if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
-          if (!append) setNode(path, { status: "error", message: String(e) });
+          if (!append)
+            setNode(path, {
+              status: "error",
+              // Remote (SFTP) commands reject with a LabonairError object
+              // ({ code, message }), not a string — String(e) on that
+              // stringifies to the literal text "[object Object]" instead
+              // of the actual message. Local commands reject with a plain
+              // string, where this is a no-op.
+              message: isLabonairError(e) ? e.message : String(e),
+            });
           else handleApiError(e, "Failed to load more entries", "File Tree");
         }
       });
@@ -206,7 +216,12 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
     (path: string) => {
       addExpanded(path);
       if (provider.capabilities.supportsWatch) void provider.watch?.(path);
-      if (!useLocalExplorerStore.getState().nodes[path]) {
+      // Also retry a previously-errored node — matches `toggle`'s guard.
+      // Without this, a node that failed once (e.g. a transient SFTP error)
+      // stays permanently stuck showing the error for any caller that only
+      // expands (keyboard nav, beginCreate) rather than toggling/refreshing.
+      const node = useLocalExplorerStore.getState().nodes[path];
+      if (!node || node.status === "error") {
         void fetchChildren(path);
       }
     },
@@ -229,7 +244,8 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
       if (rootPath && parentPath !== rootPath) {
         addExpanded(parentPath);
       }
-      if (!useLocalExplorerStore.getState().nodes[parentPath]) {
+      const node = useLocalExplorerStore.getState().nodes[parentPath];
+      if (!node || node.status === "error") {
         void fetchChildren(parentPath);
       }
     },

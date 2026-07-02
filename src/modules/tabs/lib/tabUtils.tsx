@@ -55,7 +55,7 @@ export function labelFor(t: Tab): string {
 export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {
   if (tab.kind === "editor") {
     const url = fileIconUrl(tab.title);
-    return url ? <img src={url} alt="" className="size-3.5 shrink-0" /> : null;
+    return url ? <img src={url} alt="" decoding="sync" className="size-3.5 shrink-0" /> : null;
   }
   if (tab.kind === "preview") {
     return <HugeiconsIcon icon={Globe02Icon} size={14} strokeWidth={1.75} className="shrink-0" />;

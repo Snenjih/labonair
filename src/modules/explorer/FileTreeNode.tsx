@@ -96,7 +96,7 @@ function FileTreeNodeImpl({
           >
             <span className="size-3.5 shrink-0" />
             {iconUrl ? (
-              <img src={iconUrl} alt="" className="size-4 shrink-0" />
+              <img src={iconUrl} alt="" decoding="sync" className="size-4 shrink-0" />
             ) : (
               <span className="size-4 shrink-0" />
             )}
@@ -193,7 +193,7 @@ function FileTreeNodeImpl({
               ) : null}
             </span>
             {iconUrl ? (
-              <img src={iconUrl} alt="" className="size-4 shrink-0" />
+              <img src={iconUrl} alt="" decoding="sync" className="size-4 shrink-0" />
             ) : (
               <span className="size-4 shrink-0" />
             )}

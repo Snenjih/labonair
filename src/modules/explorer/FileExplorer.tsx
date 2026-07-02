@@ -337,6 +337,7 @@ export function FileExplorer({
           <img
             src={folderIconUrl(basename(rootPath), false)}
             alt=""
+            decoding="sync"
             height={15}
             width={15}
             className="mx-1.5"
@@ -447,7 +448,7 @@ export function FileExplorer({
                     title={hit.path}
                   >
                     {url ? (
-                      <img src={url} alt="" className="size-3.5 shrink-0" />
+                      <img src={url} alt="" decoding="sync" className="size-3.5 shrink-0" />
                     ) : (
                       <HugeiconsIcon
                         icon={Folder01Icon}

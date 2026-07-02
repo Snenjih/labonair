@@ -119,7 +119,7 @@ function TreeNodeRow({
   if (node.kind === "file") {
     return (
       <div className="flex items-center gap-1.5 py-[3px] pr-3" style={{ paddingLeft: depth * 12 + 8 }}>
-        <img src={fileIconUrl(node.name)} className="size-[14px] shrink-0" alt="" />
+        <img src={fileIconUrl(node.name)} className="size-[14px] shrink-0" alt="" decoding="sync" />
         <span className="min-w-0 flex-1 truncate text-[11px] text-foreground/75">{node.name}</span>
         <div className="flex shrink-0 items-center gap-1 font-mono text-[9.5px]">
           {node.added > 0 && <span className="text-success">+{node.added}</span>}
@@ -143,7 +143,7 @@ function TreeNodeRow({
         )}
         style={{ paddingLeft: depth * 12 + 8 }}
       >
-        <img src={folderIconUrl(node.name, !isCollapsed)} className="size-[14px] shrink-0" alt="" />
+        <img src={folderIconUrl(node.name, !isCollapsed)} className="size-[14px] shrink-0" alt="" decoding="sync" />
         <span className={cn("text-[11px]", isRoot ? "font-medium text-foreground/60" : "text-foreground/75")}>
           {node.name}
         </span>

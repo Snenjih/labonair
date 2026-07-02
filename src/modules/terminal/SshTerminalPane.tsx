@@ -278,7 +278,12 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     ref,
     () => ({
       write: (data: string) => {
-        termRef.current?.write(data);
+        // Sends to the remote shell (matches local TerminalPane's `write`,
+        // which forwards to the pty process, not the local render buffer).
+        // Writing to `termRef` directly here would only ever paint the text
+        // onto the screen — it never reaches the shell, so e.g. the
+        // breadcrumb's `cd <path>\n` would sit unexecuted in the prompt.
+        invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
       },
       focus: () => {
         termRef.current?.focus();
