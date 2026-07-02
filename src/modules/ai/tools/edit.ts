@@ -15,10 +15,8 @@ async function applyEdits(
   kind: "edit" | "multi_edit",
 ): Promise<EditResult> {
   const r = await native.readFile(abs);
-  if (r.kind === "binary")
-    return { error: "binary file refused", path: abs };
-  if (r.kind === "toolarge")
-    return { error: `file too large (${r.size} bytes)`, path: abs };
+  if (r.kind === "binary") return { error: "binary file refused", path: abs };
+  if (r.kind === "toolarge") return { error: `file too large (${r.size} bytes)`, path: abs };
 
   const original = r.content;
   let content = original;
@@ -38,8 +36,7 @@ async function applyEdits(
       const before = content;
       content = content.split(e.old_string).join(e.new_string);
       const occurrences =
-        (before.length - content.length) /
-          (e.old_string.length - e.new_string.length || 1) || 0;
+        (before.length - content.length) / (e.old_string.length - e.new_string.length || 1) || 0;
       // Recover count via direct search to avoid divide-by-zero edge cases.
       let n = 0;
       let i = 0;
@@ -66,15 +63,11 @@ async function applyEdits(
       const second = content.indexOf(e.old_string, first + 1);
       if (second !== -1) {
         return {
-          error:
-            "old_string is not unique. Provide more surrounding context, or set replace_all=true.",
+          error: "old_string is not unique. Provide more surrounding context, or set replace_all=true.",
           path: abs,
         };
       }
-      content =
-        content.slice(0, first) +
-        e.new_string +
-        content.slice(first + e.old_string.length);
+      content = content.slice(0, first) + e.new_string + content.slice(first + e.old_string.length);
       totalReplacements += 1;
     }
   }
@@ -116,9 +109,7 @@ export function buildEditTools(ctx: ToolContext) {
         "Replace an exact string in a file. Requires read_file on this path first in the current session — this prevents blind edits. `old_string` must be unique in the file unless `replace_all: true`. Asks for user approval before writing.",
       inputSchema: z.object({
         path: z.string(),
-        old_string: z
-          .string()
-          .describe("Exact substring to replace. Must be unique unless replace_all."),
+        old_string: z.string().describe("Exact substring to replace. Must be unique unless replace_all."),
         new_string: z.string().describe("Replacement substring."),
         replace_all: z.boolean().optional(),
       }),
@@ -129,8 +120,7 @@ export function buildEditTools(ctx: ToolContext) {
         if (!safety.ok) return { error: safety.reason, path: abs };
         if (!ctx.readCache.has(abs)) {
           return {
-            error:
-              "must call read_file on this path first (read-before-edit invariant).",
+            error: "must call read_file on this path first (read-before-edit invariant).",
             path: abs,
           };
         }
@@ -160,8 +150,7 @@ export function buildEditTools(ctx: ToolContext) {
         if (!safety.ok) return { error: safety.reason, path: abs };
         if (!ctx.readCache.has(abs)) {
           return {
-            error:
-              "must call read_file on this path first (read-before-edit invariant).",
+            error: "must call read_file on this path first (read-before-edit invariant).",
             path: abs,
           };
         }

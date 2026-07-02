@@ -13,6 +13,5 @@ export const useEditorCursorStore = create<State>((set) => ({
   col: 1,
   selectionChars: 0,
   selectionLines: 0,
-  set: (line, col, selectionChars, selectionLines) =>
-    set({ line, col, selectionChars, selectionLines }),
+  set: (line, col, selectionChars, selectionLines) => set({ line, col, selectionChars, selectionLines }),
 }));

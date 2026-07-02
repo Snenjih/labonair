@@ -31,10 +31,7 @@ type DirectiveTrigger = {
   query: string;
 };
 
-function detectDirectiveTrigger(
-  value: string,
-  caret: number,
-): DirectiveTrigger | null {
+function detectDirectiveTrigger(value: string, caret: number): DirectiveTrigger | null {
   for (let i = caret - 1; i >= 0; i--) {
     const ch = value[i];
     if (ch === "#") {
@@ -143,9 +140,7 @@ export function AiInputBar() {
     if (!trigger) return [];
     const q = trigger.query;
     const cmdItems: PickerItem[] = Object.values(SLASH_COMMANDS)
-      .filter(
-        (c) => !q || c.name.includes(q) || c.label.toLowerCase().includes(q),
-      )
+      .filter((c) => !q || c.name.includes(q) || c.label.toLowerCase().includes(q))
       .map((command) => ({ kind: "command", command }));
     const dirItems: PickerItem[] = directives
       .filter(
@@ -206,8 +201,7 @@ export function AiInputBar() {
     } else {
       c.addCommand(item.command);
     }
-    const after =
-      item.kind === "command" ? afterRaw.replace(/^\s+/, "") : afterRaw;
+    const after = item.kind === "command" ? afterRaw.replace(/^\s+/, "") : afterRaw;
     c.setValue(`${before}${insert}${after}`);
     setTrigger(null);
     setActiveIndex(0);
@@ -225,17 +219,11 @@ export function AiInputBar() {
     if (it) onPickItem(it);
   };
 
-  const voiceLabel = c.voice.recording
-    ? "Listening…"
-    : c.voice.transcribing
-      ? "Transcribing…"
-      : null;
+  const voiceLabel = c.voice.recording ? "Listening…" : c.voice.transcribing ? "Transcribing…" : null;
 
   return (
     <div className="shrink-0 border-t border-border/60 bg-card/40 px-3 py-2">
-      <div
-        className="flex flex-col gap-1.5 rounded-lg px-1 py-1"
-      >
+      <div className="flex flex-col gap-1.5 rounded-lg px-1 py-1">
         <ChipsRow
           files={c.files}
           onRemoveFile={c.removeFile}
@@ -265,9 +253,7 @@ export function AiInputBar() {
                   if (fileTrigger !== null) {
                     if (e.key === "ArrowDown") {
                       e.preventDefault();
-                      setFileActiveIndex((i) =>
-                        Math.min(i + 1, Math.max(0, fileHits.length - 1)),
-                      );
+                      setFileActiveIndex((i) => Math.min(i + 1, Math.max(0, fileHits.length - 1)));
                       return;
                     }
                     if (e.key === "ArrowUp") {
@@ -291,9 +277,7 @@ export function AiInputBar() {
                   } else if (trigger !== null) {
                     if (e.key === "ArrowDown") {
                       e.preventDefault();
-                      setActiveIndex((i) =>
-                        Math.min(i + 1, Math.max(0, filteredItems.length - 1)),
-                      );
+                      setActiveIndex((i) => Math.min(i + 1, Math.max(0, filteredItems.length - 1)));
                       return;
                     }
                     if (e.key === "ArrowUp") {
@@ -408,9 +392,7 @@ export function AiInputBar() {
             >
               <span>{IS_MAC ? "⌘↵" : "Ctrl+↵"} to queue a follow-up</span>
               {c.queuedCount > 0 && (
-                <span className="rounded bg-muted px-1 font-mono text-[10px]">
-                  {c.queuedCount} queued
-                </span>
+                <span className="rounded bg-muted px-1 font-mono text-[10px]">{c.queuedCount} queued</span>
               )}
             </motion.div>
           )}
@@ -435,8 +417,7 @@ function ChipsRow({
   commands: { name: string; label: string; icon: typeof HashtagIcon }[];
   onRemoveCommand: (name: string) => void;
 }) {
-  if (files.length === 0 && directives.length === 0 && commands.length === 0)
-    return null;
+  if (files.length === 0 && directives.length === 0 && commands.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-1">
       <AnimatePresence initial={false}>
@@ -451,12 +432,7 @@ function ChipsRow({
             className="group flex items-center gap-1 rounded-md border border-border/60 bg-card px-1.5 py-0.5 text-[11px]"
             title={cmd.label}
           >
-            <HugeiconsIcon
-              icon={cmd.icon}
-              size={11}
-              strokeWidth={1.75}
-              className="text-muted-foreground"
-            />
+            <HugeiconsIcon icon={cmd.icon} size={11} strokeWidth={1.75} className="text-muted-foreground" />
             <span className="font-medium">#{cmd.name}</span>
             <button
               type="button"
@@ -479,12 +455,7 @@ function ChipsRow({
             className="group flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[11px] text-foreground dark:text-primary"
             title={d.description || d.name}
           >
-            <HugeiconsIcon
-              icon={HashtagIcon}
-              size={11}
-              strokeWidth={2}
-              className="opacity-80"
-            />
+            <HugeiconsIcon icon={HashtagIcon} size={11} strokeWidth={2} className="opacity-80" />
             <span className="font-medium">{d.handle}</span>
             <button
               type="button"
@@ -519,16 +490,12 @@ function ChipsRow({
             ) : f.kind === "ref" ? (
               <span className="font-mono text-[10px] text-muted-foreground">@</span>
             ) : (
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {extOf(f.name)}
-              </span>
+              <span className="font-mono text-[10px] text-muted-foreground">{extOf(f.name)}</span>
             )}
             <span className="max-w-35 truncate">
               {f.name}
               {f.kind === "selection" && f.text ? (
-                <span className="ml-1 text-muted-foreground">
-                  · {selLineCount(f.text)}L
-                </span>
+                <span className="ml-1 text-muted-foreground">· {selLineCount(f.text)}L</span>
               ) : null}
             </span>
             <button
@@ -575,8 +542,7 @@ export function AiInputBarConnect({ onAdd }: { onAdd: () => void }) {
     <div className="shrink-0 border-t border-border/60 bg-card/40 px-3 py-2">
       <div className="flex h-10 items-center justify-between gap-3 rounded-lg px-3 text-xs">
         <span className="text-muted-foreground">
-          Connect any AI provider (or use local models) - your key stays in your
-          OS keychain.
+          Connect any AI provider (or use local models) - your key stays in your OS keychain.
         </span>
         <div className="flex items-center gap-2">
           <Button size="xs" onClick={onAdd}>

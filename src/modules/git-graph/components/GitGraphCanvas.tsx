@@ -39,8 +39,14 @@ function AuthorAvatar({ name, email }: { name: string; email: string }) {
         src={getAvatarUrl(userId, 36)}
         alt={name}
         className="size-[18px] shrink-0 rounded-[3px] object-cover"
-        onLoad={() => { setCached(userId, true); setStatus("ok"); }}
-        onError={() => { setCached(userId, false); setStatus("error"); }}
+        onLoad={() => {
+          setCached(userId, true);
+          setStatus("ok");
+        }}
+        onError={() => {
+          setCached(userId, false);
+          setStatus("error");
+        }}
       />
     );
   }
@@ -97,10 +103,7 @@ export function GitGraphCanvas({
     getItemKey: (i) => commits[i]?.hash ?? i,
   });
 
-  const maxLaneCount = useMemo(
-    () => Math.max(1, ...commits.map((c) => c.laneCount)),
-    [commits],
-  );
+  const maxLaneCount = useMemo(() => Math.max(1, ...commits.map((c) => c.laneCount)), [commits]);
 
   const railReservedPx = railWidth(Math.min(maxLaneCount, MAX_VISIBLE_LANES));
 
@@ -123,10 +126,7 @@ export function GitGraphCanvas({
       </div>
 
       {/* Scrollable rows */}
-      <div
-        ref={containerRef}
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden select-none"
-      >
+      <div ref={containerRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden select-none">
         <div style={{ height: virtualizer.getTotalSize(), position: "relative", width: "100%" }}>
           {virtualizer.getVirtualItems().map((virtualRow) => {
             const commit = commits[virtualRow.index];
@@ -152,9 +152,7 @@ export function GitGraphCanvas({
                       onClick={() => onSelectCommit(commit)}
                       className={cn(
                         "group relative grid h-full w-full cursor-pointer items-center gap-3 border-l-2 border-transparent pr-3 text-left transition-colors",
-                        isSelected
-                          ? "border-l-primary/60 bg-accent/40"
-                          : "hover:bg-accent/20",
+                        isSelected ? "border-l-primary/60 bg-accent/40" : "hover:bg-accent/20",
                       )}
                       style={{ gridTemplateColumns: gridTemplate }}
                     >
@@ -176,7 +174,18 @@ export function GitGraphCanvas({
                       {/* Subject + ref pills */}
                       <div className="flex min-w-0 items-center gap-1.5">
                         {commit.refs.map((ref) => {
-                          const isRemote = ref.startsWith("origin/") || ref.startsWith("upstream/") || /^[a-z0-9_-]+\//.test(ref) && !ref.startsWith("feat/") && !ref.startsWith("fix/") && !ref.startsWith("chore/") && !ref.startsWith("refactor/") && !ref.startsWith("docs/") && !ref.startsWith("test/") && !ref.startsWith("perf/") && !ref.startsWith("ci/");
+                          const isRemote =
+                            ref.startsWith("origin/") ||
+                            ref.startsWith("upstream/") ||
+                            (/^[a-z0-9_-]+\//.test(ref) &&
+                              !ref.startsWith("feat/") &&
+                              !ref.startsWith("fix/") &&
+                              !ref.startsWith("chore/") &&
+                              !ref.startsWith("refactor/") &&
+                              !ref.startsWith("docs/") &&
+                              !ref.startsWith("test/") &&
+                              !ref.startsWith("perf/") &&
+                              !ref.startsWith("ci/"));
                           const isTag = /^v\d/.test(ref);
                           return (
                             <span
@@ -203,9 +212,7 @@ export function GitGraphCanvas({
                         <span
                           className={cn(
                             "min-w-0 truncate text-[12px] leading-tight",
-                            isSelected
-                              ? "font-semibold text-foreground"
-                              : "font-medium text-foreground/90",
+                            isSelected ? "font-semibold text-foreground" : "font-medium text-foreground/90",
                           )}
                         >
                           {commit.subject}
@@ -234,14 +241,10 @@ export function GitGraphCanvas({
                         {commit.insertions > 0 || commit.deletions > 0 ? (
                           <>
                             {commit.insertions > 0 && (
-                              <span className="font-semibold text-success">
-                                +{commit.insertions}
-                              </span>
+                              <span className="font-semibold text-success">+{commit.insertions}</span>
                             )}
                             {commit.deletions > 0 && (
-                              <span className="font-semibold text-error">
-                                −{commit.deletions}
-                              </span>
+                              <span className="font-semibold text-error">−{commit.deletions}</span>
                             )}
                           </>
                         ) : (

@@ -20,14 +20,7 @@ type Props = {
   onHover: (index: number) => void;
 };
 
-export function FilePickerContent({
-  hits,
-  loading,
-  query,
-  activeIndex,
-  onPick,
-  onHover,
-}: Props) {
+export function FilePickerContent({ hits, loading, query, activeIndex, onPick, onHover }: Props) {
   return (
     <PopoverContent
       side="top"
@@ -45,9 +38,7 @@ export function FilePickerContent({
         </div>
       ) : hits.length === 0 ? (
         <div className="px-3 py-2.5 text-[11px] text-muted-foreground">
-          {query
-            ? `No files matching "@${query}"`
-            : "Type a filename to search"}
+          {query ? `No files matching "@${query}"` : "Type a filename to search"}
         </div>
       ) : (
         <ul className="max-h-64 overflow-y-auto py-1">
@@ -78,9 +69,7 @@ export function FilePickerContent({
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate font-medium">{hit.name}</span>
                   {hit.rel !== hit.name && (
-                    <span className="truncate text-[10px] text-muted-foreground">
-                      {hit.rel}
-                    </span>
+                    <span className="truncate text-[10px] text-muted-foreground">{hit.rel}</span>
                   )}
                 </span>
                 {hit.is_dir && (

@@ -8,17 +8,9 @@ import {
   providerNeedsKey,
   type ProviderInstance,
 } from "@/modules/ai/config";
-import {
-  getInstanceKey,
-  setInstanceKey,
-} from "@/modules/ai/lib/keyring";
+import { getInstanceKey, setInstanceKey } from "@/modules/ai/lib/keyring";
 import { useProvidersStore } from "@/modules/ai/store/providersStore";
-import {
-  ArrowUpRight01Icon,
-  Cancel01Icon,
-  ViewIcon,
-  ViewOffSlashIcon,
-} from "@hugeicons/core-free-icons";
+import { ArrowUpRight01Icon, Cancel01Icon, ViewIcon, ViewOffSlashIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -71,7 +63,10 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
 
   const handleSaveKey = async () => {
     const trimmed = keyDraft.trim();
-    if (!trimmed) { setError("Enter your API key."); return; }
+    if (!trimmed) {
+      setError("Enter your API key.");
+      return;
+    }
     const prefix = providerInfo?.keyPrefix;
     if (prefix && !trimmed.startsWith(prefix)) {
       setError(`Keys start with "${prefix}".`);
@@ -168,8 +163,8 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
           <ProviderIcon provider={instance.providerId} size={15} />
           <span className="text-[13px] font-semibold">
             {instance.providerId === "openai-compatible" &&
-             instance.name !== instance.providerId &&
-             !/^[a-z-]+\d+$/.test(instance.name)
+            instance.name !== instance.providerId &&
+            !/^[a-z-]+\d+$/.test(instance.name)
               ? instance.name
               : (providerInfo?.label ?? instance.providerId)}
           </span>
@@ -197,9 +192,7 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
       </div>
 
       {/* Description */}
-      {description && (
-        <p className="text-[11px] text-muted-foreground">{description}</p>
-      )}
+      {description && <p className="text-[11px] text-muted-foreground">{description}</p>}
 
       {/* Name field (only when >1 instance of same provider) */}
       {showNameField && (
@@ -234,7 +227,15 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
                 onClick={() => void handleTest()}
                 disabled={testing || !baseUrl}
               >
-                {testing ? <Spinner className="size-3" /> : testResult === "ok" ? "✓" : testResult === "fail" ? "✗" : "Test"}
+                {testing ? (
+                  <Spinner className="size-3" />
+                ) : testResult === "ok" ? (
+                  "✓"
+                ) : testResult === "fail" ? (
+                  "✗"
+                ) : (
+                  "Test"
+                )}
               </Button>
             </div>
           </div>
@@ -304,8 +305,18 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
                 placeholder={keyPlaceholder}
                 value={keyDraft}
                 disabled={saving}
-                onChange={(e) => { setKeyDraft(e.target.value); if (error) setError(null); }}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void (isLocal || instance.providerId === "openrouter" ? handleSaveConfig() : handleSaveKey()); } }}
+                onChange={(e) => {
+                  setKeyDraft(e.target.value);
+                  if (error) setError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void (isLocal || instance.providerId === "openrouter"
+                      ? handleSaveConfig()
+                      : handleSaveKey());
+                  }
+                }}
                 className="h-8 pr-8 font-mono text-[11.5px]"
               />
               <button
@@ -319,7 +330,13 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
             </div>
             <Button
               size="sm"
-              onClick={() => void (isLocal || instance.providerId === "openrouter" || instance.providerId === "openai-compatible" ? handleSaveConfig() : handleSaveKey())}
+              onClick={() =>
+                void (isLocal ||
+                instance.providerId === "openrouter" ||
+                instance.providerId === "openai-compatible"
+                  ? handleSaveConfig()
+                  : handleSaveKey())
+              }
               disabled={saving}
               className="h-8 px-3 text-[11px]"
             >
@@ -353,7 +370,8 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
       )}
       {instance.providerId === "ollama" && (
         <p className="text-[10.5px] text-muted-foreground">
-          The model name from <code className="font-mono">ollama list</code> / <code className="font-mono">ollama pull</code>.
+          The model name from <code className="font-mono">ollama list</code> /{" "}
+          <code className="font-mono">ollama pull</code>.
         </p>
       )}
       {instance.providerId === "mlx" && (
@@ -362,9 +380,7 @@ export function ProviderInstanceCard({ instance, sameProviderCount }: Props) {
         </p>
       )}
       {instance.providerId === "openrouter" && (
-        <p className="text-[10.5px] text-muted-foreground">
-          Browse ids at openrouter.ai/models.
-        </p>
+        <p className="text-[10.5px] text-muted-foreground">Browse ids at openrouter.ai/models.</p>
       )}
 
       {error && <p className="text-[10.5px] text-destructive">{error}</p>}

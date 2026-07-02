@@ -1,10 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
   type AppNotification,
@@ -34,47 +30,19 @@ function relativeTime(timestamp: number): string {
 function TypeIcon({ type }: { type: NotificationType }) {
   switch (type) {
     case "error":
-      return (
-        <HugeiconsIcon
-          icon={AlertCircleIcon}
-          size={14}
-          className="mt-0.5 shrink-0 text-destructive"
-        />
-      );
+      return <HugeiconsIcon icon={AlertCircleIcon} size={14} className="mt-0.5 shrink-0 text-destructive" />;
     case "warning":
-      return (
-        <HugeiconsIcon
-          icon={Alert02Icon}
-          size={14}
-          className="mt-0.5 shrink-0 text-warning"
-        />
-      );
+      return <HugeiconsIcon icon={Alert02Icon} size={14} className="mt-0.5 shrink-0 text-warning" />;
     case "success":
       return (
-        <HugeiconsIcon
-          icon={CheckmarkCircle01Icon}
-          size={14}
-          className="mt-0.5 shrink-0 text-success"
-        />
+        <HugeiconsIcon icon={CheckmarkCircle01Icon} size={14} className="mt-0.5 shrink-0 text-success" />
       );
     case "info":
-      return (
-        <HugeiconsIcon
-          icon={InformationCircleIcon}
-          size={14}
-          className="mt-0.5 shrink-0 text-info"
-        />
-      );
+      return <HugeiconsIcon icon={InformationCircleIcon} size={14} className="mt-0.5 shrink-0 text-info" />;
   }
 }
 
-function NotificationItem({
-  notif,
-  onDismiss,
-}: {
-  notif: AppNotification;
-  onDismiss: () => void;
-}) {
+function NotificationItem({ notif, onDismiss }: { notif: AppNotification; onDismiss: () => void }) {
   function handleCopy() {
     void navigator.clipboard.writeText(notif.message);
   }
@@ -90,14 +58,9 @@ function NotificationItem({
         <TypeIcon type={notif.type} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="truncate text-[13px] font-semibold leading-tight">
-              {notif.title}
-            </span>
+            <span className="truncate text-[13px] font-semibold leading-tight">{notif.title}</span>
             {notif.source && (
-              <Badge
-                variant="secondary"
-                className="shrink-0 px-1.5 py-0 text-[10px]"
-              >
+              <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
                 {notif.source}
               </Badge>
             )}
@@ -108,9 +71,7 @@ function NotificationItem({
         </div>
       </div>
       <div className="flex items-center justify-between pl-5">
-        <span className="text-[10px] text-muted-foreground">
-          {relativeTime(notif.timestamp)}
-        </span>
+        <span className="text-[10px] text-muted-foreground">{relativeTime(notif.timestamp)}</span>
         <div className="flex items-center gap-1">
           <button
             onClick={handleCopy}
@@ -134,8 +95,7 @@ function NotificationItem({
 }
 
 export function NotificationDropdown() {
-  const { notifications, removeNotification, clearAll } =
-    useNotificationStore();
+  const { notifications, removeNotification, clearAll } = useNotificationStore();
 
   if (notifications.length === 0) return null;
 
@@ -161,10 +121,7 @@ export function NotificationDropdown() {
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="z-[100] flex max-h-[80vh] w-[380px] flex-col p-0"
-      >
+      <PopoverContent align="end" className="z-[100] flex max-h-[80vh] w-[380px] flex-col p-0">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
           <span className="text-sm font-semibold">Notifications</span>
           <button
@@ -177,11 +134,7 @@ export function NotificationDropdown() {
         <div className="flex-1 divide-y divide-border/40 overflow-y-auto">
           <AnimatePresence initial={false}>
             {notifications.map((notif) => (
-              <NotificationItem
-                key={notif.id}
-                notif={notif}
-                onDismiss={() => removeNotification(notif.id)}
-              />
+              <NotificationItem key={notif.id} notif={notif} onDismiss={() => removeNotification(notif.id)} />
             ))}
           </AnimatePresence>
         </div>

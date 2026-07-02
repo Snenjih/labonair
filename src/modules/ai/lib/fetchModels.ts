@@ -6,8 +6,8 @@ import {
   type ProviderInstance,
 } from "../config";
 
-const CLOUD_TTL_MS = 60 * 60 * 1000;     // 1 hour
-const LOCAL_TTL_MS = 5 * 60 * 1000;      // 5 minutes
+const CLOUD_TTL_MS = 60 * 60 * 1000; // 1 hour
+const LOCAL_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const OPENROUTER_LIMIT = 200;
 
 const LOCAL_PROVIDERS: readonly ProviderId[] = ["ollama", "lmstudio", "mlx", "openai-compatible"];
@@ -97,10 +97,7 @@ function groqFilter(m: OaiModel): boolean {
 type AnthropicModel = { id: string; display_name: string };
 type AnthropicModelsResponse = { data: AnthropicModel[] };
 
-async function fetchAnthropic(
-  instance: ProviderInstance,
-  apiKey: string,
-): Promise<DynamicModelInfo[]> {
+async function fetchAnthropic(instance: ProviderInstance, apiKey: string): Promise<DynamicModelInfo[]> {
   const res = await fetch("https://api.anthropic.com/v1/models", {
     headers: {
       "x-api-key": apiKey,
@@ -126,10 +123,7 @@ async function fetchAnthropic(
 type GoogleModel = { name: string; displayName: string; supportedGenerationMethods?: string[] };
 type GoogleModelsResponse = { models: GoogleModel[] };
 
-async function fetchGoogle(
-  instance: ProviderInstance,
-  apiKey: string,
-): Promise<DynamicModelInfo[]> {
+async function fetchGoogle(instance: ProviderInstance, apiKey: string): Promise<DynamicModelInfo[]> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
   );
@@ -157,10 +151,7 @@ async function fetchGoogle(
 type OllamaTag = { name: string };
 type OllamaTagsResponse = { models: OllamaTag[] };
 
-async function fetchOllamaFallback(
-  baseUrl: string,
-  instance: ProviderInstance,
-): Promise<DynamicModelInfo[]> {
+async function fetchOllamaFallback(baseUrl: string, instance: ProviderInstance): Promise<DynamicModelInfo[]> {
   const res = await fetch(`${baseUrl}/api/tags`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = (await res.json()) as OllamaTagsResponse;
@@ -192,12 +183,7 @@ export async function fetchModelsForInstance(
       return fetchGoogle(instance, apiKey!);
 
     case "openai":
-      return fetchOpenAiCompatible(
-        "https://api.openai.com",
-        apiKey,
-        instance,
-        openAiFilter,
-      );
+      return fetchOpenAiCompatible("https://api.openai.com", apiKey, instance, openAiFilter);
 
     case "xai":
       return fetchOpenAiCompatible("https://api.x.ai", apiKey, instance);
@@ -206,23 +192,13 @@ export async function fetchModelsForInstance(
       return fetchOpenAiCompatible("https://api.cerebras.ai", apiKey, instance);
 
     case "groq":
-      return fetchOpenAiCompatible(
-        "https://api.groq.com/openai",
-        apiKey,
-        instance,
-        groqFilter,
-      );
+      return fetchOpenAiCompatible("https://api.groq.com/openai", apiKey, instance, groqFilter);
 
     case "deepseek":
       return fetchOpenAiCompatible("https://api.deepseek.com", apiKey, instance);
 
     case "mistral":
-      return fetchOpenAiCompatible(
-        "https://api.mistral.ai",
-        apiKey,
-        instance,
-        mistralFilter,
-      );
+      return fetchOpenAiCompatible("https://api.mistral.ai", apiKey, instance, mistralFilter);
 
     case "openrouter":
       return fetchOpenAiCompatible(

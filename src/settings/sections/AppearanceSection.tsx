@@ -27,13 +27,7 @@ import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import {
   Add01Icon,
@@ -135,18 +129,14 @@ export function AppearanceSection() {
   async function handleImport() {
     const selected = await open({
       multiple: false,
-      filters: [
-        { name: "Image", extensions: VALID_IMAGE_EXTS },
-      ],
+      filters: [{ name: "Image", extensions: VALID_IMAGE_EXTS }],
     });
     if (!selected) return;
     try {
       const info = await invoke<BackgroundInfo>("background_import", {
         sourcePath: selected,
       });
-      setBackgrounds((prev) =>
-        [...prev, info].sort((a, b) => a.filename.localeCompare(b.filename))
-      );
+      setBackgrounds((prev) => [...prev, info].sort((a, b) => a.filename.localeCompare(b.filename)));
       void invoke<string>("background_read_data_url", { filename: info.filename })
         .then((url) => setThumbUrls((prev) => ({ ...prev, [info.filename]: url })))
         .catch(() => {});
@@ -174,9 +164,7 @@ export function AppearanceSection() {
     if (!ext || !VALID_IMAGE_EXTS.includes(ext)) return;
     try {
       const info = await invoke<BackgroundInfo>("background_import", { sourcePath: path });
-      setBackgrounds((prev) =>
-        [...prev, info].sort((a, b) => a.filename.localeCompare(b.filename))
-      );
+      setBackgrounds((prev) => [...prev, info].sort((a, b) => a.filename.localeCompare(b.filename)));
       void invoke<string>("background_read_data_url", { filename: info.filename })
         .then((url) => setThumbUrls((prev) => ({ ...prev, [info.filename]: url })))
         .catch(() => {});
@@ -222,10 +210,7 @@ export function AppearanceSection() {
 
   return (
     <div className="flex flex-col gap-[var(--ui-section-gap)]">
-      <SectionHeader
-        title="Appearance"
-        description="Color theme, background, typography, and layout."
-      />
+      <SectionHeader title="Appearance" description="Color theme, background, typography, and layout." />
 
       <div className="flex flex-col gap-2">
         <Label>Color theme</Label>
@@ -255,16 +240,17 @@ export function AppearanceSection() {
 
         {/* Drop zone wrapper */}
         <div
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
           onDragLeave={(e) => {
             if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
           }}
           onDrop={(e) => void handleDrop(e)}
           className={cn(
             "rounded-xl border-2 border-dashed p-2.5 transition-all duration-150",
-            isDragging
-              ? "border-foreground/40 bg-foreground/5"
-              : "border-transparent",
+            isDragging ? "border-foreground/40 bg-foreground/5" : "border-transparent",
           )}
         >
           <div className="flex flex-wrap gap-3">
@@ -284,13 +270,17 @@ export function AppearanceSection() {
                 <div
                   className="absolute inset-0"
                   style={{
-                    backgroundImage:
-                      "repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%)",
+                    backgroundImage: "repeating-conic-gradient(hsl(var(--muted)) 0% 25%, transparent 0% 50%)",
                     backgroundSize: "12px 12px",
                   }}
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <HugeiconsIcon icon={CancelCircleIcon} size={22} strokeWidth={1.3} className="text-muted-foreground/50" />
+                  <HugeiconsIcon
+                    icon={CancelCircleIcon}
+                    size={22}
+                    strokeWidth={1.3}
+                    className="text-muted-foreground/50"
+                  />
                 </div>
                 {backgroundImage === "" && <SelectedBadge />}
               </button>
@@ -298,10 +288,7 @@ export function AppearanceSection() {
 
             {/* Saved background thumbnails */}
             {backgrounds.map((bg) => (
-              <TileWrapper
-                key={bg.filename}
-                label={bg.filename.replace(/\.[^.]+$/, "")}
-              >
+              <TileWrapper key={bg.filename} label={bg.filename.replace(/\.[^.]+$/, "")}>
                 <ContextMenu>
                   <ContextMenuTrigger asChild>
                     <div
@@ -338,9 +325,7 @@ export function AppearanceSection() {
                         }}
                         className={cn(
                           "absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-background/90 text-muted-foreground shadow-sm transition-all hover:bg-destructive/90 hover:text-white",
-                          hoveredFilename === bg.filename
-                            ? "opacity-100 scale-100"
-                            : "opacity-0 scale-75",
+                          hoveredFilename === bg.filename ? "opacity-100 scale-100" : "opacity-0 scale-75",
                         )}
                         title={`Delete ${bg.filename}`}
                       >
@@ -349,26 +334,33 @@ export function AppearanceSection() {
                     </div>
                   </ContextMenuTrigger>
                   <ContextMenuContent className="w-48">
-                    <ContextMenuItem
-                      onClick={() => void revealItemInDir(bg.path)}
-                    >
-                      <HugeiconsIcon icon={FolderOpenIcon} size={13} strokeWidth={1.5} className="mr-2 text-muted-foreground" />
+                    <ContextMenuItem onClick={() => void revealItemInDir(bg.path)}>
+                      <HugeiconsIcon
+                        icon={FolderOpenIcon}
+                        size={13}
+                        strokeWidth={1.5}
+                        className="mr-2 text-muted-foreground"
+                      />
                       Open in Finder
                     </ContextMenuItem>
                     <ContextMenuItem
-                      onClick={() => void emit("labonair:open-preview", {
-                        path: bg.path,
-                        title: bg.filename.replace(/\.[^.]+$/, ""),
-                      })}
+                      onClick={() =>
+                        void emit("labonair:open-preview", {
+                          path: bg.path,
+                          title: bg.filename.replace(/\.[^.]+$/, ""),
+                        })
+                      }
                     >
-                      <HugeiconsIcon icon={EyeIcon} size={13} strokeWidth={1.5} className="mr-2 text-muted-foreground" />
+                      <HugeiconsIcon
+                        icon={EyeIcon}
+                        size={13}
+                        strokeWidth={1.5}
+                        className="mr-2 text-muted-foreground"
+                      />
                       Open in Preview
                     </ContextMenuItem>
                     <ContextMenuSeparator />
-                    <ContextMenuItem
-                      variant="destructive"
-                      onClick={() => void handleDelete(bg.filename)}
-                    >
+                    <ContextMenuItem variant="destructive" onClick={() => void handleDelete(bg.filename)}>
                       <HugeiconsIcon icon={Delete01Icon} size={13} strokeWidth={1.5} className="mr-2" />
                       Delete
                     </ContextMenuItem>
@@ -398,9 +390,7 @@ export function AppearanceSection() {
             </div>
           )}
           {isDragging && (
-            <p className="mt-2 text-center text-[10.5px] font-medium text-foreground/70">
-              Drop to import
-            </p>
+            <p className="mt-2 text-center text-[10.5px] font-medium text-foreground/70">Drop to import</p>
           )}
         </div>
 
@@ -502,16 +492,18 @@ export function AppearanceSection() {
         >
           <Select
             value={sidebarPosition}
-            onValueChange={(v) =>
-              void setSidebarPosition(v as "left" | "right")
-            }
+            onValueChange={(v) => void setSidebarPosition(v as "left" | "right")}
           >
             <SelectTrigger className="h-7 w-24 text-[11.5px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="left" className="text-[11.5px]">Left</SelectItem>
-              <SelectItem value="right" className="text-[11.5px]">Right</SelectItem>
+              <SelectItem value="left" className="text-[11.5px]">
+                Left
+              </SelectItem>
+              <SelectItem value="right" className="text-[11.5px]">
+                Right
+              </SelectItem>
             </SelectContent>
           </Select>
         </SettingRow>
@@ -521,17 +513,21 @@ export function AppearanceSection() {
         >
           <Select
             value={titlebarsIconsPosition}
-            onValueChange={(v) =>
-              void setTitlebarsIconsPosition(v as "auto" | "left" | "right")
-            }
+            onValueChange={(v) => void setTitlebarsIconsPosition(v as "auto" | "left" | "right")}
           >
             <SelectTrigger className="h-7 w-24 text-[11.5px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="auto" className="text-[11.5px]">Auto</SelectItem>
-              <SelectItem value="left" className="text-[11.5px]">Left</SelectItem>
-              <SelectItem value="right" className="text-[11.5px]">Right</SelectItem>
+              <SelectItem value="auto" className="text-[11.5px]">
+                Auto
+              </SelectItem>
+              <SelectItem value="left" className="text-[11.5px]">
+                Left
+              </SelectItem>
+              <SelectItem value="right" className="text-[11.5px]">
+                Right
+              </SelectItem>
             </SelectContent>
           </Select>
         </SettingRow>
@@ -547,8 +543,12 @@ export function AppearanceSection() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="titlebar" className="text-[11.5px]">Titlebar</SelectItem>
-              <SelectItem value="sidebar" className="text-[11.5px]">Sidebar</SelectItem>
+              <SelectItem value="titlebar" className="text-[11.5px]">
+                Titlebar
+              </SelectItem>
+              <SelectItem value="sidebar" className="text-[11.5px]">
+                Sidebar
+              </SelectItem>
             </SelectContent>
           </Select>
         </SettingRow>
@@ -556,19 +556,13 @@ export function AppearanceSection() {
           title="Show header bar"
           description="Display the header bar with tabs and window controls. Hide it to maximise vertical space."
         >
-          <Switch
-            checked={zenModeShowHeader}
-            onCheckedChange={(v) => void setZenModeShowHeader(v)}
-          />
+          <Switch checked={zenModeShowHeader} onCheckedChange={(v) => void setZenModeShowHeader(v)} />
         </SettingRow>
         <SettingRow
           title="Show status bar"
           description="Display the status bar at the bottom. Hide it to maximise vertical space."
         >
-          <Switch
-            checked={zenModeShowStatusbar}
-            onCheckedChange={(v) => void setZenModeShowStatusbar(v)}
-          />
+          <Switch checked={zenModeShowStatusbar} onCheckedChange={(v) => void setZenModeShowStatusbar(v)} />
         </SettingRow>
         <div className="h-px bg-border/40" />
         <span className="text-[11px] font-medium text-muted-foreground">Status Bar Items</span>
@@ -580,20 +574,14 @@ export function AppearanceSection() {
       <div className="flex flex-col gap-2">
         <Label>Typography</Label>
         <div className="flex flex-col gap-2">
-          <SettingRow
-            title="UI font family"
-            description="The font used for all application UI text."
-          >
+          <SettingRow title="UI font family" description="The font used for all application UI text.">
             <Input
               value={appFontFamily}
               onChange={(e) => void setAppFontFamily(e.target.value)}
               className="h-7 w-44 text-[11.5px]"
             />
           </SettingRow>
-          <SettingRow
-            title="UI font size"
-            description="Base font size for the interface (in px)."
-          >
+          <SettingRow title="UI font size" description="Base font size for the interface (in px).">
             <input
               type="number"
               min={10}
@@ -625,11 +613,7 @@ export function AppearanceSection() {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="text-[11px] font-medium tracking-tight text-muted-foreground">{children}</span>;
 }
 
 function TileWrapper({ label, children }: { label: string; children: React.ReactNode }) {
@@ -663,10 +647,7 @@ function StatusBarItemRow({ descriptor }: { descriptor: StatusBarItemDescriptor 
   const enabled = usePreferencesStore((s) => s[descriptor.prefKey] as boolean);
   return (
     <SettingRow title={descriptor.label} description={descriptor.description}>
-      <Switch
-        checked={enabled}
-        onCheckedChange={(v) => void STATUSBAR_ITEM_SETTERS[descriptor.id](v)}
-      />
+      <Switch checked={enabled} onCheckedChange={(v) => void STATUSBAR_ITEM_SETTERS[descriptor.id](v)} />
     </SettingRow>
   );
 }
@@ -692,7 +673,8 @@ function SliderControl({ label, description, value, min, max, step, suffix, onCh
           <span className="text-[10px] text-muted-foreground">{description}</span>
         </div>
         <span className="shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
-          {value}{suffix}
+          {value}
+          {suffix}
         </span>
       </div>
       <input

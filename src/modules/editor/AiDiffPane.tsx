@@ -70,10 +70,7 @@ const STATUS_LABEL: Record<AiDiffStatus, string> = {
   rejected: "Rejected",
 };
 
-const STATUS_BADGE: Record<
-  AiDiffStatus,
-  "outline" | "secondary" | "destructive"
-> = {
+const STATUS_BADGE: Record<AiDiffStatus, "outline" | "secondary" | "destructive"> = {
   pending: "outline",
   approved: "secondary",
   rejected: "destructive",
@@ -139,10 +136,7 @@ export function AiDiffPane({
     <div className="flex h-full min-h-0 flex-col rounded-md border border-border/60 bg-background">
       <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-border/60 px-3">
         <div className="flex min-w-0 items-center gap-2">
-          <Badge
-            className="text-[11px] px-2.5 py-2.5"
-            variant={STATUS_BADGE[status]}
-          >
+          <Badge className="text-[11px] px-2.5 py-2.5" variant={STATUS_BADGE[status]}>
             {STATUS_LABEL[status]}
           </Badge>
           {isNewFile ? (
@@ -150,38 +144,21 @@ export function AiDiffPane({
               New file
             </span>
           ) : null}
-          <span
-            className="truncate font-mono text-[11px] text-muted-foreground"
-            title={path}
-          >
+          <span className="truncate font-mono text-[11px] text-muted-foreground" title={path}>
             {path}
           </span>
           <span className="flex shrink-0 items-center gap-1.5 text-[10.5px] tabular-nums">
-            <span className="text-success">
-              +{stats.added}
-            </span>
-            <span className="text-error">
-              −{stats.removed}
-            </span>
+            <span className="text-success">+{stats.added}</span>
+            <span className="text-error">−{stats.removed}</span>
           </span>
         </div>
         {status === "pending" ? (
           <div className="flex shrink-0 items-center gap-1.5">
-            <Button
-              size="sm"
-              variant="default"
-              onClick={onAccept}
-              className="h-7 gap-1.5"
-            >
+            <Button size="sm" variant="default" onClick={onAccept} className="h-7 gap-1.5">
               <HugeiconsIcon icon={Tick02Icon} size={13} strokeWidth={2} />
               Accept
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onReject}
-              className="h-7 gap-1.5"
-            >
+            <Button size="sm" variant="ghost" onClick={onReject} className="h-7 gap-1.5">
               <HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={2} />
               Reject
             </Button>
@@ -211,10 +188,7 @@ export function AiDiffPane({
   );
 }
 
-function computeLineStats(
-  original: string,
-  proposed: string,
-): { added: number; removed: number } {
+function computeLineStats(original: string, proposed: string): { added: number; removed: number } {
   const changes = presentableDiff(original, proposed);
   let added = 0;
   let removed = 0;

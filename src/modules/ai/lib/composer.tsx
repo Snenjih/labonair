@@ -1,18 +1,13 @@
-import { handleApiError } from "@/lib/errors";
-import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { handleApiError } from "@/lib/errors";
+import { useHostsStore } from "@/modules/hosts";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { useWhisperRecording } from "../hooks/useWhisperRecording";
-import { expandDirectiveTokens, type Directive } from "../lib/directives";
-import { tryRunSlashCommand, type SlashCommandMeta } from "./slashCommands";
+import { type Directive, expandDirectiveTokens } from "../lib/directives";
 import { getOrCreateChat, useChatStore } from "../store/chatStore";
 import { useDirectivesStore } from "../store/directivesStore";
+import { type SlashCommandMeta, tryRunSlashCommand } from "./slashCommands";
 
 export type FileAttachment = {
   id: string;
@@ -24,9 +19,17 @@ export type FileAttachment = {
   size: number;
   /** Absolute path — only set for kind === "ref". */
   path?: string;
-  /** For kind === "selection": which surface it came from. */
-  source?: "terminal" | "editor";
+  /** For kind === "selection": which surface it came from. For a remote
+   *  (kind === "text") attachment: the host's display name, for chip
+   *  labeling — mirrors selection's `source` field. */
+  source?: "terminal" | "editor" | string;
 };
+
+/** Detail shape for the `"labonair:ai-attach-file"` window event — dispatched
+ *  by the explorer tree's "Attach to Agent" and the breadcrumb's "Reference
+ *  in AI chat". `sessionId`/`hostId` are set when the path is on a remote
+ *  host, so the content gets read over SFTP instead of the local filesystem. */
+export type AiAttachFileDetail = { path: string; sessionId?: string; hostId?: string };
 
 type MessagePart =
   | { type: "text"; text: string }
@@ -44,8 +47,11 @@ type ComposerCtx = {
   setValue: React.Dispatch<React.SetStateAction<string>>;
   files: FileAttachment[];
   addFiles: (list: FileList | null) => Promise<void>;
-  /** Attach a file by absolute path — used by the file explorer's "Attach to Agent". */
-  attachFileByPath: (path: string) => Promise<void>;
+  /** Attach a file by absolute path — used by the file explorer's "Attach to
+   *  Agent" and the breadcrumb's "Reference in AI chat". `remote` reads the
+   *  content over the given SSH session's SFTP connection instead of the
+   *  local filesystem. */
+  attachFileByPath: (path: string, remote?: { sessionId: string; hostId: string }) => Promise<void>;
   /** Add a file reference chip (no content read — agent will read_file itself). */
   addFileRef: (path: string) => void;
   removeFile: (id: string) => void;
@@ -68,8 +74,7 @@ const Ctx = createContext<ComposerCtx | null>(null);
 
 export function useComposer(): ComposerCtx {
   const ctx = useContext(Ctx);
-  if (!ctx)
-    throw new Error("useComposer must be used inside <AiComposerProvider>");
+  if (!ctx) throw new Error("useComposer must be used inside <AiComposerProvider>");
   return ctx;
 }
 
@@ -103,14 +108,18 @@ export function AiComposerProvider({ children }: ProviderProps) {
     }
   }, [focusSignal, pendingPrefill, consumePrefill]);
 
-  // Listen for explorer's "Attach to Agent" event.
+  // Listen for explorer's "Attach to Agent" / breadcrumb's "Reference in AI
+  // chat" events.
   // biome-ignore lint/correctness/useExhaustiveDependencies: attachFileByPath is stable (closes over setFiles only)
   useEffect(() => {
     const onAttach = (e: Event) => {
-      const path = (e as CustomEvent<string>).detail;
-      if (typeof path === "string" && path.length > 0) {
-        void attachFileByPath(path);
-      }
+      const detail = (e as CustomEvent<AiAttachFileDetail>).detail;
+      if (!detail?.path) return;
+      const remote =
+        detail.sessionId && detail.hostId
+          ? { sessionId: detail.sessionId, hostId: detail.hostId }
+          : undefined;
+      void attachFileByPath(detail.path, remote);
     };
     window.addEventListener("labonair:ai-attach-file", onAttach);
     return () => window.removeEventListener("labonair:ai-attach-file", onAttach);
@@ -127,10 +136,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
         if (existing.has(sel.id)) continue;
         next.push({
           id: sel.id,
-          name:
-            sel.source === "editor"
-              ? "Editor selection"
-              : "Terminal selection",
+          name: sel.source === "editor" ? "Editor selection" : "Terminal selection",
           kind: "selection",
           mediaType: "text/plain",
           text: sel.text,
@@ -159,30 +165,28 @@ export function AiComposerProvider({ children }: ProviderProps) {
     if (next.length) setFiles((prev) => [...prev, ...next]);
   };
 
-  const removeFile = (id: string) =>
-    setFiles((prev) => prev.filter((f) => f.id !== id));
+  const removeFile = (id: string) => setFiles((prev) => prev.filter((f) => f.id !== id));
 
   const addDirective = (d: Directive) =>
-    setPickedDirectives((prev) =>
-      prev.some((p) => p.id === d.id) ? prev : [...prev, d],
-    );
-  const removeDirective = (id: string) =>
-    setPickedDirectives((prev) => prev.filter((d) => d.id !== id));
+    setPickedDirectives((prev) => (prev.some((p) => p.id === d.id) ? prev : [...prev, d]));
+  const removeDirective = (id: string) => setPickedDirectives((prev) => prev.filter((d) => d.id !== id));
 
   const addCommand = (cmd: SlashCommandMeta) =>
-    setPickedCommands((prev) =>
-      prev.some((p) => p.name === cmd.name) ? prev : [...prev, cmd],
-    );
-  const removeCommand = (name: string) =>
-    setPickedCommands((prev) => prev.filter((c) => c.name !== name));
+    setPickedCommands((prev) => (prev.some((p) => p.name === cmd.name) ? prev : [...prev, cmd]));
+  const removeCommand = (name: string) => setPickedCommands((prev) => prev.filter((c) => c.name !== name));
 
-  const attachFileByPath = async (path: string) => {
+  const attachFileByPath = async (path: string, remote?: { sessionId: string; hostId: string }) => {
     try {
       type ReadResult =
         | { kind: "text"; content: string; size: number }
         | { kind: "binary"; size: number }
         | { kind: "toolarge"; size: number; limit: number };
-      const result = await invoke<ReadResult>("fs_read_file", { path });
+      const result = remote
+        ? await invoke<ReadResult>("sftp_read_file_content", {
+            sessionId: remote.sessionId,
+            remotePath: path,
+          })
+        : await invoke<ReadResult>("fs_read_file", { path });
       if (result.kind !== "text") {
         const msg =
           result.kind === "toolarge"
@@ -198,6 +202,9 @@ export function AiComposerProvider({ children }: ProviderProps) {
       }
       const name = path.split("/").pop() || path;
       const id = `path-${path}`;
+      const hostLabel = remote
+        ? (useHostsStore.getState().hosts.find((h) => h.id === remote.hostId)?.name ?? remote.hostId)
+        : undefined;
       setFiles((prev) => {
         if (prev.some((f) => f.id === id)) return prev;
         const att: FileAttachment = {
@@ -207,12 +214,21 @@ export function AiComposerProvider({ children }: ProviderProps) {
           mediaType: "text/plain",
           text: result.content,
           size: result.size,
+          source: hostLabel,
         };
         return [...prev, att];
       });
       // Open the AI panel & focus the input so the user sees the chip.
       useChatStore.getState().focusInput();
     } catch (e) {
+      if (remote) {
+        // Unlike the local case, there's no fallback ref-chip here — the
+        // agent's own read_file tool is local-only and can't reach a
+        // remote path later, so a failed remote attach is a dead end, not
+        // a "read it another way" situation.
+        handleApiError(e, "Failed to attach remote file", "Attachment");
+        return;
+      }
       // Directories can't be read as files — attach as a ref instead so the agent
       // can call list_directory on it.
       const msg = String(e);
@@ -229,10 +245,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
     const id = `ref-${path}`;
     setFiles((prev) => {
       if (prev.some((f) => f.id === id)) return prev;
-      return [
-        ...prev,
-        { id, name, kind: "ref", mediaType: "text/plain", path, size: 0 },
-      ];
+      return [...prev, { id, name, kind: "ref", mediaType: "text/plain", path, size: 0 }];
     });
     useChatStore.getState().focusInput();
   };
@@ -240,12 +253,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
   const submit = () => {
     if (isBusy) return;
     const trimmed = value.trim();
-    if (
-      !trimmed &&
-      files.length === 0 &&
-      pickedDirectives.length === 0 &&
-      pickedCommands.length === 0
-    )
+    if (!trimmed && files.length === 0 && pickedDirectives.length === 0 && pickedCommands.length === 0)
       return;
 
     useChatStore.getState().openMini();
@@ -276,19 +284,13 @@ export function AiComposerProvider({ children }: ProviderProps) {
     const parts: MessagePart[] = [];
     const fileBlocks = files
       .filter((f) => f.kind === "text")
-      .map(
-        (f) =>
-          `<file name="${f.name}" mediaType="${f.mediaType}">\n${f.text ?? ""}\n</file>`,
-      );
+      .map((f) => `<file name="${f.name}" mediaType="${f.mediaType}">\n${f.text ?? ""}\n</file>`);
     const refBlocks = files
       .filter((f) => f.kind === "ref")
       .map((f) => `<file-ref name="${f.name}" path="${f.path ?? f.name}" />`);
     const selectionBlocks = files
       .filter((f) => f.kind === "selection")
-      .map(
-        (f) =>
-          `<selection source="${f.source ?? "terminal"}">\n${f.text ?? ""}\n</selection>`,
-      );
+      .map((f) => `<selection source="${f.source ?? "terminal"}">\n${f.text ?? ""}\n</selection>`);
     const { body: bodyAfterTokens, blocks: directiveBlocks } = expandDirectiveTokens(
       effectiveText,
       useDirectivesStore.getState().directives,
@@ -298,9 +300,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
     for (const d of pickedDirectives) {
       if (seenHandles.has(d.handle)) continue;
       seenHandles.add(d.handle);
-      allDirectiveBlocks.push(
-        `<directive name="${d.handle}">\n${d.content}\n</directive>`,
-      );
+      allDirectiveBlocks.push(`<directive name="${d.handle}">\n${d.content}\n</directive>`);
     }
     for (const block of directiveBlocks) {
       const m = block.match(/^<directive name="([^"]+)"/);
@@ -333,9 +333,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
 
     if (!sessionId) return;
     const chat = getOrCreateChat(sessionId);
-    void chat.sendMessage({ role: "user", parts } as Parameters<
-      typeof chat.sendMessage
-    >[0]);
+    void chat.sendMessage({ role: "user", parts } as Parameters<typeof chat.sendMessage>[0]);
     setValue("");
     setFiles([]);
     setPickedDirectives([]);
@@ -365,10 +363,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
 
   const canSend =
     !isBusy &&
-    (value.trim().length > 0 ||
-      files.length > 0 ||
-      pickedDirectives.length > 0 ||
-      pickedCommands.length > 0);
+    (value.trim().length > 0 || files.length > 0 || pickedDirectives.length > 0 || pickedCommands.length > 0);
 
   const ctx: ComposerCtx = {
     textareaRef,

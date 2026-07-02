@@ -23,10 +23,7 @@ Auto-executes (no approval) — subagents are read-only by design.`,
           .describe(
             "Self-contained instruction. The subagent has no memory of prior conversation — include all relevant context.",
           ),
-        description: z
-          .string()
-          .optional()
-          .describe("Short label shown in the chat UI for the spawn card."),
+        description: z.string().optional().describe("Short label shown in the chat UI for the spawn card."),
       }),
       execute: async ({ type, prompt, description }) => {
         const { apiKeys, selectedModelId } = useChatStore.getState();

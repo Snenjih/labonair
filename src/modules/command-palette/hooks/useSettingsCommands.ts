@@ -101,9 +101,9 @@ export function useSettingsCommands(): {
 
   const appModeActions: CommandAction[] = (
     [
-      { id: "mode.dark",   title: "Dark Mode",       value: "dark"   as ThemePref },
-      { id: "mode.light",  title: "Light Mode",      value: "light"  as ThemePref },
-      { id: "mode.system", title: "System (Auto)",   value: "system" as ThemePref },
+      { id: "mode.dark", title: "Dark Mode", value: "dark" as ThemePref },
+      { id: "mode.light", title: "Light Mode", value: "light" as ThemePref },
+      { id: "mode.system", title: "System (Auto)", value: "system" as ThemePref },
     ] as const
   ).map((m) => ({
     id: m.id,
@@ -158,8 +158,7 @@ export function useSettingsCommands(): {
       contexts: ["editor"],
       rightLabel: editorAutoSave !== "off" ? "ON" : "OFF",
       icon: createElement(HugeiconsIcon, { icon: CheckListIcon, strokeWidth: 2, className: "size-4" }),
-      perform: () =>
-        void setEditorAutoSave(editorAutoSave === "off" ? "afterDelay" : "off"),
+      perform: () => void setEditorAutoSave(editorAutoSave === "off" ? "afterDelay" : "off"),
     },
 
     // Terminal toggles
@@ -281,7 +280,12 @@ export function useSettingsCommands(): {
 
   return {
     rootActions,
-    themesPage: { id: "themes", searchPlaceholder: "Search themes...", actions: themeActions, onLeave: revertToSavedTheme },
+    themesPage: {
+      id: "themes",
+      searchPlaceholder: "Search themes...",
+      actions: themeActions,
+      onLeave: revertToSavedTheme,
+    },
     appModePage: { id: "mode", searchPlaceholder: "Search color modes...", actions: appModeActions },
     editorThemePage,
   };

@@ -3,8 +3,9 @@ import type { PanelImperativeHandle } from "react-resizable-panels";
 import { ResizablePanel } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 import { FileExplorer } from "@/modules/explorer";
-import { SnippetsPanel } from "@/modules/snippets";
+import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
 import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets";
+import { SnippetsPanel } from "@/modules/snippets";
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SidebarPanel } from "@/modules/statusbar";
 import { SidebarTabList } from "@/modules/tabs";
@@ -15,7 +16,7 @@ export interface SidebarContentProps {
   activePanel: SidebarPanel;
   setActivePanel: React.Dispatch<React.SetStateAction<SidebarPanel>>;
   onSidebarResize: (size: { asPercentage: number }) => void;
-  explorerRoot: string | null;
+  explorerTarget: ExplorerTarget;
   // Tab list callbacks
   onSelect: (id: number) => void;
   onNew: () => void;
@@ -35,7 +36,10 @@ export interface SidebarContentProps {
   onPathRenamed: (from: string, to: string) => void;
   onPathDeleted: (path: string) => void;
   onRevealInTerminal: (path: string) => void;
-  onAttachToAgent: (path: string) => void;
+  onAttachToAgent: (path: string, remote?: { sessionId: string; hostId: string }) => void;
+  onOpenRemoteFile?: (sessionId: string, path: string) => void;
+  onOpenRemotePreview?: (sessionId: string, path: string) => void;
+  onOpenSftpTab?: (hostId: string, title: string) => void;
   // Snippet
   onSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
   // Source control
@@ -48,7 +52,7 @@ export function SidebarContent({
   sidebarRef,
   activePanel,
   onSidebarResize,
-  explorerRoot,
+  explorerTarget,
   onSelect,
   onNew,
   onNewPreview,
@@ -67,6 +71,9 @@ export function SidebarContent({
   onPathDeleted,
   onRevealInTerminal,
   onAttachToAgent,
+  onOpenRemoteFile,
+  onOpenRemotePreview,
+  onOpenSftpTab,
   onSnippetRun,
   onOpenGitGraph,
   onNewGitGraph,
@@ -107,19 +114,19 @@ export function SidebarContent({
         ) : activePanel === "snippets" ? (
           <SnippetsPanel onRun={onSnippetRun} />
         ) : activePanel === "source-control" ? (
-          <SourceControlPanel
-            rootPath={explorerRoot}
-            onOpenGitGraph={onOpenGitGraph}
-          />
+          <SourceControlPanel target={explorerTarget} onOpenGitGraph={onOpenGitGraph} />
         ) : (
           <FileExplorer
-            rootPath={explorerRoot}
+            explorerTarget={explorerTarget}
             onOpenFile={onOpenFile}
+            onOpenRemoteFile={onOpenRemoteFile}
+            onOpenRemotePreview={onOpenRemotePreview}
             onOpenPreview={onOpenPreview}
             onPathRenamed={onPathRenamed}
             onPathDeleted={onPathDeleted}
             onRevealInTerminal={onRevealInTerminal}
             onAttachToAgent={onAttachToAgent}
+            onOpenSftpTab={onOpenSftpTab}
           />
         )}
       </div>

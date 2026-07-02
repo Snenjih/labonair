@@ -13,13 +13,7 @@ import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function CommandPaletteSection() {
   const blur = usePreferencesStore((s) => s.commandPaletteBlur);
@@ -60,10 +54,7 @@ export function CommandPaletteSection() {
             </div>
           </SettingRow>
 
-          <SettingRow
-            title="Palette opacity"
-            description="Opacity of the command palette panel (60–100%)."
-          >
+          <SettingRow title="Palette opacity" description="Opacity of the command palette panel (60–100%).">
             <div className="flex items-center gap-3">
               <Slider
                 min={60}
@@ -79,10 +70,7 @@ export function CommandPaletteSection() {
             </div>
           </SettingRow>
 
-          <SettingRow
-            title="Open position"
-            description="Vertical position of the palette when it opens."
-          >
+          <SettingRow title="Open position" description="Vertical position of the palette when it opens.">
             <Select
               value={position}
               onValueChange={(v) => void setCommandPalettePosition(v as "top" | "center" | "high")}
@@ -91,17 +79,20 @@ export function CommandPaletteSection() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="top" className="text-[11.5px]">Top (15%)</SelectItem>
-                <SelectItem value="high" className="text-[11.5px]">High (8%)</SelectItem>
-                <SelectItem value="center" className="text-[11.5px]">Center</SelectItem>
+                <SelectItem value="top" className="text-[11.5px]">
+                  Top (15%)
+                </SelectItem>
+                <SelectItem value="high" className="text-[11.5px]">
+                  High (8%)
+                </SelectItem>
+                <SelectItem value="center" className="text-[11.5px]">
+                  Center
+                </SelectItem>
               </SelectContent>
             </Select>
           </SettingRow>
 
-          <SettingRow
-            title="Animation speed"
-            description="Speed of open/close and page-slide animations."
-          >
+          <SettingRow title="Animation speed" description="Speed of open/close and page-slide animations.">
             <Select
               value={animation}
               onValueChange={(v) => void setCommandPaletteAnimation(v as "fast" | "normal" | "slow" | "none")}
@@ -110,10 +101,18 @@ export function CommandPaletteSection() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="fast" className="text-[11.5px]">Fast</SelectItem>
-                <SelectItem value="normal" className="text-[11.5px]">Normal</SelectItem>
-                <SelectItem value="slow" className="text-[11.5px]">Slow</SelectItem>
-                <SelectItem value="none" className="text-[11.5px]">None</SelectItem>
+                <SelectItem value="fast" className="text-[11.5px]">
+                  Fast
+                </SelectItem>
+                <SelectItem value="normal" className="text-[11.5px]">
+                  Normal
+                </SelectItem>
+                <SelectItem value="slow" className="text-[11.5px]">
+                  Slow
+                </SelectItem>
+                <SelectItem value="none" className="text-[11.5px]">
+                  None
+                </SelectItem>
               </SelectContent>
             </Select>
           </SettingRow>
@@ -127,10 +126,7 @@ export function CommandPaletteSection() {
             title="Show recent commands"
             description="Display recently used commands at the top of the palette."
           >
-            <Switch
-              checked={showRecent}
-              onCheckedChange={(v) => void setCommandPaletteShowRecent(v)}
-            />
+            <Switch checked={showRecent} onCheckedChange={(v) => void setCommandPaletteShowRecent(v)} />
           </SettingRow>
 
           <SettingRow
@@ -148,21 +144,26 @@ export function CommandPaletteSection() {
             />
           </SettingRow>
 
-          <SettingRow
-            title="Search mode"
-            description="How search queries are matched against command names."
-          >
+          <SettingRow title="Search mode" description="How search queries are matched against command names.">
             <Select
               value={searchMode}
-              onValueChange={(v) => void setCommandPaletteSearchMode(v as "contains" | "startsWith" | "fuzzy")}
+              onValueChange={(v) =>
+                void setCommandPaletteSearchMode(v as "contains" | "startsWith" | "fuzzy")
+              }
             >
               <SelectTrigger className="h-7 w-32 text-[11.5px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="contains" className="text-[11.5px]">Contains</SelectItem>
-                <SelectItem value="startsWith" className="text-[11.5px]">Starts with</SelectItem>
-                <SelectItem value="fuzzy" className="text-[11.5px]">Fuzzy</SelectItem>
+                <SelectItem value="contains" className="text-[11.5px]">
+                  Contains
+                </SelectItem>
+                <SelectItem value="startsWith" className="text-[11.5px]">
+                  Starts with
+                </SelectItem>
+                <SelectItem value="fuzzy" className="text-[11.5px]">
+                  Fuzzy
+                </SelectItem>
               </SelectContent>
             </Select>
           </SettingRow>
@@ -183,9 +184,5 @@ export function CommandPaletteSection() {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="text-[11px] font-medium tracking-tight text-muted-foreground">{children}</span>;
 }

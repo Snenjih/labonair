@@ -86,7 +86,10 @@ export function CredentialCard({ credential, hostsCount, isSelected, onClick, on
         {/* ZONE A: Info Body */}
         <button
           onClick={onClick}
-          onDoubleClick={(e) => { e.stopPropagation(); onEdit(); }}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
           className="flex flex-1 items-start gap-3 p-3.5 text-left outline-none"
         >
           {/* Avatar */}
@@ -94,7 +97,10 @@ export function CredentialCard({ credential, hostsCount, isSelected, onClick, on
             {initials(credential.name) || "?"}
             {/* Secret stored dot */}
             {credential.has_secret && (
-              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background bg-success [box-shadow:0_0_6px_color-mix(in_oklch,var(--color-success)_70%,transparent)]" title="Secret stored" />
+              <span
+                className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background bg-success [box-shadow:0_0_6px_color-mix(in_oklch,var(--color-success)_70%,transparent)]"
+                title="Secret stored"
+              />
             )}
           </div>
 
@@ -105,21 +111,45 @@ export function CredentialCard({ credential, hostsCount, isSelected, onClick, on
             {/* Type badge */}
             <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
               {credential.cred_type === "key" ? (
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                  <circle cx="7.5" cy="15.5" r="5.5"/>
-                  <path d="m21 2-9.6 9.6"/>
-                  <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0"
+                >
+                  <circle cx="7.5" cy="15.5" r="5.5" />
+                  <path d="m21 2-9.6 9.6" />
+                  <path d="m15.5 7.5 3 3L22 7l-3-3" />
                 </svg>
               ) : (
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="shrink-0"
+                >
+                  <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
               )}
               <span className="truncate">{credTypeLabel(credential)}</span>
             </span>
             <span className="mt-1.5 text-[10px] text-muted-foreground/70">
-              {hostsCount === 1 ? "Used by 1 host" : hostsCount > 0 ? `Used by ${hostsCount} hosts` : "Not used"}
+              {hostsCount === 1
+                ? "Used by 1 host"
+                : hostsCount > 0
+                  ? `Used by ${hostsCount} hosts`
+                  : "Not used"}
               {" · "}
               {relativeTime(credential.created_at)}
             </span>
@@ -138,12 +168,24 @@ export function CredentialCard({ credential, hostsCount, isSelected, onClick, on
           <Button
             variant="ghost"
             size="sm"
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
             className="h-9 flex-1 gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-background/50"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
             Edit
           </Button>
@@ -180,11 +222,13 @@ export function CredentialCard({ credential, hostsCount, isSelected, onClick, on
             <AlertDialogDescription>
               {affectedHosts.length > 0 ? (
                 <>
-                  The following {affectedHosts.length === 1 ? "host" : `${affectedHosts.length} hosts`} will lose their
-                  credential reference and revert to no auth:
+                  The following {affectedHosts.length === 1 ? "host" : `${affectedHosts.length} hosts`} will
+                  lose their credential reference and revert to no auth:
                   <ul className="mt-2 space-y-0.5 text-foreground">
                     {affectedHosts.map((h) => (
-                      <li key={h.id} className="text-sm">• {h.name}</li>
+                      <li key={h.id} className="text-sm">
+                        • {h.name}
+                      </li>
                     ))}
                   </ul>
                   <span className="mt-2 block">This action cannot be undone.</span>

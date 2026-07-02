@@ -16,9 +16,15 @@ export function useOsFileDrop(
   const onDroppedRef = useRef(onDropped);
   const rootPathRef = useRef(rootPath);
 
-  useEffect(() => { isSearchActiveRef.current = isSearchActive; }, [isSearchActive]);
-  useEffect(() => { onDroppedRef.current = onDropped; }, [onDropped]);
-  useEffect(() => { rootPathRef.current = rootPath; }, [rootPath]);
+  useEffect(() => {
+    isSearchActiveRef.current = isSearchActive;
+  }, [isSearchActive]);
+  useEffect(() => {
+    onDroppedRef.current = onDropped;
+  }, [onDropped]);
+  useEffect(() => {
+    rootPathRef.current = rootPath;
+  }, [rootPath]);
 
   useEffect(() => {
     if (!rootPath) return;

@@ -1,18 +1,9 @@
+import { FilterIcon, GitCompareIcon, SourceCodeIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  FilterIcon,
-  GitCompareIcon,
-  SourceCodeIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { git } from "@/modules/source-control/lib/gitInvoke";
 
@@ -21,6 +12,7 @@ interface Props {
   filePath: string;
   staged: boolean;
   section: "staged" | "unstaged" | "untracked";
+  sessionId?: string;
 }
 
 interface DiffLineProps {
@@ -31,7 +23,8 @@ function DiffLine({ line }: DiffLineProps) {
   const isAdd = line.startsWith("+") && !line.startsWith("+++");
   const isDel = line.startsWith("-") && !line.startsWith("---");
   const isHunk = line.startsWith("@@");
-  const isMeta = line.startsWith("diff ") || line.startsWith("index ") || line.startsWith("---") || line.startsWith("+++");
+  const isMeta =
+    line.startsWith("diff ") || line.startsWith("index ") || line.startsWith("---") || line.startsWith("+++");
 
   return (
     <div
@@ -88,7 +81,7 @@ const SECTION_LABEL: Record<Props["section"], string> = {
   untracked: "Untracked",
 };
 
-export function GitDiffPane({ repoRoot, filePath, staged, section }: Props) {
+export function GitDiffPane({ repoRoot, filePath, staged, section, sessionId }: Props) {
   const [diff, setDiff] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +95,7 @@ export function GitDiffPane({ repoRoot, filePath, staged, section }: Props) {
     setDiff(null);
 
     git
-      .getDiff(repoRoot, filePath, staged, ignoreWhitespace)
+      .getDiff(repoRoot, filePath, staged, ignoreWhitespace, sessionId)
       .then((content) => {
         if (!cancelRef.current) setDiff(content);
       })
@@ -116,22 +109,25 @@ export function GitDiffPane({ repoRoot, filePath, staged, section }: Props) {
     return () => {
       cancelRef.current = true;
     };
-  }, [repoRoot, filePath, staged, ignoreWhitespace]);
+  }, [repoRoot, filePath, staged, ignoreWhitespace, sessionId]);
 
   const stats = diff ? computeStats(diff) : null;
   const lines = diff ? diff.split("\n") : [];
   const isBinary = diff?.includes("Binary files") ?? false;
 
-  const dirPath = filePath.includes("/")
-    ? filePath.slice(0, filePath.lastIndexOf("/") + 1)
-    : "";
+  const dirPath = filePath.includes("/") ? filePath.slice(0, filePath.lastIndexOf("/") + 1) : "";
   const fileName = filePath.split("/").pop() ?? filePath;
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-md border border-border/60 bg-background">
       {/* Header */}
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border/50 px-3">
-        <HugeiconsIcon icon={GitCompareIcon} size={13} strokeWidth={1.75} className="shrink-0 text-modified" />
+        <HugeiconsIcon
+          icon={GitCompareIcon}
+          size={13}
+          strokeWidth={1.75}
+          className="shrink-0 text-modified"
+        />
 
         {/* Path */}
         <span className="flex min-w-0 flex-1 items-baseline gap-0 truncate font-mono text-[11px]">
@@ -186,11 +182,18 @@ export function GitDiffPane({ repoRoot, filePath, staged, section }: Props) {
             <p className="text-[11px] text-muted-foreground/60">{error}</p>
           </div>
         )}
-        {!loading && !error && diff !== null && (
-          isBinary ? (
+        {!loading &&
+          !error &&
+          diff !== null &&
+          (isBinary ? (
             <div className="flex h-full items-center justify-center">
               <div className="flex flex-col items-center gap-2">
-                <HugeiconsIcon icon={SourceCodeIcon} size={24} strokeWidth={1.5} className="text-muted-foreground/30" />
+                <HugeiconsIcon
+                  icon={SourceCodeIcon}
+                  size={24}
+                  strokeWidth={1.5}
+                  className="text-muted-foreground/30"
+                />
                 <p className="text-[11px] text-muted-foreground/50">Binary file — no diff available</p>
               </div>
             </div>
@@ -206,8 +209,7 @@ export function GitDiffPane({ repoRoot, filePath, staged, section }: Props) {
                 ))}
               </div>
             </ScrollArea>
-          )
-        )}
+          ))}
       </div>
     </div>
   );

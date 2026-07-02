@@ -2,11 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import type { ProviderInfo } from "@/modules/ai/config";
-import {
-  ArrowUpRight01Icon,
-  ViewIcon,
-  ViewOffSlashIcon,
-} from "@hugeicons/core-free-icons";
+import { ArrowUpRight01Icon, ViewIcon, ViewOffSlashIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useState } from "react";
@@ -75,11 +71,7 @@ export function ProviderKeyCard({ provider, currentKey, onSave }: Props) {
             className="flex items-center gap-0.5 text-[10.5px] text-muted-foreground transition-colors hover:text-foreground"
           >
             Get key
-            <HugeiconsIcon
-              icon={ArrowUpRight01Icon}
-              size={10}
-              strokeWidth={2}
-            />
+            <HugeiconsIcon icon={ArrowUpRight01Icon} size={10} strokeWidth={2} />
           </button>
         )}
       </div>
@@ -112,11 +104,7 @@ export function ProviderKeyCard({ provider, currentKey, onSave }: Props) {
             className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
             aria-label={reveal ? "Hide key" : "Show key"}
           >
-            <HugeiconsIcon
-              icon={reveal ? ViewOffSlashIcon : ViewIcon}
-              size={12}
-              strokeWidth={1.75}
-            />
+            <HugeiconsIcon icon={reveal ? ViewOffSlashIcon : ViewIcon} size={12} strokeWidth={1.75} />
           </button>
         </div>
         <Button
@@ -130,9 +118,7 @@ export function ProviderKeyCard({ provider, currentKey, onSave }: Props) {
         </Button>
       </div>
 
-      {error && (
-        <p className="text-[10.5px] text-destructive">{error}</p>
-      )}
+      {error && <p className="text-[10.5px] text-destructive">{error}</p>}
     </div>
   );
 }

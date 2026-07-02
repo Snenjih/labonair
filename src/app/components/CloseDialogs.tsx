@@ -43,9 +43,7 @@ export function CloseDialogs({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Save before closing?</AlertDialogTitle>
-            <AlertDialogDescription>
-              "{pendingSaveTab?.title}" has not been saved.
-            </AlertDialogDescription>
+            <AlertDialogDescription>"{pendingSaveTab?.title}" has not been saved.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel
@@ -113,9 +111,7 @@ export function CloseDialogs({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Close terminal tab?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The running shell process will be terminated.
-            </AlertDialogDescription>
+            <AlertDialogDescription>The running shell process will be terminated.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

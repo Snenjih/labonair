@@ -1,22 +1,28 @@
+import { MotionConfig } from "motion/react";
+import { AiOverlays, CloseDialogs, SidebarContent, WorkspaceArea } from "@/app/components";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AiComposerProvider } from "@/modules/ai/lib/composer";
-import { Header } from "@/modules/header";
-import { SnippetLogDrawer } from "@/modules/snippets";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
-import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
-import { ShortcutsDialog } from "@/modules/shortcuts";
-import { StatusBar } from "@/modules/statusbar";
-import type { SidebarReturn } from "@/modules/statusbar";
-import { CommandPalette, useCommandStore } from "@/modules/command-palette";
-import type { PaletteCallbacksReturn } from "@/modules/command-palette";
-import { UpdaterDialog } from "@/modules/updater";
-import { MotionConfig } from "motion/react";
-import { ThemeProvider } from "@/modules/theme";
-import { type TabManagementReturn, type AiDiffStatus, useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import type { AiLiveBridgeReturn } from "@/modules/ai";
-import { AiOverlays, CloseDialogs, SidebarContent, WorkspaceArea } from "@/app/components";
+import { AiComposerProvider } from "@/modules/ai/lib/composer";
+import type { PaletteCallbacksReturn } from "@/modules/command-palette";
+import { CommandPalette, useCommandStore } from "@/modules/command-palette";
+import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
+import { Header } from "@/modules/header";
+import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
+import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { ShortcutsDialog } from "@/modules/shortcuts";
+import { SnippetLogDrawer } from "@/modules/snippets";
 import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
+import type { SidebarReturn } from "@/modules/statusbar";
+import { StatusBar } from "@/modules/statusbar";
+import {
+  type AiDiffStatus,
+  selectActiveTabKind,
+  type TabManagementReturn,
+  useTabsStore,
+} from "@/modules/tabs";
+import { ThemeProvider } from "@/modules/theme";
+import { UpdaterDialog } from "@/modules/updater";
 
 // ─── Stable store actions threaded down from App ─────────────────────────────
 export interface AppShellStoreActions {
@@ -35,6 +41,7 @@ export interface AppShellStoreActions {
   newSftpTab: (hostId: string, title: string) => number;
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
+  openRemotePreviewTab: (sftpTabId: string, remotePath: string) => Promise<void>;
   openUntitledTab: () => Promise<number>;
   setActiveId: (id: number) => void;
 }
@@ -51,6 +58,7 @@ export interface AppShellPrefs {
 export interface AppShellControlState {
   home: string | null;
   explorerRoot: string | null;
+  explorerTarget: ExplorerTarget;
   hasComposer: boolean;
   keysLoaded: boolean;
   detectedPreviewUrl: string | null;
@@ -77,8 +85,16 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
 
   const onNewGitGraph = () => {
     const { repoRoot, currentBranch } = useSourceControlStore.getState();
-    const path = repoRoot ?? ctrl.explorerRoot ?? "";
-    tabs.openGitGraphTab(path, currentBranch);
+    // hostId/sessionId come from the always-live explorerTarget (derived
+    // from the active tab) rather than the Source Control store, which only
+    // gets populated once that panel has mounted and polled at least once —
+    // otherwise opening Git Graph on a fresh SSH tab silently falls back to
+    // a local executor against a remote path string.
+    const target = ctrl.explorerTarget;
+    const path = repoRoot ?? target.path ?? ctrl.explorerRoot ?? "";
+    const hostId = target.type === "remote" ? target.hostId : undefined;
+    const sessionId = target.type === "remote" ? target.sessionId : undefined;
+    tabs.openGitGraphTab(path, currentBranch, hostId, sessionId);
   };
 
   const sidebarPassthrough = {
@@ -86,7 +102,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     activePanel: sidebar.activePanel,
     setActivePanel: sidebar.setActivePanel,
     onSidebarResize: sidebar.onSidebarResize,
-    explorerRoot: ctrl.explorerRoot,
+    explorerTarget: ctrl.explorerTarget,
     onSelect: actions.setActiveId,
     onNew: tabs.openNewTab,
     onNewPreview: () => tabs.openPreviewTab(""),
@@ -105,6 +121,15 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onPathDeleted: tabs.handlePathDeleted,
     onRevealInTerminal: tabs.cdInNewTab,
     onAttachToAgent: ai.handleAttachFileToAgent,
+    onOpenRemoteFile: (sessionId: string, path: string) => {
+      void actions.openRemoteEditorTab(sessionId, path);
+    },
+    onOpenRemotePreview: (sessionId: string, path: string) => {
+      void actions.openRemotePreviewTab(sessionId, path);
+    },
+    onOpenSftpTab: (hostId: string, title: string) => {
+      actions.newSftpTab(hostId, title);
+    },
     onSnippetRun: tabs.handleSnippetRun,
     onOpenGitGraph: tabs.openGitGraphTab,
     onNewGitGraph,
@@ -200,7 +225,10 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 }}
                 activePanel={sidebar.activePanel}
                 onPanelToggle={(panel) => {
-                  if (panel === "hosts") { actions.openHomeTab(); return; }
+                  if (panel === "hosts") {
+                    actions.openHomeTab();
+                    return;
+                  }
                   sidebar.handlePanelToggle(panel);
                 }}
               />

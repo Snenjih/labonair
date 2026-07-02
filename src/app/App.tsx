@@ -1,26 +1,18 @@
-import {
-  hasAnyKey,
-  useChatStore,
-  useAiLiveBridge,
-} from "@/modules/ai";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useShortcutHandlers } from "@/modules/shortcuts";
-import {
-  useWorkspaceCwd,
-  useTabManagement,
-  useTabsStore,
-  selectActiveTabKind,
-} from "@/modules/tabs";
-import { usePaletteCallbacks } from "@/modules/command-palette";
-import { useMenuBridge } from "@/app/hooks/useMenuBridge";
-import { useUpdater } from "@/modules/updater";
-import { useAppBootstrap } from "@/app/hooks/useAppBootstrap";
-import { useSessionLifecycle, setScrollbackLive } from "@/modules/session";
-import { useSidebar } from "@/modules/statusbar";
-import { usePreviewDetection } from "@/modules/terminal";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/app/components";
+import { useAppBootstrap } from "@/app/hooks/useAppBootstrap";
+import { useMenuBridge } from "@/app/hooks/useMenuBridge";
+import { hasAnyKey, useAiLiveBridge, useChatStore } from "@/modules/ai";
+import { usePaletteCallbacks } from "@/modules/command-palette";
+import { useExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
+import { setScrollbackLive, useSessionLifecycle } from "@/modules/session";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useShortcutHandlers } from "@/modules/shortcuts";
+import { useSidebar } from "@/modules/statusbar";
+import { selectActiveTabKind, useTabManagement, useTabsStore, useWorkspaceCwd } from "@/modules/tabs";
+import { usePreviewDetection } from "@/modules/terminal";
+import { useUpdater } from "@/modules/updater";
 
 export default function App() {
   // ── Stable store actions (never change — safe to destructure once) ────────
@@ -34,6 +26,7 @@ export default function App() {
     newSftpTab,
     updateSftpPaths,
     openRemoteEditorTab,
+    openRemotePreviewTab,
     openUntitledTab,
     setActiveId,
     splitPane,
@@ -47,6 +40,7 @@ export default function App() {
 
   // ── useWorkspaceCwd MUST come before useTabManagement ─────────────────────
   const { explorerRoot, inheritedCwdForNewTab } = useWorkspaceCwd(home);
+  const explorerTarget = useExplorerTarget(explorerRoot);
 
   // ── Sidebar hook ──────────────────────────────────────────────────────────
   const sidebar = useSidebar();
@@ -162,6 +156,7 @@ export default function App() {
         newSftpTab,
         updateSftpPaths,
         openRemoteEditorTab,
+        openRemotePreviewTab,
         openUntitledTab,
         setActiveId,
       }}
@@ -175,6 +170,7 @@ export default function App() {
       ctrl={{
         home,
         explorerRoot,
+        explorerTarget,
         hasComposer,
         keysLoaded,
         detectedPreviewUrl,

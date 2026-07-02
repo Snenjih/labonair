@@ -1,13 +1,3 @@
-import { Button } from "@/components/ui/button";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Cancel01Icon,
   FileAddIcon,
@@ -19,33 +9,55 @@ import {
   ViewOffSlashIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { handleApiError } from "@/lib/errors";
-import { invoke } from "@tauri-apps/api/core";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { FileTreeNode } from "./FileTreeNode";
-import { InlineInput } from "./InlineInput";
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { handleApiError } from "@/lib/errors";
+import { useHostsStore } from "@/modules/hosts";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { ExplorerAuthPrompt } from "./components/ExplorerAuthPrompt";
+import { VirtualizedTreeList } from "./components/VirtualizedTreeList";
+import { buildTreeRows } from "./lib/buildTreeRows";
 import { copyToClipboard, revealInFinder } from "./lib/contextActions";
+import type { SearchHit } from "./lib/fsProvider";
 import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
+import { createLocalFsProvider } from "./lib/providers/localFsProvider";
+import { createRemoteFsProvider } from "./lib/providers/remoteFsProvider";
+import type { ExplorerTarget } from "./lib/useExplorerTarget";
 import { useFileTree } from "./lib/useFileTree";
+import { useLazyExplorerSession } from "./lib/useLazyExplorerSession";
 import { useOsFileDrop } from "./lib/useOsFileDrop";
 
-type SearchHit = {
-  path: string;
-  rel: string;
-  name: string;
-  is_dir: boolean;
-};
-
 type Props = {
-  rootPath: string | null;
+  explorerTarget: ExplorerTarget;
   onOpenFile: (path: string) => void;
+  /** Opens a remote path via the same prepare_remote_edit flow the SFTP dual-pane
+   *  tab already uses. Required for remote browsing to do anything useful on
+   *  file click — `onOpenFile` alone would try to open the (nonexistent) local
+   *  path. */
+  onOpenRemoteFile?: (sessionId: string, path: string) => void;
+  /** Opens a remote path in a preview tab via the same prepare_remote_edit
+   *  temp-download `onOpenRemoteFile` uses — read-only, no save-back. */
+  onOpenRemotePreview?: (sessionId: string, path: string) => void;
   onOpenPreview?: (path: string) => void;
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
-  onAttachToAgent?: (path: string) => void;
+  onAttachToAgent?: (path: string, remote?: { sessionId: string; hostId: string }) => void;
+  /** Escape hatch from the auth-required state — opens a full SFTP tab, which
+   *  has the interactive credential/2FA/host-key UI this narrow sidebar
+   *  deliberately doesn't duplicate. */
+  onOpenSftpTab?: (hostId: string, title: string) => void;
 };
 
 function basename(path: string): string {
@@ -54,45 +66,108 @@ function basename(path: string): string {
 }
 
 export function FileExplorer({
-  rootPath,
+  explorerTarget,
   onOpenFile,
+  onOpenRemoteFile,
+  onOpenRemotePreview,
   onOpenPreview,
   onPathRenamed,
   onPathDeleted,
   onRevealInTerminal,
   onAttachToAgent,
+  onOpenSftpTab,
 }: Props) {
-  const tree = useFileTree(rootPath, { onPathRenamed, onPathDeleted });
+  const hosts = useHostsStore((s) => s.hosts);
+
+  // Only "lazy-session" targets (an SSH workspace tab with no SFTP tab open
+  // for that host) need us to manage a connection's lifecycle — an "sftp-tab"
+  // target already owns a live session via its own tab.
+  const lazyHostId =
+    explorerTarget.type === "remote" && explorerTarget.source === "lazy-session"
+      ? explorerTarget.hostId
+      : null;
+  const lazySession = useLazyExplorerSession(lazyHostId);
+
+  const activeSessionId =
+    explorerTarget.type === "remote"
+      ? explorerTarget.source === "sftp-tab"
+        ? explorerTarget.sessionId
+        : lazySession?.status === "connected"
+          ? lazySession.sessionId
+          : null
+      : null;
+
+  const localProvider = useMemo(() => createLocalFsProvider(), []);
+  const provider = useMemo(() => {
+    if (explorerTarget.type === "remote" && activeSessionId) {
+      return createRemoteFsProvider(activeSessionId, explorerTarget.hostId);
+    }
+    return localProvider;
+  }, [explorerTarget, activeSessionId, localProvider]);
+
+  // Nothing is fetched until a remote session is actually ready — the tree
+  // is fed a null root in the meantime (same "no root" idle state as local).
+  const rootPath =
+    explorerTarget.type === "local" ? explorerTarget.path : activeSessionId ? explorerTarget.path : null;
+
+  const tree = useFileTree(provider, rootPath, { onPathRenamed, onPathDeleted });
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
 
+  // Native OS drag-drop needs a real local file handle to hand the OS — never
+  // wired up for a remote target (see remoteFsProvider's supportsNativeDrag).
   const { dropTargetPath } = useOsFileDrop(
-    rootPath,
+    explorerTarget.type === "local" ? rootPath : null,
     !!query.trim(),
     (destDir) => tree.refresh(destDir),
   );
 
+  const handleOpenFile = (path: string) => {
+    if (explorerTarget.type === "remote" && activeSessionId) {
+      onOpenRemoteFile?.(activeSessionId, path);
+    } else {
+      onOpenFile(path);
+    }
+  };
+
+  // "Open in Terminal" assumes a local terminal cwd — meaningless for a
+  // remote path, so it's simply not passed down for a remote target.
+  // FileTreeNode already renders it conditionally on the callback being
+  // defined. "Attach to Agent" now works for both (reads over SFTP when
+  // remote — see sftp_read_file_content), so it's threaded through with the
+  // active session/host instead of being suppressed.
+  const effectiveOnRevealInTerminal = explorerTarget.type === "local" ? onRevealInTerminal : undefined;
+  const effectiveOnAttachToAgent =
+    explorerTarget.type === "remote" && activeSessionId
+      ? (path: string) =>
+          onAttachToAgent?.(path, { sessionId: activeSessionId, hostId: explorerTarget.hostId })
+      : onAttachToAgent;
+  const effectiveOnOpenPreview =
+    explorerTarget.type === "remote" && activeSessionId
+      ? onOpenRemotePreview
+        ? (path: string) => onOpenRemotePreview(activeSessionId, path)
+        : undefined
+      : onOpenPreview;
+
+  // Single flattening pass feeds both the virtualized render and keyboard
+  // navigation — `flat` is the entry-only subset `treeRows` already implies
+  // (loading/error/pending-create rows aren't navigable targets).
+  const treeRows = useMemo(
+    () =>
+      rootPath ? buildTreeRows(rootPath, tree.nodes, tree.expanded, tree.joinPath, tree.pendingCreate) : [],
+    [rootPath, tree.nodes, tree.expanded, tree.joinPath, tree.pendingCreate],
+  );
   type FlatItem = { path: string; isDir: boolean };
-  const flat = useMemo<FlatItem[]>(() => {
-    if (!rootPath) return [];
-    const out: FlatItem[] = [];
-    const walk = (parent: string) => {
-      const node = tree.nodes[parent];
-      if (!node || node.status !== "loaded") return;
-      for (const e of node.entries) {
-        const p = tree.joinPath(parent, e.name);
-        const isDir = e.kind === "dir";
-        out.push({ path: p, isDir });
-        if (isDir && tree.expanded.has(p)) walk(p);
-      }
-    };
-    walk(rootPath);
-    return out;
-  }, [rootPath, tree.nodes, tree.expanded, tree.joinPath]);
+  const flat = useMemo<FlatItem[]>(
+    () =>
+      treeRows
+        .filter((r) => r.kind === "entry")
+        .map((r) => ({ path: r.path, isDir: r.entry.kind === "dir" })),
+    [treeRows],
+  );
 
   useEffect(() => {
     if (selectedPath && !flat.some((f) => f.path === selectedPath)) {
@@ -112,9 +187,7 @@ export function FileExplorer({
     let alive = true;
     const handle = setTimeout(async () => {
       try {
-        const hits = await invoke<SearchHit[]>("fs_search", {
-          root: rootPath,
-          query: q,
+        const hits = await provider.search(rootPath, q, {
           limit: 200,
           showHidden: tree.showHidden,
         });
@@ -132,53 +205,86 @@ export function FileExplorer({
       alive = false;
       clearTimeout(handle);
     };
-  }, [query, rootPath]);
+  }, [query, rootPath, provider]);
+
+  // Lets the command palette (useExplorerCommands) drive this panel's
+  // toolbar actions without threading callbacks through App.tsx/SidebarContent
+  // — same window-event pattern as ssh.reconnect's "labonair:ssh-reconnect".
+  // Listeners are registered unconditionally (harmless no-op while a
+  // different sidebar panel is mounted instead of this one) — each handler
+  // checks `rootPath` itself and surfaces a toast instead of silently doing
+  // nothing while a remote session is still connecting/erroring (rootPath
+  // stays null until then, see the ExplorerAuthPrompt branch below).
+  useEffect(() => {
+    const notifyNotReady = () =>
+      useNotificationStore.getState().addNotification({
+        type: "info",
+        title: "Explorer Not Ready",
+        message: "The sidebar file tree isn't connected yet.",
+        source: "Explorer",
+      });
+    const onRefresh = () => (rootPath ? tree.refresh(rootPath) : notifyNotReady());
+    const onToggleHidden = () => {
+      if (!rootPath) return notifyNotReady();
+      tree.toggleShowHidden();
+      tree.refresh(rootPath);
+    };
+    const onNewFile = () => (rootPath ? tree.beginCreate(rootPath, "file") : notifyNotReady());
+    const onNewFolder = () => (rootPath ? tree.beginCreate(rootPath, "dir") : notifyNotReady());
+    const onCopyRootPath = () => (rootPath ? void copyToClipboard(rootPath) : notifyNotReady());
+    window.addEventListener("labonair:explorer-refresh", onRefresh);
+    window.addEventListener("labonair:explorer-toggle-hidden", onToggleHidden);
+    window.addEventListener("labonair:explorer-new-file", onNewFile);
+    window.addEventListener("labonair:explorer-new-folder", onNewFolder);
+    window.addEventListener("labonair:explorer-copy-root-path", onCopyRootPath);
+    return () => {
+      window.removeEventListener("labonair:explorer-refresh", onRefresh);
+      window.removeEventListener("labonair:explorer-toggle-hidden", onToggleHidden);
+      window.removeEventListener("labonair:explorer-new-file", onNewFile);
+      window.removeEventListener("labonair:explorer-new-folder", onNewFolder);
+      window.removeEventListener("labonair:explorer-copy-root-path", onCopyRootPath);
+    };
+  }, [rootPath, tree]);
+
+  // A lazy remote session that isn't connected yet gets its own compact
+  // state instead of the tree — deliberately not a full-screen loading
+  // screen (see ExplorerAuthPrompt's doc comment).
+  if (lazyHostId && (!lazySession || lazySession.status !== "connected")) {
+    const host = hosts.find((h) => h.id === lazyHostId);
+    return (
+      <ExplorerAuthPrompt
+        status={lazySession?.status ?? "connecting"}
+        error={lazySession?.error ?? null}
+        hostLabel={host?.name ?? lazyHostId}
+        onReconnect={() => lazySession?.reconnect()}
+        onOpenSftpTab={() => onOpenSftpTab?.(lazyHostId, host?.name ?? "SSH")}
+      />
+    );
+  }
 
   if (!rootPath) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-        <HugeiconsIcon
-          icon={Folder01Icon}
-          size={24}
-          strokeWidth={1.5}
-          className="text-muted-foreground"
-        />
-        <div className="text-xs text-muted-foreground">
-          No current directory
-        </div>
+        <HugeiconsIcon icon={Folder01Icon} size={24} strokeWidth={1.5} className="text-muted-foreground" />
+        <div className="text-xs text-muted-foreground">No current directory</div>
       </div>
     );
   }
 
-  const root = tree.nodes[rootPath];
-  const pendingAtRoot =
-    tree.pendingCreate?.parentPath === rootPath ? tree.pendingCreate : null;
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (tree.renaming || tree.pendingCreate || query.trim()) return;
     const target = e.target as HTMLElement;
-    if (
-      target.tagName === "INPUT" ||
-      target.tagName === "TEXTAREA" ||
-      target.isContentEditable
-    )
-      return;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
     if (flat.length === 0) return;
 
-    const currentIdx = selectedPath
-      ? flat.findIndex((f) => f.path === selectedPath)
-      : -1;
+    const currentIdx = selectedPath ? flat.findIndex((f) => f.path === selectedPath) : -1;
 
     const move = (next: number) => {
       const clamped = Math.max(0, Math.min(flat.length - 1, next));
-      const path = flat[clamped].path;
-      setSelectedPath(path);
-      requestAnimationFrame(() => {
-        const el = listRef.current?.querySelector<HTMLElement>(
-          `[data-fs-path="${CSS.escape(path)}"]`,
-        );
-        el?.scrollIntoView({ block: "nearest" });
-      });
+      // VirtualizedTreeList scrolls the new selection into view reactively
+      // (via useVirtualizer's index-based scrollToIndex) once selectedPath
+      // changes — no DOM query needed here.
+      setSelectedPath(flat[clamped].path);
     };
 
     switch (e.key) {
@@ -218,23 +324,16 @@ export function FileExplorer({
         {
           const item = flat[currentIdx];
           if (item.isDir) tree.toggle(item.path);
-          else onOpenFile(item.path);
+          else handleOpenFile(item.path);
         }
         break;
     }
   };
 
   return (
-    <div
-      className="flex h-full flex-col outline-none"
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-    >
+    <div className="flex h-full flex-col outline-none" tabIndex={0} onKeyDown={handleKeyDown}>
       <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-2">
-        <span
-          className="flex-1 flex truncate text-xs font-medium text-foreground/80"
-          title={rootPath}
-        >
+        <span className="flex-1 flex truncate text-xs font-medium text-foreground/80" title={rootPath}>
           <img
             src={folderIconUrl(basename(rootPath), false)}
             alt=""
@@ -292,11 +391,7 @@ export function FileExplorer({
           }}
           title={tree.showHidden ? "Hide hidden files" : "Show hidden files"}
         >
-          <HugeiconsIcon
-            icon={tree.showHidden ? ViewIcon : ViewOffSlashIcon}
-            size={13}
-            strokeWidth={2}
-          />
+          <HugeiconsIcon icon={tree.showHidden ? ViewIcon : ViewOffSlashIcon} size={13} strokeWidth={2} />
         </Button>
       </div>
 
@@ -335,13 +430,9 @@ export function FileExplorer({
         <ScrollArea className="min-h-0 flex-1">
           <div className="py-1">
             {searching && results.length === 0 ? (
-              <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                Searching…
-              </div>
+              <div className="px-3 py-2 text-[11px] text-muted-foreground">Searching…</div>
             ) : results.length === 0 ? (
-              <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                No matches
-              </div>
+              <div className="px-3 py-2 text-[11px] text-muted-foreground">No matches</div>
             ) : (
               results.map((hit) => {
                 const url = hit.is_dir ? null : fileIconUrl(hit.name);
@@ -350,7 +441,7 @@ export function FileExplorer({
                     key={hit.path}
                     type="button"
                     onClick={() => {
-                      if (!hit.is_dir) onOpenFile(hit.path);
+                      if (!hit.is_dir) handleOpenFile(hit.path);
                     }}
                     className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-xs hover:bg-accent"
                     title={hit.path}
@@ -366,9 +457,7 @@ export function FileExplorer({
                       />
                     )}
                     <span className="truncate">{hit.name}</span>
-                    <span className="ml-auto truncate text-[10px] text-muted-foreground">
-                      {hit.rel}
-                    </span>
+                    <span className="ml-auto truncate text-[10px] text-muted-foreground">{hit.rel}</span>
                   </button>
                 );
               })
@@ -382,96 +471,47 @@ export function FileExplorer({
               {dropTargetPath === rootPath && (
                 <div className="pointer-events-none absolute inset-0 z-10 rounded-sm ring-2 ring-inset ring-primary/60 bg-primary/5" />
               )}
-              <ScrollArea className="h-full">
-              <div className="py-1" ref={listRef}>
-                {pendingAtRoot && (
-                  <div
-                    className="flex w-full items-center gap-1.5 px-1.5 py-0.5 text-xs"
-                    style={{ paddingLeft: 6 }}
-                  >
-                    <span className="size-3 shrink-0" />
-                    <span className="size-4 shrink-0" />
-                    <InlineInput
-                      initial=""
-                      placeholder={
-                        pendingAtRoot.kind === "dir" ? "New folder" : "New file"
-                      }
-                      onCommit={tree.commitCreate}
-                      onCancel={tree.cancelCreate}
-                    />
-                  </div>
-                )}
-                {root?.status === "loading" && (
-                  <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                    Loading…
-                  </div>
-                )}
-                {root?.status === "error" && (
-                  <div className="px-3 py-2 text-[11px] text-destructive">
-                    {root.message}
-                  </div>
-                )}
-                {root?.status === "loaded" &&
-                  root.entries.map((entry) => (
-                    <FileTreeNode
-                      key={entry.name}
-                      entry={entry}
-                      parentPath={rootPath}
-                      rootPath={rootPath}
-                      depth={0}
-                      tree={tree}
-                      onOpenFile={onOpenFile}
-                      onOpenPreview={onOpenPreview}
-                      onRevealInTerminal={onRevealInTerminal}
-                      onAttachToAgent={onAttachToAgent}
-                      selectedPath={selectedPath}
-                      onSelectPath={setSelectedPath}
-                      dropTargetPath={dropTargetPath}
-                    />
-                  ))}
-              </div>
-              </ScrollArea>
+              <VirtualizedTreeList
+                rows={treeRows}
+                rootPath={rootPath}
+                tree={tree}
+                onOpenFile={handleOpenFile}
+                onOpenPreview={effectiveOnOpenPreview}
+                onRevealInTerminal={effectiveOnRevealInTerminal}
+                onAttachToAgent={effectiveOnAttachToAgent}
+                selectedPath={selectedPath}
+                onSelectPath={setSelectedPath}
+                dropTargetPath={dropTargetPath}
+                dragOriginHostId={explorerTarget.type === "remote" ? explorerTarget.hostId : undefined}
+              />
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className={COMPACT_CONTENT}>
-            {onRevealInTerminal && (
+            {effectiveOnRevealInTerminal && (
               <ContextMenuItem
                 className={COMPACT_ITEM}
-                onSelect={() => onRevealInTerminal(rootPath)}
+                onSelect={() => effectiveOnRevealInTerminal(rootPath)}
               >
                 Open in Terminal
               </ContextMenuItem>
             )}
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => void revealInFinder(rootPath)}
-            >
-              Reveal in Finder
-            </ContextMenuItem>
+            {tree.capabilities.supportsReveal && (
+              <ContextMenuItem className={COMPACT_ITEM} onSelect={() => void revealInFinder(rootPath)}>
+                Reveal in Finder
+              </ContextMenuItem>
+            )}
             <ContextMenuSeparator />
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => tree.beginCreate(rootPath, "file")}
-            >
+            <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginCreate(rootPath, "file")}>
               New File
             </ContextMenuItem>
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => tree.beginCreate(rootPath, "dir")}
-            >
+            <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginCreate(rootPath, "dir")}>
               New Folder
             </ContextMenuItem>
             <ContextMenuSeparator />
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => void copyToClipboard(rootPath)}
-            >
+            <ContextMenuItem className={COMPACT_ITEM} onSelect={() => void copyToClipboard(rootPath)}>
               Copy Path
             </ContextMenuItem>
-            <ContextMenuItem
-              className={COMPACT_ITEM}
-              onSelect={() => tree.refresh(rootPath)}
-            >
+            <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.refresh(rootPath)}>
               Refresh
             </ContextMenuItem>
           </ContextMenuContent>

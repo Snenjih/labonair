@@ -23,15 +23,14 @@ type Props = {
   onRespond: (approved: boolean) => void;
 };
 
-const TOOL_META: Record<string, { label: string; icon: typeof FilePlusIcon }> =
-  {
-    write_file: { label: "Write file", icon: FilePlusIcon },
-    edit: { label: "Edit file", icon: FileEditIcon },
-    multi_edit: { label: "Edit file (batch)", icon: Edit02Icon },
-    create_directory: { label: "Create directory", icon: FolderAddIcon },
-    bash_run: { label: "Run shell command", icon: TerminalIcon },
-    bash_background: { label: "Spawn background process", icon: TerminalIcon },
-  };
+const TOOL_META: Record<string, { label: string; icon: typeof FilePlusIcon }> = {
+  write_file: { label: "Write file", icon: FilePlusIcon },
+  edit: { label: "Edit file", icon: FileEditIcon },
+  multi_edit: { label: "Edit file (batch)", icon: Edit02Icon },
+  create_directory: { label: "Create directory", icon: FolderAddIcon },
+  bash_run: { label: "Run shell command", icon: TerminalIcon },
+  bash_background: { label: "Spawn background process", icon: TerminalIcon },
+};
 
 function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
   const meta = TOOL_META[toolName];
@@ -42,34 +41,26 @@ function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
 
   const isShellTool = toolName === "bash_run" || toolName === "bash_background";
   const cmd = isShellTool ? String(input.command ?? "") : null;
-  const destructiveWarning =
-    warnDestructive && cmd ? checkDestructiveCommand(cmd) : null;
+  const destructiveWarning = warnDestructive && cmd ? checkDestructiveCommand(cmd) : null;
 
   return (
-    <div className={cn(
-      "rounded-lg border bg-card shadow-sm",
-      destructiveWarning ? "border-warning/60" : "border-border",
-    )}>
+    <div
+      className={cn(
+        "rounded-lg border bg-card shadow-sm",
+        destructiveWarning ? "border-warning/60" : "border-border",
+      )}
+    >
       <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
         <span className="size-1.5 shrink-0 rounded-full bg-warning animate-pulse" />
-        <HugeiconsIcon
-          icon={Icon}
-          size={13}
-          strokeWidth={1.75}
-          className="shrink-0 text-muted-foreground"
-        />
-        <span className="text-[12px] font-medium text-foreground">
-          {label}
-        </span>
+        <HugeiconsIcon icon={Icon} size={13} strokeWidth={1.75} className="shrink-0 text-muted-foreground" />
+        <span className="text-[12px] font-medium text-foreground">{label}</span>
         {destructiveWarning && (
           <span className="ml-1 flex items-center gap-1 rounded bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning">
             <HugeiconsIcon icon={Alert02Icon} size={10} strokeWidth={2} />
             {destructiveWarning}
           </span>
         )}
-        <span className="ml-auto text-[10px] text-muted-foreground">
-          needs approval
-        </span>
+        <span className="ml-auto text-[10px] text-muted-foreground">needs approval</span>
       </div>
 
       <div className="px-3 py-2.5">
@@ -105,19 +96,11 @@ export const AiToolApproval = memo(AiToolApprovalImpl, (a, b) => {
   // the model has emitted the approval-requested part with its input, we
   // don't want to re-render on every downstream token.
   return (
-    a.toolName === b.toolName &&
-    a.part.approval.id === b.part.approval.id &&
-    a.onRespond === b.onRespond
+    a.toolName === b.toolName && a.part.approval.id === b.part.approval.id && a.onRespond === b.onRespond
   );
 });
 
-function InlineDiff({
-  oldLines,
-  newLines,
-}: {
-  oldLines: string[];
-  newLines: string[];
-}) {
+function InlineDiff({ oldLines, newLines }: { oldLines: string[]; newLines: string[] }) {
   return (
     <div className="overflow-hidden rounded-md border border-border/40 font-mono text-[10.5px]">
       {oldLines.map((line, i) => (
@@ -144,22 +127,12 @@ function InlineDiff({
   );
 }
 
-function PreviewBlock({
-  toolName,
-  input,
-}: {
-  toolName: string;
-  input: Record<string, unknown>;
-}) {
+function PreviewBlock({ toolName, input }: { toolName: string; input: Record<string, unknown> }) {
   if (toolName === "bash_run" || toolName === "bash_background") {
     const cwd = typeof input.cwd === "string" ? input.cwd : null;
     return (
       <div className="space-y-1.5">
-        {cwd && (
-          <div className="font-mono text-[10.5px] text-muted-foreground">
-            {cwd}
-          </div>
-        )}
+        {cwd && <div className="font-mono text-[10.5px] text-muted-foreground">{cwd}</div>}
         <pre
           className={cn(
             "max-h-40 overflow-auto rounded-md bg-muted/60 p-2 font-mono text-[11px] leading-relaxed",
@@ -202,8 +175,8 @@ function PreviewBlock({
           <InlineDiff oldLines={oldLines} newLines={newLines} />
         ) : (
           <div className="text-[10.5px] text-muted-foreground/80">
-            −{oldLines.length} / +{newLines.length} line{oldLines.length === 1 && newLines.length === 1 ? "" : "s"} ·
-            review in the diff tab
+            −{oldLines.length} / +{newLines.length} line
+            {oldLines.length === 1 && newLines.length === 1 ? "" : "s"} · review in the diff tab
           </div>
         )}
       </div>
@@ -235,19 +208,14 @@ function PreviewBlock({
           </div>
         ) : (
           <div className="text-[10.5px] text-muted-foreground/80">
-            {edits.length} edit{edits.length === 1 ? "" : "s"} · review in the
-            diff tab
+            {edits.length} edit{edits.length === 1 ? "" : "s"} · review in the diff tab
           </div>
         )}
       </div>
     );
   }
   if (toolName === "create_directory") {
-    return (
-      <div className="font-mono text-[11px] text-muted-foreground">
-        {String(input.path ?? "")}
-      </div>
-    );
+    return <div className="font-mono text-[11px] text-muted-foreground">{String(input.path ?? "")}</div>;
   }
   return (
     <pre className="overflow-auto rounded-md bg-muted/60 p-2 font-mono text-[11px] leading-relaxed">
@@ -255,4 +223,3 @@ function PreviewBlock({
     </pre>
   );
 }
-

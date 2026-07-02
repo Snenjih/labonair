@@ -1,27 +1,10 @@
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  isValidHandle,
-  normalizeHandle,
-  type Directive,
-} from "@/modules/ai/lib/directives";
-import {
-  newDirectiveId,
-  useDirectivesStore,
-} from "@/modules/ai/store/directivesStore";
-import {
-  Add01Icon,
-  Delete02Icon,
-  Edit02Icon,
-} from "@hugeicons/core-free-icons";
+import { isValidHandle, normalizeHandle, type Directive } from "@/modules/ai/lib/directives";
+import { newDirectiveId, useDirectivesStore } from "@/modules/ai/store/directivesStore";
+import { Add01Icon, Delete02Icon, Edit02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
@@ -75,8 +58,8 @@ export function DirectivesSection() {
 
         {directives.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/60 bg-card/30 px-4 py-6 text-center text-[11px] text-muted-foreground">
-            No directives yet. Create one and insert it with{" "}
-            <code className="font-mono">#handle</code> in the AI input.
+            No directives yet. Create one and insert it with <code className="font-mono">#handle</code> in the
+            AI input.
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -91,9 +74,7 @@ export function DirectivesSection() {
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[12px] font-medium">{d.name}</span>
                   {d.description ? (
-                    <span className="truncate text-[10.5px] text-muted-foreground">
-                      {d.description}
-                    </span>
+                    <span className="truncate text-[10.5px] text-muted-foreground">{d.description}</span>
                   ) : null}
                 </div>
                 <Button
@@ -155,10 +136,7 @@ function DirectiveEditorDialog({
       : existing.some((d) => d.id !== draft.id && d.handle === draft.handle)
         ? "Already in use."
         : null;
-  const canSave =
-    !handleErr &&
-    draft.name.trim().length > 0 &&
-    draft.content.trim().length > 0;
+  const canSave = !handleErr && draft.name.trim().length > 0 && draft.content.trim().length > 0;
 
   return (
     <Dialog open={!!directive} onOpenChange={(o) => !o && onClose()}>
@@ -178,16 +156,12 @@ function DirectiveEditorDialog({
                 </span>
                 <Input
                   value={draft.handle}
-                  onChange={(e) =>
-                    setDraft({ ...draft, handle: normalizeHandle(e.target.value) })
-                  }
+                  onChange={(e) => setDraft({ ...draft, handle: normalizeHandle(e.target.value) })}
                   placeholder="review"
                   className="h-8 pl-5 font-mono text-[11.5px]"
                 />
               </div>
-              {handleErr ? (
-                <span className="text-[10px] text-destructive">{handleErr}</span>
-              ) : null}
+              {handleErr ? <span className="text-[10px] text-destructive">{handleErr}</span> : null}
             </div>
             <div className="flex flex-1 flex-col gap-1">
               <Label>Name</Label>
@@ -232,9 +206,5 @@ function DirectiveEditorDialog({
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="text-[11px] font-medium tracking-tight text-muted-foreground">{children}</span>;
 }

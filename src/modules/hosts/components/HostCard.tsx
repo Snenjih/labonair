@@ -159,18 +159,20 @@ export function HostCard({
             {/* ZONE A: Info Body */}
             <button
               onClick={onSelect}
-              onDoubleClick={(e) => { e.stopPropagation(); newSshTab(host.id, host.name); }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                newSshTab(host.id, host.name);
+              }}
               className="flex flex-1 items-start gap-3 p-3.5 text-left outline-none"
             >
               <div className="relative flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40 text-sm font-semibold text-muted-foreground shadow-sm">
-                {host.pin_to_top ? (
-                  <span className="text-[10px] text-primary">★</span>
-                ) : null}
+                {host.pin_to_top ? <span className="text-[10px] text-primary">★</span> : null}
                 {initials(host.name) || "?"}
                 <span
                   className={cn(
                     "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background",
-                    pingStatus === "online" && "bg-success [box-shadow:0_0_6px_color-mix(in_oklch,var(--color-success)_70%,transparent)]",
+                    pingStatus === "online" &&
+                      "bg-success [box-shadow:0_0_6px_color-mix(in_oklch,var(--color-success)_70%,transparent)]",
                     pingStatus === "offline" && "bg-destructive",
                     (!pingStatus || pingStatus === "checking") && "bg-muted-foreground/40 animate-pulse",
                   )}
@@ -193,23 +195,49 @@ export function HostCard({
                 <span className="mt-0.5 flex items-center gap-1 font-mono text-[11px] text-muted-foreground min-w-0">
                   {host.auth_method === "credential" && credential ? (
                     <>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                        <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0"
+                      >
+                        <circle cx="7.5" cy="15.5" r="5.5" />
+                        <path d="m21 2-9.6 9.6" />
+                        <path d="m15.5 7.5 3 3L22 7l-3-3" />
                       </svg>
                       <span className="truncate">{credential.name}</span>
                       <span className="shrink-0">•</span>
                     </>
                   ) : host.auth_method === "key" ? (
                     <>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                        <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0"
+                      >
+                        <circle cx="7.5" cy="15.5" r="5.5" />
+                        <path d="m21 2-9.6 9.6" />
+                        <path d="m15.5 7.5 3 3L22 7l-3-3" />
                       </svg>
                       <span className="shrink-0">•</span>
                     </>
                   ) : (
                     <span className="shrink-0">ssh •</span>
                   )}
-                  <span className="truncate">{host.username}@{host.host_address}</span>
+                  <span className="truncate">
+                    {host.username}@{host.host_address}
+                  </span>
                 </span>
                 <span className="mt-1.5 text-[10px] text-muted-foreground/70">
                   {host.last_connected_at
@@ -234,10 +262,16 @@ export function HostCard({
                 onClick={connectSsh}
                 className="h-9 flex-1 gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-background/50"
               >
-                {hasActiveSshTab && (
-                  <span className="size-1.5 rounded-full bg-success animate-pulse" />
-                )}
-                <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                {hasActiveSshTab && <span className="size-1.5 rounded-full bg-success animate-pulse" />}
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                >
                   <rect x="1" y="3" width="12" height="8" rx="1.5" />
                   <path d="M4 7l1.5 1.5L4 10M8 9.5h2" />
                 </svg>
@@ -249,10 +283,17 @@ export function HostCard({
                 onClick={connectSftp}
                 className="h-9 flex-1 gap-2 text-xs text-muted-foreground hover:text-foreground hover:bg-background/50"
               >
-                {hasActiveSftpTab && (
-                  <span className="size-1.5 rounded-full bg-success animate-pulse" />
-                )}
-                <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                {hasActiveSftpTab && <span className="size-1.5 rounded-full bg-success animate-pulse" />}
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M1 4.5V11a1 1 0 001 1h10a1 1 0 001-1V5.5a1 1 0 00-1-1H7L5.5 3H2a1 1 0 00-1 1.5z" />
                 </svg>
                 SFTP
@@ -269,12 +310,8 @@ export function HostCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem onClick={() => onEdit()}>
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => duplicateHost(host.id)}>
-                    Duplicate
-                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEdit()}>Edit</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => duplicateHost(host.id)}>Duplicate</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => togglePin(host.id)}>
                     {host.pin_to_top ? "Unpin" : "Pin to Top"}
                   </DropdownMenuItem>
@@ -294,12 +331,8 @@ export function HostCard({
         <ContextMenuContent className="w-52">
           {isBulk ? (
             <>
-              <ContextMenuItem onClick={connectSshBulk}>
-                Connect SSH ({bulkIds.length})
-              </ContextMenuItem>
-              <ContextMenuItem onClick={connectSftpBulk}>
-                Open SFTP ({bulkIds.length})
-              </ContextMenuItem>
+              <ContextMenuItem onClick={connectSshBulk}>Connect SSH ({bulkIds.length})</ContextMenuItem>
+              <ContextMenuItem onClick={connectSftpBulk}>Open SFTP ({bulkIds.length})</ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem onClick={() => Promise.all(bulkIds.map((id) => duplicateHost(id)))}>
                 Duplicate Selected
@@ -314,17 +347,11 @@ export function HostCard({
             </>
           ) : (
             <>
-              <ContextMenuItem onClick={() => newSshTab(host.id, host.name)}>
-                Connect SSH
-              </ContextMenuItem>
-              <ContextMenuItem onClick={() => newSftpTab(host.id, host.name)}>
-                Open SFTP
-              </ContextMenuItem>
+              <ContextMenuItem onClick={() => newSshTab(host.id, host.name)}>Connect SSH</ContextMenuItem>
+              <ContextMenuItem onClick={() => newSftpTab(host.id, host.name)}>Open SFTP</ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem onClick={onEdit}>Edit</ContextMenuItem>
-              <ContextMenuItem onClick={() => duplicateHost(host.id)}>
-                Duplicate
-              </ContextMenuItem>
+              <ContextMenuItem onClick={() => duplicateHost(host.id)}>Duplicate</ContextMenuItem>
               <ContextMenuItem onClick={() => togglePin(host.id)}>
                 {host.pin_to_top ? "Unpin" : "Pin to Top"}
               </ContextMenuItem>
@@ -351,7 +378,10 @@ export function HostCard({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => { void deleteHost(host.id); setSelectedHost(null); }}
+              onClick={() => {
+                void deleteHost(host.id);
+                setSelectedHost(null);
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
@@ -365,13 +395,16 @@ export function HostCard({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {bulkIds.length} hosts?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the selected hosts and their stored credentials. This cannot be undone.
+              This will permanently remove the selected hosts and their stored credentials. This cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => { void deleteManyHosts(bulkIds); }}
+              onClick={() => {
+                void deleteManyHosts(bulkIds);
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete {bulkIds.length} Hosts

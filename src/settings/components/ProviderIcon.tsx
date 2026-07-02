@@ -38,9 +38,6 @@ type Props = {
 };
 
 export function ProviderIcon({ provider, size = 14, className }: Props) {
-  const icon =
-    (ICON_BY_PROVIDER as Record<string, typeof ChatGptIcon | undefined>)[provider] ?? BotIcon;
-  return (
-    <HugeiconsIcon icon={icon} size={size} strokeWidth={1.75} className={className} />
-  );
+  const icon = (ICON_BY_PROVIDER as Record<string, typeof ChatGptIcon | undefined>)[provider] ?? BotIcon;
+  return <HugeiconsIcon icon={icon} size={size} strokeWidth={1.75} className={className} />;
 }

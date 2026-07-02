@@ -71,7 +71,11 @@ export function useZoomCommands(activeTabKind: string | undefined): {
             subtitle: sizeLabel,
             section: "Font Size",
             shortcut: ["⌘", "−"],
-            icon: createElement(HugeiconsIcon, { icon: ArrowDown01Icon, strokeWidth: 2, className: "size-4" }),
+            icon: createElement(HugeiconsIcon, {
+              icon: ArrowDown01Icon,
+              strokeWidth: 2,
+              className: "size-4",
+            }),
             perform: decrease,
           },
           {

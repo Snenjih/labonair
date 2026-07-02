@@ -79,23 +79,10 @@ function CapabilityBars({ score, max = 5 }: { score: number; max?: number }) {
   );
 }
 
-function CapabilityGroup({
-  icon,
-  score,
-  label,
-}: {
-  icon: typeof BrainIcon;
-  score: number;
-  label: string;
-}) {
+function CapabilityGroup({ icon, score, label }: { icon: typeof BrainIcon; score: number; label: string }) {
   return (
     <div className="flex items-center gap-[3px]" title={`${label}: ${score}/5`}>
-      <HugeiconsIcon
-        icon={icon}
-        size={9}
-        strokeWidth={1.5}
-        className="text-muted-foreground/40 shrink-0"
-      />
+      <HugeiconsIcon icon={icon} size={9} strokeWidth={1.5} className="text-muted-foreground/40 shrink-0" />
       <CapabilityBars score={score} />
     </div>
   );
@@ -150,9 +137,7 @@ function ProviderButton({
       title={label}
       className={cn(
         "relative mx-1 flex items-center justify-center rounded-md w-8 h-8 transition-colors shrink-0",
-        active
-          ? "bg-accent text-foreground"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
       {active && (
@@ -165,7 +150,12 @@ function ProviderButton({
       <HugeiconsIcon icon={icon} size={14} strokeWidth={1.5} />
       {loading && (
         <span className="absolute bottom-0.5 right-0.5 size-2 rounded-full bg-background flex items-center justify-center">
-          <HugeiconsIcon icon={Loading03Icon} size={8} strokeWidth={2} className="animate-spin text-muted-foreground/60" />
+          <HugeiconsIcon
+            icon={Loading03Icon}
+            size={8}
+            strokeWidth={2}
+            className="animate-spin text-muted-foreground/60"
+          />
         </span>
       )}
       {!loading && !hasKey && (
@@ -231,10 +221,7 @@ function ModelRow({
           icon={providerIcon}
           size={13}
           strokeWidth={1.25}
-          className={cn(
-            "shrink-0",
-            selected ? "text-foreground" : "text-muted-foreground/65",
-          )}
+          className={cn("shrink-0", selected ? "text-foreground" : "text-muted-foreground/65")}
         />
 
         {/* Name + hint */}
@@ -268,12 +255,7 @@ function ModelRow({
         {/* Selected */}
         <div className="w-3 shrink-0 flex justify-end">
           {selected && (
-            <HugeiconsIcon
-              icon={Tick02Icon}
-              size={12}
-              strokeWidth={2}
-              className="text-foreground"
-            />
+            <HugeiconsIcon icon={Tick02Icon} size={12} strokeWidth={2} className="text-foreground" />
           )}
         </div>
       </button>
@@ -371,7 +353,8 @@ export function ModelPicker() {
   const triggerLabel = useMemo(() => {
     if (!currentModel) return selectedModelDefId || "Select model";
     if (currentModel.provider !== "openai-compatible") return currentModel.label;
-    const inst = instances.find((i) => i.id === selectedInstanceId) ??
+    const inst =
+      instances.find((i) => i.id === selectedInstanceId) ??
       instances.find((i) => i.providerId === "openai-compatible");
     if (!inst) return currentModel.label;
     const isDefault = inst.name === inst.providerId || /^[a-z-]+\d+$/.test(inst.name);
@@ -395,7 +378,7 @@ export function ModelPicker() {
 
   const configuredProviders = useMemo(() => {
     const seen = new Set<ProviderId>();
-    const out: typeof PROVIDERS[number][] = [];
+    const out: (typeof PROVIDERS)[number][] = [];
     for (const inst of instances) {
       if (!seen.has(inst.providerId)) {
         seen.add(inst.providerId);
@@ -431,9 +414,7 @@ export function ModelPicker() {
         }
       } else if (!isLoading) {
         // No cache yet and not loading — use static fallback for this provider
-        const staticModels = (MODELS as readonly ModelInfo[]).filter(
-          (m) => m.provider === inst.providerId,
-        );
+        const staticModels = (MODELS as readonly ModelInfo[]).filter((m) => m.provider === inst.providerId);
         const sameProviderInstances = instances.filter((i) => i.providerId === inst.providerId);
         const showInstanceName = sameProviderInstances.length > 1;
         for (const m of staticModels) {
@@ -541,12 +522,7 @@ export function ModelPicker() {
           title={hasKey ? `Model: ${triggerLabel}` : `${triggerLabel} — no key configured`}
         >
           {triggerLabel}
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            size={11}
-            strokeWidth={2}
-            className="opacity-70"
-          />
+          <HugeiconsIcon icon={ArrowDown01Icon} size={11} strokeWidth={2} className="opacity-70" />
         </Button>
       </PopoverTrigger>
 
@@ -657,9 +633,7 @@ export function ModelPicker() {
                   icon={PROVIDER_ICON[p.id]}
                   active={activeProvider === p.id}
                   label={p.label}
-                  onClick={() =>
-                    setActiveProvider(activeProvider === p.id ? null : p.id)
-                  }
+                  onClick={() => setActiveProvider(activeProvider === p.id ? null : p.id)}
                   hasKey={providerHasKeyFn(p.id)}
                   loading={isProviderLoading}
                 />
@@ -674,7 +648,10 @@ export function ModelPicker() {
                 <span className="text-[12px] text-muted-foreground/60">No providers configured</span>
                 <button
                   type="button"
-                  onClick={() => { void openSettingsWindow("ai"); setOpen(false); }}
+                  onClick={() => {
+                    void openSettingsWindow("ai");
+                    setOpen(false);
+                  }}
                   className="text-[11px] text-muted-foreground/40 hover:text-muted-foreground underline-offset-2 hover:underline transition-colors"
                 >
                   Add a provider in Settings
@@ -725,9 +702,7 @@ export function ModelPicker() {
                 ) : (
                   filtered.map((m, i) => {
                     const ref = makeModelRef(m.id, m.instanceId ?? undefined);
-                    const isSelected =
-                      selected === ref ||
-                      (m.instanceName === null && selected === m.id);
+                    const isSelected = selected === ref || (m.instanceName === null && selected === m.id);
                     return (
                       <div key={`${m.id}-${m.instanceId ?? "single"}`}>
                         {m.instanceName && (
@@ -747,9 +722,7 @@ export function ModelPicker() {
                               : providerHasKeyFn(m.provider as ProviderId)
                           }
                           isFavorite={favorites.includes(m.id)}
-                          providerIcon={
-                            PROVIDER_ICON[m.provider as ProviderId] ?? ComputerIcon
-                          }
+                          providerIcon={PROVIDER_ICON[m.provider as ProviderId] ?? ComputerIcon}
                           onSelect={() => onPick(m)}
                           onToggleFavorite={(e) => {
                             e.stopPropagation();

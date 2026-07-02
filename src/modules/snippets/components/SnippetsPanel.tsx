@@ -82,7 +82,7 @@ export function SnippetsPanel({ onRun }: Props) {
         (s) =>
           s.name.toLowerCase().includes(query.toLowerCase()) ||
           s.command.toLowerCase().includes(query.toLowerCase()) ||
-          s.description?.toLowerCase().includes(query.toLowerCase())
+          s.description?.toLowerCase().includes(query.toLowerCase()),
       )
     : snippets;
 
@@ -128,15 +128,13 @@ export function SnippetsPanel({ onRun }: Props) {
           >
             {/* Toolbar header */}
             <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/60 px-2">
-              <span className="flex-1 pl-1 text-xs font-medium text-foreground/80">
-                Snippets
-              </span>
+              <span className="flex-1 pl-1 text-xs font-medium text-foreground/80">Snippets</span>
               <Button
                 variant="ghost"
                 size="icon"
                 className={cn(
                   "size-6 text-muted-foreground hover:text-foreground",
-                  searchOpen && "bg-muted text-foreground"
+                  searchOpen && "bg-muted text-foreground",
                 )}
                 onClick={toggleSearch}
                 title="Search snippets"
@@ -196,12 +194,16 @@ export function SnippetsPanel({ onRun }: Props) {
             {/* Snippet list */}
             <ScrollArea className="flex-1">
               <div className="px-2 py-2">
-
                 {/* Empty state */}
                 {filtered.length === 0 && (
                   <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-border/40 bg-muted/30">
-                      <HugeiconsIcon icon={CommandIcon} size={22} strokeWidth={1.5} className="text-muted-foreground/40" />
+                      <HugeiconsIcon
+                        icon={CommandIcon}
+                        size={22}
+                        strokeWidth={1.5}
+                        className="text-muted-foreground/40"
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <p className="text-xs font-medium text-muted-foreground">

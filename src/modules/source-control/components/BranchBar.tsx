@@ -1,12 +1,6 @@
-import { useState, useMemo } from "react";
-import { Spinner } from "@/components/ui/spinner";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { ArrowDown01Icon, ArrowUp01Icon, Cancel01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useMemo, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,17 +12,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  GitBranchIcon,
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-  Cancel01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { useSourceControlStore } from "../store/sourceControlStore";
-import { git } from "../lib/gitInvoke";
-import { BranchDropdown } from "./BranchDropdown";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { git } from "../lib/gitInvoke";
+import { useSourceControlStore } from "../store/sourceControlStore";
+import { BranchDropdown } from "./BranchDropdown";
 
 interface BranchBarProps {
   onRefresh: () => void;
@@ -36,16 +31,14 @@ interface BranchBarProps {
 
 export function BranchBar({ onRefresh }: BranchBarProps) {
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
   const status = useSourceControlStore((s) => s.status);
   const operationInProgress = useSourceControlStore((s) => s.operationInProgress);
   const setOperationInProgress = useSourceControlStore((s) => s.setOperationInProgress);
   const currentBranch = useSourceControlStore((s) => s.currentBranch);
   const branchList = useSourceControlStore((s) => s.branchList);
 
-  const localBranch = useMemo(
-    () => branchList.find((b) => b.isCurrent)?.name ?? "",
-    [branchList]
-  );
+  const localBranch = useMemo(() => branchList.find((b) => b.isCurrent)?.name ?? "", [branchList]);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,13 +60,19 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setError(null);
     setShowSetUpstreamPrompt(false);
     try {
-      await git.push(repoRoot);
+      await git.push(repoRoot, undefined, undefined, sessionId ?? undefined);
       onRefresh();
-      useNotificationStore.getState().addNotification({ type: "success", title: "Pushed", message: localBranch ? `${localBranch} pushed to remote` : "Pushed to remote" });
+      useNotificationStore.getState().addNotification({
+        type: "success",
+        title: "Pushed",
+        message: localBranch ? `${localBranch} pushed to remote` : "Pushed to remote",
+      });
     } catch (e) {
       const errMsg = String(e);
       setError(errMsg);
-      useNotificationStore.getState().addNotification({ type: "error", title: "Push Failed", message: errMsg });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Push Failed", message: errMsg });
       if (
         errMsg.includes("no upstream") ||
         errMsg.includes("no tracking") ||
@@ -92,12 +91,16 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setOperationInProgress("pull");
     setError(null);
     try {
-      await git.pull(repoRoot);
+      await git.pull(repoRoot, sessionId ?? undefined);
       onRefresh();
-      useNotificationStore.getState().addNotification({ type: "success", title: "Pulled", message: "Branch updated from remote" });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "success", title: "Pulled", message: "Branch updated from remote" });
     } catch (e) {
       setError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Pull Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Pull Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -108,12 +111,16 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setOperationInProgress("fetch");
     setError(null);
     try {
-      await git.fetch(repoRoot);
+      await git.fetch(repoRoot, sessionId ?? undefined);
       onRefresh();
-      useNotificationStore.getState().addNotification({ type: "info", title: "Fetched", message: "Fetched all remotes" });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "info", title: "Fetched", message: "Fetched all remotes" });
     } catch (e) {
       setError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Fetch Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Fetch Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -125,12 +132,18 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setOperationInProgress("push");
     setError(null);
     try {
-      await git.pushForceWithLease(repoRoot);
+      await git.pushForceWithLease(repoRoot, undefined, undefined, sessionId ?? undefined);
       onRefresh();
-      useNotificationStore.getState().addNotification({ type: "success", title: "Force Pushed", message: localBranch ? `${localBranch} force-pushed to remote` : "Force-pushed to remote" });
+      useNotificationStore.getState().addNotification({
+        type: "success",
+        title: "Force Pushed",
+        message: localBranch ? `${localBranch} force-pushed to remote` : "Force-pushed to remote",
+      });
     } catch (e) {
       setError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Force Push Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Force Push Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -142,12 +155,18 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setError(null);
     setShowSetUpstreamPrompt(false);
     try {
-      await git.pushSetUpstream(repoRoot, "origin", currentBranch);
+      await git.pushSetUpstream(repoRoot, "origin", currentBranch, sessionId ?? undefined);
       onRefresh();
-      useNotificationStore.getState().addNotification({ type: "success", title: "Pushed & Upstream Set", message: localBranch ? `${localBranch} pushed with upstream set` : "Upstream set and pushed" });
+      useNotificationStore.getState().addNotification({
+        type: "success",
+        title: "Pushed & Upstream Set",
+        message: localBranch ? `${localBranch} pushed with upstream set` : "Upstream set and pushed",
+      });
     } catch (e) {
       setError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Push Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Push Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -180,9 +199,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
           strokeWidth={2}
           className="mr-1.5 shrink-0 text-muted-foreground"
         />
-        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
-          {repoName}
-        </span>
+        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{repoName}</span>
         <span className="mx-1 shrink-0 text-[11px] text-muted-foreground/30">/</span>
 
         {repoRoot ? (
@@ -191,6 +208,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
             onOpenChange={setDropdownOpen}
             trigger={branchTrigger}
             repoRoot={repoRoot}
+            sessionId={sessionId ?? undefined}
             currentBranch={localBranch}
             onRefresh={onRefresh}
           />
@@ -277,7 +295,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
             "border-t border-border/40 px-3 py-1.5 text-[10px] font-medium",
             mergeInProgress && "bg-warning/10 text-warning",
             rebaseInProgress && "bg-warning/10 text-warning",
-            cherryPickInProgress && "bg-warning/10 text-warning"
+            cherryPickInProgress && "bg-warning/10 text-warning",
           )}
         >
           {mergeInProgress && "Merge in progress — resolve conflicts, then commit or Abort"}
@@ -327,9 +345,8 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Force Push?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will overwrite the remote branch. Force-with-lease protects against overwriting
-              others' work if they pushed after your last fetch — but it is still a destructive
-              operation.
+              This will overwrite the remote branch. Force-with-lease protects against overwriting others'
+              work if they pushed after your last fetch — but it is still a destructive operation.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

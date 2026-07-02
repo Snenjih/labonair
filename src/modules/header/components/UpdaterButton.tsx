@@ -59,12 +59,7 @@ export function UpdaterButton() {
           "text-[11px] font-medium leading-none",
         )}
       >
-        <HugeiconsIcon
-          icon={Download01Icon}
-          size={11}
-          strokeWidth={2}
-          className="shrink-0 animate-bounce"
-        />
+        <HugeiconsIcon icon={Download01Icon} size={11} strokeWidth={2} className="shrink-0 animate-bounce" />
         <span>{pct !== null ? `Downloading ${pct}%` : "Downloading…"}</span>
       </div>
     );

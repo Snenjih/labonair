@@ -1,4 +1,5 @@
 use super::*;
+use super::net_error::is_network_error;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
@@ -137,17 +138,6 @@ pub async fn run_worker(
 fn emit_progress(app: &tauri::AppHandle, job: &TransferJob) {
     use tauri::Emitter;
     let _ = app.emit("transfer_progress", job);
-}
-
-fn is_network_error(e: &str) -> bool {
-    let lower = e.to_lowercase();
-    lower.contains("broken pipe")
-        || lower.contains("connection reset")
-        || lower.contains("connection refused")
-        || lower.contains("no route to host")
-        || lower.contains("network")
-        || lower.contains("no sftp session")
-        || lower.contains("sftp_state lock")
 }
 
 async fn process_job(

@@ -1,9 +1,4 @@
-import {
-  Experimental_Agent as Agent,
-  DirectChatTransport,
-  stepCountIs,
-  type LanguageModel,
-} from "ai";
+import { Experimental_Agent as Agent, DirectChatTransport, stepCountIs, type LanguageModel } from "ai";
 import {
   DEFAULT_MODEL_ID,
   getModel,
@@ -85,15 +80,12 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> = 
   write_file: (i) => `Writing ${shortPath(i.path)}`,
   create_directory: (i) => `Creating ${shortPath(i.path)}`,
   bash_run: (i) => `Running ${ellipsize(String(i.command ?? ""), 60)}`,
-  bash_background: (i) =>
-    `Spawning ${ellipsize(String(i.command ?? ""), 60)}`,
+  bash_background: (i) => `Spawning ${ellipsize(String(i.command ?? ""), 60)}`,
   bash_logs: () => `Reading logs`,
   bash_list: () => `Listing background processes`,
   bash_kill: () => `Stopping background process`,
-  suggest_command: (i) =>
-    `Suggesting ${ellipsize(String(i.command ?? ""), 60)}`,
-  todo_write: (i) =>
-    `Updating plan (${Array.isArray(i.todos) ? i.todos.length : 0} items)`,
+  suggest_command: (i) => `Suggesting ${ellipsize(String(i.command ?? ""), 60)}`,
+  todo_write: (i) => `Updating plan (${Array.isArray(i.todos) ? i.todos.length : 0} items)`,
   run_subagent: (i) => `Spawning ${String(i.type ?? "subagent")} subagent`,
   spawn_claude_session: (i) =>
     `Spawning Claude in ${i.target === "new" ? "new terminal" : i.target === "current" ? "current terminal" : `terminal ${i.target}`}`,
@@ -134,9 +126,7 @@ export async function buildLanguageModel(
   options: BuildModelOptions = {},
 ): Promise<LanguageModel> {
   if (providerNeedsKey(provider) && provider !== "openai-compatible" && !keys[provider]) {
-    throw new Error(
-      `No API key configured for ${provider}. Open Settings → AI to add one.`,
-    );
+    throw new Error(`No API key configured for ${provider}. Open Settings → AI to add one.`);
   }
   const key = keys[provider] ?? "";
   const baseURL = options.lmstudioBaseURL ?? LMSTUDIO_DEFAULT_BASE_URL;
@@ -180,18 +170,12 @@ export async function buildLanguageModel(
       break;
     }
     case "lmstudio": {
-      const { createOpenAICompatible } = await import(
-        "@ai-sdk/openai-compatible"
-      );
-      built = createOpenAICompatible({ name: "lmstudio", baseURL })(
-        resolvedModelId,
-      );
+      const { createOpenAICompatible } = await import("@ai-sdk/openai-compatible");
+      built = createOpenAICompatible({ name: "lmstudio", baseURL })(resolvedModelId);
       break;
     }
     case "openai-compatible": {
-      const { createOpenAICompatible } = await import(
-        "@ai-sdk/openai-compatible"
-      );
+      const { createOpenAICompatible } = await import("@ai-sdk/openai-compatible");
       const compat = createOpenAICompatible({
         name: "openai-compatible",
         baseURL: compatBaseURL,
@@ -291,7 +275,9 @@ export async function buildLanguageModelFromInstance(
     }
     case "lmstudio": {
       const { createOpenAICompatible } = await import("@ai-sdk/openai-compatible");
-      built = createOpenAICompatible({ name: "lmstudio", baseURL: baseURL ?? LMSTUDIO_DEFAULT_BASE_URL })(resolvedModelId);
+      built = createOpenAICompatible({ name: "lmstudio", baseURL: baseURL ?? LMSTUDIO_DEFAULT_BASE_URL })(
+        resolvedModelId,
+      );
       break;
     }
     case "openai-compatible": {
@@ -353,7 +339,12 @@ function buildModel(
     if (instance) {
       const key = providerNeedsKey(m.provider) ? (instanceKeys[instance.id] ?? null) : null;
       let resolvedModelId: string = m.id;
-      if (m.provider === "lmstudio" || m.provider === "mlx" || m.provider === "ollama" || m.provider === "openai-compatible") {
+      if (
+        m.provider === "lmstudio" ||
+        m.provider === "mlx" ||
+        m.provider === "ollama" ||
+        m.provider === "openai-compatible"
+      ) {
         if (!instance.localModelId?.trim()) {
           throw new Error(`No model ID configured for ${instance.name}. Open Settings → AI → Providers.`);
         }
@@ -444,20 +435,28 @@ export async function createLabonairAgent({
   const { modelDefId } = parseModelRef(modelId);
   const basePrompt = selectSystemPrompt(modelDefId);
   const instructions = `${basePrompt}${memoryBlock}${personaBlock}${customBlock}${planBlock}`;
-  const baseModel = await buildModel(modelId, keys, {
-    lmstudioBaseURL,
-    lmstudioChatModelId,
-    openaiCompatibleBaseURL,
-    openaiCompatibleModelId,
-    mlxBaseURL,
-    mlxChatModelId,
-    ollamaBaseURL,
-    ollamaChatModelId,
-  }, instances, instanceKeys);
+  const baseModel = await buildModel(
+    modelId,
+    keys,
+    {
+      lmstudioBaseURL,
+      lmstudioChatModelId,
+      openaiCompatibleBaseURL,
+      openaiCompatibleModelId,
+      mlxBaseURL,
+      mlxChatModelId,
+      ollamaBaseURL,
+      ollamaChatModelId,
+    },
+    instances,
+    instanceKeys,
+  );
   const model =
     temperature !== undefined &&
     typeof (baseModel as unknown as { withSettings?: unknown }).withSettings === "function"
-      ? (baseModel as unknown as { withSettings: (s: { temperature: number }) => LanguageModel }).withSettings({ temperature })
+      ? (
+          baseModel as unknown as { withSettings: (s: { temperature: number }) => LanguageModel }
+        ).withSettings({ temperature })
       : baseModel;
   const steps = maxAgentSteps ?? MAX_AGENT_STEPS;
 
@@ -480,11 +479,7 @@ export async function createLabonairAgent({
         const last = step.toolCalls?.[step.toolCalls.length - 1];
         if (last) {
           const label = TOOL_LABELS[last.toolName];
-          onStep(
-            label
-              ? label((last.input ?? {}) as Record<string, unknown>)
-              : `Calling ${last.toolName}`,
-          );
+          onStep(label ? label((last.input ?? {}) as Record<string, unknown>) : `Calling ${last.toolName}`);
         } else if (step.text) {
           onStep("Writing");
         }
@@ -495,8 +490,12 @@ export async function createLabonairAgent({
         onUsage({
           inputTokens: u.inputTokens ?? 0,
           outputTokens: u.outputTokens ?? 0,
-          cacheReadTokens: (u as unknown as { inputTokenDetails?: { cacheReadTokens?: number } }).inputTokenDetails?.cacheReadTokens ?? 0,
-          reasoningTokens: (u as unknown as { outputTokenDetails?: { reasoningTokens?: number } }).outputTokenDetails?.reasoningTokens ?? 0,
+          cacheReadTokens:
+            (u as unknown as { inputTokenDetails?: { cacheReadTokens?: number } }).inputTokenDetails
+              ?.cacheReadTokens ?? 0,
+          reasoningTokens:
+            (u as unknown as { outputTokenDetails?: { reasoningTokens?: number } }).outputTokenDetails
+              ?.reasoningTokens ?? 0,
           hitStepCap: false,
           isFinal: false,
         });
@@ -511,8 +510,12 @@ export async function createLabonairAgent({
         onUsage({
           inputTokens: tu.inputTokens ?? 0,
           outputTokens: tu.outputTokens ?? 0,
-          cacheReadTokens: (tu as unknown as { inputTokenDetails?: { cacheReadTokens?: number } }).inputTokenDetails?.cacheReadTokens ?? 0,
-          reasoningTokens: (tu as unknown as { outputTokenDetails?: { reasoningTokens?: number } }).outputTokenDetails?.reasoningTokens ?? 0,
+          cacheReadTokens:
+            (tu as unknown as { inputTokenDetails?: { cacheReadTokens?: number } }).inputTokenDetails
+              ?.cacheReadTokens ?? 0,
+          reasoningTokens:
+            (tu as unknown as { outputTokenDetails?: { reasoningTokens?: number } }).outputTokenDetails
+              ?.reasoningTokens ?? 0,
           hitStepCap,
           isFinal: true,
         });

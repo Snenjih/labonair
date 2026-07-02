@@ -61,12 +61,7 @@ export function AgentSwitcher({ isMiniWindow }: { isMiniWindow?: boolean }) {
         >
           <HugeiconsIcon icon={ActiveIcon} size={12} strokeWidth={1.75} />
           <span className="max-w-[7rem] truncate">{active.name}</span>
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            size={10}
-            strokeWidth={2}
-            className="opacity-70"
-          />
+          <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} className="opacity-70" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-60">
@@ -79,27 +74,17 @@ export function AgentSwitcher({ isMiniWindow }: { isMiniWindow?: boolean }) {
             <DropdownMenuItem
               key={a.id}
               onSelect={() => setActiveId(a.id)}
-              className={cn(
-                "flex items-start gap-2 pr-2 text-[12px]",
-                a.id === activeId && "bg-accent/40",
-              )}
+              className={cn("flex items-start gap-2 pr-2 text-[12px]", a.id === activeId && "bg-accent/40")}
             >
               <HugeiconsIcon
                 icon={Icon}
                 size={13}
                 strokeWidth={1.75}
-                className={cn(
-                  "mt-0.5",
-                  a.id === activeId
-                    ? "text-foreground"
-                    : "text-muted-foreground",
-                )}
+                className={cn("mt-0.5", a.id === activeId ? "text-foreground" : "text-muted-foreground")}
               />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span>{a.name}</span>
-                <span className="line-clamp-1 text-[10.5px] text-muted-foreground">
-                  {a.description}
-                </span>
+                <span className="line-clamp-1 text-[10.5px] text-muted-foreground">{a.description}</span>
               </span>
               {a.id === activeId ? (
                 <HugeiconsIcon
@@ -124,10 +109,7 @@ export function AgentSwitcher({ isMiniWindow }: { isMiniWindow?: boolean }) {
                 <DropdownMenuItem
                   key={a.id}
                   onSelect={() => setActiveId(a.id)}
-                  className={cn(
-                    "flex items-start gap-2 text-[12px]",
-                    a.id === activeId && "bg-accent/40",
-                  )}
+                  className={cn("flex items-start gap-2 text-[12px]", a.id === activeId && "bg-accent/40")}
                 >
                   <HugeiconsIcon
                     icon={Icon}

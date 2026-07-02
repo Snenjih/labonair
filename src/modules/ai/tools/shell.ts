@@ -21,10 +21,7 @@ async function isShellAlive(shellId: number): Promise<boolean> {
   }
 }
 
-async function getSessionShell(
-  sessionId: string,
-  cwd: string | null,
-): Promise<number> {
+async function getSessionShell(sessionId: string, cwd: string | null): Promise<number> {
   const existing = sessionShells.get(sessionId);
   if (existing !== undefined) {
     try {

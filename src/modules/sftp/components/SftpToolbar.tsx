@@ -7,7 +7,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Bookmark02Icon, Cancel01Icon, EyeIcon, ArrowUp01Icon, Refresh01Icon, TerminalIcon } from "@hugeicons/core-free-icons";
+import {
+  Bookmark02Icon,
+  Cancel01Icon,
+  EyeIcon,
+  ArrowUp01Icon,
+  Refresh01Icon,
+  TerminalIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import { useBookmarksStore } from "../store/bookmarksStore";

@@ -14,9 +14,7 @@ export function buildFsTools(ctx: ToolContext) {
       description:
         "Read a UTF-8 text file. Returns content for text files; refuses binary, oversized, or sensitive files (.env, keys, credentials). Files larger than 200KB are truncated — re-call with a different path or use run_command for `sed -n` slicing if you need the rest.",
       inputSchema: z.object({
-        path: z
-          .string()
-          .describe("Absolute path, or relative to the active terminal cwd."),
+        path: z.string().describe("Absolute path, or relative to the active terminal cwd."),
       }),
       execute: async ({ path }) => {
         const sshTabId = ctx.getActiveSshTabId();
@@ -28,8 +26,7 @@ export function buildFsTools(ctx: ToolContext) {
               "ssh_exec_command",
               { tabId: sshTabId, command: `cat -- ${JSON.stringify(path)}` },
             );
-            if (r.exit_code !== 0)
-              return { error: r.stderr || `cat exited ${r.exit_code}`, path };
+            if (r.exit_code !== 0) return { error: r.stderr || `cat exited ${r.exit_code}`, path };
             const content = r.stdout.slice(0, AI_READ_CAP);
             ctx.readCache.add(path);
             return {
@@ -61,8 +58,7 @@ export function buildFsTools(ctx: ToolContext) {
             }
             return { path: abs, content: r.content, size: r.size };
           }
-          if (r.kind === "binary")
-            return { error: "binary file refused", path: abs, size: r.size };
+          if (r.kind === "binary") return { error: "binary file refused", path: abs, size: r.size };
           return {
             error: `file too large (${r.size} bytes, limit ${r.limit})`,
             path: abs,
@@ -74,12 +70,9 @@ export function buildFsTools(ctx: ToolContext) {
     }),
 
     list_directory: tool({
-      description:
-        "List immediate entries (files + directories) in a directory. Hidden entries are omitted.",
+      description: "List immediate entries (files + directories) in a directory. Hidden entries are omitted.",
       inputSchema: z.object({
-        path: z
-          .string()
-          .describe("Absolute path, or relative to the active terminal cwd."),
+        path: z.string().describe("Absolute path, or relative to the active terminal cwd."),
       }),
       execute: async ({ path }) => {
         const sshTabId = ctx.getActiveSshTabId();
@@ -91,8 +84,7 @@ export function buildFsTools(ctx: ToolContext) {
               "ssh_exec_command",
               { tabId: sshTabId, command: `ls -la -- ${JSON.stringify(path)}` },
             );
-            if (r.exit_code !== 0)
-              return { error: r.stderr || `ls exited ${r.exit_code}`, path };
+            if (r.exit_code !== 0) return { error: r.stderr || `ls exited ${r.exit_code}`, path };
             return { path, listing: r.stdout, remote: true };
           } catch (e) {
             return { error: String(e), path };
@@ -162,8 +154,7 @@ export function buildFsTools(ctx: ToolContext) {
     }),
 
     create_directory: tool({
-      description:
-        "Create a directory (and any missing parents). Always asks the user before running.",
+      description: "Create a directory (and any missing parents). Always asks the user before running.",
       inputSchema: z.object({
         path: z.string(),
       }),

@@ -1,22 +1,15 @@
+import { invoke } from "@tauri-apps/api/core";
+import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import {
-  useTabsStore,
-  selectActiveTabKind,
-  selectActivePaneId,
-} from "../store/tabsStore";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { PREVIEW_EXTENSIONS } from "@/modules/explorer";
-import {
-  useSnippetExec,
-  type CommandSnippet,
-  type SnippetExecMode,
-} from "@/modules/snippets";
 import type { EditorPaneHandle } from "@/modules/editor";
+import { PREVIEW_EXTENSIONS } from "@/modules/explorer";
 import type { PreviewPaneHandle } from "@/modules/preview";
-import type { WorkspacePaneHandle, TerminalPaneHandle } from "@/modules/terminal";
-import type { WorkspaceTab, AiDiffTab } from "../types";
-import type React from "react";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { type CommandSnippet, type SnippetExecMode, useSnippetExec } from "@/modules/snippets";
+import type { TerminalPaneHandle, WorkspacePaneHandle } from "@/modules/terminal";
+import { selectActivePaneId, selectActiveTabKind, useTabsStore } from "../store/tabsStore";
+import type { AiDiffTab, WorkspaceTab } from "../types";
 
 export interface UseTabManagementOptions {
   home: string | null;
@@ -71,7 +64,12 @@ export interface TabManagementReturn {
   handleSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
   execSnippet: ReturnType<typeof useSnippetExec>["execSnippet"];
   captureActiveSelection: () => string | null;
-  openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
+  openGitGraphTab: (
+    repositoryPath: string,
+    initialBranch: string,
+    hostId?: string,
+    sessionId?: string,
+  ) => number;
 }
 
 export function useTabManagement({
@@ -151,48 +149,66 @@ export function useTabManagement({
     }
   }, []);
 
-  const disposeTab = useCallback((id: number) => {
-    const { tabs } = useTabsStore.getState();
-    const tab = tabs.find((t) => t.id === id);
-    if (tab?.kind === "workspace") {
-      for (const sessionId of Object.keys((tab as WorkspaceTab).sessions)) {
-        terminalRefs.current.delete(sessionId);
-        detectedUrls.current.delete(sessionId);
+  const disposeTab = useCallback(
+    (id: number) => {
+      const { tabs } = useTabsStore.getState();
+      const tab = tabs.find((t) => t.id === id);
+      if (tab?.kind === "workspace") {
+        for (const sessionId of Object.keys((tab as WorkspaceTab).sessions)) {
+          terminalRefs.current.delete(sessionId);
+          detectedUrls.current.delete(sessionId);
+        }
+        workspacePaneRefs.current.delete(id);
       }
-      workspacePaneRefs.current.delete(id);
-    }
-    editorRefs.current.delete(id);
-    previewRefs.current.delete(id);
-    closeTab(id);
-  }, [closeTab]);
+      // Best-effort cleanup of the local temp file `prepare_remote_edit`
+      // staged for a remote editor/preview tab — fire-and-forget, a
+      // leftover temp file isn't worth blocking or failing a tab close over.
+      if (tab?.kind === "editor" && tab.remoteHostTabId && tab.remotePath) {
+        void invoke("cleanup_remote_edit_temp", { localTempPath: tab.path }).catch(() => {});
+      }
+      if (tab?.kind === "preview" && tab.remoteHostTabId && tab.remoteTempPath) {
+        void invoke("cleanup_remote_edit_temp", { localTempPath: tab.remoteTempPath }).catch(() => {});
+      }
+      editorRefs.current.delete(id);
+      previewRefs.current.delete(id);
+      closeTab(id);
+    },
+    [closeTab],
+  );
 
-  const handleClose = useCallback((id: number) => {
-    const { tabs } = useTabsStore.getState();
-    const t = tabs.find((x) => x.id === id);
-    if (t?.kind === "workspace") {
-      if (confirmCloseTerminalTab) {
-        setPendingCloseTabId(id);
+  const handleClose = useCallback(
+    (id: number) => {
+      const { tabs } = useTabsStore.getState();
+      const t = tabs.find((x) => x.id === id);
+      if (t?.kind === "workspace") {
+        if (confirmCloseTerminalTab) {
+          setPendingCloseTabId(id);
+          return;
+        }
+        disposeTab(id);
+        return;
+      }
+      if (t?.kind === "editor" && (t as { isUntitled: boolean }).isUntitled) {
+        setPendingSaveTab({ id, title: t.title });
+        return;
+      }
+      if (t?.kind === "editor" && (t as { dirty: boolean }).dirty) {
+        setPendingDirtyTab({ id, title: t.title });
         return;
       }
       disposeTab(id);
-      return;
-    }
-    if (t?.kind === "editor" && (t as { isUntitled: boolean }).isUntitled) {
-      setPendingSaveTab({ id, title: t.title });
-      return;
-    }
-    if (t?.kind === "editor" && (t as { dirty: boolean }).dirty) {
-      setPendingDirtyTab({ id, title: t.title });
-      return;
-    }
-    disposeTab(id);
-  }, [disposeTab, confirmCloseTerminalTab]);
+    },
+    [disposeTab, confirmCloseTerminalTab],
+  );
 
-  const handleCloseOthers = useCallback((keepId: number) => {
-    const { tabs } = useTabsStore.getState();
-    tabs.filter((t) => t.id !== keepId).forEach((t) => handleClose(t.id));
-    setActiveId(keepId);
-  }, [handleClose, setActiveId]);
+  const handleCloseOthers = useCallback(
+    (keepId: number) => {
+      const { tabs } = useTabsStore.getState();
+      tabs.filter((t) => t.id !== keepId).forEach((t) => handleClose(t.id));
+      setActiveId(keepId);
+    },
+    [handleClose, setActiveId],
+  );
 
   const handleCloseAll = useCallback(() => {
     const { tabs } = useTabsStore.getState();
@@ -203,37 +219,43 @@ export function useTabManagement({
     useTabsStore.getState().renameTab(id, label);
   }, []);
 
-  const handleDuplicateTab = useCallback((id: number) => {
-    const { tabs } = useTabsStore.getState();
-    const tab = tabs.find((t) => t.id === id);
-    if (!tab) return;
-    if (tab.kind === "workspace") {
-      const wt = tab as WorkspaceTab;
-      const session = wt.sessions[wt.activePaneId] ?? null;
-      if (session?.kind === "ssh" && session.hostId) newSshTab(session.hostId, tab.title);
-      else newTab(session?.cwd);
-    } else if (tab.kind === "editor") {
-      openFileTab((tab as { path: string }).path);
-    }
-  }, [newTab, newSshTab, openFileTab]);
+  const handleDuplicateTab = useCallback(
+    (id: number) => {
+      const { tabs } = useTabsStore.getState();
+      const tab = tabs.find((t) => t.id === id);
+      if (!tab) return;
+      if (tab.kind === "workspace") {
+        const wt = tab as WorkspaceTab;
+        const session = wt.sessions[wt.activePaneId] ?? null;
+        if (session?.kind === "ssh" && session.hostId) newSshTab(session.hostId, tab.title);
+        else newTab(session?.cwd);
+      } else if (tab.kind === "editor") {
+        openFileTab((tab as { path: string }).path);
+      }
+    },
+    [newTab, newSshTab, openFileTab],
+  );
 
-  const cycleTab = useCallback((delta: 1 | -1) => {
-    const { tabs, activeId: aid } = useTabsStore.getState();
-    if (tabs.length < 2) return;
-    const idx = tabs.findIndex((t) => t.id === aid);
-    const nextIdx = (idx + delta + tabs.length) % tabs.length;
-    setActiveId(tabs[nextIdx].id);
-  }, [setActiveId]);
+  const cycleTab = useCallback(
+    (delta: 1 | -1) => {
+      const { tabs, activeId: aid } = useTabsStore.getState();
+      if (tabs.length < 2) return;
+      const idx = tabs.findIndex((t) => t.id === aid);
+      const nextIdx = (idx + delta + tabs.length) % tabs.length;
+      setActiveId(tabs[nextIdx].id);
+    },
+    [setActiveId],
+  );
 
   const openNewTab = useCallback(() => {
     const { newTabInheritsCwd, terminalDefaultPath } = usePreferencesStore.getState();
-    const cwd = newTabInheritsCwd
-      ? inheritedCwdForNewTab()
-      : (terminalDefaultPath.trim() || undefined);
+    const cwd = newTabInheritsCwd ? inheritedCwdForNewTab() : terminalDefaultPath.trim() || undefined;
     newTab(cwd);
   }, [inheritedCwdForNewTab, newTab]);
 
-  const onOpenHostManager = useCallback(() => { openHomeTab(); }, [openHomeTab]);
+  const onOpenHostManager = useCallback(() => {
+    openHomeTab();
+  }, [openHomeTab]);
 
   const sendCd = useCallback((path: string) => {
     const paneId = selectActivePaneId(useTabsStore.getState());
@@ -245,58 +267,73 @@ export function useTabManagement({
     term.focus();
   }, []);
 
-  const cdInNewTab = useCallback((path: string) => {
-    const id = newTab(path);
-    setTimeout(() => {
+  const cdInNewTab = useCallback(
+    (path: string) => {
+      const id = newTab(path);
+      setTimeout(() => {
+        const { tabs } = useTabsStore.getState();
+        const newTabData = tabs.find((t) => t.id === id);
+        if (!newTabData || newTabData.kind !== "workspace") return;
+        const paneId = (newTabData as WorkspaceTab).activePaneId;
+        const t = terminalRefs.current.get(paneId);
+        if (!t) return;
+        const quoted = path.includes(" ") ? `'${path.replace(/'/g, `'\\''`)}'` : path;
+        t.write(`cd ${quoted}\n`);
+        t.focus();
+      }, 80);
+    },
+    [newTab],
+  );
+
+  const handlePathRenamed = useCallback(
+    (from: string, to: string) => {
       const { tabs } = useTabsStore.getState();
-      const newTabData = tabs.find((t) => t.id === id);
-      if (!newTabData || newTabData.kind !== "workspace") return;
-      const paneId = (newTabData as WorkspaceTab).activePaneId;
-      const t = terminalRefs.current.get(paneId);
-      if (!t) return;
-      const quoted = path.includes(" ") ? `'${path.replace(/'/g, `'\\''`)}'` : path;
-      t.write(`cd ${quoted}\n`);
-      t.focus();
-    }, 80);
-  }, [newTab]);
-
-  const handlePathRenamed = useCallback((from: string, to: string) => {
-    const { tabs } = useTabsStore.getState();
-    for (const t of tabs) {
-      if (t.kind !== "editor") continue;
-      const et = t as { path: string; id: number };
-      if (et.path === from) {
-        const i = to.lastIndexOf("/");
-        updateTab(t.id, { path: to, title: i === -1 ? to : to.slice(i + 1) });
-      } else if (et.path.startsWith(`${from}/`)) {
-        const suffix = et.path.slice(from.length);
-        const newPath = `${to}${suffix}`;
-        const i = newPath.lastIndexOf("/");
-        updateTab(t.id, { path: newPath, title: i === -1 ? newPath : newPath.slice(i + 1) });
+      for (const t of tabs) {
+        if (t.kind !== "editor") continue;
+        const et = t as { path: string; id: number };
+        if (et.path === from) {
+          const i = to.lastIndexOf("/");
+          updateTab(t.id, { path: to, title: i === -1 ? to : to.slice(i + 1) });
+        } else if (et.path.startsWith(`${from}/`)) {
+          const suffix = et.path.slice(from.length);
+          const newPath = `${to}${suffix}`;
+          const i = newPath.lastIndexOf("/");
+          updateTab(t.id, { path: newPath, title: i === -1 ? newPath : newPath.slice(i + 1) });
+        }
       }
-    }
-  }, [updateTab]);
+    },
+    [updateTab],
+  );
 
-  const handlePathDeleted = useCallback((path: string) => {
-    const { tabs } = useTabsStore.getState();
-    for (const t of tabs) {
-      if (t.kind !== "editor") continue;
-      const et = t as { path: string };
-      if (et.path === path || et.path.startsWith(`${path}/`)) disposeTab(t.id);
-    }
-  }, [disposeTab]);
+  const handlePathDeleted = useCallback(
+    (path: string) => {
+      const { tabs } = useTabsStore.getState();
+      for (const t of tabs) {
+        if (t.kind !== "editor") continue;
+        const et = t as { path: string };
+        if (et.path === path || et.path.startsWith(`${path}/`)) disposeTab(t.id);
+      }
+    },
+    [disposeTab],
+  );
 
-  const openPreviewTab = useCallback((url: string) => {
-    const id = newPreviewTab(url);
-    if (!url) setTimeout(() => previewRefs.current.get(id)?.focusAddressBar(), 0);
-    return id;
-  }, [newPreviewTab]);
+  const openPreviewTab = useCallback(
+    (url: string) => {
+      const id = newPreviewTab(url);
+      if (!url) setTimeout(() => previewRefs.current.get(id)?.focusAddressBar(), 0);
+      return id;
+    },
+    [newPreviewTab],
+  );
 
-  const handleOpenFile = useCallback((path: string) => {
-    const ext = path.split(".").pop()?.toLowerCase() ?? "";
-    if (PREVIEW_EXTENSIONS.has(ext)) openPreviewTab(path);
-    else openFileTab(path);
-  }, [openPreviewTab, openFileTab]);
+  const handleOpenFile = useCallback(
+    (path: string) => {
+      const ext = path.split(".").pop()?.toLowerCase() ?? "";
+      if (PREVIEW_EXTENSIONS.has(ext)) openPreviewTab(path);
+      else openFileTab(path);
+    },
+    [openPreviewTab, openFileTab],
+  );
 
   const restoreFocus = useCallback(() => {
     const kind = selectActiveTabKind(useTabsStore.getState());
@@ -306,11 +343,14 @@ export function useTabManagement({
     else if (kind === "editor") editorRefs.current.get(aid)?.focus();
   }, []);
 
-  const registerEditorHandle = useCallback((id: number, h: EditorPaneHandle | null) => {
-    if (h) editorRefs.current.set(id, h);
-    else editorRefs.current.delete(id);
-    if (id === activeId) setActiveEditorHandle(h);
-  }, [activeId]);
+  const registerEditorHandle = useCallback(
+    (id: number, h: EditorPaneHandle | null) => {
+      if (h) editorRefs.current.set(id, h);
+      else editorRefs.current.delete(id);
+      if (id === activeId) setActiveEditorHandle(h);
+    },
+    [activeId],
+  );
 
   const registerPreviewHandle = useCallback((id: number, h: PreviewPaneHandle | null) => {
     if (h) previewRefs.current.set(id, h);
@@ -318,11 +358,17 @@ export function useTabManagement({
   }, []);
 
   const handlePreviewUrl = useCallback((id: number, url: string) => updateTab(id, { url }), [updateTab]);
-  const handleEditorDirty = useCallback((id: number, dirty: boolean) => updateTab(id, { dirty }), [updateTab]);
-  const handleEditorSaveAs = useCallback((id: number, newPath: string) => {
-    const name = newPath.split("/").pop() ?? newPath;
-    updateTab(id, { path: newPath, title: name });
-  }, [updateTab]);
+  const handleEditorDirty = useCallback(
+    (id: number, dirty: boolean) => updateTab(id, { dirty }),
+    [updateTab],
+  );
+  const handleEditorSaveAs = useCallback(
+    (id: number, newPath: string) => {
+      const name = newPath.split("/").pop() ?? newPath;
+      updateTab(id, { path: newPath, title: name });
+    },
+    [updateTab],
+  );
 
   const captureActiveSelection = useCallback((): string | null => {
     const { tabs, activeId: aid } = useTabsStore.getState();
@@ -340,15 +386,18 @@ export function useTabManagement({
   // ── Snippet exec ───────────────────────────────────────────────────────────
   const { execSnippet } = useSnippetExec({
     tabs: workspaceTabs,
-    activeTerminalRef: () => activePaneId ? (terminalRefs.current.get(activePaneId) ?? null) : null,
+    activeTerminalRef: () => (activePaneId ? (terminalRefs.current.get(activePaneId) ?? null) : null),
     onNewLocalTab: (cwd, command) => newTab(cwd ?? inheritedCwdForNewTab(), command),
     onNewSshTab: (hostId, title, cwd, command) => newSshTab(hostId, title, cwd, command),
     onOpenLogDrawer: () => setSnippetLogDrawerOpen(true),
   });
 
-  const handleSnippetRun = useCallback((snippet: CommandSnippet, mode?: SnippetExecMode) => {
-    void execSnippet(snippet, mode);
-  }, [execSnippet]);
+  const handleSnippetRun = useCallback(
+    (snippet: CommandSnippet, mode?: SnippetExecMode) => {
+      void execSnippet(snippet, mode);
+    },
+    [execSnippet],
+  );
 
   return {
     refs: {

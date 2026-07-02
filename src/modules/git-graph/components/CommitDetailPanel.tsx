@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { git } from "@/modules/source-control/lib/gitInvoke";
+import { cn } from "@/lib/utils";
 import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
+import { git } from "@/modules/source-control/lib/gitInvoke";
 import { getAvatarUrl, getCached, setCached } from "../lib/avatarCache";
 import { getAvatarColor } from "../lib/laneColors";
-import { cn } from "@/lib/utils";
 import type { LayoutCommit } from "../types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -25,7 +25,6 @@ function parseGithubEmail(email: string): { userId: string; username: string } |
   const m = /^(\d+)\+(.+)@users\.noreply\.github\.com$/.exec(email);
   return m ? { userId: m[1], username: m[2] } : null;
 }
-
 
 function buildGithubCommitUrl(remoteUrl: string, hash: string): string | null {
   const m =
@@ -119,21 +118,12 @@ function TreeNodeRow({
 }) {
   if (node.kind === "file") {
     return (
-      <div
-        className="flex items-center gap-1.5 py-[3px] pr-3"
-        style={{ paddingLeft: depth * 12 + 8 }}
-      >
+      <div className="flex items-center gap-1.5 py-[3px] pr-3" style={{ paddingLeft: depth * 12 + 8 }}>
         <img src={fileIconUrl(node.name)} className="size-[14px] shrink-0" alt="" />
-        <span className="min-w-0 flex-1 truncate text-[11px] text-foreground/75">
-          {node.name}
-        </span>
+        <span className="min-w-0 flex-1 truncate text-[11px] text-foreground/75">{node.name}</span>
         <div className="flex shrink-0 items-center gap-1 font-mono text-[9.5px]">
-          {node.added > 0 && (
-            <span className="text-success">+{node.added}</span>
-          )}
-          {node.removed > 0 && (
-            <span className="text-error">-{node.removed}</span>
-          )}
+          {node.added > 0 && <span className="text-success">+{node.added}</span>}
+          {node.removed > 0 && <span className="text-error">-{node.removed}</span>}
         </div>
       </div>
     );
@@ -149,23 +139,12 @@ function TreeNodeRow({
         onClick={() => !isRoot && onToggle(node.path)}
         className={cn(
           "flex w-full items-center gap-1.5 py-[3px] pr-3 text-left transition-colors",
-          isRoot
-            ? "cursor-default"
-            : "cursor-pointer hover:bg-accent/20",
+          isRoot ? "cursor-default" : "cursor-pointer hover:bg-accent/20",
         )}
         style={{ paddingLeft: depth * 12 + 8 }}
       >
-        <img
-          src={folderIconUrl(node.name, !isCollapsed)}
-          className="size-[14px] shrink-0"
-          alt=""
-        />
-        <span
-          className={cn(
-            "text-[11px]",
-            isRoot ? "font-medium text-foreground/60" : "text-foreground/75",
-          )}
-        >
+        <img src={folderIconUrl(node.name, !isCollapsed)} className="size-[14px] shrink-0" alt="" />
+        <span className={cn("text-[11px]", isRoot ? "font-medium text-foreground/60" : "text-foreground/75")}>
           {node.name}
         </span>
         {!isRoot && (
@@ -207,9 +186,7 @@ function TreeNodeRow({
 function InitialsAvatar({ name }: { name: string }) {
   const parts = name.trim().split(/\s+/);
   const initials =
-    parts.length === 1
-      ? parts[0][0].toUpperCase()
-      : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    parts.length === 1 ? parts[0][0].toUpperCase() : (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   return (
     <div
       className="flex size-full items-center justify-center text-[20px] font-bold text-background"
@@ -243,9 +220,7 @@ function MetaRow({
       )}
     >
       <span className="shrink-0 text-muted-foreground/50">{icon}</span>
-      <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-        {children}
-      </span>
+      <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{children}</span>
     </Tag>
   );
 }
@@ -286,6 +261,7 @@ interface CommitDetailPanelProps {
   commit: LayoutCommit;
   onClose: () => void;
   repositoryPath: string;
+  sessionId?: string;
   onViewChanges?: (hash: string) => void;
 }
 
@@ -293,6 +269,7 @@ export function CommitDetailPanel({
   commit,
   onClose,
   repositoryPath,
+  sessionId,
   onViewChanges,
 }: CommitDetailPanelProps) {
   const [numstatRaw, setNumstatRaw] = useState<string | null>(null);
@@ -313,7 +290,10 @@ export function CommitDetailPanel({
 
   // Reset avatar status when the commit (and thus potentially the author) changes
   useEffect(() => {
-    if (!userId) { setAvatarStatus("error"); return; }
+    if (!userId) {
+      setAvatarStatus("error");
+      return;
+    }
     const cached = getCached(userId);
     setAvatarStatus(cached === true ? "ok" : cached === false ? "error" : "pending");
   }, [userId]);
@@ -321,17 +301,16 @@ export function CommitDetailPanel({
   useEffect(() => {
     setNumstatRaw(null);
     void git
-      .getCommitNumstat(repositoryPath, commit.hash)
+      .getCommitNumstat(repositoryPath, commit.hash, sessionId)
       .then(setNumstatRaw)
       .catch(() => setNumstatRaw(""));
     void git
-      .getRemoteUrl(repositoryPath)
+      .getRemoteUrl(repositoryPath, undefined, sessionId)
       .then(setRemoteUrl)
       .catch(() => setRemoteUrl(null));
-  }, [repositoryPath, commit.hash]);
+  }, [repositoryPath, commit.hash, sessionId]);
 
-  const githubCommitUrl =
-    remoteUrl ? buildGithubCommitUrl(remoteUrl, commit.hash) : null;
+  const githubCommitUrl = remoteUrl ? buildGithubCommitUrl(remoteUrl, commit.hash) : null;
 
   const fileStats = numstatRaw ? parseNumstat(numstatRaw) : [];
   const tree = buildTree(fileStats);
@@ -375,27 +354,27 @@ export function CommitDetailPanel({
               src={getAvatarUrl(userId, 80)}
               alt={commit.authorName}
               className="size-full object-cover"
-              onLoad={() => { setCached(userId, true); setAvatarStatus("ok"); }}
-              onError={() => { setCached(userId, false); setAvatarStatus("error"); }}
+              onLoad={() => {
+                setCached(userId, true);
+                setAvatarStatus("ok");
+              }}
+              onError={() => {
+                setCached(userId, false);
+                setAvatarStatus("error");
+              }}
             />
           ) : (
             <InitialsAvatar name={commit.authorName} />
           )}
         </div>
 
-        <p className="mt-2.5 text-[14px] font-semibold text-foreground">
-          {commit.authorName}
-        </p>
-        <p className="text-[12px] text-muted-foreground">
-          {formatDetailDate(commit.timestamp)}
-        </p>
+        <p className="mt-2.5 text-[14px] font-semibold text-foreground">{commit.authorName}</p>
+        <p className="text-[12px] text-muted-foreground">{formatDetailDate(commit.timestamp)}</p>
       </div>
 
       {/* ── Meta rows ─────────────────────────────────────────────────── */}
       <div className="shrink-0 space-y-1.5 px-4 pb-4">
-        <MetaRow icon={<MailIcon />}>
-          {commit.authorEmail}
-        </MetaRow>
+        <MetaRow icon={<MailIcon />}>{commit.authorEmail}</MetaRow>
         <MetaRow
           icon={<HashIcon />}
           onClick={() => void navigator.clipboard.writeText(commit.hash)}
@@ -404,10 +383,7 @@ export function CommitDetailPanel({
           <code className="font-mono">{commit.hash}</code>
         </MetaRow>
         {githubCommitUrl && (
-          <MetaRow
-            icon={<GithubIcon />}
-            onClick={() => void openUrl(githubCommitUrl)}
-          >
+          <MetaRow icon={<GithubIcon />} onClick={() => void openUrl(githubCommitUrl)}>
             View on GitHub
           </MetaRow>
         )}
@@ -418,32 +394,22 @@ export function CommitDetailPanel({
       {/* ── Scrollable body ───────────────────────────────────────────── */}
       <ScrollArea className="min-h-0 flex-1">
         {/* Commit message */}
-        <p className="px-4 py-3 text-[13px] font-medium leading-snug text-foreground">
-          {commit.subject}
-        </p>
+        <p className="px-4 py-3 text-[13px] font-medium leading-snug text-foreground">{commit.subject}</p>
 
         <Separator />
 
         {/* Files header */}
         <div className="flex items-center justify-between px-4 py-2.5">
-          <span className="text-[12px] text-foreground/70">
-            {commit.filesChanged} Changed Files
-          </span>
+          <span className="text-[12px] text-foreground/70">{commit.filesChanged} Changed Files</span>
           <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold">
-            {totalAdded > 0 && (
-              <span className="text-success">+{totalAdded}</span>
-            )}
-            {totalRemoved > 0 && (
-              <span className="text-error">−{totalRemoved}</span>
-            )}
+            {totalAdded > 0 && <span className="text-success">+{totalAdded}</span>}
+            {totalRemoved > 0 && <span className="text-error">−{totalRemoved}</span>}
           </div>
         </div>
 
         {/* File tree */}
         <div className="pb-4">
-          {numstatRaw === null && (
-            <p className="px-4 text-[11px] text-muted-foreground">Loading...</p>
-          )}
+          {numstatRaw === null && <p className="px-4 text-[11px] text-muted-foreground">Loading...</p>}
           {tree.map((node, i) => (
             <TreeNodeRow
               key={node.kind === "dir" ? node.path : `root-file-${i}`}
@@ -459,11 +425,7 @@ export function CommitDetailPanel({
       {/* ── Footer ────────────────────────────────────────────────────── */}
       {onViewChanges && (
         <div className="shrink-0 border-t border-border p-3">
-          <Button
-            variant="ghost"
-            className="w-full text-[12px]"
-            onClick={() => onViewChanges(commit.hash)}
-          >
+          <Button variant="ghost" className="w-full text-[12px]" onClick={() => onViewChanges(commit.hash)}>
             View Commit
           </Button>
         </div>

@@ -1,11 +1,5 @@
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
@@ -105,20 +99,14 @@ export function TerminalSection() {
       <div className="flex flex-col gap-2">
         <Label>Font</Label>
         <div className="flex flex-col gap-2">
-          <SettingRow
-            title="Font family"
-            description="Monospace font for the terminal emulator."
-          >
+          <SettingRow title="Font family" description="Monospace font for the terminal emulator.">
             <Input
               value={terminalFontFamily}
               onChange={(e) => void setTerminalFontFamily(e.target.value)}
               className="h-7 w-52 text-[11.5px]"
             />
           </SettingRow>
-          <SettingRow
-            title="Font size"
-            description="Font size used in the terminal (in px)."
-          >
+          <SettingRow title="Font size" description="Font size used in the terminal (in px).">
             <NumInput
               value={terminalFontSize}
               min={8}
@@ -127,30 +115,28 @@ export function TerminalSection() {
               onChange={(v) => void setTerminalFontSize(v)}
             />
           </SettingRow>
-          <SettingRow
-            title="Font weight"
-            description="Weight of the text rendered in the terminal."
-          >
+          <SettingRow title="Font weight" description="Weight of the text rendered in the terminal.">
             <Select
               value={terminalFontWeight}
-              onValueChange={(v) =>
-                void setTerminalFontWeight(v as "normal" | "medium" | "bold")
-              }
+              onValueChange={(v) => void setTerminalFontWeight(v as "normal" | "medium" | "bold")}
             >
               <SelectTrigger className="h-7 w-28 text-[11.5px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="normal" className="text-[11.5px]">Normal</SelectItem>
-                <SelectItem value="medium" className="text-[11.5px]">Medium</SelectItem>
-                <SelectItem value="bold" className="text-[11.5px]">Bold</SelectItem>
+                <SelectItem value="normal" className="text-[11.5px]">
+                  Normal
+                </SelectItem>
+                <SelectItem value="medium" className="text-[11.5px]">
+                  Medium
+                </SelectItem>
+                <SelectItem value="bold" className="text-[11.5px]">
+                  Bold
+                </SelectItem>
               </SelectContent>
             </Select>
           </SettingRow>
-          <SettingRow
-            title="Letter spacing"
-            description="Horizontal spacing between characters (in px)."
-          >
+          <SettingRow title="Letter spacing" description="Horizontal spacing between characters (in px).">
             <NumInput
               value={terminalLetterSpacing}
               min={-2}
@@ -159,10 +145,7 @@ export function TerminalSection() {
               onChange={(v) => void setTerminalLetterSpacing(v)}
             />
           </SettingRow>
-          <SettingRow
-            title="Line height"
-            description="Vertical spacing between lines in the terminal."
-          >
+          <SettingRow title="Line height" description="Vertical spacing between lines in the terminal.">
             <NumInput
               value={terminalLineHeight}
               min={0.8}
@@ -177,34 +160,29 @@ export function TerminalSection() {
       <div className="flex flex-col gap-2">
         <Label>Cursor</Label>
         <div className="flex flex-col gap-2">
-          <SettingRow
-            title="Cursor style"
-            description="Shape of the cursor in the terminal."
-          >
+          <SettingRow title="Cursor style" description="Shape of the cursor in the terminal.">
             <Select
               value={terminalCursorStyle}
-              onValueChange={(v) =>
-                void setTerminalCursorStyle(v as "block" | "underline" | "bar")
-              }
+              onValueChange={(v) => void setTerminalCursorStyle(v as "block" | "underline" | "bar")}
             >
               <SelectTrigger className="h-7 w-28 text-[11.5px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="block" className="text-[11.5px]">Block</SelectItem>
-                <SelectItem value="underline" className="text-[11.5px]">Underline</SelectItem>
-                <SelectItem value="bar" className="text-[11.5px]">Bar</SelectItem>
+                <SelectItem value="block" className="text-[11.5px]">
+                  Block
+                </SelectItem>
+                <SelectItem value="underline" className="text-[11.5px]">
+                  Underline
+                </SelectItem>
+                <SelectItem value="bar" className="text-[11.5px]">
+                  Bar
+                </SelectItem>
               </SelectContent>
             </Select>
           </SettingRow>
-          <SettingRow
-            title="Cursor blink"
-            description="Animate the terminal cursor with a blinking effect."
-          >
-            <Switch
-              checked={terminalCursorBlink}
-              onCheckedChange={(v) => void setTerminalCursorBlink(v)}
-            />
+          <SettingRow title="Cursor blink" description="Animate the terminal cursor with a blinking effect.">
+            <Switch checked={terminalCursorBlink} onCheckedChange={(v) => void setTerminalCursorBlink(v)} />
           </SettingRow>
           {terminalCursorBlink && (
             <SettingRow
@@ -251,10 +229,7 @@ export function TerminalSection() {
           title="Use WebGL renderer"
           description="Accelerates terminal rendering using your GPU. Turn off if terminal text flickers, appears blurry, or causes graphics issues. Applies to new terminal sessions."
         >
-          <Switch
-            checked={terminalUseWebGL}
-            onCheckedChange={(v) => void setTerminalUseWebGL(v)}
-          />
+          <Switch checked={terminalUseWebGL} onCheckedChange={(v) => void setTerminalUseWebGL(v)} />
         </SettingRow>
       </div>
 
@@ -264,19 +239,13 @@ export function TerminalSection() {
           title="Terminal bell"
           description="Play a sound when the terminal bell character (BEL) is received."
         >
-          <Switch
-            checked={terminalBell}
-            onCheckedChange={(v) => void setTerminalBell(v)}
-          />
+          <Switch checked={terminalBell} onCheckedChange={(v) => void setTerminalBell(v)} />
         </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">
         <Label>Buffer</Label>
-        <SettingRow
-          title="Scrollback buffer"
-          description="Number of lines kept in the terminal history."
-        >
+        <SettingRow title="Scrollback buffer" description="Number of lines kept in the terminal history.">
           <NumInput
             value={terminalScrollback}
             min={500}
@@ -289,14 +258,8 @@ export function TerminalSection() {
 
       <div className="flex flex-col gap-2">
         <Label>Input</Label>
-        <SettingRow
-          title="Copy on select"
-          description="Automatically copy selected text to the clipboard."
-        >
-          <Switch
-            checked={terminalCopyOnSelect}
-            onCheckedChange={(v) => void setTerminalCopyOnSelect(v)}
-          />
+        <SettingRow title="Copy on select" description="Automatically copy selected text to the clipboard.">
+          <Switch checked={terminalCopyOnSelect} onCheckedChange={(v) => void setTerminalCopyOnSelect(v)} />
         </SettingRow>
         <SettingRow
           title="Right-click pastes"
@@ -325,10 +288,7 @@ export function TerminalSection() {
           title="Auto-reconnect SSH sessions"
           description="Automatically retry when an SSH connection is lost unexpectedly."
         >
-          <Switch
-            checked={sshAutoReconnect}
-            onCheckedChange={(v) => void setSshAutoReconnect(v)}
-          />
+          <Switch checked={sshAutoReconnect} onCheckedChange={(v) => void setSshAutoReconnect(v)} />
         </SettingRow>
         {sshAutoReconnect && (
           <>
@@ -362,10 +322,7 @@ export function TerminalSection() {
 
       <div className="flex flex-col gap-2">
         <Label>Scrolling</Label>
-        <SettingRow
-          title="Scroll sensitivity"
-          description="Number of lines scrolled per mouse wheel tick."
-        >
+        <SettingRow title="Scroll sensitivity" description="Number of lines scrolled per mouse wheel tick.">
           <NumInput
             value={terminalScrollSensitivity}
             min={1}
@@ -380,18 +337,24 @@ export function TerminalSection() {
         >
           <Select
             value={terminalFastScrollModifier}
-            onValueChange={(v) =>
-              void setTerminalFastScrollModifier(v as "none" | "alt" | "ctrl" | "shift")
-            }
+            onValueChange={(v) => void setTerminalFastScrollModifier(v as "none" | "alt" | "ctrl" | "shift")}
           >
             <SelectTrigger className="h-7 w-28 text-[11.5px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none" className="text-[11.5px]">None</SelectItem>
-              <SelectItem value="alt" className="text-[11.5px]">Alt</SelectItem>
-              <SelectItem value="ctrl" className="text-[11.5px]">Ctrl</SelectItem>
-              <SelectItem value="shift" className="text-[11.5px]">Shift</SelectItem>
+              <SelectItem value="none" className="text-[11.5px]">
+                None
+              </SelectItem>
+              <SelectItem value="alt" className="text-[11.5px]">
+                Alt
+              </SelectItem>
+              <SelectItem value="ctrl" className="text-[11.5px]">
+                Ctrl
+              </SelectItem>
+              <SelectItem value="shift" className="text-[11.5px]">
+                Shift
+              </SelectItem>
             </SelectContent>
           </Select>
         </SettingRow>
@@ -401,11 +364,7 @@ export function TerminalSection() {
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
-      {children}
-    </span>
-  );
+  return <span className="text-[11px] font-medium tracking-tight text-muted-foreground">{children}</span>;
 }
 
 function NumInput({

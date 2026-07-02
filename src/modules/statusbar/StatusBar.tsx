@@ -1,25 +1,12 @@
-import React from "react";
-import { AgentStatusPill } from "@/modules/ai/components/AgentStatusPill";
 import {
-  AiOpenButton,
-  AiStatusBarControls,
-} from "@/modules/ai/components/AiStatusBarControls";
-import { useChatStore } from "@/modules/ai";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
-import {
-  FolderTreeIcon,
   FlashIcon,
+  FolderTreeIcon,
   GitBranchIcon,
   Globe02Icon,
   LayoutTopIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { cn } from "@/lib/utils";
-import { CwdBreadcrumb } from "./CwdBreadcrumb";
-import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
-import { useTabsStore } from "@/modules/tabs/store/tabsStore";
-import type { WorkspaceTab } from "@/modules/tabs/types";
+import React from "react";
 import {
   ContextMenu,
   ContextMenuCheckboxItem,
@@ -29,6 +16,17 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { cn } from "@/lib/utils";
+import { useChatStore } from "@/modules/ai";
+import { AgentStatusPill } from "@/modules/ai/components/AgentStatusPill";
+import { AiOpenButton, AiStatusBarControls } from "@/modules/ai/components/AiStatusBarControls";
+import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
+import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
+import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import type { WorkspaceTab } from "@/modules/tabs/types";
+import { CwdBreadcrumb } from "./CwdBreadcrumb";
 import {
   STATUSBAR_ITEM_REGISTRY,
   STATUSBAR_ITEM_SETTERS,
@@ -52,10 +50,25 @@ type Props = {
   onPanelToggle?: (panel: SidebarPanel) => void;
 };
 
-const PANEL_BUTTONS: Array<{ panel: SidebarPanel; icon: typeof FolderTreeIcon; title: string; prefKey: "statusBarShowExplorerButton" | "statusBarShowSnippetsButton" | "statusBarShowSourceControlButton" }> = [
-  { panel: "explorer",       icon: FolderTreeIcon,  title: "Explorer (Cmd+B)",  prefKey: "statusBarShowExplorerButton" },
-  { panel: "snippets",       icon: FlashIcon,        title: "Snippets",          prefKey: "statusBarShowSnippetsButton" },
-  { panel: "source-control", icon: GitBranchIcon,    title: "Source Control",    prefKey: "statusBarShowSourceControlButton" },
+const PANEL_BUTTONS: Array<{
+  panel: SidebarPanel;
+  icon: typeof FolderTreeIcon;
+  title: string;
+  prefKey: "statusBarShowExplorerButton" | "statusBarShowSnippetsButton" | "statusBarShowSourceControlButton";
+}> = [
+  {
+    panel: "explorer",
+    icon: FolderTreeIcon,
+    title: "Explorer (Cmd+B)",
+    prefKey: "statusBarShowExplorerButton",
+  },
+  { panel: "snippets", icon: FlashIcon, title: "Snippets", prefKey: "statusBarShowSnippetsButton" },
+  {
+    panel: "source-control",
+    icon: GitBranchIcon,
+    title: "Source Control",
+    prefKey: "statusBarShowSourceControlButton",
+  },
 ];
 
 export const StatusBar = React.memo(function StatusBar({
@@ -84,22 +97,43 @@ export const StatusBar = React.memo(function StatusBar({
   const cursorLine = useEditorCursorStore((s) => s.line);
   const cursorCol = useEditorCursorStore((s) => s.col);
 
-  const panelButtonVisibility = { statusBarShowExplorerButton: showExplorerButton, statusBarShowSnippetsButton: showSnippetsButton, statusBarShowSourceControlButton: showSourceControlButton };
+  const panelButtonVisibility = {
+    statusBarShowExplorerButton: showExplorerButton,
+    statusBarShowSnippetsButton: showSnippetsButton,
+    statusBarShowSourceControlButton: showSourceControlButton,
+  };
   const showTabsBtn = tabsLocation === "sidebar" && showTabsButton;
-  const anyPanelButtonVisible = showExplorerButton || showSnippetsButton || showSourceControlButton || showTabsBtn;
+  const anyPanelButtonVisible =
+    showExplorerButton || showSnippetsButton || showSourceControlButton || showTabsBtn;
 
   const cwd = useTabsStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId);
     if (tab?.kind !== "workspace") return null;
     const wt = tab as WorkspaceTab;
     const session = wt.sessions[wt.activePaneId];
-    return session?.kind === "local" ? session.cwd ?? null : null;
+    if (session?.kind === "local") return session.cwd ?? null;
+    if (session?.kind === "ssh") return session.cwd ?? null;
+    return null;
   });
+  // Same {hostId} the sidebar tree's ExplorerTarget resolves to for an SSH
+  // workspace pane — acquiring it here (ref-counted, idempotent) reuses the
+  // sidebar's already-open session when there is one, or lazily connects a
+  // shared one otherwise, instead of the breadcrumb standing up its own.
+  const sshHostId = useTabsStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    if (tab?.kind !== "workspace") return null;
+    const wt = tab as WorkspaceTab;
+    const session = wt.sessions[wt.activePaneId];
+    return session?.kind === "ssh" ? (session.hostId ?? null) : null;
+  });
+  const lazySession = useLazyExplorerSession(sshHostId);
+  const remoteTarget =
+    sshHostId && lazySession ? { hostId: sshHostId, sessionId: lazySession.sessionId } : null;
   const filePath = useTabsStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId);
     if (tab?.kind !== "editor") return null;
     const et = tab as { isUntitled: boolean; path: string };
-    return et.isUntitled ? et.path.split("/").pop() ?? "untitled.txt" : et.path;
+    return et.isUntitled ? (et.path.split("/").pop() ?? "untitled.txt") : et.path;
   });
 
   return (
@@ -121,12 +155,12 @@ export const StatusBar = React.memo(function StatusBar({
                         "flex h-5 w-5 items-center justify-center rounded transition-colors",
                         activePanel === panel
                           ? "bg-primary/20 text-foreground dark:text-primary"
-                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
                       )}
                     >
                       <HugeiconsIcon icon={icon} size={12} strokeWidth={1.75} />
                     </button>
-                  ) : null
+                  ) : null,
                 )}
                 {showTabsBtn && (
                   <button
@@ -137,7 +171,7 @@ export const StatusBar = React.memo(function StatusBar({
                       "flex h-5 w-5 items-center justify-center rounded transition-colors",
                       activePanel === "tabs"
                         ? "bg-primary/20 text-foreground dark:text-primary"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
                     )}
                   >
                     <HugeiconsIcon icon={LayoutTopIcon} size={12} strokeWidth={1.75} />
@@ -150,7 +184,14 @@ export const StatusBar = React.memo(function StatusBar({
               <>
                 {anyPanelButtonVisible && <div className="mx-1 h-3.5 w-px shrink-0 bg-border/60" />}
                 <div className="min-w-0 truncate">
-                  <CwdBreadcrumb cwd={cwd} filePath={filePath} home={home} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+                  <CwdBreadcrumb
+                    cwd={cwd}
+                    filePath={filePath}
+                    home={home}
+                    remoteTarget={remoteTarget}
+                    onCd={onCd}
+                    onCdInNewTab={onCdInNewTab}
+                  />
                 </div>
               </>
             )}
@@ -175,17 +216,13 @@ export const StatusBar = React.memo(function StatusBar({
                   className="shrink-0 text-muted-foreground"
                 />
                 <span className="truncate">Open preview</span>
-                <span className="truncate text-muted-foreground">
-                  {hostFromUrl(detectedPreviewUrl)}
-                </span>
+                <span className="truncate text-muted-foreground">{hostFromUrl(detectedPreviewUrl)}</span>
               </button>
             ) : null}
             {aiEnabled && showAiControls && <AgentStatusPill onClick={onOpenMini} />}
-            {aiEnabled && showAiControls && (panelOpen && hasComposer ? (
-              <AiStatusBarControls />
-            ) : (
-              <AiOpenButton onOpen={openPanel} />
-            ))}
+            {aiEnabled &&
+              showAiControls &&
+              (panelOpen && hasComposer ? <AiStatusBarControls /> : <AiOpenButton onOpen={openPanel} />)}
           </div>
         </footer>
       </ContextMenuTrigger>
@@ -198,10 +235,7 @@ export const StatusBar = React.memo(function StatusBar({
           return <StatusBarMenuCheckboxItem key={item.id} descriptor={item} />;
         })}
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className="text-[12px]"
-          onSelect={() => void openSettingsWindow("appearance")}
-        >
+        <ContextMenuItem className="text-[12px]" onSelect={() => void openSettingsWindow("appearance")}>
           Status Bar Settings…
         </ContextMenuItem>
       </ContextMenuContent>

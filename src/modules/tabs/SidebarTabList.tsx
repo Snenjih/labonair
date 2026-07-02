@@ -5,18 +5,10 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  Cancel01Icon,
-  PencilEdit02Icon,
-  PlusSignIcon,
-} from "@hugeicons/core-free-icons";
+import { Cancel01Icon, PencilEdit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   DndContext,
@@ -26,11 +18,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -74,9 +62,7 @@ export function SidebarTabList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -119,15 +105,8 @@ export function SidebarTabList({
         ref={scrollRef}
         className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={tabs.map((t) => t.id)}
-            strategy={verticalListSortingStrategy}
-          >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={tabs.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             {tabs.map((t) => {
               const isActive = t.id === activeId;
               const isNew = !firstRender && !seen!.has(t.id);
@@ -202,10 +181,7 @@ export function SidebarTabList({
                   <SortableSidebarTabWrapper key={t.id} id={t.id} disabled={false}>
                     <ContextMenu>
                       <ContextMenuTrigger asChild>{btn}</ContextMenuTrigger>
-                      <ContextMenuContent
-                        className="min-w-36"
-                        onCloseAutoFocus={(e) => e.preventDefault()}
-                      >
+                      <ContextMenuContent className="min-w-36" onCloseAutoFocus={(e) => e.preventDefault()}>
                         <ContextMenuItem onSelect={() => setEditingId(t.id)}>
                           <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.75} />
                           <span className="flex-1">Rename</span>
@@ -232,21 +208,13 @@ export function SidebarTabList({
                     <ContextMenuContent>
                       {t.kind !== "home" && (
                         <>
-                          <ContextMenuItem onSelect={() => onClose(t.id)}>
-                            Close Tab
-                          </ContextMenuItem>
-                          <ContextMenuItem onSelect={() => onDuplicate(t.id)}>
-                            Duplicate Tab
-                          </ContextMenuItem>
+                          <ContextMenuItem onSelect={() => onClose(t.id)}>Close Tab</ContextMenuItem>
+                          <ContextMenuItem onSelect={() => onDuplicate(t.id)}>Duplicate Tab</ContextMenuItem>
                           <ContextMenuSeparator />
                         </>
                       )}
-                      <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>
-                        Close Others
-                      </ContextMenuItem>
-                      <ContextMenuItem onSelect={onCloseAll}>
-                        Close All
-                      </ContextMenuItem>
+                      <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>Close Others</ContextMenuItem>
+                      <ContextMenuItem onSelect={onCloseAll}>Close All</ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
                 </SortableSidebarTabWrapper>
@@ -295,8 +263,10 @@ function SortableSidebarTabWrapper({
   disabled: boolean;
   children: ReactNode;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id, disabled });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled,
+  });
 
   return (
     <div

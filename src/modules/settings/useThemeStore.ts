@@ -1,10 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
-import {
-  applyThemeColors,
-  revertThemeColors,
-  type ThemeMeta,
-} from "@/lib/useThemeEngine";
+import { applyThemeColors, revertThemeColors, type ThemeMeta } from "@/lib/useThemeEngine";
 import { setAppTheme } from "./store";
 import { usePreferencesStore } from "./preferences";
 
@@ -29,8 +25,7 @@ const MOCK_COMMUNITY_THEMES: RemoteTheme[] = [
     author: "Catppuccin",
     authorUrl: "https://github.com/catppuccin",
     type: "dark",
-    rawUrl:
-      "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/themes/catppuccin-mocha.json",
+    rawUrl: "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/themes/catppuccin-mocha.json",
   },
   {
     id: "nord",
@@ -40,13 +35,11 @@ const MOCK_COMMUNITY_THEMES: RemoteTheme[] = [
     author: "arcticicestudio",
     authorUrl: "https://github.com/arcticicestudio",
     type: "dark",
-    rawUrl:
-      "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/themes/nord.json",
+    rawUrl: "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/themes/nord.json",
   },
 ];
 
-const COMMUNITY_INDEX_URL =
-  "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/index.json";
+const COMMUNITY_INDEX_URL = "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/index.json";
 
 type ThemeStore = {
   installedThemes: ThemeMeta[];
@@ -99,8 +92,7 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
     } catch (e) {
       console.warn("Could not fetch community themes:", e);
       set({
-        communityError:
-          "Could not connect to the theme registry. Showing cached entries.",
+        communityError: "Could not connect to the theme registry. Showing cached entries.",
         communityThemes: MOCK_COMMUNITY_THEMES,
       });
     } finally {

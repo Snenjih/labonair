@@ -1,15 +1,9 @@
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/modules/hosts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import {
-  setSftpShowHiddenFiles,
-} from "@/modules/settings/store";
+import { setSftpShowHiddenFiles } from "@/modules/settings/store";
 import { Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
@@ -45,9 +39,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     loadRemoteDir,
     setSelectedLocal,
     setSelectedRemote,
+    clearDisconnected,
     tabs,
   } = useSftpStore();
   const tabState = tabs[tabId];
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   const hosts = useHostsStore((s) => s.hosts);
   const host = hosts.find((h) => h.id === tab.hostId);
@@ -88,7 +84,9 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     loadRemoteDir(tabId, host?.default_path_sftp ?? "/");
     return () => {
       destroyTab(tabId);
-      invoke("sftp_disconnect", { sessionId: tabId }).catch((e) => handleApiError(e, "Failed to disconnect SFTP", "SFTP"));
+      invoke("sftp_disconnect", { sessionId: tabId }).catch((e) =>
+        handleApiError(e, "Failed to disconnect SFTP", "SFTP"),
+      );
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabId, isConnected]);
@@ -140,7 +138,9 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       loadRemoteDir(tabId, target);
       return;
     }
-    onOpenRemoteEditor(tabId, file.path).catch((e) => handleApiError(e, "Failed to open remote file", "SFTP"));
+    onOpenRemoteEditor(tabId, file.path).catch((e) =>
+      handleApiError(e, "Failed to open remote file", "SFTP"),
+    );
   }
 
   function startRename(path: string) {
@@ -150,7 +150,10 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   }
 
   async function commitRename(side: "local" | "remote") {
-    if (!renamingPath || !renameValue.trim()) { setRenamingPath(null); return; }
+    if (!renamingPath || !renameValue.trim()) {
+      setRenamingPath(null);
+      return;
+    }
     const dir = renamingPath.substring(0, renamingPath.lastIndexOf("/"));
     const newPath = `${dir}/${renameValue.trim()}`;
     try {
@@ -250,10 +253,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   }
 
   async function commitNewFolder(side: "local" | "remote") {
-    if (!newFolderName.trim()) { setCreatingFolderSide(null); return; }
-    const basePath = side === "remote"
-      ? (tabState?.remotePath ?? "/")
-      : (tabState?.localPath ?? "~");
+    if (!newFolderName.trim()) {
+      setCreatingFolderSide(null);
+      return;
+    }
+    const basePath = side === "remote" ? (tabState?.remotePath ?? "/") : (tabState?.localPath ?? "~");
     const sep = basePath.endsWith("/") ? "" : "/";
     const newPath = `${basePath}${sep}${newFolderName.trim()}`;
     try {
@@ -292,6 +296,20 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     }
   }
 
+  async function handleReconnect() {
+    setIsReconnecting(true);
+    try {
+      await invoke("sftp_connect", { sessionId: tabId, hostId: tab.hostId });
+      clearDisconnected(tabId);
+      loadLocalDir(tabId, tabState?.localPath ?? "~");
+      loadRemoteDir(tabId, tabState?.remotePath ?? host?.default_path_sftp ?? "/");
+    } catch (e) {
+      handleApiError(e, "Reconnect failed", "SFTP");
+    } finally {
+      setIsReconnecting(false);
+    }
+  }
+
   const localPath = tabState?.localPath ?? "~";
   const remotePath = tabState?.remotePath ?? "/";
 
@@ -306,9 +324,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   };
 
   function buildFileList(files: FileNode[], currentPath: string): FileNode[] {
-    let result = sftpShowHiddenFiles
-      ? files
-      : files.filter((f) => !f.name.startsWith("."));
+    let result = sftpShowHiddenFiles ? files : files.filter((f) => !f.name.startsWith("."));
     if (sftpShowUpFolder && currentPath !== "/" && currentPath !== "") {
       result = [UP_ENTRY, ...result];
     }
@@ -340,17 +356,34 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-background" style={{ fontSize: `${sftpFontSize}px` }}>
+    <div
+      className="flex flex-col h-full overflow-hidden bg-background"
+      style={{ fontSize: `${sftpFontSize}px` }}
+    >
       {/* Top host bar */}
       <div className="h-8 shrink-0 border-b border-border bg-card flex items-center px-4 gap-2">
         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest select-none">
           SFTP
         </span>
         <span className="text-muted-foreground/40 text-xs select-none">—</span>
-        <span className="text-xs font-medium text-foreground/80 select-none truncate">
-          {hostLabel}
-        </span>
+        <span className="text-xs font-medium text-foreground/80 select-none truncate">{hostLabel}</span>
       </div>
+
+      {tabState?.disconnected && (
+        <div className="h-8 shrink-0 border-b border-destructive/40 bg-destructive/10 flex items-center px-3 gap-2">
+          <span className="text-[11px] text-destructive truncate flex-1">
+            Connection lost{tabState.disconnectReason ? ` — ${tabState.disconnectReason}` : ""}
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleReconnect()}
+            disabled={isReconnecting}
+            className="text-[11px] font-medium text-destructive underline decoration-dotted underline-offset-2 hover:text-destructive/80 disabled:opacity-50"
+          >
+            {isReconnecting ? "Reconnecting…" : "Reconnect"}
+          </button>
+        </div>
+      )}
 
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
         {/* LOCAL */}
@@ -373,7 +406,10 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                 value={newFolderName}
                 onChange={setNewFolderName}
                 onCommit={() => commitNewFolder("local")}
-                onCancel={() => { setCreatingFolderSide(null); setNewFolderName(""); }}
+                onCancel={() => {
+                  setCreatingFolderSide(null);
+                  setNewFolderName("");
+                }}
               />
             )}
             <div className="flex-1 min-h-0">
@@ -387,7 +423,10 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                 files={displayedLocalFiles}
                 onRefresh={() => loadLocalDir(tabId, localPath)}
                 onStartRename={startRename}
-                onStartNewFolder={() => { setCreatingFolderSide("local"); setNewFolderName(""); }}
+                onStartNewFolder={() => {
+                  setCreatingFolderSide("local");
+                  setNewFolderName("");
+                }}
                 onOpenRemoteEditor={onOpenRemoteEditor}
               >
                 <div className="h-full">
@@ -431,7 +470,10 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
             <SftpToolbar
               key={`toolbar-remote-${remotePath}`}
               path={remotePath}
-              onNavigate={(p) => { setDeepSearchResults(null); loadRemoteDir(tabId, p); }}
+              onNavigate={(p) => {
+                setDeepSearchResults(null);
+                loadRemoteDir(tabId, p);
+              }}
               showOpenTerminal
               onOpenTerminal={() => onOpenSshTerminal?.(tab.hostId, hostLabel, remotePath)}
               showHidden={sftpShowHiddenFiles}
@@ -445,7 +487,10 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                 value={newFolderName}
                 onChange={setNewFolderName}
                 onCommit={() => commitNewFolder("remote")}
-                onCancel={() => { setCreatingFolderSide(null); setNewFolderName(""); }}
+                onCancel={() => {
+                  setCreatingFolderSide(null);
+                  setNewFolderName("");
+                }}
               />
             )}
 
@@ -510,7 +555,10 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                   files={displayedRemoteFiles}
                   onRefresh={() => loadRemoteDir(tabId, remotePath)}
                   onStartRename={startRename}
-                  onStartNewFolder={() => { setCreatingFolderSide("remote"); setNewFolderName(""); }}
+                  onStartNewFolder={() => {
+                    setCreatingFolderSide("remote");
+                    setNewFolderName("");
+                  }}
                   onOpenRemoteEditor={onOpenRemoteEditor}
                 >
                   <div className="h-full">

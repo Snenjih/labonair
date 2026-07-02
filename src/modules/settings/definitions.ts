@@ -7,16 +7,12 @@ export type SettingCategory =
   | "Editor"
   | "Command Palette"
   | "File Manager"
+  | "Source Control"
   | "AI"
   | "Directives"
   | "About";
 
-export type ControlType =
-  | "Switch"
-  | "Select"
-  | "Input"
-  | "NumberInput"
-  | "Custom";
+export type ControlType = "Switch" | "Select" | "Input" | "NumberInput" | "Custom";
 
 export type SelectOption = { value: string; label: string };
 
@@ -239,6 +235,15 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "Terminal",
     controlType: "NumberInput",
   },
+  // --- Source Control ---
+  {
+    id: "gitStatusPollIntervalMs",
+    label: "Refresh interval",
+    description:
+      "How often Source Control polls for status changes (in ms). Remote repositories over SSH automatically use a longer effective interval since each check is a network round-trip.",
+    category: "Source Control",
+    controlType: "NumberInput",
+  },
   {
     id: "terminalCursorStyle",
     label: "Cursor style",
@@ -261,7 +266,8 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "terminalCursorBlinkInterval",
     label: "Cursor blink interval",
-    description: "Duration of one blink cycle in milliseconds (200–2000 ms). Only applies when cursor blink is enabled.",
+    description:
+      "Duration of one blink cycle in milliseconds (200–2000 ms). Only applies when cursor blink is enabled.",
     category: "Terminal",
     controlType: "NumberInput",
   },
@@ -462,14 +468,62 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "sftpRemoteEditShowTransfers",
     label: "Show remote edit transfers",
-    description: "Display temporary download and upload operations when editing remote files in the transfers panel.",
+    description:
+      "Display temporary download and upload operations when editing remote files in the transfers panel.",
     category: "File Manager",
     controlType: "Switch",
   },
   {
+    id: "explorerShowHiddenByDefault",
+    label: "Explorer: Show hidden files by default",
+    description: "Start the sidebar file tree with hidden files visible (applies to local and remote hosts).",
+    category: "File Manager",
+    controlType: "Switch",
+  },
+  {
+    id: "explorerRemotePollInterval",
+    label: "Explorer: Remote refresh interval",
+    description:
+      "How often the sidebar file tree re-polls an SSH host's expanded folders for changes (SFTP has no live watch).",
+    category: "File Manager",
+    controlType: "Select",
+    options: [
+      { value: "10", label: "Every 10 seconds" },
+      { value: "20", label: "Every 20 seconds" },
+      { value: "30", label: "Every 30 seconds" },
+      { value: "60", label: "Every minute" },
+      { value: "0", label: "Never" },
+    ],
+  },
+  {
+    id: "explorerAutoReconnect",
+    label: "Explorer: Auto-reconnect remote sessions",
+    description:
+      "Automatically retry the sidebar's SSH browsing connection when it drops unexpectedly, using the SSH reconnect delay/attempts below.",
+    category: "File Manager",
+    controlType: "Switch",
+  },
+  {
+    id: "explorerIdleSessionTimeoutMin",
+    label: "Explorer: Idle session timeout (min)",
+    description:
+      "Disconnect a background SSH browsing session after it has had no active viewer for this many minutes (1–30).",
+    category: "File Manager",
+    controlType: "NumberInput",
+  },
+  {
+    id: "explorerMaxIdleSessions",
+    label: "Explorer: Max cached remote sessions",
+    description:
+      "How many idle SSH browsing connections the sidebar keeps warm before disconnecting the oldest (1–10).",
+    category: "File Manager",
+    controlType: "NumberInput",
+  },
+  {
     id: "hostPingInterval",
     label: "Ping interval",
-    description: "How often to check whether each host is reachable. Set to Never to disable availability checks.",
+    description:
+      "How often to check whether each host is reachable. Set to Never to disable availability checks.",
     category: "General",
     controlType: "Select",
     options: [
@@ -513,6 +567,7 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Editor",
   "Command Palette",
   "File Manager",
+  "Source Control",
   "AI",
   "Directives",
   "About",

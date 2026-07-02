@@ -7,9 +7,7 @@ import type { PreviewTab } from "@/modules/tabs";
 export function usePreviewDetection(activeDetectedUrl: string | null): string | null {
   const isWorkspaceTab = useTabsStore((s) => selectActiveTabKind(s) === "workspace");
   const previewTabUrls = useTabsStore(
-    useShallow((s) =>
-      s.tabs.filter((t): t is PreviewTab => t.kind === "preview").map((t) => t.url),
-    ),
+    useShallow((s) => s.tabs.filter((t): t is PreviewTab => t.kind === "preview").map((t) => t.url)),
   );
 
   return useMemo(() => {

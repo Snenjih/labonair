@@ -6,7 +6,7 @@ interface SideBySideDiffProps {
   diffContent: string;
 }
 
-type DiffRowKind = 'hunk-header' | 'file-header' | 'context' | 'deletion' | 'addition' | 'paired';
+type DiffRowKind = "hunk-header" | "file-header" | "context" | "deletion" | "addition" | "paired";
 
 interface DiffRow {
   kind: DiffRowKind;
@@ -29,9 +29,9 @@ function parseSideBySide(diffContent: string): DiffRow[] {
     for (const del of pendingDeletions) {
       leftLineNum++;
       rows.push({
-        kind: 'deletion',
+        kind: "deletion",
         left: del,
-        right: '',
+        right: "",
         leftLineNum,
       });
     }
@@ -41,7 +41,7 @@ function parseSideBySide(diffContent: string): DiffRow[] {
   for (const line of lines) {
     if (line.startsWith("diff --git")) {
       flushDeletions();
-      rows.push({ kind: 'file-header', left: line, right: line });
+      rows.push({ kind: "file-header", left: line, right: line });
       leftLineNum = 0;
       rightLineNum = 0;
       continue;
@@ -57,7 +57,7 @@ function parseSideBySide(diffContent: string): DiffRow[] {
       line.startsWith("rename ")
     ) {
       flushDeletions();
-      rows.push({ kind: 'file-header', left: line, right: line });
+      rows.push({ kind: "file-header", left: line, right: line });
       continue;
     }
 
@@ -69,7 +69,7 @@ function parseSideBySide(diffContent: string): DiffRow[] {
         leftLineNum = parseInt(hunkMatch[1], 10) - 1;
         rightLineNum = parseInt(hunkMatch[2], 10) - 1;
       }
-      rows.push({ kind: 'hunk-header', left: line, right: line });
+      rows.push({ kind: "hunk-header", left: line, right: line });
       continue;
     }
 
@@ -87,7 +87,7 @@ function parseSideBySide(diffContent: string): DiffRow[] {
         leftLineNum++;
         rightLineNum++;
         rows.push({
-          kind: 'paired',
+          kind: "paired",
           left: delContent,
           right: addContent,
           leftLineNum,
@@ -96,8 +96,8 @@ function parseSideBySide(diffContent: string): DiffRow[] {
       } else {
         rightLineNum++;
         rows.push({
-          kind: 'addition',
-          left: '',
+          kind: "addition",
+          left: "",
           right: addContent,
           rightLineNum,
         });
@@ -112,7 +112,7 @@ function parseSideBySide(diffContent: string): DiffRow[] {
       leftLineNum++;
       rightLineNum++;
       rows.push({
-        kind: 'context',
+        kind: "context",
         left: contextContent,
         right: contextContent,
         leftLineNum,
@@ -126,22 +126,20 @@ function parseSideBySide(diffContent: string): DiffRow[] {
 }
 
 interface DiffSideRowProps {
-  side: 'left' | 'right';
+  side: "left" | "right";
   row: DiffRow;
 }
 
 function DiffSideRow({ side, row }: DiffSideRowProps) {
-  const content = side === 'left' ? row.left : row.right;
-  const lineNum = side === 'left' ? row.leftLineNum : row.rightLineNum;
+  const content = side === "left" ? row.left : row.right;
+  const lineNum = side === "left" ? row.leftLineNum : row.rightLineNum;
 
-  const isEmpty = content === '';
+  const isEmpty = content === "";
 
-  const isFileMeta = row.kind === 'file-header';
-  const isHunk = row.kind === 'hunk-header';
-  const isDeletion =
-    (row.kind === 'deletion' || row.kind === 'paired') && side === 'left';
-  const isAddition =
-    (row.kind === 'addition' || row.kind === 'paired') && side === 'right';
+  const isFileMeta = row.kind === "file-header";
+  const isHunk = row.kind === "hunk-header";
+  const isDeletion = (row.kind === "deletion" || row.kind === "paired") && side === "left";
+  const isAddition = (row.kind === "addition" || row.kind === "paired") && side === "right";
 
   return (
     <div
@@ -157,10 +155,10 @@ function DiffSideRow({ side, row }: DiffSideRowProps) {
       {/* Line number gutter */}
       {!isFileMeta && !isHunk && (
         <span className="w-8 shrink-0 select-none pr-2 text-right text-[10px] text-muted-foreground/30">
-          {lineNum ?? ''}
+          {lineNum ?? ""}
         </span>
       )}
-      <span className="flex-1 overflow-hidden px-1">{content || ' '}</span>
+      <span className="flex-1 overflow-hidden px-1">{content || " "}</span>
     </div>
   );
 }
@@ -178,13 +176,13 @@ export function SideBySideDiff({ diffContent }: SideBySideDiffProps) {
 
   return (
     <div ref={scrollRef} className="max-h-[300px] overflow-auto">
-      <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
+      <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
         {virtualizer.getVirtualItems().map((virtualItem) => {
           const row = rows[virtualItem.index];
           return (
             <div
               key={virtualItem.key}
-              style={{ position: 'absolute', top: virtualItem.start, width: '100%' }}
+              style={{ position: "absolute", top: virtualItem.start, width: "100%" }}
               className="flex"
             >
               <div className="min-w-0 flex-1 overflow-hidden border-r border-border/40">

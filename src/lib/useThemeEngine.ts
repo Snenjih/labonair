@@ -156,9 +156,15 @@ export function hexToHslCss(hex: string): string {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
     switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / d + 2) / 6; break;
-      case b: h = ((r - g) / d + 4) / 6; break;
+      case r:
+        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+        break;
+      case g:
+        h = ((b - r) / d + 2) / 6;
+        break;
+      case b:
+        h = ((r - g) / d + 4) / 6;
+        break;
     }
   }
 
@@ -176,10 +182,7 @@ export function hexToHslCss(hex: string): string {
  * Apply a loaded theme's colors to a DOM element (default: :root).
  * Also sets the `.dark` / `.light` root class based on the theme's type.
  */
-export function applyThemeColors(
-  meta: ThemeMeta,
-  target: HTMLElement = document.documentElement,
-): void {
+export function applyThemeColors(meta: ThemeMeta, target: HTMLElement = document.documentElement): void {
   // Clear all previously injected vars first so no leftover values from a
   // prior theme bleed through when the new theme omits certain color keys.
   for (const cssVar of ALL_VARS) {
@@ -202,9 +205,7 @@ export function applyThemeColors(
  * Remove all inline CSS vars set by a JSON theme, reverting to globals.css.
  * The dark/light class management is left entirely to ThemeProvider.
  */
-export function revertThemeColors(
-  target: HTMLElement = document.documentElement,
-): void {
+export function revertThemeColors(target: HTMLElement = document.documentElement): void {
   for (const cssVar of ALL_VARS) {
     target.style.removeProperty(cssVar);
   }

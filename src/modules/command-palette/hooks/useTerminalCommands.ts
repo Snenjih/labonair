@@ -1,9 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  AiEraserIcon,
-  WifiDisconnected01Icon,
-  WifiConnected01Icon,
-} from "@hugeicons/core-free-icons";
+import { AiEraserIcon, WifiDisconnected01Icon, WifiConnected01Icon } from "@hugeicons/core-free-icons";
 import { createElement } from "react";
 import type { CommandPage, RegistryCallbacks } from "../types";
 

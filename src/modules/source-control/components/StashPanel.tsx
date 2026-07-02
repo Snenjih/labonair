@@ -1,6 +1,13 @@
+import {
+  ArrowDown01Icon,
+  ArrowRight01Icon,
+  Cancel01Icon,
+  Delete01Icon,
+  GitBranchIcon,
+  PlusSignIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,23 +18,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  ArrowDown01Icon,
-  ArrowRight01Icon,
-  PlusSignIcon,
-  Delete01Icon,
-  Cancel01Icon,
-  GitBranchIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { useSourceControlStore } from "../store/sourceControlStore";
-import { git } from "../lib/gitInvoke";
-import type { StashEntry } from "../types";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { git } from "../lib/gitInvoke";
+import { useSourceControlStore } from "../store/sourceControlStore";
+import type { StashEntry } from "../types";
 
 interface StashPanelProps {
   repoRoot: string;
+  sessionId?: string;
   onRefresh: () => void;
 }
 
@@ -36,10 +37,11 @@ interface StashPanelProps {
 interface StashEntryRowProps {
   entry: StashEntry;
   repoRoot: string;
+  sessionId?: string;
   onRefresh: () => void;
 }
 
-function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
+function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowProps) {
   const setError = useSourceControlStore((s) => s.setStashError);
   const [actionLoading, setActionLoading] = useState<"apply" | "pop" | "drop" | null>(null);
   const [showDropConfirm, setShowDropConfirm] = useState(false);
@@ -48,16 +50,22 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
     setActionLoading("apply");
     setError(null);
     try {
-      await git.stashApply(repoRoot, entry.hash);
+      await git.stashApply(repoRoot, entry.hash, sessionId);
       onRefresh();
     } catch (e) {
       const msg = String(e);
       if (msg.includes("conflict") || msg.includes("CONFLICT")) {
         setError("Conflicts after stash apply — resolve before proceeding");
-        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Apply Failed", message: "Conflicts after stash apply — resolve before proceeding" });
+        useNotificationStore.getState().addNotification({
+          type: "error",
+          title: "Stash Apply Failed",
+          message: "Conflicts after stash apply — resolve before proceeding",
+        });
       } else {
         setError(msg);
-        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Apply Failed", message: msg });
+        useNotificationStore
+          .getState()
+          .addNotification({ type: "error", title: "Stash Apply Failed", message: msg });
       }
     } finally {
       setActionLoading(null);
@@ -68,16 +76,22 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
     setActionLoading("pop");
     setError(null);
     try {
-      await git.stashPop(repoRoot, entry.hash);
+      await git.stashPop(repoRoot, entry.hash, sessionId);
       onRefresh();
     } catch (e) {
       const msg = String(e);
       if (msg.includes("conflict") || msg.includes("CONFLICT")) {
         setError("Conflicts after stash apply — resolve before proceeding");
-        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Pop Failed", message: "Conflicts after stash apply — resolve before proceeding" });
+        useNotificationStore.getState().addNotification({
+          type: "error",
+          title: "Stash Pop Failed",
+          message: "Conflicts after stash apply — resolve before proceeding",
+        });
       } else {
         setError(msg);
-        useNotificationStore.getState().addNotification({ type: "error", title: "Stash Pop Failed", message: msg });
+        useNotificationStore
+          .getState()
+          .addNotification({ type: "error", title: "Stash Pop Failed", message: msg });
       }
     } finally {
       setActionLoading(null);
@@ -88,12 +102,14 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
     setActionLoading("drop");
     setError(null);
     try {
-      await git.stashDrop(repoRoot, entry.hash);
+      await git.stashDrop(repoRoot, entry.hash, sessionId);
       setShowDropConfirm(false);
       onRefresh();
     } catch (e) {
       setError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Stash Drop Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Stash Drop Failed", message: String(e) });
     } finally {
       setActionLoading(null);
     }
@@ -127,7 +143,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
         <div
           className={cn(
             "flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/stash:opacity-100",
-            isLoading && "opacity-100"
+            isLoading && "opacity-100",
           )}
         >
           {/* Apply */}
@@ -184,9 +200,11 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
             <AlertDialogTitle>Drop stash?</AlertDialogTitle>
             <AlertDialogDescription>
               Drop{" "}
-              <span className="font-mono text-foreground">stash@{"{"}
-              {entry.index}
-              {"}"}</span>
+              <span className="font-mono text-foreground">
+                stash@{"{"}
+                {entry.index}
+                {"}"}
+              </span>
               ? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -207,7 +225,7 @@ function StashEntryRow({ entry, repoRoot, onRefresh }: StashEntryRowProps) {
 
 // ─── StashPanel ───────────────────────────────────────────────────────────────
 
-export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
+export function StashPanel({ repoRoot, sessionId, onRefresh }: StashPanelProps) {
   const stashEntries = useSourceControlStore((s) => s.stashEntries);
   const stashError = useSourceControlStore((s) => s.stashError);
   const setStashError = useSourceControlStore((s) => s.setStashError);
@@ -221,13 +239,15 @@ export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
     setIsStashing(true);
     setStashError(null);
     try {
-      await git.stashPush(repoRoot, stashMessage.trim() || undefined);
+      await git.stashPush(repoRoot, stashMessage.trim() || undefined, undefined, sessionId);
       setStashMessage("");
       setShowStashForm(false);
       onRefresh();
     } catch (e) {
       setStashError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Stash Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Stash Failed", message: String(e) });
     } finally {
       setIsStashing(false);
     }
@@ -322,8 +342,8 @@ export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
       )}
 
       {/* Stash entries */}
-      {!collapsed && (
-        stashEntries.length === 0 ? (
+      {!collapsed &&
+        (stashEntries.length === 0 ? (
           <div className="px-3 py-2 text-[11px] text-muted-foreground/50">No stashes</div>
         ) : (
           <div className="px-1 pb-1">
@@ -332,12 +352,12 @@ export function StashPanel({ repoRoot, onRefresh }: StashPanelProps) {
                 key={`stash-${entry.index}-${entry.hash}`}
                 entry={entry}
                 repoRoot={repoRoot}
+                sessionId={sessionId}
                 onRefresh={onRefresh}
               />
             ))}
           </div>
-        )
-      )}
+        ))}
     </div>
   );
 }

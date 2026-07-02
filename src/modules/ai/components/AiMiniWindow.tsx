@@ -133,11 +133,7 @@ export function AiMiniWindow() {
         className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-foreground/[0.03] to-transparent"
       />
       {sessionId ? (
-        <Body
-          sessionId={sessionId}
-          onClose={closeMini}
-          onExpand={expandToPanel}
-        />
+        <Body sessionId={sessionId} onClose={closeMini} onExpand={expandToPanel} />
       ) : (
         <EmptyShell onClose={closeMini} onExpand={expandToPanel} />
       )}
@@ -160,18 +156,11 @@ function Body({
 
   const chat = useMemo(() => getOrCreateChat(sessionId), [sessionId]);
   const helpers = useChat<UIMessage>({ chat });
-  const isBusy =
-    helpers.status === "submitted" || helpers.status === "streaming";
+  const isBusy = helpers.status === "submitted" || helpers.status === "streaming";
 
   return (
     <>
-      <Header
-        step={step}
-        isBusy={isBusy}
-        onClose={onClose}
-        onExpand={onExpand}
-        messages={helpers.messages}
-      />
+      <Header step={step} isBusy={isBusy} onClose={onClose} onExpand={onExpand} messages={helpers.messages} />
 
       <PlanModeStrip />
 
@@ -222,21 +211,10 @@ function PlanModeStrip() {
   );
 }
 
-function EmptyShell({
-  onClose,
-  onExpand,
-}: {
-  onClose: () => void;
-  onExpand: () => void;
-}) {
+function EmptyShell({ onClose, onExpand }: { onClose: () => void; onExpand: () => void }) {
   return (
     <>
-      <Header
-        step={null}
-        isBusy={false}
-        onClose={onClose}
-        onExpand={onExpand}
-      />
+      <Header step={null} isBusy={false} onClose={onClose} onExpand={onExpand} />
       <div className="flex flex-1 items-center justify-center text-[11px] text-muted-foreground">
         Loading sessions…
       </div>
@@ -263,9 +241,7 @@ function Header({
     <div className="relative flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border/60 px-3">
       <div className="flex min-w-0 items-center gap-1.5">
         <AgentSwitcher isMiniWindow />
-        {messages !== undefined ? (
-          <ContextIndicator messages={messages} />
-        ) : null}
+        {messages !== undefined ? <ContextIndicator messages={messages} /> : null}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {isBusy ? (
@@ -398,19 +374,11 @@ function SessionPicker() {
           title="Switch session"
         >
           <span className="truncate">{active.title || "New chat"}</span>
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            size={10}
-            strokeWidth={2}
-            className="opacity-70"
-          />
+          <HugeiconsIcon icon={ArrowDown01Icon} size={10} strokeWidth={2} className="opacity-70" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-56">
-        <DropdownMenuItem
-          onSelect={() => newSession()}
-          className="gap-2 text-xs"
-        >
+        <DropdownMenuItem onSelect={() => newSession()} className="gap-2 text-xs">
           <HugeiconsIcon icon={Add01Icon} size={12} strokeWidth={1.75} />
           New session
         </DropdownMenuItem>
@@ -451,14 +419,9 @@ function SessionRow({
         }
         onSelect();
       }}
-      className={cn(
-        "group flex items-center justify-between gap-2 text-xs",
-        active && "bg-accent/40",
-      )}
+      className={cn("group flex items-center justify-between gap-2 text-xs", active && "bg-accent/40")}
     >
-      <span className="min-w-0 flex-1 truncate">
-        {session.title || "New chat"}
-      </span>
+      <span className="min-w-0 flex-1 truncate">{session.title || "New chat"}</span>
       <button
         type="button"
         data-session-delete
@@ -480,9 +443,7 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
     <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 py-10 text-center">
       <img src="/logo.png" alt="Labonair" className="size-14 opacity-90" />
       <div className="space-y-1.5">
-        <p className="text-[14px] font-semibold tracking-tight">
-          Ask Labonair anything
-        </p>
+        <p className="text-[14px] font-semibold tracking-tight">Ask Labonair anything</p>
         <p className="max-w-[18rem] text-[11.5px] leading-relaxed text-muted-foreground">
           Labonair sees the active terminal — cwd, recent commands, and output.
         </p>
@@ -502,12 +463,8 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
               <HugeiconsIcon icon={s.icon} size={13} strokeWidth={1.75} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[12px] font-medium text-foreground">
-                {s.label}
-              </div>
-              <div className="text-[10.5px] text-muted-foreground">
-                {s.hint}
-              </div>
+              <div className="text-[12px] font-medium text-foreground">{s.label}</div>
+              <div className="text-[10.5px] text-muted-foreground">{s.hint}</div>
             </div>
           </button>
         ))}

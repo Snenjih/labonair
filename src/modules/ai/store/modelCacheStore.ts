@@ -83,10 +83,7 @@ export const useModelCacheStore = create<ModelCacheState>((set, get) => ({
     const ttl = getTtlForProvider(instance.providerId);
 
     // Skip if still fresh
-    if (
-      existing?.status === "success" &&
-      Date.now() - existing.fetchedAt < ttl
-    ) {
+    if (existing?.status === "success" && Date.now() - existing.fetchedAt < ttl) {
       return;
     }
 
@@ -130,9 +127,7 @@ export const useModelCacheStore = create<ModelCacheState>((set, get) => ({
 
   fetchAllConfigured: async (instances, instanceKeys) => {
     await Promise.allSettled(
-      instances.map((inst) =>
-        get().fetchForInstance(inst, instanceKeys[inst.id] ?? null),
-      ),
+      instances.map((inst) => get().fetchForInstance(inst, instanceKeys[inst.id] ?? null)),
     );
   },
 
@@ -153,8 +148,7 @@ export const useModelCacheStore = create<ModelCacheState>((set, get) => ({
 
   isLoading: (instanceId) => get().cache[instanceId]?.status === "loading",
 
-  isAnyLoading: () =>
-    Object.values(get().cache).some((e) => e.status === "loading"),
+  isAnyLoading: () => Object.values(get().cache).some((e) => e.status === "loading"),
 
   getError: (instanceId) => {
     const entry = get().cache[instanceId];

@@ -57,6 +57,12 @@ export type PreviewTab = {
   kind: "preview";
   title: string;
   url: string;
+  /** Set when previewing a remote file staged via `prepare_remote_edit` —
+   *  mirrors `EditorTab`'s `remoteHostTabId`/`remotePath`, used only to
+   *  clean up the local temp file on tab close (previews are read-only, no
+   *  save-back). */
+  remoteHostTabId?: string;
+  remoteTempPath?: string;
 };
 
 export type AiDiffStatus = "pending" | "approved" | "rejected";
@@ -100,6 +106,11 @@ export type GitGraphTab = {
   title: string;
   repositoryPath: string; // locked at open time — never changes
   initialBranch: string;
+  // Snapshotted at open time alongside repositoryPath, same "frozen" rule —
+  // a Git Graph tab must stay pinned to the repo/host it was opened
+  // against, independent of whatever the sidebar switches to afterward.
+  hostId?: string;
+  sessionId?: string;
 };
 
 export type GitDiffTab = {
@@ -110,6 +121,8 @@ export type GitDiffTab = {
   filePath: string;
   staged: boolean;
   section: "staged" | "unstaged" | "untracked";
+  hostId?: string;
+  sessionId?: string;
 };
 
 export type CommitDiffTab = {
@@ -118,9 +131,20 @@ export type CommitDiffTab = {
   title: string;
   repositoryPath: string;
   hash: string;
+  hostId?: string;
+  sessionId?: string;
 };
 
-export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | GitGraphTab | GitDiffTab | CommitDiffTab;
+export type Tab =
+  | WorkspaceTab
+  | EditorTab
+  | PreviewTab
+  | AiDiffTab
+  | HomeTab
+  | SftpTab
+  | GitGraphTab
+  | GitDiffTab
+  | CommitDiffTab;
 
 export type TabPatch = Partial<{
   title: string;

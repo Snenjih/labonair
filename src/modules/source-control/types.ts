@@ -59,8 +59,18 @@ export interface FileDiffStat {
   staged: boolean;
 }
 
+/** Bundles the poll cycle's 5 reads into one round-trip — see gitInvoke.ts. */
+export interface WorkspaceGitState {
+  status: GitStatus;
+  branches: Branch[];
+  currentBranch: string;
+  stash: StashEntry[];
+  tags: string[];
+  diffStats: FileDiffStat[];
+}
+
 export type SelectionMode =
-  | { type: 'file'; path: string; staged: boolean }
-  | { type: 'section'; section: 'staged' | 'unstaged' | 'untracked' }
-  | { type: 'all' }
-  | { type: 'commit'; hash: string; repositoryPath: string };
+  | { type: "file"; path: string; staged: boolean }
+  | { type: "section"; section: "staged" | "unstaged" | "untracked" }
+  | { type: "all" }
+  | { type: "commit"; hash: string; repositoryPath: string; sessionId?: string };

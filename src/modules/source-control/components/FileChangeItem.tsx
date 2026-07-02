@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { cn } from "@/lib/utils";
-import { PlusSignIcon, MinusSignIcon } from "@hugeicons/core-free-icons";
+import { MinusSignIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,11 +19,12 @@ import {
   ContextMenuShortcut,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { useTabsStore } from "@/modules/tabs/store/tabsStore";
-import { useSourceControlStore } from "../store/sourceControlStore";
-import { git } from "../lib/gitInvoke";
-import type { FileStatus } from "../types";
+import { cn } from "@/lib/utils";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import { git } from "../lib/gitInvoke";
+import { useSourceControlStore } from "../store/sourceControlStore";
+import type { FileStatus } from "../types";
 
 interface FileChangeItemProps {
   file: FileStatus;
@@ -49,6 +49,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps) {
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
+  const hostId = useSourceControlStore((s) => s.hostId);
   const diffStats = useSourceControlStore((s) => s.diffStats);
   const openGitDiffTab = useTabsStore((s) => s.openGitDiffTab);
   const setDiffViewMode = useSourceControlStore((s) => s.setDiffViewMode);
@@ -65,18 +67,18 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
 
   const isRename = !!file.originalPath;
   const fileName = basename(file.path);
-  const displayName = isRename
-    ? `${basename(file.path)} ← ${basename(file.originalPath!)}`
-    : fileName;
+  const displayName = isRename ? `${basename(file.path)} ← ${basename(file.originalPath!)}` : fileName;
 
   async function handleStage(e?: React.MouseEvent) {
     e?.stopPropagation();
     if (!repoRoot) return;
     try {
-      await git.stageFile(repoRoot, file.path);
+      await git.stageFile(repoRoot, file.path, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
@@ -84,51 +86,59 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
     e?.stopPropagation();
     if (!repoRoot) return;
     try {
-      await git.unstageFile(repoRoot, file.path);
+      await git.unstageFile(repoRoot, file.path, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
   async function handleDiscard() {
     if (!repoRoot) return;
     try {
-      await git.discardFile(repoRoot, file.path);
+      await git.discardFile(repoRoot, file.path, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
   async function handleAddToGitignore() {
     if (!repoRoot) return;
     try {
-      await git.addToGitignore(repoRoot, file.path);
+      await git.addToGitignore(repoRoot, file.path, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
   async function handleAddToExclude() {
     if (!repoRoot) return;
     try {
-      await git.addToExclude(repoRoot, file.path);
+      await git.addToExclude(repoRoot, file.path, sessionId ?? undefined);
     } catch (e) {
-      useNotificationStore.getState().addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
     }
   }
 
   function handleOpenDiff() {
     if (!repoRoot) return;
-    openGitDiffTab(repoRoot, file.path, isStaged, section);
+    openGitDiffTab(repoRoot, file.path, isStaged, section, hostId ?? undefined, sessionId ?? undefined);
   }
 
   function handleOpenDiffSplit() {
     if (!repoRoot) return;
     setDiffViewMode("split");
-    openGitDiffTab(repoRoot, file.path, isStaged, section);
+    openGitDiffTab(repoRoot, file.path, isStaged, section, hostId ?? undefined, sessionId ?? undefined);
   }
 
   return (
@@ -158,12 +168,8 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
             {/* Diff stats — always visible */}
             {stat && (stat.added > 0 || stat.removed > 0) && (
               <span className="flex shrink-0 items-center gap-1 text-[10px] tabular-nums">
-                {stat.added > 0 && (
-                  <span className="font-medium text-success">+{stat.added}</span>
-                )}
-                {stat.removed > 0 && (
-                  <span className="font-medium text-error">−{stat.removed}</span>
-                )}
+                {stat.added > 0 && <span className="font-medium text-success">+{stat.added}</span>}
+                {stat.removed > 0 && <span className="font-medium text-error">−{stat.removed}</span>}
               </span>
             )}
 
@@ -205,10 +211,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
             </ContextMenuItem>
           )}
           {section === "unstaged" && (
-            <ContextMenuItem
-              variant="destructive"
-              onSelect={() => setShowDiscard(true)}
-            >
+            <ContextMenuItem variant="destructive" onSelect={() => setShowDiscard(true)}>
               Discard Changes
               <ContextMenuShortcut>⌫</ContextMenuShortcut>
             </ContextMenuItem>
@@ -216,9 +219,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
 
           <ContextMenuSeparator />
 
-          <ContextMenuItem onSelect={() => void handleAddToGitignore()}>
-            Add to .gitignore
-          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => void handleAddToGitignore()}>Add to .gitignore</ContextMenuItem>
           <ContextMenuItem onSelect={() => void handleAddToExclude()}>
             Add to .git/info/exclude
           </ContextMenuItem>
@@ -243,8 +244,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
             <AlertDialogTitle>Discard changes?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently discard all changes to{" "}
-              <span className="font-mono text-foreground">{fileName}</span>. This cannot be
-              undone.
+              <span className="font-mono text-foreground">{fileName}</span>. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

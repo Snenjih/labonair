@@ -19,6 +19,17 @@ pub async fn sftp_connect(
     secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
     app: tauri::AppHandle,
 ) -> Result<(), LabonairError> {
+    // Idempotent: a session already live under this session_id is left alone
+    // instead of opening a second TCP/SSH connection. Needed for React
+    // StrictMode's double-invoke of effects and for lazy sidebar-tree
+    // sessions that may be requested more than once in quick succession.
+    {
+        let map = state.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+        if map.contains_key(&session_id) {
+            return Ok(());
+        }
+    }
+
     // Fetch host from DB (fast, sync).
     let (host_address, port, username, auth_method, private_key_path, keep_alive_interval,
          keep_alive_tries, default_path_sftp, credential_id) = {
