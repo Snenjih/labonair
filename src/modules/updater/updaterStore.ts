@@ -1,6 +1,7 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { create } from "zustand";
+import { handleApiError } from "@/lib/errors";
 
 const LAST_CHECK_KEY = "labonair:updater:last-check";
 const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -51,6 +52,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
       }
     } catch (err) {
       set({ status: { kind: "error", message: String(err) } });
+      handleApiError(err, "Update check failed", "Updater");
     }
   },
 
@@ -76,6 +78,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => ({
       await relaunch();
     } catch (err) {
       set({ status: { kind: "error", message: String(err) } });
+      handleApiError(err, "Update install failed", "Updater");
     }
   },
 

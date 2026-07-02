@@ -6,6 +6,7 @@ import { saveAllScrollbacks, cleanupScrollbacks } from "./scrollback";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 
 export interface SessionLifecycleReturn {
   sessionRestored: boolean;
@@ -54,6 +55,14 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
     }).then((result) => {
       if (!alive) return;
       if (!result || result.restoredCount === 0) actions.openDefaultTab();
+      if (result && result.failedTabs.length > 0) {
+        useNotificationStore.getState().addNotification({
+          type: "warning",
+          title: "Some tabs could not be restored",
+          message: result.failedTabs.map((f) => `${f.title}: ${f.reason}`).join("\n"),
+          source: "Session",
+        });
+      }
       setSessionRestored(true);
       if (sessionRestore) {
         setTimeout(() => {

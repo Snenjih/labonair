@@ -15,6 +15,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { ThemeThumbnail } from "./ThemeThumbnail";
 import { setAppTheme } from "@/modules/settings/store";
 import { applyThemeColors, revertThemeColors } from "@/lib/useThemeEngine";
+import { handleApiError } from "@/lib/errors";
 
 type InstalledCardProps = {
   meta: ThemeMeta;
@@ -162,8 +163,12 @@ function CommunityCard({
 
   const handleApply = async () => {
     if (!installedMeta) return;
-    await setAppTheme(installedMeta.id);
-    applyThemeColors(installedMeta);
+    try {
+      await setAppTheme(installedMeta.id);
+      applyThemeColors(installedMeta);
+    } catch (e) {
+      handleApiError(e, "Failed to apply theme", "Themes");
+    }
   };
 
   const handleUninstall = async () => {

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
 import { FileChangeItem } from "./FileChangeItem";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import type { FileStatus } from "../types";
 
 interface FileChangeListProps {
@@ -63,8 +64,12 @@ export function FileChangeList({ files, section, onRefresh }: FileChangeListProp
         await git.stageAll(repoRoot);
       }
       onRefresh();
-    } catch {
-      // ignore
+    } catch (e) {
+      useNotificationStore.getState().addNotification({
+        type: "error",
+        title: section === "staged" ? "Unstage All Failed" : "Stage All Failed",
+        message: String(e),
+      });
     }
   }
 

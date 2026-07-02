@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { git } from "../lib/gitInvoke";
 import { FileChangeItem } from "./FileChangeItem";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import type { FileStatus } from "../types";
 
 interface UntrackedSectionProps {
@@ -24,7 +25,9 @@ export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
     try {
       await git.stageAll(repoRoot);
       onRefresh();
-    } catch { /* ignore */ }
+    } catch (e) {
+      useNotificationStore.getState().addNotification({ type: "error", title: "Stage All Failed", message: String(e) });
+    }
   }
 
   return (

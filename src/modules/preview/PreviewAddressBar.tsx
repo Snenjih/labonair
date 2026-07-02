@@ -20,6 +20,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { handleApiError } from "@/lib/errors";
 
 type PortPreset = {
   port: number;
@@ -189,7 +190,7 @@ export const PreviewAddressBar = forwardRef<PreviewAddressBarHandle, Props>(
           variant="ghost"
           size="icon"
           onClick={() => {
-            if (url) void openUrl(url).catch(console.error);
+            if (url) void openUrl(url).catch((e) => handleApiError(e, "Failed to open URL", "Preview"));
           }}
           title="Open in system browser"
           className="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
