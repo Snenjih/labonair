@@ -4,8 +4,8 @@ import { ResizablePanel } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 import { FileExplorer } from "@/modules/explorer";
 import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
-import { SnippetsPanel } from "@/modules/snippets";
 import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets";
+import { SnippetsPanel } from "@/modules/snippets";
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SidebarPanel } from "@/modules/statusbar";
 import { SidebarTabList } from "@/modules/tabs";
@@ -16,7 +16,6 @@ export interface SidebarContentProps {
   activePanel: SidebarPanel;
   setActivePanel: React.Dispatch<React.SetStateAction<SidebarPanel>>;
   onSidebarResize: (size: { asPercentage: number }) => void;
-  explorerRoot: string | null;
   explorerTarget: ExplorerTarget;
   // Tab list callbacks
   onSelect: (id: number) => void;
@@ -52,7 +51,6 @@ export function SidebarContent({
   sidebarRef,
   activePanel,
   onSidebarResize,
-  explorerRoot,
   explorerTarget,
   onSelect,
   onNew,
@@ -114,7 +112,7 @@ export function SidebarContent({
         ) : activePanel === "snippets" ? (
           <SnippetsPanel onRun={onSnippetRun} />
         ) : activePanel === "source-control" ? (
-          <SourceControlPanel rootPath={explorerRoot} onOpenGitGraph={onOpenGitGraph} />
+          <SourceControlPanel target={explorerTarget} onOpenGitGraph={onOpenGitGraph} />
         ) : (
           <FileExplorer
             explorerTarget={explorerTarget}

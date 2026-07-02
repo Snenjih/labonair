@@ -1,17 +1,17 @@
-import { useMemo } from "react";
-import type React from "react";
-import type { PanelImperativeHandle } from "react-resizable-panels";
 import { invoke } from "@tauri-apps/api/core";
+import type React from "react";
+import { useMemo } from "react";
+import type { PanelImperativeHandle } from "react-resizable-panels";
 import { useChatStore } from "@/modules/ai";
-import { useTabsStore, selectActivePaneId, type WorkspaceTab } from "@/modules/tabs";
+import type { RegistryCallbacks } from "@/modules/command-palette";
+import type { EditorPaneHandle } from "@/modules/editor";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { openSettingsWindow, type SettingsTab } from "@/modules/settings/openSettingsWindow";
-import type { RegistryCallbacks } from "@/modules/command-palette";
-import type { SidebarPanel } from "@/modules/statusbar";
 import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets";
-import type { TerminalPaneHandle } from "@/modules/terminal";
-import type { EditorPaneHandle } from "@/modules/editor";
 import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
+import type { SidebarPanel } from "@/modules/statusbar";
+import { selectActivePaneId, useTabsStore, type WorkspaceTab } from "@/modules/tabs";
+import type { TerminalPaneHandle } from "@/modules/terminal";
 
 export interface UsePaletteCallbacksOptions {
   openNewTab: () => void;
@@ -173,9 +173,9 @@ export function usePaletteCallbacks({
       },
       openGitGraph: () => {
         const { openGitGraphTab } = useTabsStore.getState();
-        const { repoRoot, currentBranch } = useSourceControlStore.getState();
+        const { repoRoot, currentBranch, hostId, sessionId } = useSourceControlStore.getState();
         const path = repoRoot ?? "";
-        openGitGraphTab(path, currentBranch || "HEAD");
+        openGitGraphTab(path, currentBranch || "HEAD", hostId ?? undefined, sessionId ?? undefined);
       },
       focusSourceControl: () => {
         setActivePanel("source-control");

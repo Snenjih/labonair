@@ -1,28 +1,28 @@
+import { MotionConfig } from "motion/react";
+import { AiOverlays, CloseDialogs, SidebarContent, WorkspaceArea } from "@/app/components";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AiComposerProvider } from "@/modules/ai/lib/composer";
-import { Header } from "@/modules/header";
-import { SnippetLogDrawer } from "@/modules/snippets";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
-import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
-import { ShortcutsDialog } from "@/modules/shortcuts";
-import { StatusBar } from "@/modules/statusbar";
-import type { SidebarReturn } from "@/modules/statusbar";
-import { CommandPalette, useCommandStore } from "@/modules/command-palette";
-import type { PaletteCallbacksReturn } from "@/modules/command-palette";
-import { UpdaterDialog } from "@/modules/updater";
-import { MotionConfig } from "motion/react";
-import { ThemeProvider } from "@/modules/theme";
-import {
-  type TabManagementReturn,
-  type AiDiffStatus,
-  useTabsStore,
-  selectActiveTabKind,
-} from "@/modules/tabs";
 import type { AiLiveBridgeReturn } from "@/modules/ai";
+import { AiComposerProvider } from "@/modules/ai/lib/composer";
+import type { PaletteCallbacksReturn } from "@/modules/command-palette";
+import { CommandPalette, useCommandStore } from "@/modules/command-palette";
 import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
-import { AiOverlays, CloseDialogs, SidebarContent, WorkspaceArea } from "@/app/components";
+import { Header } from "@/modules/header";
+import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
+import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { ShortcutsDialog } from "@/modules/shortcuts";
+import { SnippetLogDrawer } from "@/modules/snippets";
 import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
+import type { SidebarReturn } from "@/modules/statusbar";
+import { StatusBar } from "@/modules/statusbar";
+import {
+  type AiDiffStatus,
+  selectActiveTabKind,
+  type TabManagementReturn,
+  useTabsStore,
+} from "@/modules/tabs";
+import { ThemeProvider } from "@/modules/theme";
+import { UpdaterDialog } from "@/modules/updater";
 
 // ─── Stable store actions threaded down from App ─────────────────────────────
 export interface AppShellStoreActions {
@@ -83,9 +83,9 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
   const activeTabKind = useTabsStore(selectActiveTabKind);
 
   const onNewGitGraph = () => {
-    const { repoRoot, currentBranch } = useSourceControlStore.getState();
+    const { repoRoot, currentBranch, hostId, sessionId } = useSourceControlStore.getState();
     const path = repoRoot ?? ctrl.explorerRoot ?? "";
-    tabs.openGitGraphTab(path, currentBranch);
+    tabs.openGitGraphTab(path, currentBranch, hostId ?? undefined, sessionId ?? undefined);
   };
 
   const sidebarPassthrough = {
@@ -93,7 +93,6 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     activePanel: sidebar.activePanel,
     setActivePanel: sidebar.setActivePanel,
     onSidebarResize: sidebar.onSidebarResize,
-    explorerRoot: ctrl.explorerRoot,
     explorerTarget: ctrl.explorerTarget,
     onSelect: actions.setActiveId,
     onNew: tabs.openNewTab,

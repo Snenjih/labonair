@@ -100,6 +100,11 @@ export type GitGraphTab = {
   title: string;
   repositoryPath: string; // locked at open time — never changes
   initialBranch: string;
+  // Snapshotted at open time alongside repositoryPath, same "frozen" rule —
+  // a Git Graph tab must stay pinned to the repo/host it was opened
+  // against, independent of whatever the sidebar switches to afterward.
+  hostId?: string;
+  sessionId?: string;
 };
 
 export type GitDiffTab = {
@@ -110,6 +115,8 @@ export type GitDiffTab = {
   filePath: string;
   staged: boolean;
   section: "staged" | "unstaged" | "untracked";
+  hostId?: string;
+  sessionId?: string;
 };
 
 export type CommitDiffTab = {
@@ -118,6 +125,8 @@ export type CommitDiffTab = {
   title: string;
   repositoryPath: string;
   hash: string;
+  hostId?: string;
+  sessionId?: string;
 };
 
 export type Tab =

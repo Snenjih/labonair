@@ -1,27 +1,27 @@
-import { create } from "zustand";
 import { arrayMove } from "@dnd-kit/sortable";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useHostsStore } from "@/modules/hosts/store/hostsStore";
-import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
-import { useTransferStore } from "@/modules/sftp/store/transferStore";
 import { invoke } from "@tauri-apps/api/core";
+import { create } from "zustand";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTransferStore } from "@/modules/sftp/store/transferStore";
+import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
 import {
+  type AiDiffStatus,
+  basename,
+  type CommitDiffTab,
+  collectLeafIds,
+  findParent,
+  type GitDiffTab,
   makeLeaf,
   newSessionId,
-  findParent,
-  replaceNode,
-  collectLeafIds,
-  basename,
-  titleFromUrl,
-  type AiDiffStatus,
-  type CommitDiffTab,
-  type GitDiffTab,
   type PaneDirection,
   type PaneNode,
   type PaneSplit,
+  replaceNode,
   type Tab,
   type TabPatch,
   type TerminalSessionData,
+  titleFromUrl,
   type WorkspaceTab,
 } from "../types";
 
@@ -65,14 +65,21 @@ export type TabsState = {
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
-  openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
+  openGitGraphTab: (
+    repositoryPath: string,
+    initialBranch: string,
+    hostId?: string,
+    sessionId?: string,
+  ) => number;
   openGitDiffTab: (
     repoRoot: string,
     filePath: string,
     staged: boolean,
     section: "staged" | "unstaged" | "untracked",
+    hostId?: string,
+    sessionId?: string,
   ) => number;
-  openCommitDiffTab: (repositoryPath: string, hash: string) => number;
+  openCommitDiffTab: (repositoryPath: string, hash: string, hostId?: string, sessionId?: string) => number;
   renameTab: (id: number, label: string) => void;
   reorderTabs: (activeTabId: number, overTabId: number) => void;
   setActivePaneId: (tabId: number, paneId: string) => void;
@@ -466,7 +473,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }));
   },
 
-  openGitGraphTab: (repositoryPath, initialBranch) => {
+  openGitGraphTab: (repositoryPath, initialBranch, hostId, sessionId) => {
     const existing = get().tabs.find(
       (t) =>
         t.kind === "git-graph" && t.repositoryPath === repositoryPath && t.initialBranch === initialBranch,
@@ -485,6 +492,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           title: `Git Graph · ${initialBranch}`,
           repositoryPath,
           initialBranch,
+          hostId,
+          sessionId,
         },
       ],
       activeId: id,
@@ -493,7 +502,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return id;
   },
 
-  openGitDiffTab: (repoRoot, filePath, staged, section) => {
+  openGitDiffTab: (repoRoot, filePath, staged, section, hostId, sessionId) => {
     const existing = get().tabs.find(
       (t) =>
         t.kind === "git-diff" && t.repoRoot === repoRoot && t.filePath === filePath && t.staged === staged,
@@ -512,6 +521,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       filePath,
       staged,
       section,
+      hostId,
+      sessionId,
     };
     set((s) => ({
       tabs: [...s.tabs, tab],
@@ -521,7 +532,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return id;
   },
 
-  openCommitDiffTab: (repositoryPath, hash) => {
+  openCommitDiffTab: (repositoryPath, hash, hostId, sessionId) => {
     const shortHash = hash.slice(0, 7);
     const existing = get().tabs.find(
       (t) => t.kind === "commit-diff" && t.repositoryPath === repositoryPath && t.hash === hash,
@@ -537,6 +548,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       title: shortHash,
       repositoryPath,
       hash,
+      hostId,
+      sessionId,
     };
     set((s) => ({
       tabs: [...s.tabs, tab],

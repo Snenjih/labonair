@@ -1,14 +1,14 @@
+import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useTabsStore, selectActiveTabKind, selectActivePaneId } from "../store/tabsStore";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { PREVIEW_EXTENSIONS } from "@/modules/explorer";
-import { useSnippetExec, type CommandSnippet, type SnippetExecMode } from "@/modules/snippets";
 import type { EditorPaneHandle } from "@/modules/editor";
+import { PREVIEW_EXTENSIONS } from "@/modules/explorer";
 import type { PreviewPaneHandle } from "@/modules/preview";
-import type { WorkspacePaneHandle, TerminalPaneHandle } from "@/modules/terminal";
-import type { WorkspaceTab, AiDiffTab } from "../types";
-import type React from "react";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { type CommandSnippet, type SnippetExecMode, useSnippetExec } from "@/modules/snippets";
+import type { TerminalPaneHandle, WorkspacePaneHandle } from "@/modules/terminal";
+import { selectActivePaneId, selectActiveTabKind, useTabsStore } from "../store/tabsStore";
+import type { AiDiffTab, WorkspaceTab } from "../types";
 
 export interface UseTabManagementOptions {
   home: string | null;
@@ -63,7 +63,12 @@ export interface TabManagementReturn {
   handleSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
   execSnippet: ReturnType<typeof useSnippetExec>["execSnippet"];
   captureActiveSelection: () => string | null;
-  openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
+  openGitGraphTab: (
+    repositoryPath: string,
+    initialBranch: string,
+    hostId?: string,
+    sessionId?: string,
+  ) => number;
 }
 
 export function useTabManagement({

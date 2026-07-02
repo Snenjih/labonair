@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { Host } from "@/modules/hosts";
 import { useHostsStore } from "@/modules/hosts";
 // Imported from the source files directly (not the `@/modules/tabs` barrel)
@@ -6,7 +7,6 @@ import { useHostsStore } from "@/modules/hosts";
 // circular import (explorer -> tabs -> explorer).
 import { selectActiveTab, useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { Tab } from "@/modules/tabs/types";
-import { useMemo } from "react";
 
 export type ExplorerTarget =
   | { type: "local"; path: string | null }
@@ -66,11 +66,12 @@ export function deriveExplorerTarget(
 }
 
 /**
- * Derives what the sidebar explorer should currently browse from the active
- * tab, independent of `useWorkspaceCwd`'s `explorerRoot` (which intentionally
- * stays local-only — it also feeds SourceControlPanel, which has no remote
- * story). `explorerRoot` is reused as-is for the local fallback case so the
- * existing "last local cwd" logic isn't duplicated.
+ * Derives what the sidebar explorer — and, identically, Source Control, Git
+ * Graph, and the CwdBreadcrumb path bar — should currently browse from the
+ * active tab. `explorerRoot` (from `useWorkspaceCwd`) is reused as-is for
+ * the local fallback case so the existing "last local cwd" logic isn't
+ * duplicated. All four consumers share this single derivation rather than
+ * each re-deriving local/remote session identity independently.
  */
 export function useExplorerTarget(explorerRoot: string | null): ExplorerTarget {
   const activeTab = useTabsStore(selectActiveTab);

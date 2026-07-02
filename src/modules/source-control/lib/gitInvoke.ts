@@ -1,62 +1,140 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { GitStatus, Branch, CommitInfo, CommitResult, StashEntry, FileDiffStat } from "../types";
+import type {
+  Branch,
+  CommitInfo,
+  CommitResult,
+  FileDiffStat,
+  GitStatus,
+  StashEntry,
+  WorkspaceGitState,
+} from "../types";
 
+/**
+ * Every wrapper takes an optional trailing `sessionId` — when set, the
+ * command runs against a remote host over that SSH session's existing SFTP
+ * connection instead of the local filesystem. `path` is always the
+ * repository path as seen from wherever it's executing (local disk path or
+ * remote absolute path) — never a local path when `sessionId` is set.
+ */
 export const git = {
-  isRepo: (path: string) => invoke<boolean>("git_is_repo", { path }),
-  getRepoRoot: (path: string) => invoke<string>("git_get_repo_root", { path }),
-  getStatus: (path: string) => invoke<GitStatus>("git_get_status", { path }),
-  getCurrentBranch: (path: string) => invoke<string>("git_get_current_branch", { path }),
-  getBranches: (path: string) => invoke<Branch[]>("git_get_branches", { path }),
-  getDiff: (path: string, file: string, staged: boolean, ignoreWhitespace?: boolean) =>
-    invoke<string>("git_get_diff", { path, file, staged, ignoreWhitespace: ignoreWhitespace ?? false }),
-  stageFile: (path: string, file: string) => invoke<void>("git_stage_file", { path, file }),
-  unstageFile: (path: string, file: string) => invoke<void>("git_unstage_file", { path, file }),
-  stageAll: (path: string) => invoke<void>("git_stage_all", { path }),
-  unstageAll: (path: string) => invoke<void>("git_unstage_all", { path }),
-  discardFile: (path: string, file: string) => invoke<void>("git_discard_file", { path, file }),
-  commit: (path: string, message: string, amend: boolean) =>
-    invoke<CommitResult>("git_commit", { path, message, amend }),
-  push: (path: string, remote?: string, branch?: string) =>
-    invoke<string>("git_push", { path, remote: remote ?? null, branch: branch ?? null }),
-  pull: (path: string) => invoke<string>("git_pull", { path }),
-  fetch: (path: string) => invoke<string>("git_fetch", { path }),
-  abort: (path: string) => invoke<void>("git_abort", { path }),
-  getLog: (path: string, limit?: number, allBranches?: boolean) =>
-    invoke<CommitInfo[]>("git_get_log", { path, limit: limit ?? null, allBranches: allBranches ?? true }),
-  getCommitDetail: (path: string, hash: string) => invoke<string>("git_get_commit_detail", { path, hash }),
-  checkoutBranch: (path: string, branch: string) => invoke<void>("git_checkout_branch", { path, branch }),
-  createBranch: (path: string, name: string, fromRef?: string, checkout?: boolean) =>
-    invoke<void>("git_create_branch", { path, name, fromRef: fromRef ?? null, checkout: checkout ?? true }),
-  deleteBranch: (path: string, name: string, force?: boolean) =>
-    invoke<void>("git_delete_branch", { path, name, force: force ?? false }),
-  renameBranch: (path: string, oldName: string, newName: string) =>
-    invoke<void>("git_rename_branch", { path, oldName, newName }),
-  stashPush: (path: string, message?: string, includeUntracked?: boolean) =>
+  isRepo: (path: string, sessionId?: string) =>
+    invoke<boolean>("git_is_repo", { path, sessionId: sessionId ?? null }),
+  getRepoRoot: (path: string, sessionId?: string) =>
+    invoke<string>("git_get_repo_root", { path, sessionId: sessionId ?? null }),
+  getStatus: (path: string, sessionId?: string) =>
+    invoke<GitStatus>("git_get_status", { path, sessionId: sessionId ?? null }),
+  getWorkspaceState: (path: string, sessionId?: string) =>
+    invoke<WorkspaceGitState>("git_get_workspace_state", { path, sessionId: sessionId ?? null }),
+  getCurrentBranch: (path: string, sessionId?: string) =>
+    invoke<string>("git_get_current_branch", { path, sessionId: sessionId ?? null }),
+  getBranches: (path: string, sessionId?: string) =>
+    invoke<Branch[]>("git_get_branches", { path, sessionId: sessionId ?? null }),
+  getDiff: (path: string, file: string, staged: boolean, ignoreWhitespace?: boolean, sessionId?: string) =>
+    invoke<string>("git_get_diff", {
+      path,
+      file,
+      staged,
+      ignoreWhitespace: ignoreWhitespace ?? false,
+      sessionId: sessionId ?? null,
+    }),
+  stageFile: (path: string, file: string, sessionId?: string) =>
+    invoke<void>("git_stage_file", { path, file, sessionId: sessionId ?? null }),
+  unstageFile: (path: string, file: string, sessionId?: string) =>
+    invoke<void>("git_unstage_file", { path, file, sessionId: sessionId ?? null }),
+  stageAll: (path: string, sessionId?: string) =>
+    invoke<void>("git_stage_all", { path, sessionId: sessionId ?? null }),
+  unstageAll: (path: string, sessionId?: string) =>
+    invoke<void>("git_unstage_all", { path, sessionId: sessionId ?? null }),
+  discardFile: (path: string, file: string, sessionId?: string) =>
+    invoke<void>("git_discard_file", { path, file, sessionId: sessionId ?? null }),
+  commit: (path: string, message: string, amend: boolean, sessionId?: string) =>
+    invoke<CommitResult>("git_commit", { path, message, amend, sessionId: sessionId ?? null }),
+  push: (path: string, remote?: string, branch?: string, sessionId?: string) =>
+    invoke<string>("git_push", {
+      path,
+      remote: remote ?? null,
+      branch: branch ?? null,
+      sessionId: sessionId ?? null,
+    }),
+  pull: (path: string, sessionId?: string) =>
+    invoke<string>("git_pull", { path, sessionId: sessionId ?? null }),
+  fetch: (path: string, sessionId?: string) =>
+    invoke<string>("git_fetch", { path, sessionId: sessionId ?? null }),
+  abort: (path: string, sessionId?: string) =>
+    invoke<void>("git_abort", { path, sessionId: sessionId ?? null }),
+  getLog: (path: string, limit?: number, allBranches?: boolean, sessionId?: string) =>
+    invoke<CommitInfo[]>("git_get_log", {
+      path,
+      limit: limit ?? null,
+      allBranches: allBranches ?? true,
+      sessionId: sessionId ?? null,
+    }),
+  getCommitDetail: (path: string, hash: string, sessionId?: string) =>
+    invoke<string>("git_get_commit_detail", { path, hash, sessionId: sessionId ?? null }),
+  checkoutBranch: (path: string, branch: string, sessionId?: string) =>
+    invoke<void>("git_checkout_branch", { path, branch, sessionId: sessionId ?? null }),
+  createBranch: (path: string, name: string, fromRef?: string, checkout?: boolean, sessionId?: string) =>
+    invoke<void>("git_create_branch", {
+      path,
+      name,
+      fromRef: fromRef ?? null,
+      checkout: checkout ?? true,
+      sessionId: sessionId ?? null,
+    }),
+  deleteBranch: (path: string, name: string, force?: boolean, sessionId?: string) =>
+    invoke<void>("git_delete_branch", { path, name, force: force ?? false, sessionId: sessionId ?? null }),
+  renameBranch: (path: string, oldName: string, newName: string, sessionId?: string) =>
+    invoke<void>("git_rename_branch", { path, oldName, newName, sessionId: sessionId ?? null }),
+  stashPush: (path: string, message?: string, includeUntracked?: boolean, sessionId?: string) =>
     invoke<void>("git_stash_push", {
       path,
       message: message ?? null,
       includeUntracked: includeUntracked ?? true,
+      sessionId: sessionId ?? null,
     }),
-  stashList: (path: string) => invoke<StashEntry[]>("git_stash_list", { path }),
-  stashPop: (path: string, hash: string) => invoke<void>("git_stash_pop", { path, hash }),
-  stashApply: (path: string, hash: string) => invoke<void>("git_stash_apply", { path, hash }),
-  stashDrop: (path: string, hash: string) => invoke<void>("git_stash_drop", { path, hash }),
-  getCommitDiff: (path: string, hash: string) => invoke<string>("git_get_commit_diff", { path, hash }),
-  pushForceWithLease: (path: string, remote?: string, branch?: string) =>
-    invoke<string>("git_push_force_with_lease", { path, remote: remote ?? null, branch: branch ?? null }),
-  pushSetUpstream: (path: string, remote: string, branch: string) =>
-    invoke<string>("git_push_set_upstream", { path, remote, branch }),
-  cherryPick: (path: string, hash: string) => invoke<void>("git_cherry_pick", { path, hash }),
-  getTags: (path: string) => invoke<string[]>("git_get_tags", { path }),
-  createTag: (path: string, name: string, message?: string, hash?: string) =>
-    invoke<void>("git_create_tag", { path, name, message: message ?? null, hash: hash ?? null }),
-  deleteTag: (path: string, name: string) => invoke<void>("git_delete_tag", { path, name }),
-  pushTag: (path: string, name: string, remote?: string) =>
-    invoke<string>("git_push_tag", { path, name, remote: remote ?? null }),
-  getDiffStats: (path: string) => invoke<FileDiffStat[]>("git_get_diff_stats", { path }),
-  getCommitNumstat: (path: string, hash: string) => invoke<string>("git_get_commit_numstat", { path, hash }),
-  getRemoteUrl: (path: string, remote?: string) =>
-    invoke<string>("git_get_remote_url", { path, remote: remote ?? null }),
+  stashList: (path: string, sessionId?: string) =>
+    invoke<StashEntry[]>("git_stash_list", { path, sessionId: sessionId ?? null }),
+  stashPop: (path: string, hash: string, sessionId?: string) =>
+    invoke<void>("git_stash_pop", { path, hash, sessionId: sessionId ?? null }),
+  stashApply: (path: string, hash: string, sessionId?: string) =>
+    invoke<void>("git_stash_apply", { path, hash, sessionId: sessionId ?? null }),
+  stashDrop: (path: string, hash: string, sessionId?: string) =>
+    invoke<void>("git_stash_drop", { path, hash, sessionId: sessionId ?? null }),
+  getCommitDiff: (path: string, hash: string, sessionId?: string) =>
+    invoke<string>("git_get_commit_diff", { path, hash, sessionId: sessionId ?? null }),
+  pushForceWithLease: (path: string, remote?: string, branch?: string, sessionId?: string) =>
+    invoke<string>("git_push_force_with_lease", {
+      path,
+      remote: remote ?? null,
+      branch: branch ?? null,
+      sessionId: sessionId ?? null,
+    }),
+  pushSetUpstream: (path: string, remote: string, branch: string, sessionId?: string) =>
+    invoke<string>("git_push_set_upstream", { path, remote, branch, sessionId: sessionId ?? null }),
+  cherryPick: (path: string, hash: string, sessionId?: string) =>
+    invoke<void>("git_cherry_pick", { path, hash, sessionId: sessionId ?? null }),
+  getTags: (path: string, sessionId?: string) =>
+    invoke<string[]>("git_get_tags", { path, sessionId: sessionId ?? null }),
+  createTag: (path: string, name: string, message?: string, hash?: string, sessionId?: string) =>
+    invoke<void>("git_create_tag", {
+      path,
+      name,
+      message: message ?? null,
+      hash: hash ?? null,
+      sessionId: sessionId ?? null,
+    }),
+  deleteTag: (path: string, name: string, sessionId?: string) =>
+    invoke<void>("git_delete_tag", { path, name, sessionId: sessionId ?? null }),
+  pushTag: (path: string, name: string, remote?: string, sessionId?: string) =>
+    invoke<string>("git_push_tag", { path, name, remote: remote ?? null, sessionId: sessionId ?? null }),
+  getDiffStats: (path: string, sessionId?: string) =>
+    invoke<FileDiffStat[]>("git_get_diff_stats", { path, sessionId: sessionId ?? null }),
+  getCommitNumstat: (path: string, hash: string, sessionId?: string) =>
+    invoke<string>("git_get_commit_numstat", { path, hash, sessionId: sessionId ?? null }),
+  getRemoteUrl: (path: string, remote?: string, sessionId?: string) =>
+    invoke<string>("git_get_remote_url", { path, remote: remote ?? null, sessionId: sessionId ?? null }),
   addToGitignore: (path: string, file: string) => invoke<void>("git_add_to_gitignore", { path, file }),
   addToExclude: (path: string, file: string) => invoke<void>("git_add_to_exclude", { path, file }),
+  init: (path: string, sessionId?: string) =>
+    invoke<void>("git_init", { path, sessionId: sessionId ?? null }),
 };

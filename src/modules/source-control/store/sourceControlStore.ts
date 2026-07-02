@@ -1,6 +1,6 @@
-import { create } from "zustand";
 import { load } from "@tauri-apps/plugin-store";
-import type { GitStatus, Branch, StashEntry, SelectionMode, FileDiffStat } from "../types";
+import { create } from "zustand";
+import type { Branch, FileDiffStat, GitStatus, SelectionMode, StashEntry } from "../types";
 
 const STORE_FILE = "labonair-git.json";
 const STORE_KEY = "recentMessages";
@@ -11,6 +11,11 @@ function getStore() {
 
 export interface SourceControlState {
   repoRoot: string | null;
+  /** Set when the resolved target is a remote SSH host — passed to every
+   *  `git.*` call so it routes through that session instead of the local
+   *  filesystem. `null` for local targets. */
+  sessionId: string | null;
+  hostId: string | null;
   isRepo: boolean;
   status: GitStatus | null;
   selectionMode: SelectionMode | null;
@@ -44,13 +49,14 @@ export interface SourceControlState {
 
   // actions
   setRepoInfo: (isRepo: boolean, repoRoot: string | null) => void;
+  setTarget: (hostId: string | null, sessionId: string | null) => void;
   setDiffStats: (stats: FileDiffStat[]) => void;
   setStatus: (status: GitStatus | null) => void;
   setIsStatusLoading: (loading: boolean) => void;
   selectFile: (path: string, staged: boolean) => void;
   selectSection: (section: "staged" | "unstaged" | "untracked") => void;
   selectAll: () => void;
-  selectCommitDiff: (hash: string, repositoryPath: string) => void;
+  selectCommitDiff: (hash: string, repositoryPath: string, sessionId?: string) => void;
   clearSelectedFile: () => void;
   setDiffContent: (content: string | null) => void;
   setIsDiffLoading: (loading: boolean) => void;
@@ -80,6 +86,8 @@ export interface SourceControlState {
 
 export const useSourceControlStore = create<SourceControlState>()((set) => ({
   repoRoot: null,
+  sessionId: null,
+  hostId: null,
   isRepo: false,
   status: null,
   selectionMode: null,
@@ -106,14 +114,15 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   recentMessages: [],
 
   setRepoInfo: (isRepo, repoRoot) => set({ isRepo, repoRoot }),
+  setTarget: (hostId, sessionId) => set({ hostId, sessionId }),
   setDiffStats: (diffStats) => set({ diffStats }),
   setStatus: (status) => set({ status }),
   setIsStatusLoading: (isStatusLoading) => set({ isStatusLoading }),
   selectFile: (path, staged) => set({ selectionMode: { type: "file", path, staged } }),
   selectSection: (section) => set({ selectionMode: { type: "section", section } }),
   selectAll: () => set({ selectionMode: { type: "all" } }),
-  selectCommitDiff: (hash, repositoryPath) =>
-    set({ selectionMode: { type: "commit", hash, repositoryPath } }),
+  selectCommitDiff: (hash, repositoryPath, sessionId) =>
+    set({ selectionMode: { type: "commit", hash, repositoryPath, sessionId } }),
   clearSelectedFile: () => set({ selectionMode: null, diffContent: null }),
   setDiffContent: (diffContent) => set({ diffContent }),
   setIsDiffLoading: (isDiffLoading) => set({ isDiffLoading }),
