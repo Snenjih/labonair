@@ -1,6 +1,33 @@
 # Handshake — Session State
 
-## Last Session: 2026-07-02 (Remote Source Control, Git Graph & SSH-aware Path Breadcrumb)
+## Last Session: 2026-07-02 (Full Remote-Parity Fix Pass — Explorer, Source Control, AI Attach)
+
+### What Was Done
+User asked for an audit of the remote-explorer/Source-Control work (PR #115) for anything still local-only or missing empty/error states. A general-purpose research agent found 8 concrete gaps (verified against actual code, not speculative) plus the 2 already-disclosed scope cuts (`.gitignore`/exclude remote writes, PATH heuristic). User asked for **all of it** fixed in one pass. Went through plan mode (3 parallel Explore-agent research streams + several direct file reads to nail exact signatures) before implementing. 3 sequential commits on `feat/explorer-remote-provider`, still part of PR #115. `cargo check` ✅ · `cargo clippy` ✅ · `cargo test --lib` (67/67) ✅ · `tsc --noEmit` ✅ · `vitest run` (285/285, +10 new) ✅. **Still not merged — no manual `pnpm tauri dev` testing done (headless sandbox).**
+
+**Commits:**
+1. `295b79e` — `fix(git,sftp)`: Rust backend — `net_error.rs`/`executor.rs` emit `ssh_connection_lost` for a dead lazy session immediately (previously never classified); `exec_remote_args` retries a short fixed list of absolute git paths on PATH-resolution failure; `git_add_to_gitignore`/`git_add_to_exclude` gain optional `session_id` + remote branch via `GitExecutor::run_shell_script`; new `sftp_read_file_content` (one-shot remote read for AI attach) and `cleanup_remote_edit_temp` (was previously never cleaned up at all)
+2. `18a3df7` — `fix(source-control,git-graph)`: `useGitStatus.ts` catch blocks always surface errors now (was a narrow "not installed" allowlist, silently mis-rendering session-loss as "not a git repo"); new `gitErrors.ts` (`isSessionLostError`) shared by `NoRepoState`/`GitGraphPane`; `SourceControlPanel.tsx`/`GitGraphPane.tsx` now call `useLazyExplorerSession` themselves (previously only `FileExplorer` did — switching sidebar panels away from Files, or leaving a Git Graph tab open, let the session idle-time-out with nothing watching it); Stage All/Unstage All and git-init no longer swallow errors silently
+3. `6d211ae` — `feat(explorer,ai)`: `AppShell.tsx`'s `onNewGitGraph` now derives `hostId`/`sessionId` from the always-live `ctrl.explorerTarget` instead of the panel-dependent Source Control store (was silently falling back to local); AI "Attach to Agent"/"Reference in AI chat" now work for remote files; drag-to-terminal decoupled from native-OS-drag capability (remote rows can now drag at all); command-palette explorer commands register unconditionally + toast when not ready; "Copy Root Path" fixed to reflect remote roots; new `openRemotePreviewTab` closes the file-preview scope cut by reusing `prepare_remote_edit`'s temp-download; `disposeTab` now cleans up remote-edit/-preview temp files on close
+
+**New test coverage:** `gitErrors.test.ts`, `explorerDrag.test.ts` (10 new tests, pure-logic pieces only — most of this pass is UI/session wiring, harder to unit test without heavy mocking, consistent with this codebase's existing test coverage style).
+
+**Deliberately left out of scope (stated explicitly in the plan, not silently skipped):** the per-host `ssh2::Session` Mutex shared between git commands and SFTP browsing (session contention) — fixing that would mean connection pooling, a much larger separate initiative. Drag-to-terminal cross-host pastes (e.g. dragging a remote file onto a *different* host's terminal, or a local file onto an SSH terminal) are left lenient/unblocked — matches the pre-existing local→SSH-terminal behavior, no new restriction added.
+
+### Current State
+Branch `feat/explorer-remote-provider` (18 commits ahead of `main` now), PR #115 not yet updated with this pass's description/checklist. All automated checks green. Manual verification still needs a human with `pnpm tauri dev` + a real SSH host — this pass adds several new manual-test scenarios worth adding to the PR checklist (see plan file, still at `~/.claude/plans/bubbly-launching-ember.md`, for the full A–J list): kill an SSH connection mid Source-Control-poll and confirm "Connection Lost" + working Reconnect (not "not a git repo"); open Git Graph on a fresh SSH tab without ever opening Source Control first and confirm it resolves remote, not local; drag a remote file into its own host's SSH terminal; attach a remote file to the AI chat; add a file to `.gitignore` on a remote repo; open a remote HTML/image file in Preview.
+
+### What's Next
+- Update PR #115's description with this pass's changes + extend the manual verification checklist
+- Run the full manual checklist (old + all prior passes + this one) against a real SSH host
+- After merge: revisit the explicitly-deferred session-contention (git+SFTP shared Mutex) item if it ever causes a reported problem
+
+### Blockers
+- None (aside from needing a real SSH host + display for manual verification, same as every prior session on this branch)
+
+---
+
+## Previous Session: 2026-07-02 (Remote Source Control, Git Graph & SSH-aware Path Breadcrumb)
 
 ### What Was Done
 Extended the remote-capable sidebar explorer (PR #115) with full local/remote parity for Source Control, Git Graph, and the bottom-bar path breadcrumb — closing the gap `useExplorerTarget.ts` explicitly documented ("SourceControlPanel has no remote story"). Planned via plan-mode (3 Explore agents + 1 Plan agent researching the git module, SC/git-graph frontend, and settings/test conventions before implementation). 7 more sequential commits on `feat/explorer-remote-provider`, PR #115 description extended. `cargo check` ✅ · `cargo clippy` ✅ · `cargo test --lib` (66/66) ✅ · `tsc --noEmit` ✅ · `vitest run` (275/275) ✅. **Not merged — no manual `pnpm tauri dev` testing done (headless sandbox, no display).**
