@@ -15,23 +15,23 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 
 const TOOL_META: Record<string, { label: string; icon: typeof ToolsIcon }> = {
-  write_file:       { label: "Write file",         icon: FilePlusIcon  },
-  edit:             { label: "Edit file",          icon: FileEditIcon  },
-  multi_edit:       { label: "Edit file (batch)",  icon: Edit02Icon    },
-  create_directory: { label: "Create directory",   icon: FolderAddIcon },
-  bash_run:         { label: "Run command",        icon: TerminalIcon  },
-  bash_background:  { label: "Background process", icon: TerminalIcon  },
-  bash_list:        { label: "List processes",     icon: TerminalIcon  },
-  bash_logs:        { label: "Tail logs",          icon: TerminalIcon  },
-  bash_kill:        { label: "Kill process",       icon: TerminalIcon  },
-  read_file:        { label: "Read file",          icon: FileEditIcon  },
-  list_directory:   { label: "List directory",     icon: FolderAddIcon },
-  grep:             { label: "Search",             icon: Search01Icon  },
-  glob:             { label: "Find files",         icon: Search01Icon  },
-  suggest_command:  { label: "Suggest command",    icon: TerminalIcon  },
-  open_preview:     { label: "Open preview",       icon: ToolsIcon     },
-  todo_write:       { label: "Update tasks",       icon: ToolsIcon     },
-  run_subagent:     { label: "Run subagent",       icon: ToolsIcon     },
+  write_file: { label: "Write file", icon: FilePlusIcon },
+  edit: { label: "Edit file", icon: FileEditIcon },
+  multi_edit: { label: "Edit file (batch)", icon: Edit02Icon },
+  create_directory: { label: "Create directory", icon: FolderAddIcon },
+  bash_run: { label: "Run command", icon: TerminalIcon },
+  bash_background: { label: "Background process", icon: TerminalIcon },
+  bash_list: { label: "List processes", icon: TerminalIcon },
+  bash_logs: { label: "Tail logs", icon: TerminalIcon },
+  bash_kill: { label: "Kill process", icon: TerminalIcon },
+  read_file: { label: "Read file", icon: FileEditIcon },
+  list_directory: { label: "List directory", icon: FolderAddIcon },
+  grep: { label: "Search", icon: Search01Icon },
+  glob: { label: "Find files", icon: Search01Icon },
+  suggest_command: { label: "Suggest command", icon: TerminalIcon },
+  open_preview: { label: "Open preview", icon: ToolsIcon },
+  todo_write: { label: "Update tasks", icon: ToolsIcon },
+  run_subagent: { label: "Run subagent", icon: ToolsIcon },
 };
 
 // Tools whose output is worth expanding — others just show a success chip.
@@ -51,11 +51,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function buildSummary(
-  toolName: string,
-  input: Record<string, unknown>,
-  output: unknown,
-): string {
+function buildSummary(toolName: string, input: Record<string, unknown>, output: unknown): string {
   const out = output as Record<string, unknown> | null;
 
   switch (toolName) {
@@ -147,11 +143,7 @@ function ExpandedDetail({
     const cwdAfter = typeof out?.cwd_after === "string" ? out.cwd_after : null;
     return (
       <div className="space-y-1.5 pt-2.5">
-        {cwdAfter && (
-          <div className="font-mono text-[10px] text-muted-foreground">
-            {String(cwdAfter)}
-          </div>
-        )}
+        {cwdAfter && <div className="font-mono text-[10px] text-muted-foreground">{String(cwdAfter)}</div>}
         {stdout && (
           <pre className="max-h-48 overflow-auto rounded bg-muted/50 p-2 font-mono text-[10.5px] leading-relaxed">
             {stdout}
@@ -179,11 +171,7 @@ function ExpandedDetail({
   if (toolName === "read_file") {
     const error = out && "error" in out ? String(out.error) : null;
     if (error) {
-      return (
-        <div className="pt-2.5 font-mono text-[10.5px] text-destructive/80">
-          {error}
-        </div>
-      );
+      return <div className="pt-2.5 font-mono text-[10.5px] text-destructive/80">{error}</div>;
     }
     const content = String(out?.content ?? "");
     if (!content) return null;
@@ -201,23 +189,17 @@ function ExpandedDetail({
   }
 
   if (toolName === "list_directory") {
-    const entries = Array.isArray(out)
-      ? (out as Array<{ name: string; kind: string }>)
-      : [];
+    const entries = Array.isArray(out) ? (out as Array<{ name: string; kind: string }>) : [];
     return (
       <div className="max-h-48 overflow-auto pt-2.5">
         {entries.slice(0, 40).map((e) => (
           <div key={e.name} className="flex gap-2 font-mono text-[10px]">
-            <span className="w-3 shrink-0 text-muted-foreground">
-              {e.kind === "dir" ? "d" : "f"}
-            </span>
+            <span className="w-3 shrink-0 text-muted-foreground">{e.kind === "dir" ? "d" : "f"}</span>
             <span className="text-foreground/80">{e.name}</span>
           </div>
         ))}
         {entries.length > 40 && (
-          <div className="mt-1 text-[10px] text-muted-foreground">
-            …and {entries.length - 40} more
-          </div>
+          <div className="mt-1 text-[10px] text-muted-foreground">…and {entries.length - 40} more</div>
         )}
       </div>
     );
@@ -231,23 +213,20 @@ function ExpandedDetail({
     return (
       <div className="max-h-48 overflow-auto space-y-0.5 pt-2.5">
         {shown.map((hit, i) => (
-          <div key={`${hit.rel ?? hit.path ?? ""}:${hit.line ?? i}`} className="flex min-w-0 gap-2 font-mono text-[10px]">
+          <div
+            key={`${hit.rel ?? hit.path ?? ""}:${hit.line ?? i}`}
+            className="flex min-w-0 gap-2 font-mono text-[10px]"
+          >
             <span className="shrink-0 text-muted-foreground">
               {hit.rel ?? hit.path ?? ""}:{hit.line ?? ""}
             </span>
-            <span className="truncate text-foreground/80">
-              {String(hit.text ?? "").trim()}
-            </span>
+            <span className="truncate text-foreground/80">{String(hit.text ?? "").trim()}</span>
           </div>
         ))}
         {hits.length > 25 && (
-          <div className="text-[10px] text-muted-foreground">
-            …and {hits.length - 25} more
-          </div>
+          <div className="text-[10px] text-muted-foreground">…and {hits.length - 25} more</div>
         )}
-        {outObj?.truncated && (
-          <div className="text-[10px] text-muted-foreground">Results truncated</div>
-        )}
+        {outObj?.truncated && <div className="text-[10px] text-muted-foreground">Results truncated</div>}
       </div>
     );
   }
@@ -264,13 +243,9 @@ function ExpandedDetail({
           </div>
         ))}
         {hits.length > 30 && (
-          <div className="text-[10px] text-muted-foreground">
-            …and {hits.length - 30} more
-          </div>
+          <div className="text-[10px] text-muted-foreground">…and {hits.length - 30} more</div>
         )}
-        {outObj?.truncated && (
-          <div className="text-[10px] text-muted-foreground">Results truncated</div>
-        )}
+        {outObj?.truncated && <div className="text-[10px] text-muted-foreground">Results truncated</div>}
       </div>
     );
   }
@@ -299,9 +274,7 @@ export function ToolCallChip({ toolName, state, input, output, errorText }: Prop
 
   const canExpand = (isSuccess && EXPANDABLE_TOOLS.has(toolName)) || isError;
 
-  const summary = isSuccess || isError
-    ? buildSummary(toolName, input, output)
-    : meta?.label ?? toolName;
+  const summary = isSuccess || isError ? buildSummary(toolName, input, output) : (meta?.label ?? toolName);
 
   return (
     <div
@@ -324,26 +297,16 @@ export function ToolCallChip({ toolName, state, input, output, errorText }: Prop
           expanded && "rounded-b-none",
         )}
       >
-        {isPending && (
-          <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-info/70" />
-        )}
+        {isPending && <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-info/70" />}
         {isSuccess && (
-          <HugeiconsIcon
-            icon={Tick02Icon}
-            size={11}
-            strokeWidth={2.5}
-            className="shrink-0 text-success"
-          />
+          <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2.5} className="shrink-0 text-success" />
         )}
         {(isError || isDenied) && (
           <HugeiconsIcon
             icon={Cancel01Icon}
             size={11}
             strokeWidth={2.5}
-            className={cn(
-              "shrink-0",
-              isError ? "text-destructive" : "text-muted-foreground",
-            )}
+            className={cn("shrink-0", isError ? "text-destructive" : "text-muted-foreground")}
           />
         )}
 
@@ -371,11 +334,7 @@ export function ToolCallChip({ toolName, state, input, output, errorText }: Prop
           {summary}
         </span>
 
-        {isDenied && (
-          <span className="shrink-0 text-[10px] text-muted-foreground">
-            Denied
-          </span>
-        )}
+        {isDenied && <span className="shrink-0 text-[10px] text-muted-foreground">Denied</span>}
 
         {canExpand && (
           <HugeiconsIcon
@@ -392,11 +351,7 @@ export function ToolCallChip({ toolName, state, input, output, errorText }: Prop
 
       {expanded && canExpand && (
         <div className="border-t border-border/40 px-2.5 pb-2.5">
-          <ExpandedDetail
-            toolName={toolName}
-            output={output}
-            errorText={errorText}
-          />
+          <ExpandedDetail toolName={toolName} output={output} errorText={errorText} />
         </div>
       )}
     </div>

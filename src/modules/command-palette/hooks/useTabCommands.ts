@@ -23,12 +23,18 @@ export function useTabCommands(cb: RegistryCallbacks): {
 
   function iconForKind(kind: string) {
     switch (kind) {
-      case "workspace": return TerminalIcon;
-      case "editor": return File02Icon;
-      case "sftp": return Folder01Icon;
-      case "preview": return Globe02Icon;
-      case "ai-diff": return SparklesIcon;
-      default: return TerminalIcon;
+      case "workspace":
+        return TerminalIcon;
+      case "editor":
+        return File02Icon;
+      case "sftp":
+        return Folder01Icon;
+      case "preview":
+        return Globe02Icon;
+      case "ai-diff":
+        return SparklesIcon;
+      default:
+        return TerminalIcon;
     }
   }
 

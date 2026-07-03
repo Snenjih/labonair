@@ -3,13 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import { useSftpStore } from "./sftpStore";
 
-export type TransferStatus =
-  | "queued"
-  | "running"
-  | "paused"
-  | "cancelled"
-  | "completed"
-  | { failed: string };
+export type TransferStatus = "queued" | "running" | "paused" | "cancelled" | "completed" | { failed: string };
 
 export interface TransferJob {
   id: string;
@@ -34,7 +28,7 @@ interface TransferState {
   resolveConflict: (
     jobId: string,
     resolution: "overwrite" | "skip" | "rename",
-    newName?: string
+    newName?: string,
   ) => Promise<void>;
 }
 
@@ -52,9 +46,7 @@ export const useTransferStore = create<TransferState>((set) => ({
 
   clearCompleted: () =>
     set((s) => ({
-      jobs: s.jobs.filter(
-        (j) => j.status !== "completed" && j.status !== "cancelled"
-      ),
+      jobs: s.jobs.filter((j) => j.status !== "completed" && j.status !== "cancelled"),
     })),
 
   cancelJob: async (id) => {
@@ -64,9 +56,7 @@ export const useTransferStore = create<TransferState>((set) => ({
   resolveConflict: async (jobId, resolution, newName) => {
     set((s) => ({
       jobs: s.jobs.map((j) =>
-        j.id === jobId
-          ? { ...j, conflict: undefined, status: "running" as TransferStatus }
-          : j
+        j.id === jobId ? { ...j, conflict: undefined, status: "running" as TransferStatus } : j,
       ),
     }));
     await invoke("resolve_conflict", {
@@ -107,20 +97,17 @@ export async function bootstrapTransferListeners() {
     }
   });
 
-  await listen<{ job_id: string; src_path: string; dest_path: string }>(
-    "file_conflict",
-    (event) => {
-      const store = useTransferStore.getState();
-      const job = store.jobs.find((j) => j.id === event.payload.job_id);
-      if (!job) return;
-      store.updateJob({
-        ...job,
-        status: "paused",
-        conflict: {
-          src_path: event.payload.src_path,
-          dest_path: event.payload.dest_path,
-        },
-      });
-    }
-  );
+  await listen<{ job_id: string; src_path: string; dest_path: string }>("file_conflict", (event) => {
+    const store = useTransferStore.getState();
+    const job = store.jobs.find((j) => j.id === event.payload.job_id);
+    if (!job) return;
+    store.updateJob({
+      ...job,
+      status: "paused",
+      conflict: {
+        src_path: event.payload.src_path,
+        dest_path: event.payload.dest_path,
+      },
+    });
+  });
 }

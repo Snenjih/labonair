@@ -18,9 +18,7 @@ export function buildTodoTools(ctx: ToolContext) {
               id: z
                 .string()
                 .optional()
-                .describe(
-                  "Stable id; generated if omitted. Reuse ids across calls to keep UI stable.",
-                ),
+                .describe("Stable id; generated if omitted. Reuse ids across calls to keep UI stable."),
               title: z.string().min(1),
               description: z.string().optional(),
               status: TodoStatus,
@@ -30,8 +28,7 @@ export function buildTodoTools(ctx: ToolContext) {
       }),
       execute: async ({ todos }) => {
         const sessionId = ctx.getSessionId();
-        if (!sessionId)
-          return { error: "no active session; cannot persist todos" };
+        if (!sessionId) return { error: "no active session; cannot persist todos" };
 
         const normalized: Todo[] = todos.map((t) => ({
           id: t.id ?? newTodoId(),
@@ -48,8 +45,7 @@ export function buildTodoTools(ctx: ToolContext) {
         return {
           ok: true,
           count: normalized.length,
-          inProgress:
-            normalized.find((t) => t.status === "in_progress")?.title ?? null,
+          inProgress: normalized.find((t) => t.status === "in_progress")?.title ?? null,
         };
       },
     }),

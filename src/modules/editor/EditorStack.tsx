@@ -16,15 +16,8 @@ type Props = {
   onSaveAs: (id: number, newPath: string) => void;
 };
 
-export function EditorStack({
-  onDirtyChange,
-  registerHandle,
-  onCloseTab,
-  onSaveAs,
-}: Props) {
-  const editors = useTabsStore(
-    useShallow((s) => s.tabs.filter((t): t is EditorTab => t.kind === "editor")),
-  );
+export function EditorStack({ onDirtyChange, registerHandle, onCloseTab, onSaveAs }: Props) {
+  const editors = useTabsStore(useShallow((s) => s.tabs.filter((t): t is EditorTab => t.kind === "editor")));
   const activeId = useTabsStore((s) => s.activeId);
 
   // Stable per-tab callbacks. Inline arrows in `ref` and `onDirtyChange`
@@ -48,9 +41,7 @@ export function EditorStack({
     saveAsRef.current = onSaveAs;
   }, [onSaveAs]);
 
-  const refCallbacks = useRef(
-    new Map<number, (h: EditorPaneHandle | null) => void>(),
-  );
+  const refCallbacks = useRef(new Map<number, (h: EditorPaneHandle | null) => void>());
   const dirtyCallbacks = useRef(new Map<number, (dirty: boolean) => void>());
   const closeCallbacks = useRef(new Map<number, () => void>());
   const savedCallbacks = useRef(new Map<number, (() => void) | undefined>());
@@ -115,36 +106,38 @@ export function EditorStack({
           sessionId: t.remoteHostTabId,
           remotePath: t.remotePath,
           localTempPath: t.path,
-        }).then(() => {
-          if (showTransfers) {
-            useTransferStore.getState().updateJob({
-              id: jobId,
-              session_id: t.remoteHostTabId!,
-              src_path: "(editor)",
-              dest_path: t.remotePath!,
-              direction: "upload",
-              status: "completed",
-              bytes_total: 1,
-              bytes_transferred: 1,
-              speed_bps: 0,
-            });
-          }
-        }).catch((e: unknown) => {
-          if (showTransfers) {
-            useTransferStore.getState().updateJob({
-              id: jobId,
-              session_id: t.remoteHostTabId!,
-              src_path: "(editor)",
-              dest_path: t.remotePath!,
-              direction: "upload",
-              status: { failed: String(e) },
-              bytes_total: 0,
-              bytes_transferred: 0,
-              speed_bps: 0,
-            });
-          }
-          handleApiError(e, "Failed to save to remote", "Editor");
-        });
+        })
+          .then(() => {
+            if (showTransfers) {
+              useTransferStore.getState().updateJob({
+                id: jobId,
+                session_id: t.remoteHostTabId!,
+                src_path: "(editor)",
+                dest_path: t.remotePath!,
+                direction: "upload",
+                status: "completed",
+                bytes_total: 1,
+                bytes_transferred: 1,
+                speed_bps: 0,
+              });
+            }
+          })
+          .catch((e: unknown) => {
+            if (showTransfers) {
+              useTransferStore.getState().updateJob({
+                id: jobId,
+                session_id: t.remoteHostTabId!,
+                src_path: "(editor)",
+                dest_path: t.remotePath!,
+                direction: "upload",
+                status: { failed: String(e) },
+                bytes_total: 0,
+                bytes_transferred: 0,
+                speed_bps: 0,
+              });
+            }
+            handleApiError(e, "Failed to save to remote", "Editor");
+          });
       };
       savedCallbacks.current.set(t.id, cb);
     }
@@ -179,10 +172,7 @@ export function EditorStack({
         return (
           <div
             key={t.id}
-            className={cn(
-              "absolute inset-0",
-              !visible && "invisible pointer-events-none",
-            )}
+            className={cn("absolute inset-0", !visible && "invisible pointer-events-none")}
             aria-hidden={!visible}
           >
             <EditorPane

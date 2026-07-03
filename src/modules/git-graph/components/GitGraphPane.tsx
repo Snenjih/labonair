@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Refresh01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
+import { ComputerIcon, GitBranchIcon, Refresh01Icon, ServerStack01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,15 +11,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { GitGraphTab } from "@/modules/tabs/types";
-import { useTabsStore } from "@/modules/tabs/store/tabsStore";
-import { git } from "@/modules/source-control/lib/gitInvoke";
+import { Button } from "@/components/ui/button";
+import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
+import { useHostsStore } from "@/modules/hosts";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { NewBranchDialog } from "@/modules/source-control/components/NewBranchDialog";
+import { isSessionLostError } from "@/modules/source-control/lib/gitErrors";
+import { git } from "@/modules/source-control/lib/gitInvoke";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import type { GitGraphTab } from "@/modules/tabs/types";
 import { useGitGraph } from "../lib/useGitGraph";
 import type { LayoutCommit } from "../types";
-import { GitGraphCanvas } from "./GitGraphCanvas";
 import { CommitDetailPanel } from "./CommitDetailPanel";
+import { GitGraphCanvas } from "./GitGraphCanvas";
 
 function LoadingSkeleton() {
   return (
@@ -71,7 +74,35 @@ function NoRepoState({ path }: { path: string }) {
   );
 }
 
+/** Distinct from `NoRepoState`/`ErrorState` — the repo is fine, the SSH
+ *  session backing it died. Offers a working reconnect when this tab was
+ *  opened against a lazy session (see `lazyEligible` below); otherwise
+ *  points the user at re-establishing the connection manually, since the
+ *  tab was pinned to a specific SFTP tab's session that can't be
+ *  auto-recreated here. */
+function SessionLostState({ error, onReconnect }: { error: string; onReconnect?: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+      <p className="text-sm font-medium text-destructive">Connection Lost</p>
+      <p className="max-w-xs text-xs text-muted-foreground">{error}</p>
+      {onReconnect ? (
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={onReconnect}>
+          Reconnect
+        </Button>
+      ) : (
+        <p className="max-w-xs text-[11px] text-muted-foreground/60">
+          Reopen an SSH terminal or SFTP tab for this host, then refresh.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function isNoRepoError(error: string): boolean {
+  // A dead SSH session is not "no repo" — it needs a distinct
+  // reconnect-aware error state (see `SessionLostState` below), not the
+  // "open a folder with a git repo" empty state.
+  if (isSessionLostError(error)) return false;
   const lower = error.toLowerCase();
   return (
     lower.includes("not a git repo") ||
@@ -92,16 +123,9 @@ function RefreshAge({ date }: { date: Date }) {
   }, []);
 
   const seconds = Math.round((Date.now() - date.getTime()) / 1000);
-  const label =
-    seconds < 60
-      ? `${seconds}s ago`
-      : `${Math.round(seconds / 60)}m ago`;
+  const label = seconds < 60 ? `${seconds}s ago` : `${Math.round(seconds / 60)}m ago`;
 
-  return (
-    <span className="text-[10px] text-muted-foreground/40">
-      {label}
-    </span>
-  );
+  return <span className="text-[10px] text-muted-foreground/40">{label}</span>;
 }
 
 interface Props {
@@ -117,7 +141,10 @@ export function GitGraphPane({ tab }: Props) {
 }
 
 function GitGraphPaneContent({ tab }: Props) {
-  const { commits, isLoading, error, hasMore, loadMore, reload, lastRefreshedAt } = useGitGraph(tab.repositoryPath);
+  const { commits, isLoading, error, hasMore, loadMore, reload, lastRefreshedAt } = useGitGraph(
+    tab.repositoryPath,
+    tab.sessionId,
+  );
   const [selectedCommit, setSelectedCommit] = useState<LayoutCommit | null>(null);
   const openCommitDiffTab = useTabsStore((s) => s.openCommitDiffTab);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -125,6 +152,30 @@ function GitGraphPaneContent({ tab }: Props) {
   const [checkoutConfirmCommit, setCheckoutConfirmCommit] = useState<LayoutCommit | null>(null);
   const [cherryPickConfirmCommit, setCherryPickConfirmCommit] = useState<LayoutCommit | null>(null);
   const [createBranchFromCommit, setCreateBranchFromCommit] = useState<string | null>(null);
+
+  const isRemote = !!tab.hostId;
+  const host = useHostsStore((s) => (tab.hostId ? s.hosts.find((h) => h.id === tab.hostId) : undefined));
+  const hostLabel = host?.name ?? tab.hostId ?? "";
+  const repoName = tab.repositoryPath.split("/").pop() || tab.repositoryPath;
+  const parentPath = tab.repositoryPath.slice(0, tab.repositoryPath.length - repoName.length);
+
+  // Only re-acquire via useLazyExplorerSession when this tab's sessionId was
+  // actually sourced from one — an sftp-tab-sourced session is pinned to a
+  // *specific* SFTP tab and re-acquiring here would stand up an unrelated
+  // second session instead of reconnecting the real one.
+  const lazyHostId = tab.hostId && tab.sessionId === `explorer:${tab.hostId}` ? tab.hostId : null;
+  const lazySession = useLazyExplorerSession(lazyHostId);
+  const prevLazyStatus = useRef(lazySession?.status);
+  useEffect(() => {
+    if (
+      prevLazyStatus.current &&
+      prevLazyStatus.current !== "connected" &&
+      lazySession?.status === "connected"
+    ) {
+      reload();
+    }
+    prevLazyStatus.current = lazySession?.status;
+  }, [lazySession?.status, reload]);
 
   // Auto-dismiss error after 8 seconds
   useEffect(() => {
@@ -142,11 +193,13 @@ function GitGraphPaneContent({ tab }: Props) {
     setIsActioning(true);
     setActionError(null);
     try {
-      await git.checkoutBranch(tab.repositoryPath, checkoutConfirmCommit.hash);
+      await git.checkoutBranch(tab.repositoryPath, checkoutConfirmCommit.hash, tab.sessionId);
       reload();
     } catch (e) {
       setActionError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Checkout Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Checkout Failed", message: String(e) });
     } finally {
       setIsActioning(false);
       setCheckoutConfirmCommit(null);
@@ -162,11 +215,13 @@ function GitGraphPaneContent({ tab }: Props) {
     setIsActioning(true);
     setActionError(null);
     try {
-      await git.cherryPick(tab.repositoryPath, cherryPickConfirmCommit.hash);
+      await git.cherryPick(tab.repositoryPath, cherryPickConfirmCommit.hash, tab.sessionId);
       reload();
     } catch (e) {
       setActionError(String(e));
-      useNotificationStore.getState().addNotification({ type: "error", title: "Cherry-pick Failed", message: String(e) });
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Cherry-pick Failed", message: String(e) });
     } finally {
       setIsActioning(false);
       setCherryPickConfirmCommit(null);
@@ -178,6 +233,9 @@ function GitGraphPaneContent({ tab }: Props) {
   }
 
   if (error) {
+    if (isSessionLostError(error)) {
+      return <SessionLostState error={error} onReconnect={lazySession?.reconnect} />;
+    }
     if (isNoRepoError(error)) {
       return <NoRepoState path={tab.repositoryPath} />;
     }
@@ -193,11 +251,32 @@ function GitGraphPaneContent({ tab }: Props) {
       {/* Graph canvas */}
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Toolbar */}
-        <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-1">
-          <span className="truncate text-[11px] text-muted-foreground">
-            {tab.repositoryPath.split("/").pop()}
-          </span>
-          <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 px-3 py-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="min-w-0 truncate text-[11px]" title={tab.repositoryPath}>
+              <span className="text-muted-foreground/40">{parentPath}</span>
+              <span className="font-medium text-foreground/80">{repoName}</span>
+            </span>
+            <span
+              className="flex shrink-0 items-center gap-1 rounded border border-border/60 px-1.5 py-px font-mono text-[9px] leading-none text-muted-foreground"
+              title={
+                isRemote
+                  ? host
+                    ? `Remote — ${host.username}@${host.host_address}:${host.port}`
+                    : `Remote — ${hostLabel}`
+                  : "Local repository"
+              }
+            >
+              <HugeiconsIcon
+                icon={isRemote ? ServerStack01Icon : ComputerIcon}
+                size={9}
+                strokeWidth={1.75}
+                className="shrink-0"
+              />
+              {isRemote ? hostLabel : "Local"}
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
             {lastRefreshedAt && <RefreshAge date={lastRefreshedAt} />}
             <button
               type="button"
@@ -229,7 +308,9 @@ function GitGraphPaneContent({ tab }: Props) {
           commits={commits}
           onSelectCommit={setSelectedCommit}
           selectedHash={selectedCommit?.hash ?? null}
-          onViewChanges={(commit) => openCommitDiffTab(tab.repositoryPath, commit.hash)}
+          onViewChanges={(commit) =>
+            openCommitDiffTab(tab.repositoryPath, commit.hash, tab.hostId, tab.sessionId)
+          }
           onCheckoutCommit={handleCheckoutCommit}
           onCreateBranchHere={(commit) => setCreateBranchFromCommit(commit.hash)}
           onCherryPick={handleCherryPick}
@@ -255,8 +336,9 @@ function GitGraphPaneContent({ tab }: Props) {
           key={selectedCommit.hash}
           commit={selectedCommit}
           repositoryPath={tab.repositoryPath}
+          sessionId={tab.sessionId}
           onClose={() => setSelectedCommit(null)}
-          onViewChanges={(hash) => openCommitDiffTab(tab.repositoryPath, hash)}
+          onViewChanges={(hash) => openCommitDiffTab(tab.repositoryPath, hash, tab.hostId, tab.sessionId)}
         />
       )}
 
@@ -270,9 +352,8 @@ function GitGraphPaneContent({ tab }: Props) {
             <AlertDialogTitle>Checkout commit?</AlertDialogTitle>
             <AlertDialogDescription>
               You will enter detached HEAD state at{" "}
-              <code className="font-mono text-foreground">{checkoutConfirmCommit?.shortHash}</code>.
-              Any new commits will not be on a named branch. You can create a branch later with
-              "Create Branch Here".
+              <code className="font-mono text-foreground">{checkoutConfirmCommit?.shortHash}</code>. Any new
+              commits will not be on a named branch. You can create a branch later with "Create Branch Here".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -294,9 +375,8 @@ function GitGraphPaneContent({ tab }: Props) {
             <AlertDialogTitle>Cherry-pick commit?</AlertDialogTitle>
             <AlertDialogDescription>
               Apply the changes from commit{" "}
-              <code className="font-mono text-foreground">{cherryPickConfirmCommit?.shortHash}</code>{" "}
-              "{cherryPickConfirmCommit?.subject?.slice(0, 60)}"
-              onto the current branch.
+              <code className="font-mono text-foreground">{cherryPickConfirmCommit?.shortHash}</code> "
+              {cherryPickConfirmCommit?.subject?.slice(0, 60)}" onto the current branch.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -313,6 +393,7 @@ function GitGraphPaneContent({ tab }: Props) {
         open={!!createBranchFromCommit}
         onOpenChange={(open) => !open && setCreateBranchFromCommit(null)}
         repoRoot={tab.repositoryPath}
+        sessionId={tab.sessionId}
         currentBranch=""
         fromRef={createBranchFromCommit ?? undefined}
         onSuccess={() => {

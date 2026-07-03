@@ -9,10 +9,7 @@ export type UseGlobalShortcutsOptions = {
   isDisabled?: (id: ShortcutId, e: KeyboardEvent) => boolean;
 };
 
-export function useGlobalShortcuts(
-  handlers: ShortcutHandlers,
-  options?: UseGlobalShortcutsOptions,
-) {
+export function useGlobalShortcuts(handlers: ShortcutHandlers, options?: UseGlobalShortcutsOptions) {
   const latest = useRef({ handlers, options });
   latest.current = { handlers, options };
 
@@ -35,6 +32,6 @@ export function useGlobalShortcuts(
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overrides]);
 }

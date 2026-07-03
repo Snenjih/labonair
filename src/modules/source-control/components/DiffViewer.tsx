@@ -1,18 +1,8 @@
 import { useEffect, useRef, useMemo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Cancel01Icon,
-  SourceCodeIcon,
-  FilterIcon,
-  LayoutTwoColumnIcon,
-} from "@hugeicons/core-free-icons";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Cancel01Icon, SourceCodeIcon, FilterIcon, LayoutTwoColumnIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 import { useSourceControlStore } from "../store/sourceControlStore";
@@ -25,24 +15,20 @@ function basename(path: string): string {
 }
 
 function getDiffLabel(selectionMode: SelectionMode | null, status: GitStatus | null): string {
-  if (!selectionMode) return '';
+  if (!selectionMode) return "";
   switch (selectionMode.type) {
-    case 'file':
+    case "file":
       return `Diff: ${basename(selectionMode.path)}`;
-    case 'section':
-      if (selectionMode.section === 'staged')
-        return `Staged Changes (${status?.staged.length ?? 0} files)`;
-      if (selectionMode.section === 'unstaged')
-        return `Changes (${status?.unstaged.length ?? 0} files)`;
-      return 'Untracked Files';
-    case 'all': {
+    case "section":
+      if (selectionMode.section === "staged") return `Staged Changes (${status?.staged.length ?? 0} files)`;
+      if (selectionMode.section === "unstaged") return `Changes (${status?.unstaged.length ?? 0} files)`;
+      return "Untracked Files";
+    case "all": {
       const n =
-        (status?.staged.length ?? 0) +
-        (status?.unstaged.length ?? 0) +
-        (status?.untracked.length ?? 0);
+        (status?.staged.length ?? 0) + (status?.unstaged.length ?? 0) + (status?.untracked.length ?? 0);
       return `All Changes (${n} files)`;
     }
-    case 'commit':
+    case "commit":
       return `Commit ${selectionMode.hash.slice(0, 7)}`;
   }
 }
@@ -68,11 +54,9 @@ function DiffLine({ line, isInOurs, isInTheirs }: DiffLineProps) {
       className={cn(
         "font-mono text-[11px] leading-5 px-2 whitespace-pre",
         // Conflict markers take priority
-        isConflictOurs &&
-          "bg-purple-500/15 text-purple-400 font-bold border-l-2 border-purple-500",
+        isConflictOurs && "bg-purple-500/15 text-purple-400 font-bold border-l-2 border-purple-500",
         isConflictSep && "bg-border/50 text-muted-foreground",
-        isConflictTheirs &&
-          "bg-orange-500/15 text-orange-400 font-bold border-l-2 border-orange-500",
+        isConflictTheirs && "bg-orange-500/15 text-orange-400 font-bold border-l-2 border-orange-500",
         // Conflict zone backgrounds (when inside a conflict block)
         !isConflictOurs && !isConflictSep && !isConflictTheirs && isInOurs && "bg-purple-500/5",
         !isConflictOurs && !isConflictSep && !isConflictTheirs && isInTheirs && "bg-orange-500/5",
@@ -100,7 +84,7 @@ function DiffLine({ line, isInOurs, isInTheirs }: DiffLineProps) {
           !isConflictTheirs &&
           !isInOurs &&
           !isInTheirs &&
-          "text-muted-foreground"
+          "text-muted-foreground",
       )}
     >
       {line || " "}
@@ -126,7 +110,7 @@ export function DiffViewer() {
   const selectionStillValid = useMemo(() => {
     if (!selectionMode || !status) return false;
     switch (selectionMode.type) {
-      case 'file':
+      case "file":
         if (selectionMode.staged) {
           return status.staged.some((f) => f.path === selectionMode.path);
         }
@@ -134,11 +118,11 @@ export function DiffViewer() {
           status.unstaged.some((f) => f.path === selectionMode.path) ||
           status.untracked.some((f) => f.path === selectionMode.path)
         );
-      case 'section':
+      case "section":
         return true;
-      case 'all':
+      case "all":
         return true;
-      case 'commit':
+      case "commit":
         return true;
     }
   }, [selectionMode, status]);
@@ -146,7 +130,7 @@ export function DiffViewer() {
   // If the selected file was removed from all lists, clear the diff
   useEffect(() => {
     if (selectionMode && status && !selectionStillValid) {
-      if (selectionMode.type === 'file') {
+      if (selectionMode.type === "file") {
         clearSelectedFile();
       }
     }
@@ -154,19 +138,19 @@ export function DiffViewer() {
 
   // Parse file paths from multi-file diff content
   const filePaths = useMemo(() => {
-    if (!diffContent || diffContent === '__UNTRACKED_ONLY__') return [];
+    if (!diffContent || diffContent === "__UNTRACKED_ONLY__") return [];
     const matches = diffContent.match(/^diff --git a\/.+ b\/(.+)$/gm) ?? [];
     return matches
       .map((line) => {
         const match = /^diff --git a\/.+ b\/(.+)$/.exec(line);
-        return match ? match[1] : '';
+        return match ? match[1] : "";
       })
       .filter(Boolean);
   }, [diffContent]);
 
   const parsedLines = useMemo(
-    () => (diffContent && diffContent !== '__UNTRACKED_ONLY__' ? parseDiffLines(diffContent) : []),
-    [diffContent]
+    () => (diffContent && diffContent !== "__UNTRACKED_ONLY__" ? parseDiffLines(diffContent) : []),
+    [diffContent],
   );
 
   const virtualizer = useVirtualizer({
@@ -179,22 +163,21 @@ export function DiffViewer() {
   function scrollToFile(fp: string) {
     const idx = parsedLines.findIndex((l) => l.fileAnchor === fp);
     if (idx !== -1) {
-      virtualizer.scrollToIndex(idx, { align: 'start' });
+      virtualizer.scrollToIndex(idx, { align: "start" });
     }
   }
 
   if (!selectionMode) return null;
 
   const isBinary = diffContent?.includes("Binary files") ?? false;
-  const isTruncated =
-    diffContent?.includes("[truncated]") || diffContent?.includes("[diff too large]");
+  const isTruncated = diffContent?.includes("[truncated]") || diffContent?.includes("[diff too large]");
 
-  const isMultiFile = selectionMode.type !== 'file' && filePaths.length > 1;
+  const isMultiFile = selectionMode.type !== "file" && filePaths.length > 1;
   const showConflictBadge =
-    selectionMode.type === 'file' &&
+    selectionMode.type === "file" &&
     status?.hasConflicts &&
-    (status.staged.some((f) => f.path === selectionMode.path && f.indexStatus === 'U') ||
-      status.unstaged.some((f) => f.path === selectionMode.path && f.worktreeStatus === 'U'));
+    (status.staged.some((f) => f.path === selectionMode.path && f.indexStatus === "U") ||
+      status.unstaged.some((f) => f.path === selectionMode.path && f.worktreeStatus === "U"));
 
   return (
     <div className="border-t border-border/60">
@@ -226,7 +209,7 @@ export function DiffViewer() {
                   "flex h-5 w-5 items-center justify-center rounded transition-colors",
                   ignoreWhitespace
                     ? "bg-accent text-foreground"
-                    : "text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+                    : "text-muted-foreground/60 hover:bg-muted hover:text-foreground",
                 )}
                 onClick={() => setIgnoreWhitespace(!ignoreWhitespace)}
               >
@@ -245,13 +228,11 @@ export function DiffViewer() {
                 type="button"
                 className={cn(
                   "flex h-5 w-5 items-center justify-center rounded transition-colors",
-                  diffViewMode === 'split'
+                  diffViewMode === "split"
                     ? "bg-accent text-foreground"
-                    : "text-muted-foreground/60 hover:bg-muted hover:text-foreground"
+                    : "text-muted-foreground/60 hover:bg-muted hover:text-foreground",
                 )}
-                onClick={() =>
-                  setDiffViewMode(diffViewMode === 'split' ? 'unified' : 'split')
-                }
+                onClick={() => setDiffViewMode(diffViewMode === "split" ? "unified" : "split")}
               >
                 <HugeiconsIcon icon={LayoutTwoColumnIcon} size={11} strokeWidth={2} />
               </button>
@@ -295,7 +276,7 @@ export function DiffViewer() {
           <Skeleton className="h-4 w-5/6" />
           <Skeleton className="h-4 w-2/3" />
         </div>
-      ) : diffContent === '__UNTRACKED_ONLY__' ? (
+      ) : diffContent === "__UNTRACKED_ONLY__" ? (
         <div className="flex flex-col items-center gap-2 px-4 py-6 text-center">
           <p className="text-[12px] text-muted-foreground/60">
             Untracked files are not shown in the diff preview.
@@ -305,14 +286,10 @@ export function DiffViewer() {
           </p>
         </div>
       ) : isBinary ? (
-        <div className="px-3 py-4 text-center text-[11px] text-muted-foreground/60">
-          Binary file changed
-        </div>
+        <div className="px-3 py-4 text-center text-[11px] text-muted-foreground/60">Binary file changed</div>
       ) : !diffContent ? (
-        <div className="px-3 py-4 text-center text-[11px] text-muted-foreground/60">
-          No diff available
-        </div>
-      ) : diffViewMode === 'split' ? (
+        <div className="px-3 py-4 text-center text-[11px] text-muted-foreground/60">No diff available</div>
+      ) : diffViewMode === "split" ? (
         <SideBySideDiff diffContent={diffContent} />
       ) : (
         <div ref={scrollRef} className="max-h-[300px] overflow-auto">
@@ -323,7 +300,7 @@ export function DiffViewer() {
           )}
           <div
             className="overflow-x-auto"
-            style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}
+            style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}
           >
             {virtualizer.getVirtualItems().map((virtualItem) => {
               const entry = parsedLines[virtualItem.index];
@@ -331,13 +308,9 @@ export function DiffViewer() {
                 <div
                   key={virtualItem.key}
                   id={entry.fileAnchor ? `diff-file-${encodeURIComponent(entry.fileAnchor)}` : undefined}
-                  style={{ position: 'absolute', top: virtualItem.start, width: '100%' }}
+                  style={{ position: "absolute", top: virtualItem.start, width: "100%" }}
                 >
-                  <DiffLine
-                    line={entry.line}
-                    isInOurs={entry.isInOurs}
-                    isInTheirs={entry.isInTheirs}
-                  />
+                  <DiffLine line={entry.line} isInOurs={entry.isInOurs} isInTheirs={entry.isInTheirs} />
                 </div>
               );
             })}
@@ -370,9 +343,15 @@ function parseDiffLines(diffContent: string): ParsedDiffLine[] {
     const lineIsInOurs = isInOurs;
     const lineIsInTheirs = isInTheirs;
 
-    if (enterOurs) { isInOurs = true; isInTheirs = false; }
-    else if (enterSep && isInOurs) { isInOurs = false; isInTheirs = true; }
-    else if (enterTheirs && isInTheirs) { isInTheirs = false; }
+    if (enterOurs) {
+      isInOurs = true;
+      isInTheirs = false;
+    } else if (enterSep && isInOurs) {
+      isInOurs = false;
+      isInTheirs = true;
+    } else if (enterTheirs && isInTheirs) {
+      isInTheirs = false;
+    }
 
     const match = /^diff --git a\/.+ b\/(.+)$/.exec(line);
     if (match) {

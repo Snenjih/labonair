@@ -62,7 +62,18 @@ pub fn open_shell_channel(
     channel
         .request_pty("xterm-256color", None, Some((cols, rows, 0, 0)))
         .map_err(|e| e.to_string())?;
-    channel.shell().map_err(|e| e.to_string())?;
+    // Installs the same OSC7/133 hooks the local PTY gets (see
+    // shell_integration::build_bootstrap_script) so the sidebar explorer and
+    // cwd breadcrumb can follow `cd` on a remote shell too. Falls back to a
+    // bare, non-integrated login shell if the bootstrap exec itself can't be
+    // requested (e.g. a server that only permits a fixed "shell" request) —
+    // matches the local `Shell::Other` behavior of degrading gracefully
+    // rather than failing the connection.
+    let bootstrap = super::shell_integration::build_bootstrap_script();
+    let cmd = format!("/bin/sh -c {}", super::shell::shell_quote(&bootstrap));
+    if channel.exec(&cmd).is_err() {
+        channel.shell().map_err(|e| e.to_string())?;
+    }
 
     // Non-blocking so the reader never holds the session lock indefinitely.
     sess.0.set_blocking(false);

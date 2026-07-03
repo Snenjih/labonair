@@ -4,27 +4,13 @@ import {
   ConversationEmptyState,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import {
-  Message,
-  MessageContent,
-  MessageResponse,
-} from "@/components/ai-elements/message";
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from "@/components/ai-elements/reasoning";
+import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
+import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai-elements/reasoning";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { SLASH_COMMANDS, LABONAIR_CMD_RE } from "../lib/slashCommands";
 import { ToolCallChip } from "./ToolCallChip";
 import { Spinner } from "@/components/ui/spinner";
-import type {
-  ChatStatus,
-  DynamicToolUIPart,
-  ToolUIPart,
-  UIMessage,
-  UIMessagePart,
-} from "ai";
+import type { ChatStatus, DynamicToolUIPart, ToolUIPart, UIMessage, UIMessagePart } from "ai";
 import { memo, useCallback } from "react";
 import { AiToolApproval } from "./AiToolApproval";
 
@@ -39,18 +25,9 @@ function CommandSnippet({ name }: { name: string }) {
   }
   return (
     <div className="inline-flex max-w-full items-center gap-2 rounded-md border border-border/50 bg-muted/40 px-2 py-1">
-      <HugeiconsIcon
-        icon={meta.icon}
-        size={12}
-        strokeWidth={1.75}
-        className="shrink-0 text-foreground"
-      />
-      <span className="font-mono text-[11px] text-foreground">
-        {meta.invocation}
-      </span>
-      <span className="truncate text-[11px] text-muted-foreground">
-        {meta.label}
-      </span>
+      <HugeiconsIcon icon={meta.icon} size={12} strokeWidth={1.75} className="shrink-0 text-foreground" />
+      <span className="font-mono text-[11px] text-foreground">{meta.invocation}</span>
+      <span className="truncate text-[11px] text-muted-foreground">{meta.label}</span>
     </div>
   );
 }
@@ -73,13 +50,7 @@ type Props = {
   stop: () => void | PromiseLike<void>;
 };
 
-export function AiChatView({
-  messages,
-  status,
-  error,
-  clearError,
-  addToolApprovalResponse,
-}: Props) {
+export function AiChatView({ messages, status, error, clearError, addToolApprovalResponse }: Props) {
   const isBusy = status === "submitted" || status === "streaming";
   const lastMessage = messages[messages.length - 1];
   const showSpinner = isBusy && lastMessage?.role === "user";
@@ -117,9 +88,7 @@ export function AiChatView({
         {error && (
           <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <div className="font-medium">Something went wrong.</div>
-            <div className="mt-0.5 leading-relaxed opacity-90">
-              {error.message}
-            </div>
+            <div className="mt-0.5 leading-relaxed opacity-90">{error.message}</div>
             <button
               type="button"
               onClick={clearError}
@@ -156,9 +125,7 @@ const RenderedMessage = memo(function RenderedMessage({
       <Message from="user">
         <MessageContent>
           {commandName ? <CommandSnippet name={commandName} /> : null}
-          {text ? (
-            <p className="whitespace-pre-wrap wrap-break-word">{text}</p>
-          ) : null}
+          {text ? <p className="whitespace-pre-wrap wrap-break-word">{text}</p> : null}
         </MessageContent>
       </Message>
     );
@@ -190,34 +157,20 @@ const RenderedPart = memo(function RenderedPart({
   onApproval: (id: string, approved: boolean) => void;
 }) {
   if (part.type === "text") {
-    return (
-      <MessageResponse>
-        {(part as unknown as { text: string }).text}
-      </MessageResponse>
-    );
+    return <MessageResponse>{(part as unknown as { text: string }).text}</MessageResponse>;
   }
 
   if (part.type === "reasoning") {
     return (
       <Reasoning>
         <ReasoningTrigger />
-        <ReasoningContent>
-          {(part as unknown as { text: string }).text}
-        </ReasoningContent>
+        <ReasoningContent>{(part as unknown as { text: string }).text}</ReasoningContent>
       </Reasoning>
     );
   }
 
-  if (
-    part.type === "dynamic-tool" ||
-    (typeof part.type === "string" && part.type.startsWith("tool-"))
-  ) {
-    return (
-      <RenderedTool
-        part={part as unknown as AnyToolPart}
-        onApproval={onApproval}
-      />
-    );
+  if (part.type === "dynamic-tool" || (typeof part.type === "string" && part.type.startsWith("tool-"))) {
+    return <RenderedTool part={part as unknown as AnyToolPart} onApproval={onApproval} />;
   }
 
   return null;
@@ -230,10 +183,7 @@ const RenderedTool = memo(function RenderedTool({
   part: AnyToolPart;
   onApproval: (id: string, approved: boolean) => void;
 }) {
-  const toolName =
-    part.type === "dynamic-tool"
-      ? part.toolName
-      : part.type.replace(/^tool-/, "");
+  const toolName = part.type === "dynamic-tool" ? part.toolName : part.type.replace(/^tool-/, "");
 
   if (part.state === "approval-requested") {
     return (

@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { git } from "@/modules/source-control/lib/gitInvoke";
 import { cn } from "@/lib/utils";
+import { git } from "@/modules/source-control/lib/gitInvoke";
 
 interface Props {
   repositoryPath: string;
   hash: string;
+  sessionId?: string;
 }
 
 function DiffLine({ line, isInOurs, isInTheirs }: { line: string; isInOurs: boolean; isInTheirs: boolean }) {
@@ -59,7 +60,7 @@ function basename(path: string): string {
   return parts.length ? parts[parts.length - 1] : path;
 }
 
-export function CommitDiffTabPane({ repositoryPath, hash }: Props) {
+export function CommitDiffTabPane({ repositoryPath, hash, sessionId }: Props) {
   const [diffContent, setDiffContent] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -68,11 +69,11 @@ export function CommitDiffTabPane({ repositoryPath, hash }: Props) {
     setDiffContent(null);
     setIsLoading(true);
     git
-      .getCommitDiff(repositoryPath, hash)
+      .getCommitDiff(repositoryPath, hash, sessionId)
       .then((content) => setDiffContent(content))
       .catch(() => setDiffContent(null))
       .finally(() => setIsLoading(false));
-  }, [repositoryPath, hash]);
+  }, [repositoryPath, hash, sessionId]);
 
   const filePaths = useMemo(() => {
     if (!diffContent) return [];
@@ -107,8 +108,7 @@ export function CommitDiffTabPane({ repositoryPath, hash }: Props) {
       {/* Header */}
       <div className="flex h-9 shrink-0 items-center gap-3 border-b border-border/50 px-3">
         <span className="text-[11px] font-medium text-foreground/80">
-          Changes in{" "}
-          <code className="font-mono text-foreground">{shortHash}</code>
+          Changes in <code className="font-mono text-foreground">{shortHash}</code>
         </span>
         {filePaths.length > 0 && (
           <span className="text-[10px] text-muted-foreground/60">{filePaths.length} files changed</span>
@@ -178,9 +178,7 @@ export function CommitDiffTabPane({ repositoryPath, hash }: Props) {
                     </div>
                   );
                 }
-                return (
-                  <DiffLine key={i} line={line} isInOurs={isInOurs} isInTheirs={isInTheirs} />
-                );
+                return <DiffLine key={i} line={line} isInOurs={isInOurs} isInTheirs={isInTheirs} />;
               });
             })()}
           </div>

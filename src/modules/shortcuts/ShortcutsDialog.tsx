@@ -1,10 +1,4 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { SHORTCUTS, SHORTCUT_GROUPS } from "./shortcuts";
 import { useKeybindsStore } from "./lib/useKeybindsStore";
@@ -22,9 +16,7 @@ export function ShortcutsDialog({ open, onOpenChange }: Props) {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
-          <DialogDescription>
-            Quick reference for Labonair controls.
-          </DialogDescription>
+          <DialogDescription>Quick reference for Labonair controls.</DialogDescription>
         </DialogHeader>
 
         <div className="flex max-h-[70vh] flex-col gap-5 overflow-y-auto pr-2">
@@ -33,20 +25,13 @@ export function ShortcutsDialog({ open, onOpenChange }: Props) {
             if (items.length === 0) return null;
             return (
               <section key={group} className="flex flex-col gap-2">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  {group}
-                </h3>
+                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{group}</h3>
                 <ul className="flex flex-col divide-y divide-border/60">
                   {items.map((s) => {
                     const displayKeys = getEffectiveDisplayKeys(s.id, s.keys);
                     return (
-                      <li
-                        key={s.id}
-                        className="flex items-center justify-between py-2"
-                      >
-                        <span className="text-sm text-foreground/90">
-                          {s.label}
-                        </span>
+                      <li key={s.id} className="flex items-center justify-between py-2">
+                        <span className="text-sm text-foreground/90">{s.label}</span>
                         {displayKeys.length === 0 ? (
                           <span className="text-xs text-muted-foreground/50">—</span>
                         ) : (

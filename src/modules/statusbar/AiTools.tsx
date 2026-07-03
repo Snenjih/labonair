@@ -6,11 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import {
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-  Mic01Icon,
-} from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, ArrowUp01Icon, Mic01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
@@ -46,12 +42,7 @@ export function AiTools({ aiOpen, canSubmit, onOpenAi, onSubmit }: Props) {
           <ToolButton title="Voice input">
             <HugeiconsIcon icon={Mic01Icon} size={14} strokeWidth={1.75} />
           </ToolButton>
-          <Button
-            size="sm"
-            disabled={!canSubmit}
-            onClick={onSubmit}
-            className="ml-1 h-6 px-1.5"
-          >
+          <Button size="sm" disabled={!canSubmit} onClick={onSubmit} className="ml-1 h-6 px-1.5">
             <HugeiconsIcon icon={ArrowUp01Icon} size={13} strokeWidth={2} />
           </Button>
         </motion.div>
@@ -78,13 +69,7 @@ export function AiTools({ aiOpen, canSubmit, onOpenAi, onSubmit }: Props) {
   );
 }
 
-function ToolButton({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function ToolButton({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Button
       type="button"
@@ -109,21 +94,12 @@ function ModelSelector() {
           className="h-7 gap-1 rounded-md px-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           {selected.label}
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            size={12}
-            strokeWidth={2}
-            className="opacity-70"
-          />
+          <HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} className="opacity-70" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {MODELS.map((m) => (
-          <DropdownMenuItem
-            key={m.id}
-            onSelect={() => setSelected(m)}
-            className="text-xs"
-          >
+          <DropdownMenuItem key={m.id} onSelect={() => setSelected(m)} className="text-xs">
             {m.label}
           </DropdownMenuItem>
         ))}

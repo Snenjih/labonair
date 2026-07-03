@@ -76,12 +76,12 @@ function basename(p: string): string {
 
 function normalize(p: string): string {
   return p
-    .replace(/\\/g, "/")          // backslash → forward slash
-    .replace(/^\/\?\//, "/")      // strip UNC prefix (//?/)
-    .replace(/^[a-zA-Z]:/, "")    // strip Windows drive letter (C:)
-    .replace(/:[^/]+/g, "")       // strip NTFS alternate data streams (:stream) — applied after drive removal
+    .replace(/\\/g, "/") // backslash → forward slash
+    .replace(/^\/\?\//, "/") // strip UNC prefix (//?/)
+    .replace(/^[a-zA-Z]:/, "") // strip Windows drive letter (C:)
+    .replace(/:[^/]+/g, "") // strip NTFS alternate data streams (:stream) — applied after drive removal
     .replace(/[. ]+(?=\/|$)/g, "") // strip trailing dots/spaces per segment (Windows discards them)
-    .toLowerCase();               // case-insensitive matching
+    .toLowerCase(); // case-insensitive matching
 }
 
 export function checkReadable(path: string): SafetyResult {

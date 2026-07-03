@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useSourceControlStore } from "../store/sourceControlStore";
+import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
+import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
 import { useGitStatus } from "../lib/useGitStatus";
+import { useSourceControlStore } from "../store/sourceControlStore";
 import { BranchBar } from "./BranchBar";
 import { CommitForm } from "./CommitForm";
 import { NoRepoState } from "./NoRepoState";
@@ -9,15 +11,26 @@ import { TrackedSection } from "./TrackedSection";
 import { UntrackedSection } from "./UntrackedSection";
 
 interface SourceControlPanelProps {
-  rootPath: string | null;
-  onOpenGitGraph: (repoPath: string, branch: string) => void;
+  target: ExplorerTarget;
+  onOpenGitGraph: (repoPath: string, branch: string, hostId?: string, sessionId?: string) => void;
 }
 
-export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPanelProps) {
-  const { refresh } = useGitStatus(rootPath);
+export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPanelProps) {
+  const { refresh } = useGitStatus(target);
+  const rootPath = target.path;
+
+  // A lazy SSH session (as opposed to one owned by an open SFTP tab) is only
+  // ref-counted/reconnected for as long as *something* holds a reference to
+  // it via this hook — previously only the sidebar File Explorer did, so
+  // switching to the Source Control panel let the session idle-time-out
+  // while it was the only thing being viewed. Mirrors StatusBar.tsx's
+  // identical pattern for the breadcrumb.
+  const lazyHostId = target.type === "remote" && target.source === "lazy-session" ? target.hostId : null;
+  const lazySession = useLazyExplorerSession(lazyHostId);
 
   const isRepo = useSourceControlStore((s) => s.isRepo);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
   const status = useSourceControlStore((s) => s.status);
   const diffStats = useSourceControlStore((s) => s.diffStats);
   const error = useSourceControlStore((s) => s.error);
@@ -36,7 +49,15 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
   const totalRemoved = diffStats.reduce((sum, s) => sum + s.removed, 0);
 
   if (!isRepo) {
-    return <NoRepoState rootPath={rootPath} onRefresh={refresh} errorMessage={error ?? undefined} />;
+    return (
+      <NoRepoState
+        rootPath={rootPath}
+        sessionId={sessionId ?? undefined}
+        onRefresh={refresh}
+        errorMessage={error ?? undefined}
+        onReconnect={lazySession?.reconnect}
+      />
+    );
   }
 
   return (
@@ -48,8 +69,8 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
         <span className="text-[11px] text-muted-foreground/60">
           {totalChanges > 0 ? (
             <>
-              <span className="font-semibold text-foreground/80">{totalChanges}</span>
-              {" "}Change{totalChanges !== 1 ? "s" : ""}
+              <span className="font-semibold text-foreground/80">{totalChanges}</span> Change
+              {totalChanges !== 1 ? "s" : ""}
             </>
           ) : (
             "No changes"
@@ -57,12 +78,8 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
         </span>
         {(totalAdded > 0 || totalRemoved > 0) && (
           <span className="flex items-center gap-1.5 text-[10px] tabular-nums">
-            {totalAdded > 0 && (
-              <span className="font-semibold text-success">+{totalAdded}</span>
-            )}
-            {totalRemoved > 0 && (
-              <span className="font-semibold text-error">−{totalRemoved}</span>
-            )}
+            {totalAdded > 0 && <span className="font-semibold text-success">+{totalAdded}</span>}
+            {totalRemoved > 0 && <span className="font-semibold text-error">−{totalRemoved}</span>}
           </span>
         )}
       </div>
@@ -70,6 +87,16 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
       {status?.hasConflicts && (
         <div className="mx-3 my-1 rounded border border-warning/30 bg-warning/10 px-2 py-1 text-[10px] text-warning">
           Merge conflicts detected — resolve before committing.
+        </div>
+      )}
+
+      {/* Non-fatal: repo is known-good (isRepo=true), but the most recent
+       *  poll tick failed (e.g. the SSH session dropped mid-refresh) — shown
+       *  inline instead of tearing down to NoRepoState, since the repo
+       *  itself hasn't gone anywhere. Self-clears on the next successful poll. */}
+      {error && (
+        <div className="mx-3 my-1 rounded border border-error/30 bg-error/10 px-2 py-1 text-[10px] text-error">
+          {error}
         </div>
       )}
 
@@ -81,10 +108,7 @@ export function SourceControlPanel({ rootPath, onOpenGitGraph }: SourceControlPa
             unstaged={status?.unstaged ?? []}
             onRefresh={refresh}
           />
-          <UntrackedSection
-            files={status?.untracked ?? []}
-            onRefresh={refresh}
-          />
+          <UntrackedSection files={status?.untracked ?? []} onRefresh={refresh} />
         </div>
       </ScrollArea>
 

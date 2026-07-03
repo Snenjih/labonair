@@ -103,7 +103,11 @@ const DEFAULT_FORM: FormState = {
 
 function parseTunnels(raw?: string): TunnelConfig[] {
   if (!raw) return [];
-  try { return JSON.parse(raw) as TunnelConfig[]; } catch { return []; }
+  try {
+    return JSON.parse(raw) as TunnelConfig[];
+  } catch {
+    return [];
+  }
 }
 
 function newTunnel(): TunnelConfig {
@@ -119,7 +123,7 @@ function newTunnel(): TunnelConfig {
 export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNavigateToCredentials }: Props) {
   const isNew = hostId === "__new__" || hostId === null;
 
-  const host = useHostsStore((s) => (isNew ? null : s.hosts.find((h) => h.id === hostId) ?? null));
+  const host = useHostsStore((s) => (isNew ? null : (s.hosts.find((h) => h.id === hostId) ?? null)));
   const hosts = useHostsStore((s) => s.hosts);
   const groups = useHostsStore((s) => s.groups);
   const snippets = useCommandSnippetsStore((s) => s.snippets);
@@ -131,9 +135,11 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
   const credentials = useCredentialsStore((s) => s.credentials);
   const credsFetched = useCredentialsStore((s) => s.hasFetched);
   const fetchCredentials = useCredentialsStore((s) => s.fetchCredentials);
-  useEffect(() => { if (!credsFetched) void fetchCredentials(); }, [credsFetched, fetchCredentials]);
+  useEffect(() => {
+    if (!credsFetched) void fetchCredentials();
+  }, [credsFetched, fetchCredentials]);
 
-  const [form, setForm] = useState<FormState>(isNew ? DEFAULT_FORM : (host ? hostToForm(host) : DEFAULT_FORM));
+  const [form, setForm] = useState<FormState>(isNew ? DEFAULT_FORM : host ? hostToForm(host) : DEFAULT_FORM);
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -232,13 +238,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
     onClose();
   }, [host, deleteHost, onClose]);
 
-
-  const f = (
-    label: string,
-    key: keyof FormState,
-    type = "text",
-    placeholder = "",
-  ) => (
+  const f = (label: string, key: keyof FormState, type = "text", placeholder = "") => (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <Input
@@ -286,7 +286,12 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
           <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => newSshTab(host.id, form.name)}>
             Connect SSH
           </Button>
-          <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => newSftpTab(host.id, form.name)}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 h-8 text-xs"
+            onClick={() => newSftpTab(host.id, form.name)}
+          >
             Open SFTP
           </Button>
         </div>
@@ -295,10 +300,18 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
       {/* Tabs */}
       <Tabs defaultValue="general" className="flex flex-col flex-1 overflow-hidden">
         <TabsList className="mx-4 mt-3 mb-0 shrink-0 grid grid-cols-4">
-          <TabsTrigger value="general" className="text-xs">General</TabsTrigger>
-          <TabsTrigger value="ssh" className="text-xs">SSH</TabsTrigger>
-          <TabsTrigger value="sftp" className="text-xs">SFTP</TabsTrigger>
-          <TabsTrigger value="tunnels" className="text-xs">Tunnels</TabsTrigger>
+          <TabsTrigger value="general" className="text-xs">
+            General
+          </TabsTrigger>
+          <TabsTrigger value="ssh" className="text-xs">
+            SSH
+          </TabsTrigger>
+          <TabsTrigger value="sftp" className="text-xs">
+            SFTP
+          </TabsTrigger>
+          <TabsTrigger value="tunnels" className="text-xs">
+            Tunnels
+          </TabsTrigger>
         </TabsList>
 
         {/* GENERAL TAB */}
@@ -308,12 +321,8 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Connection</p>
             {f("Display Name", "name", "text", "My Server")}
             <div className="flex gap-2">
-              <div className="flex-1">
-                {f("Host / IP Address", "host_address", "text", "192.168.1.1")}
-              </div>
-              <div className="w-20">
-                {f("Port", "port", "number", "22")}
-              </div>
+              <div className="flex-1">{f("Host / IP Address", "host_address", "text", "192.168.1.1")}</div>
+              <div className="w-20">{f("Port", "port", "number", "22")}</div>
             </div>
           </section>
 
@@ -331,7 +340,8 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 <option value="">None</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.icon ? `${g.icon} ` : ""}{g.name}
+                    {g.icon ? `${g.icon} ` : ""}
+                    {g.name}
                   </option>
                 ))}
               </select>
@@ -342,21 +352,28 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 <p className="text-[11px] text-muted-foreground">Always show this host first</p>
               </div>
               <button
-                onClick={() => { setForm((d) => ({ ...d, pin_to_top: !d.pin_to_top })); setTimeout(handleBlur, 0); }}
+                onClick={() => {
+                  setForm((d) => ({ ...d, pin_to_top: !d.pin_to_top }));
+                  setTimeout(handleBlur, 0);
+                }}
                 className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
                   form.pin_to_top ? "bg-primary" : "bg-muted"
                 }`}
               >
-                <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-primary-foreground shadow transition-transform ${
-                  form.pin_to_top ? "translate-x-4" : "translate-x-0"
-                }`} />
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-primary-foreground shadow transition-transform ${
+                    form.pin_to_top ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
               </button>
             </div>
           </section>
 
           {/* Authentication */}
           <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Authentication</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Authentication
+            </p>
             {f("Username", "username", "text", "root")}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Auth Method</Label>
@@ -364,14 +381,23 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 {(["password", "key", "credential", "none"] as const).map((method) => (
                   <button
                     key={method}
-                    onClick={() => { setForm((d) => ({ ...d, auth_method: method })); setTimeout(handleBlur, 0); }}
+                    onClick={() => {
+                      setForm((d) => ({ ...d, auth_method: method }));
+                      setTimeout(handleBlur, 0);
+                    }}
                     className={`flex-1 rounded-md border py-1.5 text-xs font-medium transition-all ${
                       form.auth_method === method
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-border bg-background text-muted-foreground hover:bg-accent"
                     }`}
                   >
-                    {method === "password" ? "Password" : method === "key" ? "SSH Key" : method === "credential" ? "Credential" : "None"}
+                    {method === "password"
+                      ? "Password"
+                      : method === "key"
+                        ? "SSH Key"
+                        : method === "credential"
+                          ? "Credential"
+                          : "None"}
                   </button>
                 ))}
               </div>
@@ -386,12 +412,12 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Private Key Path</Label>
                 <Input
-                    placeholder="~/.ssh/id_rsa"
-                    value={form.private_key_path}
-                    onChange={(e) => setForm((d) => ({ ...d, private_key_path: e.target.value }))}
-                    onBlur={handleBlur}
-                    className="h-8 text-sm bg-background"
-                  />
+                  placeholder="~/.ssh/id_rsa"
+                  value={form.private_key_path}
+                  onChange={(e) => setForm((d) => ({ ...d, private_key_path: e.target.value }))}
+                  onBlur={handleBlur}
+                  className="h-8 text-sm bg-background"
+                />
               </div>
             )}
 
@@ -400,7 +426,10 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 <Label className="text-xs text-muted-foreground">Credential</Label>
                 <select
                   value={form.credential_id}
-                  onChange={(e) => { setForm((d) => ({ ...d, credential_id: e.target.value })); setTimeout(handleBlur, 0); }}
+                  onChange={(e) => {
+                    setForm((d) => ({ ...d, credential_id: e.target.value }));
+                    setTimeout(handleBlur, 0);
+                  }}
                   className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">— Select a credential —</option>
@@ -420,7 +449,9 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   </button>
                 )}
                 {credentials.length === 0 && (
-                  <p className="text-[11px] text-muted-foreground/70">No credentials yet. Create one first.</p>
+                  <p className="text-[11px] text-muted-foreground/70">
+                    No credentials yet. Create one first.
+                  </p>
                 )}
               </div>
             )}
@@ -436,14 +467,18 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   onBlur={handleBlur}
                   className="h-8 text-sm bg-background"
                 />
-                <p className="text-[11px] text-muted-foreground/70">Stored securely in local encrypted store</p>
+                <p className="text-[11px] text-muted-foreground/70">
+                  Stored securely in local encrypted store
+                </p>
               </div>
             )}
           </section>
 
           {/* Jump Host */}
           <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Jump Host (ProxyJump)</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Jump Host (ProxyJump)
+            </p>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Via Jump Host</Label>
               <select
@@ -471,7 +506,9 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
 
           {/* Notes */}
           <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes / Runbook</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Notes / Runbook
+            </p>
             <div className="space-y-1.5">
               <textarea
                 placeholder="Configuration notes, credentials hints, runbook steps…"
@@ -488,9 +525,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
           {isNew ? (
             <div className="space-y-2">
               {error && (
-                <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  {error}
-                </p>
+                <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>
               )}
               <Button
                 size="sm"
@@ -512,7 +547,8 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete "{form.name}"?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently remove the host and its stored credentials. This action cannot be undone.
+                    This will permanently remove the host and its stored credentials. This action cannot be
+                    undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -591,7 +627,9 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
           </section>
 
           <section className="rounded-lg border border-border bg-card p-4 space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Startup Snippet</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Startup Snippet
+            </p>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Snippet</Label>
               <select
@@ -668,17 +706,35 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
         <TabsContent value="tunnels" className="flex-1 overflow-y-auto px-4 py-4 space-y-3 mt-0">
           {tunnels.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground/50">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-muted-foreground/50"
+              >
                 <path d="M12 5v14M5 12h14M3 3l18 18" />
               </svg>
               <p className="text-xs text-muted-foreground">No tunnels configured</p>
-              <p className="text-[11px] text-muted-foreground/60 max-w-[200px]">Local port forwarding routes traffic through this SSH connection</p>
+              <p className="text-[11px] text-muted-foreground/60 max-w-[200px]">
+                Local port forwarding routes traffic through this SSH connection
+              </p>
               {!isNew && (
-                <Button size="sm" variant="outline" className="h-7 text-xs mt-1" onClick={() => {
-                  const updated = [...tunnels, newTunnel()];
-                  setTunnels(updated);
-                  setTimeout(handleBlur, 0);
-                }}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs mt-1"
+                  onClick={() => {
+                    const updated = [...tunnels, newTunnel()];
+                    setTunnels(updated);
+                    setTimeout(handleBlur, 0);
+                  }}
+                >
                   Add Tunnel
                 </Button>
               )}
@@ -690,14 +746,18 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   <div key={tunnel.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
                     <div className="flex items-center gap-1.5">
                       <div className="space-y-1 w-20">
-                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Local Port</Label>
+                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          Local Port
+                        </Label>
                         <Input
                           type="number"
                           min={1}
                           max={65535}
                           value={tunnel.local_port}
                           onChange={(e) => {
-                            const updated = tunnels.map((t, idx) => idx === i ? { ...t, local_port: parseInt(e.target.value) || t.local_port } : t);
+                            const updated = tunnels.map((t, idx) =>
+                              idx === i ? { ...t, local_port: parseInt(e.target.value) || t.local_port } : t,
+                            );
                             setTunnels(updated);
                           }}
                           onBlur={handleBlur}
@@ -706,13 +766,17 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                       </div>
                       <div className="pt-5 text-muted-foreground text-sm select-none">→</div>
                       <div className="space-y-1 flex-1">
-                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Remote Host</Label>
+                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          Remote Host
+                        </Label>
                         <Input
                           type="text"
                           placeholder="127.0.0.1"
                           value={tunnel.remote_host}
                           onChange={(e) => {
-                            const updated = tunnels.map((t, idx) => idx === i ? { ...t, remote_host: e.target.value } : t);
+                            const updated = tunnels.map((t, idx) =>
+                              idx === i ? { ...t, remote_host: e.target.value } : t,
+                            );
                             setTunnels(updated);
                           }}
                           onBlur={handleBlur}
@@ -720,14 +784,20 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                         />
                       </div>
                       <div className="space-y-1 w-20">
-                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Remote Port</Label>
+                        <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                          Remote Port
+                        </Label>
                         <Input
                           type="number"
                           min={1}
                           max={65535}
                           value={tunnel.remote_port}
                           onChange={(e) => {
-                            const updated = tunnels.map((t, idx) => idx === i ? { ...t, remote_port: parseInt(e.target.value) || t.remote_port } : t);
+                            const updated = tunnels.map((t, idx) =>
+                              idx === i
+                                ? { ...t, remote_port: parseInt(e.target.value) || t.remote_port }
+                                : t,
+                            );
                             setTunnels(updated);
                           }}
                           onBlur={handleBlur}
@@ -743,8 +813,21 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                         className="pt-5 text-muted-foreground hover:text-destructive transition-colors"
                         title="Remove tunnel"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v6M14 11v6" />
+                          <path d="M9 6V4h6v2" />
                         </svg>
                       </button>
                     </div>
@@ -752,11 +835,16 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 ))}
               </div>
               {!isNew && (
-                <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={() => {
-                  const updated = [...tunnels, newTunnel()];
-                  setTunnels(updated);
-                  setTimeout(handleBlur, 0);
-                }}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-7 text-xs"
+                  onClick={() => {
+                    const updated = [...tunnels, newTunnel()];
+                    setTunnels(updated);
+                    setTimeout(handleBlur, 0);
+                  }}
+                >
                   + Add Tunnel
                 </Button>
               )}

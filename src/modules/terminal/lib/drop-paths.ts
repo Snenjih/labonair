@@ -1,5 +1,4 @@
-const isWindowsPath = (p: string) =>
-  /^[A-Za-z]:[\\/]/.test(p) || p.startsWith("\\\\") || p.includes("\\");
+const isWindowsPath = (p: string) => /^[A-Za-z]:[\\/]/.test(p) || p.startsWith("\\\\") || p.includes("\\");
 
 function quotePath(p: string): string {
   if (isWindowsPath(p)) {

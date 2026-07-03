@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { ArrowDown01Icon, ArrowRight01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useSourceControlStore } from "../store/sourceControlStore";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { git } from "../lib/gitInvoke";
-import { FileChangeItem } from "./FileChangeItem";
+import { useSourceControlStore } from "../store/sourceControlStore";
 import type { FileStatus } from "../types";
+import { FileChangeItem } from "./FileChangeItem";
 
 interface UntrackedSectionProps {
   files: FileStatus[];
@@ -15,6 +16,7 @@ interface UntrackedSectionProps {
 export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
 
   if (files.length === 0) return null;
 
@@ -22,19 +24,19 @@ export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
     e.stopPropagation();
     if (!repoRoot) return;
     try {
-      await git.stageAll(repoRoot);
+      await git.stageAll(repoRoot, sessionId ?? undefined);
       onRefresh();
-    } catch { /* ignore */ }
+    } catch (e) {
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Git Operation Failed", message: String(e) });
+    }
   }
 
   return (
     <div className="mb-0.5">
       <div className="group/hdr flex h-6 items-center gap-1.5 px-3 transition-colors hover:bg-foreground/6">
-        <button
-          type="button"
-          className="flex shrink-0 items-center"
-          onClick={() => setCollapsed((c) => !c)}
-        >
+        <button type="button" className="flex shrink-0 items-center" onClick={() => setCollapsed((c) => !c)}>
           <HugeiconsIcon
             icon={collapsed ? ArrowRight01Icon : ArrowDown01Icon}
             size={8}
@@ -51,9 +53,7 @@ export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
           <span className="select-none text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50 group-hover/hdr:text-muted-foreground/70">
             Untracked
           </span>
-          <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">
-            {files.length}
-          </span>
+          <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">{files.length}</span>
         </button>
 
         <Button

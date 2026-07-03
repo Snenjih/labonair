@@ -19,10 +19,7 @@ export function GitGraphStack({ onOpenFile }: GitGraphStackProps) {
   return (
     <>
       {tabs.map((tab) => (
-        <div
-          key={tab.id}
-          className={cn("h-full", tab.id === activeId ? "block" : "hidden")}
-        >
+        <div key={tab.id} className={cn("h-full", tab.id === activeId ? "block" : "hidden")}>
           <GitGraphPane tab={tab} onOpenFile={onOpenFile} />
         </div>
       ))}

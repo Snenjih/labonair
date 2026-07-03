@@ -28,9 +28,7 @@ function WorkspacePaneContainer({
   terminalRefs,
   onDetectedLocalUrl,
 }: ContainerProps) {
-  const tab = useTabsStore(
-    (s) => s.tabs.find((t) => t.id === tabId) as WorkspaceTab | undefined,
-  );
+  const tab = useTabsStore((s) => s.tabs.find((t) => t.id === tabId) as WorkspaceTab | undefined);
   const isActive = useTabsStore((s) => s.activeId === tabId);
   const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
 
@@ -56,8 +54,7 @@ function WorkspacePaneContainer({
   );
 
   const onCwd = useCallback(
-    (sessionId: string, cwd: string) =>
-      useTabsStore.getState().updatePaneSessionCwd(tabId, sessionId, cwd),
+    (sessionId: string, cwd: string) => useTabsStore.getState().updatePaneSessionCwd(tabId, sessionId, cwd),
     [tabId],
   );
 
@@ -94,7 +91,11 @@ function WorkspacePaneContainer({
 
 // ─── Stack ────────────────────────────────────────────────────────────────────
 
-export const WorkspaceStack = React.memo(function WorkspaceStack({ workspacePaneRefs, terminalRefs, onDetectedLocalUrl }: Props) {
+export const WorkspaceStack = React.memo(function WorkspaceStack({
+  workspacePaneRefs,
+  terminalRefs,
+  onDetectedLocalUrl,
+}: Props) {
   const workspaceTabIds = useTabsStore(
     useShallow((s) => s.tabs.filter((t) => t.kind === "workspace").map((t) => t.id)),
   );

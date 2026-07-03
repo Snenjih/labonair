@@ -2,7 +2,13 @@ import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useRef, useState } from "react";
-import { Folder01Icon, File01Icon, Link01Icon, ArrowDown01Icon, ArrowUp01Icon } from "@hugeicons/core-free-icons";
+import {
+  Folder01Icon,
+  File01Icon,
+  Link01Icon,
+  ArrowDown01Icon,
+  ArrowUp01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { FileNode } from "../types";
 
@@ -94,28 +100,31 @@ export function VirtualizedFileList({
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
 
-  const startResize = useCallback((col: keyof ColWidths, e: React.MouseEvent) => {
-    e.preventDefault();
-    resizingCol.current = col;
-    resizeStartX.current = e.clientX;
-    resizeStartWidth.current = colWidths[col];
+  const startResize = useCallback(
+    (col: keyof ColWidths, e: React.MouseEvent) => {
+      e.preventDefault();
+      resizingCol.current = col;
+      resizeStartX.current = e.clientX;
+      resizeStartWidth.current = colWidths[col];
 
-    function onMouseMove(ev: MouseEvent) {
-      if (!resizingCol.current) return;
-      const delta = ev.clientX - resizeStartX.current;
-      const newWidth = Math.max(60, resizeStartWidth.current + delta);
-      setColWidths((prev) => ({ ...prev, [resizingCol.current!]: newWidth }));
-    }
+      function onMouseMove(ev: MouseEvent) {
+        if (!resizingCol.current) return;
+        const delta = ev.clientX - resizeStartX.current;
+        const newWidth = Math.max(60, resizeStartWidth.current + delta);
+        setColWidths((prev) => ({ ...prev, [resizingCol.current!]: newWidth }));
+      }
 
-    function onMouseUp() {
-      resizingCol.current = null;
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    }
+      function onMouseUp() {
+        resizingCol.current = null;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+      }
 
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, [colWidths]);
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [colWidths],
+  );
 
   // Marquee selection: track highlighted paths during drag for live feedback
   const [marqueeHighlight, setMarqueeHighlight] = useState<Set<string>>(new Set());
@@ -127,11 +136,12 @@ export function VirtualizedFileList({
     const top = Math.min(rect.startY, rect.currentY) - rect.containerTop + scrollTop;
     const bottom = Math.max(rect.startY, rect.currentY) - rect.containerTop + scrollTop;
 
-    return virtualizer.getVirtualItems()
+    return virtualizer
+      .getVirtualItems()
       .filter((vr) => {
         const file = files[vr.index];
         if (!file || file.name === "..") return false;
-        return vr.start < bottom && (vr.start + vr.size) > top;
+        return vr.start < bottom && vr.start + vr.size > top;
       })
       .map((vr) => files[vr.index].path);
   }
@@ -206,39 +216,43 @@ export function VirtualizedFileList({
     <div
       className={cn(
         "flex flex-col h-full min-h-0 overflow-hidden relative",
-        showOverlay && isDropHovered && "ring-2 ring-inset ring-primary/60"
+        showOverlay && isDropHovered && "ring-2 ring-inset ring-primary/60",
       )}
     >
       {showOverlay && (
-        <div className={cn(
-          "absolute inset-0 z-20 pointer-events-none flex flex-col items-center justify-center gap-3 rounded-sm transition-opacity duration-150",
-          isDropHovered ? "opacity-100" : "opacity-50"
-        )}>
-          <div className={cn(
-            "absolute inset-0 rounded-sm transition-colors duration-150",
-            isDropHovered
-              ? (dropDirection === "upload" ? "bg-info/15" : "bg-success/15")
-              : "bg-primary/5"
-          )} />
-          <div className={cn(
-            "relative flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-card border shadow-lg transition-all duration-150",
-            isDropHovered
-              ? (dropDirection === "upload"
+        <div
+          className={cn(
+            "absolute inset-0 z-20 pointer-events-none flex flex-col items-center justify-center gap-3 rounded-sm transition-opacity duration-150",
+            isDropHovered ? "opacity-100" : "opacity-50",
+          )}
+        >
+          <div
+            className={cn(
+              "absolute inset-0 rounded-sm transition-colors duration-150",
+              isDropHovered ? (dropDirection === "upload" ? "bg-info/15" : "bg-success/15") : "bg-primary/5",
+            )}
+          />
+          <div
+            className={cn(
+              "relative flex flex-col items-center gap-2 px-6 py-4 rounded-xl bg-card border shadow-lg transition-all duration-150",
+              isDropHovered
+                ? dropDirection === "upload"
                   ? "bg-background/90 border-info/50 scale-105"
-                  : "bg-background/90 border-success/50 scale-105")
-              : "bg-background/60 border-primary/20 scale-100"
-          )}>
+                  : "bg-background/90 border-success/50 scale-105"
+                : "bg-background/60 border-primary/20 scale-100",
+            )}
+          >
             <HugeiconsIcon
               icon={dropDirection === "upload" ? ArrowUp01Icon : ArrowDown01Icon}
               size={28}
-              className={cn(
-                dropDirection === "upload" ? "text-info" : "text-success"
-              )}
+              className={cn(dropDirection === "upload" ? "text-info" : "text-success")}
             />
-            <span className={cn(
-              "text-sm font-semibold",
-              dropDirection === "upload" ? "text-info" : "text-success"
-            )}>
+            <span
+              className={cn(
+                "text-sm font-semibold",
+                dropDirection === "upload" ? "text-info" : "text-success",
+              )}
+            >
               {dropDirection === "upload" ? "Upload here" : "Download here"}
             </span>
           </div>
@@ -283,18 +297,19 @@ export function VirtualizedFileList({
       </div>
 
       {/* Marquee selection overlay (fixed over the list) */}
-      {marquee && (() => {
-        const top = Math.min(marquee.startY, marquee.currentY);
-        const left = marquee.containerLeft;
-        const width = marquee.containerRight - marquee.containerLeft;
-        const height = Math.abs(marquee.currentY - marquee.startY);
-        return (
-          <div
-            className="pointer-events-none fixed z-30 border border-primary/60 bg-primary/10"
-            style={{ top, left, width, height }}
-          />
-        );
-      })()}
+      {marquee &&
+        (() => {
+          const top = Math.min(marquee.startY, marquee.currentY);
+          const left = marquee.containerLeft;
+          const width = marquee.containerRight - marquee.containerLeft;
+          const height = Math.abs(marquee.currentY - marquee.startY);
+          return (
+            <div
+              className="pointer-events-none fixed z-30 border border-primary/60 bg-primary/10"
+              style={{ top, left, width, height }}
+            />
+          );
+        })()}
 
       {/* Scrollable virtual list */}
       <div
@@ -305,15 +320,9 @@ export function VirtualizedFileList({
         {isLoading ? (
           <div>
             {Array.from({ length: 10 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-7 flex items-center px-2 gap-2 animate-pulse"
-              >
+              <div key={i} className="h-7 flex items-center px-2 gap-2 animate-pulse">
                 <div className="w-4 h-3 rounded bg-muted/20" />
-                <div
-                  className="h-3 rounded bg-muted/20"
-                  style={{ width: `${40 + (i * 7) % 40}%` }}
-                />
+                <div className="h-3 rounded bg-muted/20" style={{ width: `${40 + ((i * 7) % 40)}%` }} />
               </div>
             ))}
           </div>
@@ -322,9 +331,7 @@ export function VirtualizedFileList({
             Empty directory
           </div>
         ) : (
-          <div
-            style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}
-          >
+          <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const file = files[virtualRow.index];
               const isSelected = selectedPaths.has(file.path) || marqueeHighlight.has(file.path);
@@ -379,10 +386,7 @@ interface ResizableHeaderCellProps {
 
 function ResizableHeaderCell({ label, width, onResizeStart, align = "left" }: ResizableHeaderCellProps) {
   return (
-    <div
-      className="relative shrink-0 flex items-center"
-      style={{ width }}
-    >
+    <div className="relative shrink-0 flex items-center" style={{ width }}>
       <span
         className={cn(
           "w-full text-[10px] font-semibold text-muted-foreground uppercase tracking-widest truncate",
@@ -449,9 +453,12 @@ function FileRow({
     if (file.is_symlink) return <HugeiconsIcon icon={Link01Icon} size={16} />;
     return <HugeiconsIcon icon={File01Icon} size={16} />;
   };
-  const fileExt = !file.is_dir && !file.is_symlink && !isUpEntry
-    ? (file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() ?? "—" : "—")
-    : "—";
+  const fileExt =
+    !file.is_dir && !file.is_symlink && !isUpEntry
+      ? file.name.includes(".")
+        ? (file.name.split(".").pop()?.toLowerCase() ?? "—")
+        : "—"
+      : "—";
 
   function handlePointerDown(e: React.PointerEvent) {
     if (!draggable || !onDragStart || isUpEntry || e.button !== 0) return;
@@ -488,9 +495,7 @@ function FileRow({
       className={cn(
         "h-7 flex items-center px-2 gap-1 cursor-default select-none overflow-hidden",
         isEven && !isSelected && !isHovered && "bg-muted/10",
-        isSelected
-          ? "bg-primary/20 ring-1 ring-inset ring-primary/40"
-          : isHovered && "bg-accent/20",
+        isSelected ? "bg-primary/20 ring-1 ring-inset ring-primary/40" : isHovered && "bg-accent/20",
         draggable && !isUpEntry && "cursor-grab",
         isUpEntry && "opacity-60",
         !isUpEntry && !isSelected && file.name.startsWith(".") && "opacity-50",
@@ -501,7 +506,9 @@ function FileRow({
       onClick={isRenaming ? undefined : onClick}
       onDoubleClick={isRenaming ? undefined : onDoubleClick}
     >
-      <span className="w-5 flex items-center justify-center shrink-0 leading-none text-muted-foreground">{getIcon()}</span>
+      <span className="w-5 flex items-center justify-center shrink-0 leading-none text-muted-foreground">
+        {getIcon()}
+      </span>
       {isRenaming ? (
         <input
           autoFocus
@@ -555,7 +562,7 @@ function FileRow({
           className="text-[11px] font-mono text-muted-foreground/60 shrink-0 truncate"
           style={{ width: colWidths.permissions }}
         >
-          {!isUpEntry ? (file.permissions || "—") : ""}
+          {!isUpEntry ? file.permissions || "—" : ""}
         </span>
       )}
     </div>

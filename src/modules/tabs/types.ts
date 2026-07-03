@@ -49,6 +49,13 @@ export type EditorTab = {
   isUntitled?: boolean;
   remoteHostTabId?: string;
   remotePath?: string;
+  /** Host + session-lifecycle-ownership snapshotted at open time — lets the
+   *  sidebar explorer stay pinned to this file's remote host/folder while
+   *  the tab is active, instead of falling back to the local tree (see
+   *  `deriveExplorerTarget`). Mirrors the pinning `GitGraphTab`/`GitDiffTab`
+   *  already do for `hostId`/`sessionId`. */
+  remoteHostId?: string;
+  remoteSource?: "sftp-tab" | "lazy-session";
   languageOverride?: string;
 };
 
@@ -57,6 +64,16 @@ export type PreviewTab = {
   kind: "preview";
   title: string;
   url: string;
+  /** Set when previewing a remote file staged via `prepare_remote_edit` —
+   *  mirrors `EditorTab`'s `remoteHostTabId`/`remotePath`, used only to
+   *  clean up the local temp file on tab close (previews are read-only, no
+   *  save-back). */
+  remoteHostTabId?: string;
+  remotePath?: string;
+  remoteTempPath?: string;
+  /** Same pinning purpose as `EditorTab.remoteHostId`/`remoteSource`. */
+  remoteHostId?: string;
+  remoteSource?: "sftp-tab" | "lazy-session";
 };
 
 export type AiDiffStatus = "pending" | "approved" | "rejected";
@@ -100,6 +117,11 @@ export type GitGraphTab = {
   title: string;
   repositoryPath: string; // locked at open time — never changes
   initialBranch: string;
+  // Snapshotted at open time alongside repositoryPath, same "frozen" rule —
+  // a Git Graph tab must stay pinned to the repo/host it was opened
+  // against, independent of whatever the sidebar switches to afterward.
+  hostId?: string;
+  sessionId?: string;
 };
 
 export type GitDiffTab = {
@@ -110,6 +132,8 @@ export type GitDiffTab = {
   filePath: string;
   staged: boolean;
   section: "staged" | "unstaged" | "untracked";
+  hostId?: string;
+  sessionId?: string;
 };
 
 export type CommitDiffTab = {
@@ -118,9 +142,20 @@ export type CommitDiffTab = {
   title: string;
   repositoryPath: string;
   hash: string;
+  hostId?: string;
+  sessionId?: string;
 };
 
-export type Tab = WorkspaceTab | EditorTab | PreviewTab | AiDiffTab | HomeTab | SftpTab | GitGraphTab | GitDiffTab | CommitDiffTab;
+export type Tab =
+  | WorkspaceTab
+  | EditorTab
+  | PreviewTab
+  | AiDiffTab
+  | HomeTab
+  | SftpTab
+  | GitGraphTab
+  | GitDiffTab
+  | CommitDiffTab;
 
 export type TabPatch = Partial<{
   title: string;

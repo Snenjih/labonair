@@ -25,7 +25,10 @@ function renderTopEdge(edge: GraphEdge, midY: number): ReactElement | null {
     return (
       <line
         key={`t-s-${edge.lane}`}
-        x1={x} y1={0} x2={x} y2={midY}
+        x1={x}
+        y1={0}
+        x2={x}
+        y2={midY}
         stroke={laneColor(edge.colorIndex)}
         strokeWidth={STRAIGHT_WIDTH}
         strokeLinecap="round"
@@ -58,7 +61,10 @@ function renderBottomEdge(edge: GraphEdge, midY: number, bottomY: number): React
     return (
       <line
         key={`b-s-${edge.lane}`}
-        x1={x} y1={midY} x2={x} y2={bottomY}
+        x1={x}
+        y1={midY}
+        x2={x}
+        y2={bottomY}
         stroke={laneColor(edge.colorIndex)}
         strokeWidth={STRAIGHT_WIDTH}
         strokeLinecap="round"

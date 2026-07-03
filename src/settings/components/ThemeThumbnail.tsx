@@ -10,17 +10,17 @@ export function ThemeThumbnail({ colors, className }: ThemeThumbnailProps) {
 
   const bg = hasColors ? (colors["background"] ?? "var(--background, #0f111a)") : "var(--background)";
   const sidebar = hasColors
-    ? (colors["sidebar"] ?? colors["secondary"] ?? colors["muted"] ?? "var(--sidebar, var(--secondary, #1e2130))")
+    ? (colors["sidebar"] ??
+      colors["secondary"] ??
+      colors["muted"] ??
+      "var(--sidebar, var(--secondary, #1e2130))")
     : "var(--sidebar, var(--secondary))";
   const primary = hasColors ? (colors["primary"] ?? "var(--primary, #6366f1)") : "var(--primary)";
   const border = hasColors ? (colors["border"] ?? "var(--border, #252836)") : "var(--border)";
 
   return (
     <div
-      className={cn(
-        "relative flex h-[38px] w-[52px] shrink-0 overflow-hidden rounded border",
-        className,
-      )}
+      className={cn("relative flex h-[38px] w-[52px] shrink-0 overflow-hidden rounded border", className)}
       style={{ borderColor: border, backgroundColor: bg }}
     >
       {/* Sidebar strip */}
@@ -44,10 +44,7 @@ export function ThemeThumbnail({ colors, className }: ThemeThumbnailProps) {
             style={{ backgroundColor: primary, opacity: 0.35 }}
           />
         </div>
-        <div
-          className="h-[3px] w-[20px] rounded-[1px]"
-          style={{ backgroundColor: primary, opacity: 0.2 }}
-        />
+        <div className="h-[3px] w-[20px] rounded-[1px]" style={{ backgroundColor: primary, opacity: 0.2 }} />
       </div>
     </div>
   );

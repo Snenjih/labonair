@@ -1,21 +1,8 @@
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import {
-  type TransferJob,
-  type TransferStatus,
-  useTransferStore,
-} from "@/modules/sftp/store/transferStore";
+import { type TransferJob, type TransferStatus, useTransferStore } from "@/modules/sftp/store/transferStore";
 import { Cancel01Icon, ArrowUpDownIcon, Copy01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
@@ -24,16 +11,10 @@ import { createPortal } from "react-dom";
 export function TransferDropdown() {
   const { jobs, clearCompleted, cancelJob, resolveConflict } = useTransferStore();
 
-  const activeCount = jobs.filter(
-    (j) => j.status === "queued" || j.status === "running"
-  ).length;
-  const hasConflicts = jobs.some(
-    (j) => !isFailed(j.status) && j.status === "paused" && j.conflict
-  );
+  const activeCount = jobs.filter((j) => j.status === "queued" || j.status === "running").length;
+  const hasConflicts = jobs.some((j) => !isFailed(j.status) && j.status === "paused" && j.conflict);
 
-  const conflictJob = jobs.find(
-    (j) => !isFailed(j.status) && j.status === "paused" && j.conflict
-  );
+  const conflictJob = jobs.find((j) => !isFailed(j.status) && j.status === "paused" && j.conflict);
 
   return (
     <>
@@ -50,7 +31,7 @@ export function TransferDropdown() {
               <span
                 className={cn(
                   "absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white",
-                  hasConflicts ? "bg-destructive animate-pulse" : "bg-primary"
+                  hasConflicts ? "bg-destructive animate-pulse" : "bg-primary",
                 )}
               >
                 {activeCount}
@@ -58,10 +39,7 @@ export function TransferDropdown() {
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent
-          align="end"
-          className="w-[360px] p-0 max-h-[480px] flex flex-col"
-        >
+        <PopoverContent align="end" className="w-[360px] p-0 max-h-[480px] flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
             <span className="text-sm font-semibold">Transfers</span>
             <button
@@ -80,11 +58,7 @@ export function TransferDropdown() {
             ) : (
               <div className="divide-y divide-border/40">
                 {jobs.map((job) => (
-                  <TransferItem
-                    key={job.id}
-                    job={job}
-                    onCancel={() => cancelJob(job.id)}
-                  />
+                  <TransferItem key={job.id} job={job} onCancel={() => cancelJob(job.id)} />
                 ))}
               </div>
             )}
@@ -95,9 +69,7 @@ export function TransferDropdown() {
       {conflictJob && (
         <ConflictModal
           job={conflictJob}
-          onResolve={(resolution, newName) =>
-            resolveConflict(conflictJob.id, resolution, newName)
-          }
+          onResolve={(resolution, newName) => resolveConflict(conflictJob.id, resolution, newName)}
         />
       )}
     </>
@@ -133,39 +105,49 @@ function FailedBadge({ message }: { message: string }) {
     setTooltip(true);
   }
 
-  const tooltipEl = tooltip && pos
-    ? createPortal(
-        <div
-          style={{ position: "fixed", top: pos.top, right: pos.right, zIndex: 9999, transform: "translateY(-100%)" }}
-          className={cn(
-            "min-w-[200px] max-w-[280px]",
-            "bg-popover border border-border rounded-lg shadow-xl px-3 py-2.5",
-            "flex flex-col gap-1.5 pointer-events-none",
-          )}
-        >
-          <div className="flex items-center gap-1.5">
-            <HugeiconsIcon icon={Copy01Icon} size={11} className="shrink-0 text-muted-foreground" />
-            <span className="text-[10px] font-medium text-muted-foreground">
-              {copied ? "Copied to clipboard ✓" : "Error message"}
-            </span>
-          </div>
-          <p className="text-[11px] font-mono text-destructive break-all leading-snug">{message}</p>
-          {/* Arrow pointing down toward the badge */}
+  const tooltipEl =
+    tooltip && pos
+      ? createPortal(
           <div
-            style={{ position: "absolute", bottom: -5, right: 8, width: 10, height: 10 }}
-            className="bg-popover border-r border-b border-border rotate-45"
-          />
-        </div>,
-        document.body
-      )
-    : null;
+            style={{
+              position: "fixed",
+              top: pos.top,
+              right: pos.right,
+              zIndex: 9999,
+              transform: "translateY(-100%)",
+            }}
+            className={cn(
+              "min-w-[200px] max-w-[280px]",
+              "bg-popover border border-border rounded-lg shadow-xl px-3 py-2.5",
+              "flex flex-col gap-1.5 pointer-events-none",
+            )}
+          >
+            <div className="flex items-center gap-1.5">
+              <HugeiconsIcon icon={Copy01Icon} size={11} className="shrink-0 text-muted-foreground" />
+              <span className="text-[10px] font-medium text-muted-foreground">
+                {copied ? "Copied to clipboard ✓" : "Error message"}
+              </span>
+            </div>
+            <p className="text-[11px] font-mono text-destructive break-all leading-snug">{message}</p>
+            {/* Arrow pointing down toward the badge */}
+            <div
+              style={{ position: "absolute", bottom: -5, right: 8, width: 10, height: 10 }}
+              className="bg-popover border-r border-b border-border rotate-45"
+            />
+          </div>,
+          document.body,
+        )
+      : null;
 
   return (
     <span className="shrink-0">
       <button
         ref={badgeRef}
         onClick={handleClick}
-        onBlur={() => { setTooltip(false); setCopied(false); }}
+        onBlur={() => {
+          setTooltip(false);
+          setCopied(false);
+        }}
         className={cn(
           "text-[10px] font-semibold px-1.5 py-0.5 rounded-full transition-colors",
           "bg-destructive/20 text-destructive hover:bg-destructive/30 cursor-pointer",
@@ -179,37 +161,24 @@ function FailedBadge({ message }: { message: string }) {
   );
 }
 
-function TransferItem({
-  job,
-  onCancel,
-}: {
-  job: TransferJob;
-  onCancel: () => void;
-}) {
+function TransferItem({ job, onCancel }: { job: TransferJob; onCancel: () => void }) {
   const fileName = job.dest_path.split("/").pop() ?? job.dest_path;
-  const pct =
-    job.bytes_total > 0
-      ? Math.round((job.bytes_transferred / job.bytes_total) * 100)
-      : 0;
+  const pct = job.bytes_total > 0 ? Math.round((job.bytes_transferred / job.bytes_total) * 100) : 0;
   const isActive = job.status === "running" || job.status === "queued";
   const failedMsg = isFailed(job.status) ? job.status.failed : null;
 
   return (
     <div className="px-3 py-2 flex flex-col gap-1.5">
       <div className="flex items-center gap-2 min-w-0">
-        <span className="shrink-0 text-[13px]">
-          {job.direction === "download" ? "⬇" : "⬆"}
-        </span>
-        <span className="flex-1 text-sm font-medium truncate min-w-0">
-          {fileName}
-        </span>
+        <span className="shrink-0 text-[13px]">{job.direction === "download" ? "⬇" : "⬆"}</span>
+        <span className="flex-1 text-sm font-medium truncate min-w-0">{fileName}</span>
         {failedMsg !== null ? (
           <FailedBadge message={failedMsg} />
         ) : (
           <span
             className={cn(
               "shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
-              statusColorClass(job.status)
+              statusColorClass(job.status),
             )}
           >
             {statusLabel(job.status)}
@@ -229,10 +198,7 @@ function TransferItem({
       <div className="h-1 bg-muted rounded-full overflow-hidden">
         <div
           style={{ width: `${pct}%` }}
-          className={cn(
-            "h-full rounded-full transition-all duration-300",
-            statusProgressClass(job.status)
-          )}
+          className={cn("h-full rounded-full transition-all duration-300", statusProgressClass(job.status))}
         />
       </div>
 
@@ -255,15 +221,10 @@ function ConflictModal({
   onResolve,
 }: {
   job: TransferJob;
-  onResolve: (
-    resolution: "overwrite" | "skip" | "rename",
-    newName?: string
-  ) => void;
+  onResolve: (resolution: "overwrite" | "skip" | "rename", newName?: string) => void;
 }) {
   const [renaming, setRenaming] = useState(false);
-  const [newName, setNewName] = useState(
-    job.dest_path.split("/").pop() ?? "file"
-  );
+  const [newName, setNewName] = useState(job.dest_path.split("/").pop() ?? "file");
 
   const fileName = job.dest_path.split("/").pop() ?? job.dest_path;
 
@@ -276,14 +237,10 @@ function ConflictModal({
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
             The file{" "}
-            <span className="font-mono text-foreground text-xs bg-muted px-1 py-0.5 rounded">
-              {fileName}
-            </span>{" "}
+            <span className="font-mono text-foreground text-xs bg-muted px-1 py-0.5 rounded">{fileName}</span>{" "}
             already exists at{" "}
-            <span className="font-mono text-xs text-muted-foreground">
-              {job.conflict?.dest_path}
-            </span>
-            . What would you like to do?
+            <span className="font-mono text-xs text-muted-foreground">{job.conflict?.dest_path}</span>. What
+            would you like to do?
           </p>
 
           {renaming ? (
@@ -295,18 +252,10 @@ function ConflictModal({
                 className="flex-1 h-8 text-sm bg-background border border-border rounded px-2 outline-none focus:ring-1 focus:ring-primary"
                 placeholder="New file name"
               />
-              <Button
-                size="sm"
-                onClick={() => onResolve("rename", newName)}
-                disabled={!newName.trim()}
-              >
+              <Button size="sm" onClick={() => onResolve("rename", newName)} disabled={!newName.trim()}>
                 Rename
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setRenaming(false)}
-              >
+              <Button size="sm" variant="ghost" onClick={() => setRenaming(false)}>
                 Back
               </Button>
             </div>
@@ -315,18 +264,10 @@ function ConflictModal({
               <Button size="sm" onClick={() => onResolve("overwrite")}>
                 Overwrite
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onResolve("skip")}
-              >
+              <Button size="sm" variant="outline" onClick={() => onResolve("skip")}>
                 Skip
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setRenaming(true)}
-              >
+              <Button size="sm" variant="outline" onClick={() => setRenaming(true)}>
                 Rename…
               </Button>
             </div>
@@ -349,22 +290,32 @@ function statusLabel(status: TransferStatus): string {
 function statusColorClass(status: TransferStatus): string {
   if (isFailed(status)) return "bg-destructive/20 text-destructive";
   switch (status) {
-    case "running": return "bg-info/20 text-info";
-    case "completed": return "bg-success/20 text-success";
-    case "paused": return "bg-warning/20 text-warning";
-    case "queued": return "bg-muted text-muted-foreground";
-    case "cancelled": return "bg-muted text-muted-foreground line-through";
-    default: return "bg-muted text-muted-foreground";
+    case "running":
+      return "bg-info/20 text-info";
+    case "completed":
+      return "bg-success/20 text-success";
+    case "paused":
+      return "bg-warning/20 text-warning";
+    case "queued":
+      return "bg-muted text-muted-foreground";
+    case "cancelled":
+      return "bg-muted text-muted-foreground line-through";
+    default:
+      return "bg-muted text-muted-foreground";
   }
 }
 
 function statusProgressClass(status: TransferStatus): string {
   if (isFailed(status)) return "bg-destructive";
   switch (status) {
-    case "running": return "bg-primary";
-    case "completed": return "bg-success";
-    case "paused": return "bg-warning";
-    default: return "bg-muted-foreground";
+    case "running":
+      return "bg-primary";
+    case "completed":
+      return "bg-success";
+    case "paused":
+      return "bg-warning";
+    default:
+      return "bg-muted-foreground";
   }
 }
 

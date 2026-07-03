@@ -1,13 +1,11 @@
-import { cn } from "@/lib/utils";
-import type { GitDiffTab } from "@/modules/tabs/types";
-import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import { useShallow } from "zustand/react/shallow";
+import { cn } from "@/lib/utils";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import type { GitDiffTab } from "@/modules/tabs/types";
 import { GitDiffPane } from "./GitDiffPane";
 
 export function GitDiffStack() {
-  const tabs = useTabsStore(
-    useShallow((s) => s.tabs.filter((t): t is GitDiffTab => t.kind === "git-diff")),
-  );
+  const tabs = useTabsStore(useShallow((s) => s.tabs.filter((t): t is GitDiffTab => t.kind === "git-diff")));
   const activeId = useTabsStore((s) => s.activeId);
   if (tabs.length === 0) return null;
   return (
@@ -17,10 +15,7 @@ export function GitDiffStack() {
         return (
           <div
             key={t.id}
-            className={cn(
-              "absolute inset-0",
-              !visible && "invisible pointer-events-none",
-            )}
+            className={cn("absolute inset-0", !visible && "invisible pointer-events-none")}
             aria-hidden={!visible}
           >
             <GitDiffPane
@@ -28,6 +23,7 @@ export function GitDiffStack() {
               filePath={t.filePath}
               staged={t.staged}
               section={t.section}
+              sessionId={t.sessionId}
             />
           </div>
         );

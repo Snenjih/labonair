@@ -1,9 +1,5 @@
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { Download01Icon } from "@hugeicons/core-free-icons";
@@ -23,10 +19,7 @@ export function UpdaterDialog() {
   const closeDialog = useUpdaterStore((s) => s.closeDialog);
 
   const visible =
-    dialogOpen &&
-    (status.kind === "available" ||
-      status.kind === "downloading" ||
-      status.kind === "ready");
+    dialogOpen && (status.kind === "available" || status.kind === "downloading" || status.kind === "ready");
 
   if (!visible) return null;
 
@@ -51,9 +44,7 @@ export function UpdaterDialog() {
           <div
             className={cn(
               "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg",
-              ready
-                ? "bg-primary/12 text-primary"
-                : "bg-success/12 text-success",
+              ready ? "bg-primary/12 text-primary" : "bg-success/12 text-success",
             )}
           >
             <HugeiconsIcon icon={Download01Icon} size={16} strokeWidth={2} />
@@ -75,10 +66,10 @@ export function UpdaterDialog() {
                     ? `${progress.toFixed(0)}% — ${formatBytes(status.downloaded)}`
                     : formatBytes(status.downloaded)
                   : update?.body?.trim()
-                      ? update.body.length > 120
-                        ? `${update.body.slice(0, 120).trimEnd()}…`
-                        : update.body
-                      : "A new version is ready to install."}
+                    ? update.body.length > 120
+                      ? `${update.body.slice(0, 120).trimEnd()}…`
+                      : update.body
+                    : "A new version is ready to install."}
             </p>
           </div>
         </div>
@@ -106,11 +97,7 @@ export function UpdaterDialog() {
               >
                 Later
               </Button>
-              <Button
-                size="sm"
-                className="h-7 px-3 text-[12px]"
-                onClick={() => void install()}
-              >
+              <Button size="sm" className="h-7 px-3 text-[12px]" onClick={() => void install()}>
                 Install &amp; restart
               </Button>
             </>

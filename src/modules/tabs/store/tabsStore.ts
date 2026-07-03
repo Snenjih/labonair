@@ -1,27 +1,27 @@
-import { create } from "zustand";
 import { arrayMove } from "@dnd-kit/sortable";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useHostsStore } from "@/modules/hosts/store/hostsStore";
-import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
-import { useTransferStore } from "@/modules/sftp/store/transferStore";
 import { invoke } from "@tauri-apps/api/core";
+import { create } from "zustand";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTransferStore } from "@/modules/sftp/store/transferStore";
+import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
 import {
+  type AiDiffStatus,
+  basename,
+  type CommitDiffTab,
+  collectLeafIds,
+  findParent,
+  type GitDiffTab,
   makeLeaf,
   newSessionId,
-  findParent,
-  replaceNode,
-  collectLeafIds,
-  basename,
-  titleFromUrl,
-  type AiDiffStatus,
-  type CommitDiffTab,
-  type GitDiffTab,
   type PaneDirection,
   type PaneNode,
   type PaneSplit,
+  replaceNode,
   type Tab,
   type TabPatch,
   type TerminalSessionData,
+  titleFromUrl,
   type WorkspaceTab,
 } from "../types";
 
@@ -38,7 +38,13 @@ export type TabsState = {
   // Actions
   setActiveId: (id: number) => void;
   newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
-  newSshTab: (hostId: string, title: string, cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newSshTab: (
+    hostId: string,
+    title: string,
+    cwd?: string,
+    initialCommand?: string,
+    sessionId?: string,
+  ) => number;
   newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
   openDefaultTab: () => void;
   openHomeTab: () => void;
@@ -58,10 +64,33 @@ export type TabsState = {
   newSftpTab: (hostId: string, title: string) => number;
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   openUntitledTab: () => Promise<number>;
-  openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
-  openGitGraphTab: (repositoryPath: string, initialBranch: string) => number;
-  openGitDiffTab: (repoRoot: string, filePath: string, staged: boolean, section: "staged" | "unstaged" | "untracked") => number;
-  openCommitDiffTab: (repositoryPath: string, hash: string) => number;
+  openRemoteEditorTab: (
+    sftpTabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => Promise<void>;
+  openRemotePreviewTab: (
+    sftpTabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => Promise<void>;
+  openGitGraphTab: (
+    repositoryPath: string,
+    initialBranch: string,
+    hostId?: string,
+    sessionId?: string,
+  ) => number;
+  openGitDiffTab: (
+    repoRoot: string,
+    filePath: string,
+    staged: boolean,
+    section: "staged" | "unstaged" | "untracked",
+    hostId?: string,
+    sessionId?: string,
+  ) => number;
+  openCommitDiffTab: (repositoryPath: string, hash: string, hostId?: string, sessionId?: string) => number;
   renameTab: (id: number, label: string) => void;
   reorderTabs: (activeTabId: number, overTabId: number) => void;
   setActivePaneId: (tabId: number, paneId: string) => void;
@@ -72,8 +101,7 @@ export type TabsState = {
 
 // ─── Selectors (exported for component use) ───────────────────────────────────
 
-export const selectActiveTab = (s: TabsState): Tab | undefined =>
-  s.tabs.find((t) => t.id === s.activeId);
+export const selectActiveTab = (s: TabsState): Tab | undefined => s.tabs.find((t) => t.id === s.activeId);
 
 export const selectActiveTabKind = (s: TabsState): Tab["kind"] | null =>
   s.tabs.find((t) => t.id === s.activeId)?.kind ?? null;
@@ -82,6 +110,72 @@ export const selectActivePaneId = (s: TabsState): string | null => {
   const tab = s.tabs.find((t) => t.id === s.activeId);
   return tab?.kind === "workspace" ? tab.activePaneId : null;
 };
+
+// ─── Shared remote-file staging ────────────────────────────────────────────────
+
+/** Downloads a remote file into the local `prepare_remote_edit` temp dir,
+ *  optionally surfacing it in the transfer list (same `sftpRemoteEditShowTransfers`
+ *  pref both the editor and preview flows share). Used by `openRemoteEditorTab`
+ *  and `openRemotePreviewTab` — the only difference between the two is what
+ *  kind of tab wraps the resulting local path. */
+async function prepareRemoteFileForTab(
+  sftpTabId: string,
+  remotePath: string,
+  destLabel: string,
+): Promise<string> {
+  const showTransfers = usePreferencesStore.getState().sftpRemoteEditShowTransfers;
+  const jobId = crypto.randomUUID();
+
+  if (showTransfers) {
+    useTransferStore.getState().addJob({
+      id: jobId,
+      session_id: sftpTabId,
+      src_path: remotePath,
+      dest_path: destLabel,
+      direction: "download",
+      status: "running",
+      bytes_total: 0,
+      bytes_transferred: 0,
+      speed_bps: 0,
+    });
+  }
+
+  let localTempPath: string;
+  try {
+    localTempPath = await invoke<string>("prepare_remote_edit", { sessionId: sftpTabId, remotePath });
+  } catch (e) {
+    if (showTransfers) {
+      useTransferStore.getState().updateJob({
+        id: jobId,
+        session_id: sftpTabId,
+        src_path: remotePath,
+        dest_path: destLabel,
+        direction: "download",
+        status: { failed: String(e) },
+        bytes_total: 0,
+        bytes_transferred: 0,
+        speed_bps: 0,
+      });
+    }
+    throw e;
+  }
+
+  if (showTransfers) {
+    useTransferStore.getState().updateJob({
+      id: jobId,
+      session_id: sftpTabId,
+      src_path: remotePath,
+      dest_path: destLabel,
+      direction: "download",
+      status: "completed",
+      bytes_total: 1,
+      bytes_transferred: 1,
+      speed_bps: 0,
+    });
+  }
+
+  return localTempPath;
+}
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
@@ -234,10 +328,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }
     const id = get()._nextId;
     set((s) => ({
-      tabs: [
-        ...s.tabs,
-        { id, kind: "editor" as const, title: basename(path), path, dirty: false },
-      ],
+      tabs: [...s.tabs, { id, kind: "editor" as const, title: basename(path), path, dirty: false }],
       activeId: id,
       _nextId: s._nextId + 1,
     }));
@@ -245,9 +336,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   },
 
   openAiDiffTab: (input) => {
-    const existing = get().tabs.find(
-      (t) => t.kind === "ai-diff" && t.approvalId === input.approvalId,
-    );
+    const existing = get().tabs.find((t) => t.kind === "ai-diff" && t.approvalId === input.approvalId);
     if (existing) {
       set({ activeId: existing.id });
       return existing.id;
@@ -277,9 +366,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   setAiDiffStatus: (approvalId, status) => {
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.kind === "ai-diff" && t.approvalId === approvalId ? { ...t, status } : t,
-      ),
+      tabs: s.tabs.map((t) => (t.kind === "ai-diff" && t.approvalId === approvalId ? { ...t, status } : t)),
     }));
   },
 
@@ -296,9 +383,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   renameTab: (id, label) => {
     set((s) => ({
       tabs: s.tabs.map((t) =>
-        t.id === id && t.kind === "workspace"
-          ? { ...t, customTitle: label.trim() || undefined }
-          : t,
+        t.id === id && t.kind === "workspace" ? { ...t, customTitle: label.trim() || undefined } : t,
       ),
     }));
   },
@@ -363,9 +448,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   updateSftpPaths: (tabId, remotePath, localPath) => {
     set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.kind === "sftp" && t.id === tabId ? { ...t, remotePath, localPath } : t,
-      ),
+      tabs: s.tabs.map((t) => (t.kind === "sftp" && t.id === tabId ? { ...t, remotePath, localPath } : t)),
     }));
   },
 
@@ -392,61 +475,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return id;
   },
 
-  openRemoteEditorTab: async (sftpTabId, remotePath) => {
-    const showTransfers = usePreferencesStore.getState().sftpRemoteEditShowTransfers;
-    const jobId = crypto.randomUUID();
-
-    if (showTransfers) {
-      useTransferStore.getState().addJob({
-        id: jobId,
-        session_id: sftpTabId,
-        src_path: remotePath,
-        dest_path: "(editor)",
-        direction: "download",
-        status: "running",
-        bytes_total: 0,
-        bytes_transferred: 0,
-        speed_bps: 0,
-      });
-    }
-
-    let localTempPath: string;
-    try {
-      localTempPath = await invoke<string>("prepare_remote_edit", {
-        sessionId: sftpTabId,
-        remotePath,
-      });
-    } catch (e) {
-      if (showTransfers) {
-        useTransferStore.getState().updateJob({
-          id: jobId,
-          session_id: sftpTabId,
-          src_path: remotePath,
-          dest_path: "(editor)",
-          direction: "download",
-          status: { failed: String(e) },
-          bytes_total: 0,
-          bytes_transferred: 0,
-          speed_bps: 0,
-        });
-      }
-      throw e;
-    }
-
-    if (showTransfers) {
-      useTransferStore.getState().updateJob({
-        id: jobId,
-        session_id: sftpTabId,
-        src_path: remotePath,
-        dest_path: "(editor)",
-        direction: "download",
-        status: "completed",
-        bytes_total: 1,
-        bytes_transferred: 1,
-        speed_bps: 0,
-      });
-    }
-
+  openRemoteEditorTab: async (sftpTabId, remotePath, hostId, source) => {
+    const localTempPath = await prepareRemoteFileForTab(sftpTabId, remotePath, "(editor)");
     const fileName = remotePath.split("/").pop() ?? "remote-file";
     const id = get()._nextId;
     set((s) => ({
@@ -460,6 +490,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           dirty: false,
           remoteHostTabId: sftpTabId,
           remotePath,
+          remoteHostId: hostId,
+          remoteSource: source,
         },
       ],
       activeId: id,
@@ -467,12 +499,38 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }));
   },
 
-  openGitGraphTab: (repositoryPath, initialBranch) => {
+  openRemotePreviewTab: async (sftpTabId, remotePath, hostId, source) => {
+    // Reuses prepare_remote_edit's temp-download — PreviewPane already
+    // detects a local absolute path and converts it via `convertFileSrc`,
+    // so no remote-specific rendering path is needed. Same 5 MB cap the
+    // editor flow has; not a new limit introduced here.
+    const localTempPath = await prepareRemoteFileForTab(sftpTabId, remotePath, "(preview)");
+    const fileName = remotePath.split("/").pop() ?? "remote-file";
+    const id = get()._nextId;
+    set((s) => ({
+      tabs: [
+        ...s.tabs,
+        {
+          id,
+          kind: "preview" as const,
+          title: `✦ ${fileName}`,
+          url: localTempPath,
+          remoteHostTabId: sftpTabId,
+          remotePath,
+          remoteTempPath: localTempPath,
+          remoteHostId: hostId,
+          remoteSource: source,
+        },
+      ],
+      activeId: id,
+      _nextId: s._nextId + 1,
+    }));
+  },
+
+  openGitGraphTab: (repositoryPath, initialBranch, hostId, sessionId) => {
     const existing = get().tabs.find(
       (t) =>
-        t.kind === "git-graph" &&
-        t.repositoryPath === repositoryPath &&
-        t.initialBranch === initialBranch,
+        t.kind === "git-graph" && t.repositoryPath === repositoryPath && t.initialBranch === initialBranch,
     );
     if (existing) {
       set({ activeId: existing.id });
@@ -488,6 +546,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           title: `Git Graph · ${initialBranch}`,
           repositoryPath,
           initialBranch,
+          hostId,
+          sessionId,
         },
       ],
       activeId: id,
@@ -496,13 +556,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return id;
   },
 
-  openGitDiffTab: (repoRoot, filePath, staged, section) => {
+  openGitDiffTab: (repoRoot, filePath, staged, section, hostId, sessionId) => {
     const existing = get().tabs.find(
       (t) =>
-        t.kind === "git-diff" &&
-        t.repoRoot === repoRoot &&
-        t.filePath === filePath &&
-        t.staged === staged,
+        t.kind === "git-diff" && t.repoRoot === repoRoot && t.filePath === filePath && t.staged === staged,
     );
     if (existing) {
       set({ activeId: existing.id });
@@ -518,6 +575,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       filePath,
       staged,
       section,
+      hostId,
+      sessionId,
     };
     set((s) => ({
       tabs: [...s.tabs, tab],
@@ -527,7 +586,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return id;
   },
 
-  openCommitDiffTab: (repositoryPath, hash) => {
+  openCommitDiffTab: (repositoryPath, hash, hostId, sessionId) => {
     const shortHash = hash.slice(0, 7);
     const existing = get().tabs.find(
       (t) => t.kind === "commit-diff" && t.repositoryPath === repositoryPath && t.hash === hash,
@@ -543,6 +602,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       title: shortHash,
       repositoryPath,
       hash,
+      hostId,
+      sessionId,
     };
     set((s) => ({
       tabs: [...s.tabs, tab],
@@ -632,8 +693,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (t.layout.type === "pane") {
       if (tabs.length <= 1) return;
       const next = tabs.filter((x) => x.id !== tabId);
-      const newActiveId =
-        activeId === tabId ? next[Math.max(0, tabIdx - 1)].id : activeId;
+      const newActiveId = activeId === tabId ? next[Math.max(0, tabIdx - 1)].id : activeId;
       set({ tabs: next, activeId: newActiveId });
       return;
     }

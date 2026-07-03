@@ -1,9 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  TerminalIcon,
-  Folder01Icon,
-  Add01Icon,
-} from "@hugeicons/core-free-icons";
+import { TerminalIcon, Folder01Icon, Add01Icon } from "@hugeicons/core-free-icons";
 import { createElement, useMemo } from "react";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import type { CommandAction, CommandPage } from "../types";

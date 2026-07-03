@@ -49,6 +49,7 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
       newPreviewTab: actions.newPreviewTab,
       openHomeTab: actions.openHomeTab,
       newSftpTab: actions.newSftpTab,
+      updateSftpPaths: actions.updateSftpPaths,
       splitPane: actions.splitPane,
       setActivePaneId: actions.setActivePaneId,
     }).then((result) => {
@@ -61,8 +62,10 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
         }, 5000);
       }
     });
-    return () => { alive = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefsHydrated, sessionRestore]);
 
   // Clear snapshot when session restore is disabled
@@ -82,14 +85,20 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
       clearTimeout(debounce);
       debounce = setTimeout(() => void captureAndSave(), 3_000);
     });
-    return () => { unsub(); clearTimeout(debounce); clearInterval(periodic); };
+    return () => {
+      unsub();
+      clearTimeout(debounce);
+      clearInterval(periodic);
+    };
   }, [sessionRestore, prefsHydrated]);
 
   // Keep a ref to latest tabs/activeId for the close handler (no rerender)
-  const sessionSaveRef = useRef<{ tabs: ReturnType<typeof useTabsStore.getState>["tabs"]; activeId: number }>({
-    tabs: [],
-    activeId: -1,
-  });
+  const sessionSaveRef = useRef<{ tabs: ReturnType<typeof useTabsStore.getState>["tabs"]; activeId: number }>(
+    {
+      tabs: [],
+      activeId: -1,
+    },
+  );
   useEffect(() => {
     return useTabsStore.subscribe((s) => {
       sessionSaveRef.current = { tabs: s.tabs, activeId: s.activeId };
@@ -98,38 +107,46 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
 
   // Keep confirmQuit in a ref to prevent stale closure in onCloseRequested
   const confirmQuitRef = useRef(confirmQuitWithSsh);
-  useEffect(() => { confirmQuitRef.current = confirmQuitWithSsh; }, [confirmQuitWithSsh]);
+  useEffect(() => {
+    confirmQuitRef.current = confirmQuitWithSsh;
+  }, [confirmQuitWithSsh]);
 
   // Window close handler with SSH check + session save + scrollback save
   useEffect(() => {
     if (!sessionRestore && !confirmQuitWithSsh) return;
     let cleanup: (() => void) | undefined;
-    void getCurrentWindow().onCloseRequested(async (event) => {
-      event.preventDefault();
-      if (confirmQuitRef.current) {
-        const { tabs: currentTabs } = sessionSaveRef.current;
-        const sshCount = currentTabs.filter(
-          (t) => t.kind === "workspace" && Object.values((t as WorkspaceTab).sessions).some((s) => s.kind === "ssh"),
-        ).length;
-        if (sshCount > 0) {
-          const ok = await ask(
-            `You have ${sshCount} active SSH connection${sshCount > 1 ? "s" : ""}. Quit anyway?`,
-            { title: "Active SSH Connections", kind: "warning", okLabel: "Quit", cancelLabel: "Cancel" },
-          );
-          if (!ok) return;
+    void getCurrentWindow()
+      .onCloseRequested(async (event) => {
+        event.preventDefault();
+        if (confirmQuitRef.current) {
+          const { tabs: currentTabs } = sessionSaveRef.current;
+          const sshCount = currentTabs.filter(
+            (t) =>
+              t.kind === "workspace" &&
+              Object.values((t as WorkspaceTab).sessions).some((s) => s.kind === "ssh"),
+          ).length;
+          if (sshCount > 0) {
+            const ok = await ask(
+              `You have ${sshCount} active SSH connection${sshCount > 1 ? "s" : ""}. Quit anyway?`,
+              { title: "Active SSH Connections", kind: "warning", okLabel: "Quit", cancelLabel: "Cancel" },
+            );
+            if (!ok) return;
+          }
         }
-      }
-      try {
-        if (sessionRestore) {
-          await captureAndSave();
-          await saveAllScrollbacks(collectAllSessionIds());
+        try {
+          if (sessionRestore) {
+            await captureAndSave();
+            await saveAllScrollbacks(collectAllSessionIds());
+          }
+        } finally {
+          await invoke("quit_app");
         }
-      } finally {
-        await invoke("quit_app");
-      }
-    }).then((unlisten) => { cleanup = unlisten; });
+      })
+      .then((unlisten) => {
+        cleanup = unlisten;
+      });
     return () => cleanup?.();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionRestore, confirmQuitWithSsh]);
 
   return { sessionRestored, prefsHydrated };

@@ -2,10 +2,7 @@ import { Alert02Icon, Globe02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import {
-  PreviewAddressBar,
-  type PreviewAddressBarHandle,
-} from "./PreviewAddressBar";
+import { PreviewAddressBar, type PreviewAddressBarHandle } from "./PreviewAddressBar";
 
 export type PreviewPaneHandle = {
   reload: () => void;
@@ -30,90 +27,83 @@ function getUrlExtension(url: string): string {
   }
 }
 
-export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(
-  function PreviewPane({ url, visible, onUrlChange }, ref) {
-    // `nonce` is part of the iframe `key`. Bumping it remounts the iframe,
-    // which is the only reliable cross-origin reload (calling
-    // contentWindow.location.reload() throws on cross-origin frames).
-    const [nonce, setNonce] = useState(0);
-    const addressRef = useRef<PreviewAddressBarHandle>(null);
+export const PreviewPane = forwardRef<PreviewPaneHandle, Props>(function PreviewPane(
+  { url, visible, onUrlChange },
+  ref,
+) {
+  // `nonce` is part of the iframe `key`. Bumping it remounts the iframe,
+  // which is the only reliable cross-origin reload (calling
+  // contentWindow.location.reload() throws on cross-origin frames).
+  const [nonce, setNonce] = useState(0);
+  const addressRef = useRef<PreviewAddressBarHandle>(null);
 
-    // Convert local absolute paths to asset:// protocol so the iframe can load them
-    const resolvedUrl = useMemo(() => {
-      if (!url) return url;
-      const isLocalPath = /^\//.test(url) || /^[a-zA-Z]:[\\/]/.test(url);
-      return isLocalPath ? convertFileSrc(url) : url;
-    }, [url]);
+  // Convert local absolute paths to asset:// protocol so the iframe can load them
+  const resolvedUrl = useMemo(() => {
+    if (!url) return url;
+    const isLocalPath = /^\//.test(url) || /^[a-zA-Z]:[\\/]/.test(url);
+    return isLocalPath ? convertFileSrc(url) : url;
+  }, [url]);
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        reload: () => setNonce((n) => n + 1),
-        focusAddressBar: () => addressRef.current?.focus(),
-        getUrl: () => url,
-      }),
-      [url],
-    );
+  useImperativeHandle(
+    ref,
+    () => ({
+      reload: () => setNonce((n) => n + 1),
+      focusAddressBar: () => addressRef.current?.focus(),
+      getUrl: () => url,
+    }),
+    [url],
+  );
 
-    const isLocalFilePath = url ? (/^\//.test(url) || /^[a-zA-Z]:[\\/]/.test(url)) : false;
-    const showXfoHint = url ? (!isLocalUrl(url) && !isLocalFilePath) : false;
-    const isImage = url ? IMAGE_EXTENSIONS.has(getUrlExtension(url)) : false;
+  const isLocalFilePath = url ? /^\//.test(url) || /^[a-zA-Z]:[\\/]/.test(url) : false;
+  const showXfoHint = url ? !isLocalUrl(url) && !isLocalFilePath : false;
+  const isImage = url ? IMAGE_EXTENSIONS.has(getUrlExtension(url)) : false;
 
-    return (
-      <div
-        className="flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-background"
-        style={{
-          visibility: visible ? "visible" : "hidden",
-          pointerEvents: visible ? "auto" : "none",
-        }}
-      >
-        <PreviewAddressBar
-          ref={addressRef}
-          url={url}
-          onSubmit={onUrlChange}
-          onReload={() => setNonce((n) => n + 1)}
-        />
-        {showXfoHint ? (
-          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border/60 bg-warning/8 px-3 text-[11px] text-warning">
-            <HugeiconsIcon
-              icon={Alert02Icon}
-              size={12}
-              strokeWidth={1.75}
-              className="shrink-0"
-            />
-            <span className="truncate">
-              Many public sites refuse to embed (X-Frame-Options). If the page
-              is blank, open it externally.
-            </span>
-          </div>
-        ) : null}
-        <div
-          className={
-            url && !isImage
-              ? "relative min-h-0 flex-1 bg-background"
-              : "relative min-h-0 flex-1 bg-background"
-          }
-        >
-          {url ? (
-            isImage ? (
-              <ImageViewer key={`${url}#${nonce}`} src={resolvedUrl} />
-            ) : (
-              <iframe
-                key={`${url}#${nonce}`}
-                src={resolvedUrl}
-                title="Preview"
-                className="h-full w-full border-0"
-                allow="clipboard-read; clipboard-write; fullscreen"
-              />
-            )
-          ) : (
-            <EmptyState />
-          )}
+  return (
+    <div
+      className="flex h-full w-full flex-col overflow-hidden rounded-md border border-border/60 bg-background"
+      style={{
+        visibility: visible ? "visible" : "hidden",
+        pointerEvents: visible ? "auto" : "none",
+      }}
+    >
+      <PreviewAddressBar
+        ref={addressRef}
+        url={url}
+        onSubmit={onUrlChange}
+        onReload={() => setNonce((n) => n + 1)}
+      />
+      {showXfoHint ? (
+        <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border/60 bg-warning/8 px-3 text-[11px] text-warning">
+          <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={1.75} className="shrink-0" />
+          <span className="truncate">
+            Many public sites refuse to embed (X-Frame-Options). If the page is blank, open it externally.
+          </span>
         </div>
+      ) : null}
+      <div
+        className={
+          url && !isImage ? "relative min-h-0 flex-1 bg-background" : "relative min-h-0 flex-1 bg-background"
+        }
+      >
+        {url ? (
+          isImage ? (
+            <ImageViewer key={`${url}#${nonce}`} src={resolvedUrl} />
+          ) : (
+            <iframe
+              key={`${url}#${nonce}`}
+              src={resolvedUrl}
+              title="Preview"
+              className="h-full w-full border-0"
+              allow="clipboard-read; clipboard-write; fullscreen"
+            />
+          )
+        ) : (
+          <EmptyState />
+        )}
       </div>
-    );
-  },
-);
+    </div>
+  );
+});
 
 type ZoomState = { zoom: number; tx: number; ty: number };
 
@@ -191,7 +181,9 @@ function ImageViewer({ src }: { src: string }) {
         ty: ty + (e.clientY - my),
       });
     };
-    const onMouseUp = () => { isDragging.current = false; };
+    const onMouseUp = () => {
+      isDragging.current = false;
+    };
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
     return () => {
@@ -238,17 +230,12 @@ function EmptyState() {
         <HugeiconsIcon icon={Globe02Icon} size={20} strokeWidth={1.5} />
       </div>
       <div className="space-y-1.5">
-        <p className="text-sm font-medium text-foreground">
-          Nothing to preview yet
-        </p>
+        <p className="text-sm font-medium text-foreground">Nothing to preview yet</p>
         <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
           Type a URL above, or open the{" "}
-          <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10.5px]">
-            Ports
-          </span>{" "}
-          dropdown to jump straight to your running dev server. Public sites
-          often block embedding — open them in your browser via the link icon
-          if you see a blank page.
+          <span className="rounded bg-muted px-1 py-0.5 font-mono text-[10.5px]">Ports</span> dropdown to jump
+          straight to your running dev server. Public sites often block embedding — open them in your browser
+          via the link icon if you see a blank page.
         </p>
       </div>
     </div>
@@ -260,11 +247,7 @@ function isLocalUrl(url: string): boolean {
     const u = new URL(url);
     const h = u.hostname;
     return (
-      h === "localhost" ||
-      h === "127.0.0.1" ||
-      h === "0.0.0.0" ||
-      h === "[::1]" ||
-      h.endsWith(".localhost")
+      h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "[::1]" || h.endsWith(".localhost")
     );
   } catch {
     return false;

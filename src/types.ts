@@ -1,9 +1,4 @@
-export type LabonairErrorCode =
-  | "AuthFailed"
-  | "NetworkError"
-  | "HostKeyMismatch"
-  | "IoError"
-  | "Internal";
+export type LabonairErrorCode = "AuthFailed" | "NetworkError" | "HostKeyMismatch" | "IoError" | "Internal";
 
 export interface LabonairError {
   code: LabonairErrorCode;

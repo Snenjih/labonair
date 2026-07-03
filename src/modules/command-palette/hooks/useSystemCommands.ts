@@ -1,10 +1,5 @@
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  Settings01Icon,
-  CheckListIcon,
-  SparklesIcon,
-  Key01Icon,
-} from "@hugeicons/core-free-icons";
+import { Settings01Icon, CheckListIcon, SparklesIcon, Key01Icon } from "@hugeicons/core-free-icons";
 import { createElement } from "react";
 import type { CommandPage } from "../types";
 import type { RegistryCallbacks } from "../types";

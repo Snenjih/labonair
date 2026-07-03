@@ -12,12 +12,7 @@ type Props = {
  * Enter commits, Escape cancels, blur commits (matches VSCode behavior —
  * dismissing the input is an implicit commit so a typed name isn't lost).
  */
-export function InlineInput({
-  initial,
-  placeholder,
-  onCommit,
-  onCancel,
-}: Props) {
+export function InlineInput({ initial, placeholder, onCommit, onCancel }: Props) {
   const [value, setValue] = useState(initial);
   const ref = useRef<HTMLInputElement>(null);
   const committedRef = useRef(false);

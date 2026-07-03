@@ -79,12 +79,12 @@ export const STATUSBAR_ITEM_REGISTRY: StatusBarItemDescriptor[] = [
 ];
 
 export const STATUSBAR_ITEM_SETTERS: Record<StatusBarItemId, (v: boolean) => Promise<void>> = {
-  explorerButton:      setStatusBarShowExplorerButton,
-  snippetsButton:      setStatusBarShowSnippetsButton,
+  explorerButton: setStatusBarShowExplorerButton,
+  snippetsButton: setStatusBarShowSnippetsButton,
   sourceControlButton: setStatusBarShowSourceControlButton,
-  tabsButton:          setStatusBarShowTabsButton,
-  cwdBreadcrumb:       setStatusBarShowCwdBreadcrumb,
-  cursorPosition:      setEditorShowCursorPosition,
-  previewUrl:          setStatusBarShowPreviewUrl,
-  aiControls:          setStatusBarShowAiControls,
+  tabsButton: setStatusBarShowTabsButton,
+  cwdBreadcrumb: setStatusBarShowCwdBreadcrumb,
+  cursorPosition: setEditorShowCursorPosition,
+  previewUrl: setStatusBarShowPreviewUrl,
+  aiControls: setStatusBarShowAiControls,
 };

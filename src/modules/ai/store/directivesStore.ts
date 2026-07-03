@@ -1,11 +1,6 @@
 import { emit, listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
-import {
-  loadDirectives,
-  newDirectiveId,
-  saveDirectives,
-  type Directive,
-} from "../lib/directives";
+import { loadDirectives, newDirectiveId, saveDirectives, type Directive } from "../lib/directives";
 
 const CHANGED_EVENT = "labonair://ai-directives-changed";
 
@@ -33,8 +28,7 @@ export const useDirectivesStore = create<State>((set, get) => ({
   upsert: (directive) => {
     const list = get().directives;
     const idx = list.findIndex((d) => d.id === directive.id);
-    const next =
-      idx === -1 ? [...list, directive] : list.map((d) => (d.id === directive.id ? directive : d));
+    const next = idx === -1 ? [...list, directive] : list.map((d) => (d.id === directive.id ? directive : d));
     set({ directives: next });
     void saveDirectives(next).then(() => emit(CHANGED_EVENT));
   },

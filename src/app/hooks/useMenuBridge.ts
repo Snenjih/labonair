@@ -1,11 +1,7 @@
 import { useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useChatStore } from "@/modules/ai";
-import {
-  useTabsStore,
-  selectActiveTabKind,
-  type WorkspaceTab,
-} from "@/modules/tabs";
+import { useTabsStore, selectActiveTabKind, type WorkspaceTab } from "@/modules/tabs";
 import {
   DEFAULT_PREFERENCES,
   setTerminalFontSize,
@@ -57,15 +53,21 @@ export function useMenuBridge(actions: AppActions): void {
     "menu:toggle_ai_2": () => actions.togglePanelAndFocus(),
     "menu:zoom_in": () => {
       const kind = selectActiveTabKind(useTabsStore.getState());
-      if (kind === "workspace") void setTerminalFontSize(Math.min(usePreferencesStore.getState().terminalFontSize + 1, 32));
-      else if (kind === "editor") void setEditorFontSize(Math.min(usePreferencesStore.getState().editorFontSize + 1, 32));
-      else if (kind === "sftp") void setSftpFontSize(Math.min(usePreferencesStore.getState().sftpFontSize + 1, 20));
+      if (kind === "workspace")
+        void setTerminalFontSize(Math.min(usePreferencesStore.getState().terminalFontSize + 1, 32));
+      else if (kind === "editor")
+        void setEditorFontSize(Math.min(usePreferencesStore.getState().editorFontSize + 1, 32));
+      else if (kind === "sftp")
+        void setSftpFontSize(Math.min(usePreferencesStore.getState().sftpFontSize + 1, 20));
     },
     "menu:zoom_out": () => {
       const kind = selectActiveTabKind(useTabsStore.getState());
-      if (kind === "workspace") void setTerminalFontSize(Math.max(usePreferencesStore.getState().terminalFontSize - 1, 8));
-      else if (kind === "editor") void setEditorFontSize(Math.max(usePreferencesStore.getState().editorFontSize - 1, 8));
-      else if (kind === "sftp") void setSftpFontSize(Math.max(usePreferencesStore.getState().sftpFontSize - 1, 10));
+      if (kind === "workspace")
+        void setTerminalFontSize(Math.max(usePreferencesStore.getState().terminalFontSize - 1, 8));
+      else if (kind === "editor")
+        void setEditorFontSize(Math.max(usePreferencesStore.getState().editorFontSize - 1, 8));
+      else if (kind === "sftp")
+        void setSftpFontSize(Math.max(usePreferencesStore.getState().sftpFontSize - 1, 10));
     },
     "menu:zoom_reset": () => {
       const kind = selectActiveTabKind(useTabsStore.getState());
@@ -107,7 +109,9 @@ export function useMenuBridge(actions: AppActions): void {
       listen(event, () => menuHandlersRef.current[event]?.()).then((u) => cleanups.push(u));
     };
     for (const event of Object.keys(menuHandlersRef.current)) on(event);
-    return () => { for (const fn of cleanups) fn(); };
+    return () => {
+      for (const fn of cleanups) fn();
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // labonair:open-file listener
@@ -117,7 +121,9 @@ export function useMenuBridge(actions: AppActions): void {
     let unlisten: (() => void) | undefined;
     listen<{ path: string }>("labonair:open-file", (event) => {
       openFileTabRef.current(event.payload.path);
-    }).then((fn) => { unlisten = fn; });
+    }).then((fn) => {
+      unlisten = fn;
+    });
     return () => unlisten?.();
   }, []);
 
@@ -126,8 +132,9 @@ export function useMenuBridge(actions: AppActions): void {
     let unlisten: (() => void) | undefined;
     listen<{ path: string; title: string }>("labonair:open-preview", (event) => {
       useTabsStore.getState().newPreviewTab(event.payload.path, event.payload.title);
-    }).then((fn) => { unlisten = fn; });
+    }).then((fn) => {
+      unlisten = fn;
+    });
     return () => unlisten?.();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
 }

@@ -8,9 +8,7 @@ type Props = { sessionId: string | null };
 export function QueueStrip({ sessionId }: Props) {
   // Must not use `?? []` here — a new array reference on every selector call
   // causes useSyncExternalStore's post-render consistency check to loop infinitely.
-  const queue = useChatStore((s) =>
-    sessionId ? (s.queues[sessionId] ?? null) : null,
-  );
+  const queue = useChatStore((s) => (sessionId ? (s.queues[sessionId] ?? null) : null));
   const cancelQueuedMessage = useChatStore((s) => s.cancelQueuedMessage);
 
   if (!sessionId || !queue?.length) return null;
@@ -18,16 +16,9 @@ export function QueueStrip({ sessionId }: Props) {
   return (
     <div className="shrink-0 border-t border-border/80 bg-muted/20 px-3 py-1.5">
       <div className="mb-1 flex items-center gap-1.5">
-        <HugeiconsIcon
-          icon={Clock01Icon}
-          size={11}
-          strokeWidth={1.75}
-          className="text-muted-foreground"
-        />
+        <HugeiconsIcon icon={Clock01Icon} size={11} strokeWidth={1.75} className="text-muted-foreground" />
         <span className="text-[11px] font-medium text-foreground">Queued</span>
-        <span className="text-[11px] text-muted-foreground">
-          · sends when AI finishes
-        </span>
+        <span className="text-[11px] text-muted-foreground">· sends when AI finishes</span>
       </div>
       <ul className="flex flex-col gap-0.5">
         <AnimatePresence initial={false}>
@@ -44,9 +35,7 @@ export function QueueStrip({ sessionId }: Props) {
               <span className="w-3 shrink-0 text-[10px] tabular-nums text-muted-foreground/50">
                 {index + 1}
               </span>
-              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                {item.text}
-              </span>
+              <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{item.text}</span>
               <span className="hidden shrink-0 text-[10px] text-muted-foreground/50 group-hover:block">
                 {index === 0 ? "next" : `after ${index}`}
               </span>

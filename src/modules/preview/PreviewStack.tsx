@@ -10,10 +10,7 @@ type Props = {
   registerHandle: (id: number, handle: PreviewPaneHandle | null) => void;
 };
 
-export function PreviewStack({
-  onUrlChange,
-  registerHandle,
-}: Props) {
+export function PreviewStack({ onUrlChange, registerHandle }: Props) {
   const previews = useTabsStore(
     useShallow((s) => s.tabs.filter((t): t is PreviewTab => t.kind === "preview")),
   );
@@ -28,9 +25,7 @@ export function PreviewStack({
     urlChangeRef.current = onUrlChange;
   }, [onUrlChange]);
 
-  const refCallbacks = useRef(
-    new Map<number, (h: PreviewPaneHandle | null) => void>(),
-  );
+  const refCallbacks = useRef(new Map<number, (h: PreviewPaneHandle | null) => void>());
   const urlCallbacks = useRef(new Map<number, (url: string) => void>());
 
   const getRefCallback = (id: number) => {
@@ -68,10 +63,7 @@ export function PreviewStack({
         return (
           <div
             key={t.id}
-            className={cn(
-              "absolute inset-0",
-              !visible && "invisible pointer-events-none",
-            )}
+            className={cn("absolute inset-0", !visible && "invisible pointer-events-none")}
             aria-hidden={!visible}
           >
             <PreviewPane

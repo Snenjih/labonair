@@ -1,26 +1,21 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { handleApiError } from "@/lib/errors";
-import { useCallback, useEffect, useState } from "react";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { isLabonairError } from "@/types";
+import { createAsyncQueue } from "./asyncQueue";
+import type { FsProvider } from "./fsProvider";
 import { useLocalExplorerStore } from "./useLocalExplorerStore";
-
-export type DirEntry = {
-  name: string;
-  kind: "file" | "dir" | "symlink";
-  size: number;
-  mtime: number;
-  is_ignored?: boolean;
-};
 
 export type PendingCreate = {
   parentPath: string;
   kind: "file" | "dir";
 };
 
-export function joinPath(parent: string, name: string): string {
-  if (parent.endsWith("/")) return `${parent}${name}`;
-  return `${parent}/${name}`;
-}
+type Options = {
+  onPathRenamed?: (from: string, to: string) => void;
+  onPathDeleted?: (path: string) => void;
+};
 
 export function dirname(path: string): string {
   const i = path.lastIndexOf("/");
@@ -28,83 +23,178 @@ export function dirname(path: string): string {
   return path.slice(0, i);
 }
 
-type Options = {
-  onPathRenamed?: (from: string, to: string) => void;
-  onPathDeleted?: (path: string) => void;
-};
+// Caps how many readDir requests are in flight at once (e.g. expanding
+// several directories in quick succession). Local reads don't strictly need
+// this, but remote reads all funnel through a single mutex-guarded SFTP
+// channel — bounding concurrency here keeps requests queued client-side
+// instead of piling up blocked on the backend's lock.
+const READDIR_CONCURRENCY = 3;
 
-export function useFileTree(rootPath: string | null, options?: Options) {
-  const {
-    nodes,
-    expanded,
-    showHidden,
-    setRootPath,
-    setNode,
-    toggleExpanded,
-    addExpanded,
-    toggleShowHidden,
-  } = useLocalExplorerStore();
+export function useFileTree(provider: FsProvider, rootPath: string | null, options?: Options) {
+  // Remote providers have no push-based watch — poll expanded directories at
+  // a conservative interval instead so browsing doesn't go completely stale
+  // during a long session. Local providers use OS watchers (fs:dir-changed)
+  // and never hit this path. 0 (from the "Never" option) disables polling.
+  const remotePollIntervalMs = usePreferencesStore((s) => s.explorerRemotePollInterval) * 1000;
+  const { nodes, expanded, showHidden, setScope, setNode, toggleExpanded, addExpanded, toggleShowHidden } =
+    useLocalExplorerStore();
 
   // Ephemeral UI states — don't need to survive sidebar hide/show.
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
 
+  const queueRef = useRef(createAsyncQueue(READDIR_CONCURRENCY));
+  // Deduplicates overlapping fetchChildren(path) calls for the exact same
+  // path (e.g. a double-click racing a keyboard toggle) — callers piggyback
+  // on the same in-flight request instead of firing a second one.
+  const inFlightRef = useRef<Map<string, Promise<void>>>(new Map());
+
   const fetchChildren = useCallback(
-    async (path: string) => {
-      const show_hidden = useLocalExplorerStore.getState().showHidden;
-      setNode(path, { status: "loading" });
-      try {
-        const entries = await invoke<DirEntry[]>("fs_read_dir", {
-          path,
-          showHidden: show_hidden,
-        });
-        setNode(path, { status: "loaded", entries });
-      } catch (e) {
-        setNode(path, { status: "error", message: String(e) });
+    (path: string, opts?: { append?: boolean; silent?: boolean }): Promise<void> => {
+      const append = opts?.append ?? false;
+      // Dedupe only applies to plain re-fetches — a `loadMore` (append) call
+      // is a distinct request even if a base fetch for the same path happens
+      // to be in flight. NOTE: dedup is keyed on `path` alone, not
+      // `(path, silent)` — if a silent background revalidation is already
+      // in flight when a caller requests a non-silent fetch for the same
+      // path, the caller piggybacks the silent one's promise/behavior (no
+      // loading state, a toast instead of an inline error on failure). This
+      // is a rare, cosmetic-only edge case (requires landing inside the same
+      // sub-second window as a poll/revalidation for the exact same path)
+      // — not worth a compound dedup key.
+      const silent = opts?.silent ?? false;
+      if (!append) {
+        const inFlight = inFlightRef.current.get(path);
+        if (inFlight) return inFlight;
       }
+
+      const promise = queueRef.current.run(async () => {
+        const show_hidden = useLocalExplorerStore.getState().showHidden;
+        const requestGeneration = useLocalExplorerStore.getState().generation;
+        const existing = useLocalExplorerStore.getState().nodes[path];
+        const offset = append && existing?.status === "loaded" ? existing.entries.length : 0;
+
+        // Only show the "loading" placeholder when there's nothing already
+        // rendered for this path — a re-fetch of an already-loaded directory
+        // (manual refresh, OS watcher, remote poll, retrying a stale error)
+        // must not blank out good data just to briefly flash a spinner over
+        // it. `silent` already skipped this for background polls; this
+        // widens the same protection to every re-fetch, not just polls.
+        if (!append && !silent && existing?.status !== "loaded") setNode(path, { status: "loading" });
+        try {
+          const page = await provider.readDir(path, { showHidden: show_hidden, offset });
+          // Discard a response that outlived a scope change (e.g. the user
+          // switched away from this host/root while the request was in
+          // flight) — applying it now would write into whatever scope is
+          // active by the time it resolves.
+          if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
+          const current = useLocalExplorerStore.getState().nodes[path];
+          const priorEntries = append && current?.status === "loaded" ? current.entries : [];
+          setNode(path, {
+            status: "loaded",
+            entries: [...priorEntries, ...page.entries],
+            hasMore: page.hasMore,
+          });
+        } catch (e) {
+          if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
+          if (silent) {
+            // A silent (background/revalidation) fetch must never destroy
+            // already-good cached data — surface the problem as a toast and
+            // leave the last-known-good `status:"loaded"` node in place.
+            handleApiError(e, "Failed to refresh directory", "File Tree");
+          } else if (!append) {
+            setNode(path, {
+              status: "error",
+              // Remote (SFTP) commands reject with a LabonairError object
+              // ({ code, message }), not a string — String(e) on that
+              // stringifies to the literal text "[object Object]" instead
+              // of the actual message. Local commands reject with a plain
+              // string, where this is a no-op.
+              message: isLabonairError(e) ? e.message : String(e),
+            });
+          } else {
+            handleApiError(e, "Failed to load more entries", "File Tree");
+          }
+        }
+      });
+
+      if (!append) {
+        inFlightRef.current.set(path, promise);
+        void promise.finally(() => {
+          inFlightRef.current.delete(path);
+        });
+      }
+      return promise;
     },
-    [setNode],
+    [setNode, provider],
   );
 
-  // Root change → reset persisted tree state and reload root.
+  const loadMore = useCallback(
+    (path: string) => {
+      void fetchChildren(path, { append: true });
+    },
+    [fetchChildren],
+  );
+
+  // Scope (provider identity) or root change → reset persisted tree state and reload root.
+  // Comparing scopeKey+rootPath together (not rootPath alone) prevents a stale cache
+  // from a different provider (e.g. a different SSH host) leaking into the new scope
+  // when both happen to share the same path string.
   useEffect(() => {
     if (!rootPath) {
-      setRootPath(null);
+      setScope(provider.id, null);
       setPendingCreate(null);
       setRenaming(null);
       return;
     }
-    // Only reset when root actually changes to avoid re-fetching on re-renders.
-    const current = useLocalExplorerStore.getState().rootPath;
-    if (current !== rootPath) {
-      setRootPath(rootPath);
+    const current = useLocalExplorerStore.getState();
+    if (current.scopeKey !== provider.id || current.rootPath !== rootPath) {
+      setScope(provider.id, rootPath);
       setPendingCreate(null);
       setRenaming(null);
-      void fetchChildren(rootPath);
-    } else if (!useLocalExplorerStore.getState().nodes[rootPath]) {
+      // setScope may have just hydrated `nodes`/`expanded` from a cached
+      // remote snapshot (see useLocalExplorerStore.ts) — if so, the tree is
+      // already rendering the cached view instantly; kick off a silent
+      // background revalidation instead of a blocking fetch. A cache miss
+      // (or a local scope, which is never cached) falls back to the
+      // original blocking behavior.
+      const afterScope = useLocalExplorerStore.getState();
+      if (afterScope.nodes[rootPath]?.status === "loaded") {
+        void fetchChildren(rootPath, { silent: true });
+        for (const p of afterScope.expanded) void fetchChildren(p, { silent: true });
+      } else {
+        void fetchChildren(rootPath);
+      }
+    } else if (!current.nodes[rootPath]) {
       // Store is fresh (e.g. first mount after store reset) — still fetch root.
       void fetchChildren(rootPath);
     }
-  }, [rootPath, setRootPath, fetchChildren]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rootPath, provider.id, setScope, fetchChildren]);
 
   // Sync OS watchers with the current tree state on mount/unmount/root change.
   // The expanded Set in the store survives component unmounts, so on remount we
   // restore all watchers that were active before the sidebar panel switch.
+  // No-op for providers that don't support live watching (e.g. remote/SFTP).
   useEffect(() => {
+    if (!provider.capabilities.supportsWatch || !provider.syncWatchers) return () => {};
     if (!rootPath) {
-      void invoke("fs_sync_watchers", { paths: [] });
+      void provider.syncWatchers([]);
       return () => {};
     }
     const expandedPaths = [...useLocalExplorerStore.getState().expanded];
-    void invoke("fs_sync_watchers", { paths: [rootPath, ...expandedPaths] });
+    void provider.syncWatchers([rootPath, ...expandedPaths]);
 
     return () => {
-      void invoke("fs_sync_watchers", { paths: [] });
+      void provider.syncWatchers?.([]);
     };
-  }, [rootPath]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rootPath, provider]);
 
   // Listen for OS-level directory change events and refresh the affected dir.
+  // Only local providers ever emit this event (see fs/watcher.rs).
   useEffect(() => {
+    if (!provider.capabilities.supportsWatch) return () => {};
     let unlisten: (() => void) | undefined;
     listen<{ path: string }>("fs:dir-changed", (event) => {
       const { path } = event.payload;
@@ -116,35 +206,63 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       unlisten = fn;
     });
     return () => unlisten?.();
-  }, [fetchChildren]);
+  }, [fetchChildren, provider.capabilities.supportsWatch]);
+
+  // Providers without push-based watching (remote/SFTP) get a conservative
+  // background refresh of the root and every currently-expanded directory
+  // instead — dedupe + the concurrency queue above mean this can never pile
+  // up requests even if a poll tick lands while a manual fetch is still
+  // running. Local providers rely on OS watchers and skip this entirely.
+  useEffect(() => {
+    if (provider.capabilities.supportsWatch || !rootPath || remotePollIntervalMs <= 0) return;
+    const interval = setInterval(() => {
+      const state = useLocalExplorerStore.getState();
+      // Scope may have moved on since this interval was scheduled (e.g. the
+      // sidebar target changed) — a stale poll must not resurrect it.
+      if (state.scopeKey !== provider.id || state.rootPath !== rootPath) return;
+      // Silent — a background poll must never flash a "loading" state over
+      // already-good data (this was a pre-existing wart independent of
+      // caching: every poll tick used to blow away loaded entries with a
+      // transient "loading" placeholder).
+      void fetchChildren(rootPath, { silent: true });
+      for (const path of state.expanded) {
+        void fetchChildren(path, { silent: true });
+      }
+    }, remotePollIntervalMs);
+    return () => clearInterval(interval);
+  }, [provider, rootPath, fetchChildren, remotePollIntervalMs]);
 
   const toggle = useCallback(
     (path: string) => {
       // Read expansion state BEFORE toggling so we know which direction we went.
       const wasExpanded = useLocalExplorerStore.getState().expanded.has(path);
       toggleExpanded(path);
-      if (wasExpanded) {
-        void invoke("fs_unwatch_dir", { path });
-      } else {
-        void invoke("fs_watch_dir", { path });
+      if (provider.capabilities.supportsWatch) {
+        if (wasExpanded) void provider.unwatch?.(path);
+        else void provider.watch?.(path);
       }
       const node = useLocalExplorerStore.getState().nodes[path];
       if (!node || node.status === "error") {
         void fetchChildren(path);
       }
     },
-    [toggleExpanded, fetchChildren],
+    [toggleExpanded, fetchChildren, provider],
   );
 
   const expand = useCallback(
     (path: string) => {
       addExpanded(path);
-      void invoke("fs_watch_dir", { path });
-      if (!useLocalExplorerStore.getState().nodes[path]) {
+      if (provider.capabilities.supportsWatch) void provider.watch?.(path);
+      // Also retry a previously-errored node — matches `toggle`'s guard.
+      // Without this, a node that failed once (e.g. a transient SFTP error)
+      // stays permanently stuck showing the error for any caller that only
+      // expands (keyboard nav, beginCreate) rather than toggling/refreshing.
+      const node = useLocalExplorerStore.getState().nodes[path];
+      if (!node || node.status === "error") {
         void fetchChildren(path);
       }
     },
-    [addExpanded, fetchChildren],
+    [addExpanded, fetchChildren, provider],
   );
 
   const refresh = useCallback(
@@ -163,7 +281,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
       if (rootPath && parentPath !== rootPath) {
         addExpanded(parentPath);
       }
-      if (!useLocalExplorerStore.getState().nodes[parentPath]) {
+      const node = useLocalExplorerStore.getState().nodes[parentPath];
+      if (!node || node.status === "error") {
         void fetchChildren(parentPath);
       }
     },
@@ -180,19 +299,22 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         setPendingCreate(null);
         return;
       }
-      const path = joinPath(pendingCreate.parentPath, trimmed);
-      const cmd =
-        pendingCreate.kind === "dir" ? "fs_create_dir" : "fs_create_file";
+      const path = provider.joinPath(pendingCreate.parentPath, trimmed);
       try {
-        await invoke(cmd, { path });
+        if (pendingCreate.kind === "dir") await provider.mkdir(path);
+        else await provider.createFile(path);
         await fetchChildren(pendingCreate.parentPath);
       } catch (e) {
-        handleApiError(e, `${cmd === "fs_create_dir" ? "Create folder" : "Create file"} failed`, "File Tree");
+        handleApiError(
+          e,
+          `${pendingCreate.kind === "dir" ? "Create folder" : "Create file"} failed`,
+          "File Tree",
+        );
       } finally {
         setPendingCreate(null);
       }
     },
-    [pendingCreate, fetchChildren],
+    [pendingCreate, fetchChildren, provider],
   );
 
   const beginRename = useCallback((path: string) => {
@@ -212,9 +334,9 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         setRenaming(null);
         return;
       }
-      const to = joinPath(parent, trimmed);
+      const to = provider.joinPath(parent, trimmed);
       try {
-        await invoke("fs_rename", { from: renaming, to });
+        await provider.rename(renaming, to);
         options?.onPathRenamed?.(renaming, to);
         await fetchChildren(parent);
       } catch (e) {
@@ -223,20 +345,42 @@ export function useFileTree(rootPath: string | null, options?: Options) {
         setRenaming(null);
       }
     },
-    [renaming, fetchChildren, options],
+    [renaming, fetchChildren, options, provider],
+  );
+
+  // Drag-and-drop move within the same tree — `rename` on both local and
+  // remote backends is a plain filesystem/SFTP rename, which already moves
+  // across directories, not just renames in place. Distinct from
+  // `commitRename` only in that the destination is a directory the caller
+  // resolved (drop target) rather than a typed name.
+  const movePath = useCallback(
+    async (path: string, destDir: string) => {
+      const name = path.slice(path.lastIndexOf("/") + 1);
+      const to = provider.joinPath(destDir, name);
+      if (to === path) return;
+      try {
+        await provider.rename(path, to);
+        options?.onPathRenamed?.(path, to);
+        await fetchChildren(dirname(path));
+        await fetchChildren(destDir);
+      } catch (e) {
+        handleApiError(e, "Move failed", "File Tree");
+      }
+    },
+    [fetchChildren, options, provider],
   );
 
   const deletePath = useCallback(
     async (path: string) => {
       try {
-        await invoke("fs_delete", { path });
+        await provider.delete([path]);
         options?.onPathDeleted?.(path);
         await fetchChildren(dirname(path));
       } catch (e) {
         handleApiError(e, "Delete failed", "File Tree");
       }
     },
-    [fetchChildren, options],
+    [fetchChildren, options, provider],
   );
 
   return {
@@ -246,16 +390,19 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     toggleShowHidden,
     pendingCreate,
     renaming,
+    capabilities: provider.capabilities,
     toggle,
     expand,
     refresh,
+    loadMore,
     beginCreate,
     cancelCreate,
     commitCreate,
     beginRename,
     cancelRename,
     commitRename,
+    movePath,
     deletePath,
-    joinPath,
+    joinPath: provider.joinPath,
   };
 }

@@ -13,11 +13,7 @@ export function buildClaudeTools(ctx: ToolContext) {
     Use flags for CLI options like --model.`,
       inputSchema: z.object({
         target: z
-          .union([
-            z.literal("new"),
-            z.literal("current"),
-            z.number().int().min(1),
-          ])
+          .union([z.literal("new"), z.literal("current"), z.number().int().min(1)])
           .describe(
             'Where to open the session. "new" = new tab, "current" = active terminal, or 1-based index of a specific terminal.',
           ),

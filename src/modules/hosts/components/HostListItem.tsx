@@ -159,7 +159,10 @@ export function HostListItem({
             {/* Clickable info area */}
             <button
               onClick={onSelect}
-              onDoubleClick={(e) => { e.stopPropagation(); newSshTab(host.id, host.name); }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                newSshTab(host.id, host.name);
+              }}
               className="flex flex-1 items-center gap-3 py-3 text-left outline-none min-w-0"
             >
               {/* Avatar with ping dot */}
@@ -171,7 +174,8 @@ export function HostListItem({
                 <span
                   className={cn(
                     "absolute -bottom-0.5 -right-0.5 size-2 rounded-full border-2 border-background",
-                    pingStatus === "online" && "bg-success [box-shadow:0_0_4px_color-mix(in_oklch,var(--color-success)_70%,transparent)]",
+                    pingStatus === "online" &&
+                      "bg-success [box-shadow:0_0_4px_color-mix(in_oklch,var(--color-success)_70%,transparent)]",
                     pingStatus === "offline" && "bg-destructive",
                     (!pingStatus || pingStatus === "checking") && "bg-muted-foreground/40 animate-pulse",
                   )}
@@ -196,31 +200,55 @@ export function HostListItem({
                 <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground truncate">
                   {host.auth_method === "credential" && credential ? (
                     <>
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                        <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                      <svg
+                        width="9"
+                        height="9"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0"
+                      >
+                        <circle cx="7.5" cy="15.5" r="5.5" />
+                        <path d="m21 2-9.6 9.6" />
+                        <path d="m15.5 7.5 3 3L22 7l-3-3" />
                       </svg>
                       <span className="truncate">{credential.name}</span>
                       <span className="shrink-0 opacity-50">•</span>
                     </>
                   ) : host.auth_method === "key" ? (
                     <>
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                        <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
+                      <svg
+                        width="9"
+                        height="9"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0"
+                      >
+                        <circle cx="7.5" cy="15.5" r="5.5" />
+                        <path d="m21 2-9.6 9.6" />
+                        <path d="m15.5 7.5 3 3L22 7l-3-3" />
                       </svg>
                       <span className="shrink-0 opacity-50">•</span>
                     </>
                   ) : (
                     <span className="shrink-0 opacity-50">ssh •</span>
                   )}
-                  <span className="truncate">{host.username}@{host.host_address}</span>
+                  <span className="truncate">
+                    {host.username}@{host.host_address}
+                  </span>
                 </span>
               </div>
 
               {/* Last connected — right aligned */}
               <span className="shrink-0 text-[10px] text-muted-foreground/60 hidden sm:block">
-                {host.last_connected_at
-                  ? relativeTime(host.last_connected_at)
-                  : "Never"}
+                {host.last_connected_at ? relativeTime(host.last_connected_at) : "Never"}
               </span>
             </button>
 
@@ -232,10 +260,16 @@ export function HostListItem({
                 onClick={connectSsh}
                 className="h-7 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-background/50"
               >
-                {hasActiveSshTab && (
-                  <span className="size-1.5 rounded-full bg-success animate-pulse" />
-                )}
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round">
+                {hasActiveSshTab && <span className="size-1.5 rounded-full bg-success animate-pulse" />}
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                >
                   <rect x="1" y="3" width="12" height="8" rx="1.5" />
                   <path d="M4 7l1.5 1.5L4 10M8 9.5h2" />
                 </svg>
@@ -247,10 +281,17 @@ export function HostListItem({
                 onClick={connectSftp}
                 className="h-7 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-background/50"
               >
-                {hasActiveSftpTab && (
-                  <span className="size-1.5 rounded-full bg-success animate-pulse" />
-                )}
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                {hasActiveSftpTab && <span className="size-1.5 rounded-full bg-success animate-pulse" />}
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M1 4.5V11a1 1 0 001 1h10a1 1 0 001-1V5.5a1 1 0 00-1-1H7L5.5 3H2a1 1 0 00-1 1.5z" />
                 </svg>
                 <span className="hidden sm:inline">SFTP</span>
@@ -335,7 +376,10 @@ export function HostListItem({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => { void deleteHost(host.id); setSelectedHost(null); }}
+              onClick={() => {
+                void deleteHost(host.id);
+                setSelectedHost(null);
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
@@ -349,13 +393,16 @@ export function HostListItem({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {bulkIds.length} hosts?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the selected hosts and their stored credentials. This cannot be undone.
+              This will permanently remove the selected hosts and their stored credentials. This cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => { void deleteManyHosts(bulkIds); }}
+              onClick={() => {
+                void deleteManyHosts(bulkIds);
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete {bulkIds.length} Hosts

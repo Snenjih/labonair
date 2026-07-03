@@ -1,54 +1,46 @@
-import { Input } from "@/components/ui/input";
-import { WindowControls } from "@/components/WindowControls";
-import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
-import { cn } from "@/lib/utils";
-import { useThemeEngine } from "@/lib/useThemeEngine";
-import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
-import {
-  SETTING_DEFINITIONS,
-  type SettingCategory,
-} from "@/modules/settings/definitions";
 import {
   AiScanIcon,
   File01Icon,
+  GitBranchIcon,
   KeyboardIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
+  Search01Icon,
   Settings01Icon,
   SourceCodeIcon,
   TerminalIcon,
-  Search01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { WindowControls } from "@/components/WindowControls";
 import { getStoragePaths } from "@/lib/paths";
-import * as store from "@/modules/settings/store";
+import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
+import { useThemeEngine } from "@/lib/useThemeEngine";
+import { cn } from "@/lib/utils";
+import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
+import { SETTING_DEFINITIONS, type SettingCategory } from "@/modules/settings/definitions";
+import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
+import { usePreferencesStore, usePreferencesStore as usePrefs } from "@/modules/settings/preferences";
 import type { PrefKey } from "@/modules/settings/store";
+import * as store from "@/modules/settings/store";
+import { useKeybindsStore } from "@/modules/shortcuts";
+import { SettingRow } from "./components/SettingRow";
 import { AgentsSection } from "./sections/AgentsSection";
+import { AiSection } from "./sections/AiSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { CommandPaletteSection } from "./sections/CommandPaletteSection";
 import { EditorSection } from "./sections/EditorSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { KeyboardShortcutsSection } from "./sections/KeyboardShortcutsSection";
 import { ModelsSection } from "./sections/ModelsSection";
+import { SourceControlSection } from "./sections/SourceControlSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemeMarketplace } from "./sections/ThemeMarketplace";
-import { AiSection } from "./sections/AiSection";
-import { SettingRow } from "./components/SettingRow";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { usePreferencesStore as usePrefs } from "@/modules/settings/preferences";
-import { useKeybindsStore } from "@/modules/shortcuts";
 
 type SidebarItem = {
   id: SettingsTab;
@@ -64,6 +56,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
+  { id: "source-control", category: "Source Control", label: "Source Control", icon: GitBranchIcon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
   { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
 ];
@@ -103,9 +96,8 @@ export function SettingsApp() {
         setActive(detail as SettingsTab);
       }
     };
-    const unlistenPromise = getCurrentWebviewWindow().listen<string>(
-      "labonair:settings-tab",
-      (e) => apply(e.payload),
+    const unlistenPromise = getCurrentWebviewWindow().listen<string>("labonair:settings-tab", (e) =>
+      apply(e.payload),
     );
     return () => {
       void unlistenPromise.then((un) => un());
@@ -122,9 +114,7 @@ export function SettingsApp() {
 
   const searchResults = isSearching
     ? SETTING_DEFINITIONS.filter(
-        (def) =>
-          def.label.toLowerCase().includes(trimmed) ||
-          def.description.toLowerCase().includes(trimmed),
+        (def) => def.label.toLowerCase().includes(trimmed) || def.description.toLowerCase().includes(trimmed),
       )
     : [];
 
@@ -138,10 +128,7 @@ export function SettingsApp() {
           IS_MAC ? "pr-3 pl-22" : "pr-0 pl-3"
         }`}
       >
-        <span
-          className="flex-1 text-center text-[12.5px] font-medium"
-          data-tauri-drag-region
-        >
+        <span className="flex-1 text-center text-[12.5px] font-medium" data-tauri-drag-region>
           Settings
         </span>
         {USE_CUSTOM_WINDOW_CONTROLS && <WindowControls />}
@@ -206,6 +193,7 @@ export function SettingsApp() {
                 {active === "terminal" && <TerminalSection />}
                 {active === "editor" && <EditorSection />}
                 {active === "command-palette" && <CommandPaletteSection />}
+                {active === "source-control" && <SourceControlSection />}
                 {active === "shortcuts" && <KeyboardShortcutsSection />}
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
@@ -221,33 +209,108 @@ export function SettingsApp() {
 
 function applySettingChange(id: PrefKey, value: unknown): void {
   switch (id) {
-    case "autostart": void store.setAutostart(value as boolean); break;
-    case "restoreWindowState": void store.setRestoreWindowState(value as boolean); break;
-    case "vimMode": void store.setVimMode(value as boolean); break;
-    case "theme": void store.setTheme(value as store.ThemePref); break;
-    case "terminalCursorBlink": void store.setTerminalCursorBlink(value as boolean); break;
-    case "terminalCursorBlinkInterval": void store.setTerminalCursorBlinkInterval(Number(value)); break;
-    case "terminalCursorStyle": void store.setTerminalCursorStyle(value as "block" | "underline" | "bar"); break;
-    case "terminalFontWeight": void store.setTerminalFontWeight(value as "normal" | "medium" | "bold"); break;
-    case "editorAutoSave": void store.setEditorAutoSave(value as "off" | "afterDelay" | "onFocusChange"); break;
-    case "editorLineNumbers": void store.setEditorLineNumbers(value as boolean); break;
-    case "editorWordWrap": void store.setEditorWordWrap(value as boolean); break;
-    case "editorTabSize": void store.setEditorTabSize(Number(value) as 2 | 4 | 8); break;
-    case "editorBracketMatching": void store.setEditorBracketMatching(value as boolean); break;
-    case "sftpShowHiddenFiles": void store.setSftpShowHiddenFiles(value as boolean); break;
-    case "sftpShowUpFolder": void store.setSftpShowUpFolder(value as boolean); break;
-    case "sftpColumnSize": void store.setSftpColumnSize(value as boolean); break;
-    case "sftpColumnModified": void store.setSftpColumnModified(value as boolean); break;
-    case "sftpColumnPermissions": void store.setSftpColumnPermissions(value as boolean); break;
-    case "sftpColumnType": void store.setSftpColumnType(value as boolean); break;
-    case "sftpRemoteEditShowTransfers": void store.setSftpRemoteEditShowTransfers(value as boolean); break;
-    case "hostPingInterval": void store.setHostPingInterval(Number(value)); break;
-    case "aiEnabled": void store.setAiEnabled(value as boolean); break;
-    case "showEditPrediction": void store.setShowEditPrediction(value as boolean); break;
-    case "autocompleteEnabled": void store.setAutocompleteEnabled(value as boolean); break;
-    case "sshAutoReconnect": void store.setSshAutoReconnect(value as boolean); break;
-    case "sshAutoReconnectDelay": void store.setSshAutoReconnectDelay(Number(value)); break;
-    case "sshAutoReconnectMaxAttempts": void store.setSshAutoReconnectMaxAttempts(Number(value)); break;
+    case "autostart":
+      void store.setAutostart(value as boolean);
+      break;
+    case "restoreWindowState":
+      void store.setRestoreWindowState(value as boolean);
+      break;
+    case "vimMode":
+      void store.setVimMode(value as boolean);
+      break;
+    case "theme":
+      void store.setTheme(value as store.ThemePref);
+      break;
+    case "terminalCursorBlink":
+      void store.setTerminalCursorBlink(value as boolean);
+      break;
+    case "terminalCursorBlinkInterval":
+      void store.setTerminalCursorBlinkInterval(Number(value));
+      break;
+    case "terminalCursorStyle":
+      void store.setTerminalCursorStyle(value as "block" | "underline" | "bar");
+      break;
+    case "terminalFontWeight":
+      void store.setTerminalFontWeight(value as "normal" | "medium" | "bold");
+      break;
+    case "editorAutoSave":
+      void store.setEditorAutoSave(value as "off" | "afterDelay" | "onFocusChange");
+      break;
+    case "editorLineNumbers":
+      void store.setEditorLineNumbers(value as boolean);
+      break;
+    case "editorWordWrap":
+      void store.setEditorWordWrap(value as boolean);
+      break;
+    case "editorTabSize":
+      void store.setEditorTabSize(Number(value) as 2 | 4 | 8);
+      break;
+    case "editorBracketMatching":
+      void store.setEditorBracketMatching(value as boolean);
+      break;
+    case "sftpShowHiddenFiles":
+      void store.setSftpShowHiddenFiles(value as boolean);
+      break;
+    case "sftpShowUpFolder":
+      void store.setSftpShowUpFolder(value as boolean);
+      break;
+    case "sftpColumnSize":
+      void store.setSftpColumnSize(value as boolean);
+      break;
+    case "sftpColumnModified":
+      void store.setSftpColumnModified(value as boolean);
+      break;
+    case "sftpColumnPermissions":
+      void store.setSftpColumnPermissions(value as boolean);
+      break;
+    case "sftpColumnType":
+      void store.setSftpColumnType(value as boolean);
+      break;
+    case "sftpRemoteEditShowTransfers":
+      void store.setSftpRemoteEditShowTransfers(value as boolean);
+      break;
+    case "hostPingInterval":
+      void store.setHostPingInterval(Number(value));
+      break;
+    case "aiEnabled":
+      void store.setAiEnabled(value as boolean);
+      break;
+    case "showEditPrediction":
+      void store.setShowEditPrediction(value as boolean);
+      break;
+    case "autocompleteEnabled":
+      void store.setAutocompleteEnabled(value as boolean);
+      break;
+    case "sshAutoReconnect":
+      void store.setSshAutoReconnect(value as boolean);
+      break;
+    case "sshAutoReconnectDelay":
+      void store.setSshAutoReconnectDelay(Number(value));
+      break;
+    case "sshAutoReconnectMaxAttempts":
+      void store.setSshAutoReconnectMaxAttempts(Number(value));
+      break;
+    case "explorerShowHiddenByDefault":
+      void store.setExplorerShowHiddenByDefault(value as boolean);
+      break;
+    case "explorerRemotePollInterval":
+      void store.setExplorerRemotePollInterval(Number(value));
+      break;
+    case "explorerAutoReconnect":
+      void store.setExplorerAutoReconnect(value as boolean);
+      break;
+    case "explorerIdleSessionTimeoutMin":
+      void store.setExplorerIdleSessionTimeoutMin(Number(value));
+      break;
+    case "explorerMaxIdleSessions":
+      void store.setExplorerMaxIdleSessions(Number(value));
+      break;
+    case "explorerMaxCachedRemoteScopes":
+      void store.setExplorerMaxCachedRemoteScopes(Number(value));
+      break;
+    case "gitStatusPollIntervalMs":
+      void store.setGitStatusPollIntervalMs(Number(value));
+      break;
   }
 }
 
@@ -263,16 +326,12 @@ function SearchResults({
   if (results.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 pt-16 text-center">
-        <p className="text-[12.5px] text-muted-foreground">
-          No settings matching &ldquo;{query}&rdquo;
-        </p>
+        <p className="text-[12.5px] text-muted-foreground">No settings matching &ldquo;{query}&rdquo;</p>
       </div>
     );
   }
 
-  const byCategory = results.reduce<
-    Record<string, typeof results>
-  >((acc, def) => {
+  const byCategory = results.reduce<Record<string, typeof results>>((acc, def) => {
     const cat = def.category;
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(def);
@@ -291,15 +350,8 @@ function SearchResults({
               if (def.controlType === "Switch") {
                 const val = prefs[def.id] as boolean;
                 return (
-                  <SettingRow
-                    key={def.id}
-                    title={def.label}
-                    description={def.description}
-                  >
-                    <Switch
-                      checked={val}
-                      onCheckedChange={(v) => applySettingChange(def.id, v)}
-                    />
+                  <SettingRow key={def.id} title={def.label} description={def.description}>
+                    <Switch checked={val} onCheckedChange={(v) => applySettingChange(def.id, v)} />
                   </SettingRow>
                 );
               }
@@ -307,15 +359,8 @@ function SearchResults({
                 const val = String(prefs[def.id]);
                 const opt = def.options.find((o) => o.value === val);
                 return (
-                  <SettingRow
-                    key={def.id}
-                    title={def.label}
-                    description={def.description}
-                  >
-                    <Select
-                      value={val}
-                      onValueChange={(v) => applySettingChange(def.id, v)}
-                    >
+                  <SettingRow key={def.id} title={def.label} description={def.description}>
+                    <Select value={val} onValueChange={(v) => applySettingChange(def.id, v)}>
                       <SelectTrigger className="h-7 w-36 text-[11.5px]">
                         <SelectValue>{opt?.label ?? val}</SelectValue>
                       </SelectTrigger>
@@ -331,14 +376,8 @@ function SearchResults({
                 );
               }
               return (
-                <SettingRow
-                  key={def.id}
-                  title={def.label}
-                  description={def.description}
-                >
-                  <span className="text-[11.5px] text-muted-foreground">
-                    {String(prefs[def.id])}
-                  </span>
+                <SettingRow key={def.id} title={def.label} description={def.description}>
+                  <span className="text-[11.5px] text-muted-foreground">{String(prefs[def.id])}</span>
                 </SettingRow>
               );
             })}

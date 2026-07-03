@@ -31,7 +31,12 @@ export interface WorkspaceAreaProps {
   newQuickSshTab: (username: string, hostAddress: string, port: number) => number;
   newSftpTab: (hostId: string, title: string) => number;
   onOpenSshTerminal: (hostId: string, title: string) => number;
-  onOpenRemoteEditor: (sftpTabId: string, remotePath: string) => Promise<void>;
+  onOpenRemoteEditor: (
+    sftpTabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab",
+  ) => Promise<void>;
   onSftpPathsChange: (tabId: number, remotePath: string, localPath: string) => void;
   keysLoaded: boolean;
   panelOpen: boolean;
@@ -102,10 +107,7 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           )}
           aria-hidden={!isPreviewTab}
         >
-          <PreviewStack
-            registerHandle={registerPreviewHandle}
-            onUrlChange={onPreviewUrlChange}
-          />
+          <PreviewStack registerHandle={registerPreviewHandle} onUrlChange={onPreviewUrlChange} />
         </div>
         <div
           className={cn(
@@ -114,23 +116,13 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           )}
           aria-hidden={!isAiDiffTab}
         >
-          <AiDiffStack
-            onAccept={onAcceptDiff}
-            onReject={onRejectDiff}
-          />
+          <AiDiffStack onAccept={onAcceptDiff} onReject={onRejectDiff} />
         </div>
         <div
-          className={cn(
-            "absolute inset-0",
-            isHomeTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
-          )}
+          className={cn("absolute inset-0", isHomeTab ? "z-10" : "z-0 opacity-0 pointer-events-none")}
           aria-hidden={!isHomeTab}
         >
-          <HomeDashboard
-            newSshTab={newSshTab}
-            newQuickSshTab={newQuickSshTab}
-            newSftpTab={newSftpTab}
-          />
+          <HomeDashboard newSshTab={newSshTab} newQuickSshTab={newQuickSshTab} newSftpTab={newSftpTab} />
         </div>
         <SftpStack
           onOpenSshTerminal={onOpenSshTerminal}
@@ -138,10 +130,7 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           onPathsChange={onSftpPathsChange}
         />
         <div
-          className={cn(
-            "absolute inset-0",
-            isGitGraphTab ? "z-10" : "z-0 opacity-0 pointer-events-none",
-          )}
+          className={cn("absolute inset-0", isGitGraphTab ? "z-10" : "z-0 opacity-0 pointer-events-none")}
           aria-hidden={!isGitGraphTab}
         >
           <GitGraphStack onOpenFile={onOpenGitGraphFile} />
@@ -175,11 +164,12 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           className="overflow-hidden"
           aria-hidden={!panelOpen}
         >
-          {aiEnabled && (hasComposer ? (
-            <AiInputBar />
-          ) : (
-            <AiInputBarConnect onAdd={() => void openSettingsWindow("ai")} />
-          ))}
+          {aiEnabled &&
+            (hasComposer ? (
+              <AiInputBar />
+            ) : (
+              <AiInputBarConnect onAdd={() => void openSettingsWindow("ai")} />
+            ))}
         </motion.div>
       ) : null}
     </div>

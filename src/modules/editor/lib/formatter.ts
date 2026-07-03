@@ -8,31 +8,19 @@ type PluginEntry = {
 const PARSER_MAP: Record<string, PluginEntry> = {
   js: {
     parser: "babel",
-    plugins: async () => [
-      await import("prettier/plugins/babel"),
-      await import("prettier/plugins/estree"),
-    ],
+    plugins: async () => [await import("prettier/plugins/babel"), await import("prettier/plugins/estree")],
   },
   jsx: {
     parser: "babel",
-    plugins: async () => [
-      await import("prettier/plugins/babel"),
-      await import("prettier/plugins/estree"),
-    ],
+    plugins: async () => [await import("prettier/plugins/babel"), await import("prettier/plugins/estree")],
   },
   mjs: {
     parser: "babel",
-    plugins: async () => [
-      await import("prettier/plugins/babel"),
-      await import("prettier/plugins/estree"),
-    ],
+    plugins: async () => [await import("prettier/plugins/babel"), await import("prettier/plugins/estree")],
   },
   cjs: {
     parser: "babel",
-    plugins: async () => [
-      await import("prettier/plugins/babel"),
-      await import("prettier/plugins/estree"),
-    ],
+    plugins: async () => [await import("prettier/plugins/babel"), await import("prettier/plugins/estree")],
   },
   ts: {
     parser: "typescript",
@@ -50,10 +38,7 @@ const PARSER_MAP: Record<string, PluginEntry> = {
   },
   json: {
     parser: "json",
-    plugins: async () => [
-      await import("prettier/plugins/babel"),
-      await import("prettier/plugins/estree"),
-    ],
+    plugins: async () => [await import("prettier/plugins/babel"), await import("prettier/plugins/estree")],
   },
   css: {
     parser: "css",
@@ -94,10 +79,7 @@ const PARSER_MAP: Record<string, PluginEntry> = {
 };
 
 /** Returns the formatted string, or null if the file type is unsupported. */
-export async function formatDocument(
-  content: string,
-  filePath: string,
-): Promise<string | null> {
+export async function formatDocument(content: string, filePath: string): Promise<string | null> {
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
   const entry = PARSER_MAP[ext];
   if (!entry) return null;

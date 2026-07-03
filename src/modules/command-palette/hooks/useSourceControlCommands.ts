@@ -62,7 +62,8 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
         perform: () => {
           const root = useSourceControlStore.getState().repoRoot;
           if (!root) return;
-          void git.push(root)
+          void git
+            .push(root)
             .then(() => notify("success", "Pushed", "Branch pushed to remote"))
             .catch((e: unknown) => notify("error", "Push Failed", String(e)));
         },
@@ -75,7 +76,8 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
         perform: () => {
           const root = useSourceControlStore.getState().repoRoot;
           if (!root) return;
-          void git.pull(root)
+          void git
+            .pull(root)
             .then(() => notify("success", "Pulled", "Branch updated from remote"))
             .catch((e: unknown) => notify("error", "Pull Failed", String(e)));
         },
@@ -88,7 +90,8 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
         perform: () => {
           const root = useSourceControlStore.getState().repoRoot;
           if (!root) return;
-          void git.fetch(root)
+          void git
+            .fetch(root)
             .then(() => notify("info", "Fetched", "Fetched all remotes"))
             .catch((e: unknown) => notify("error", "Fetch Failed", String(e)));
         },
@@ -101,7 +104,8 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
         perform: () => {
           const root = useSourceControlStore.getState().repoRoot;
           if (!root) return;
-          void git.pushForceWithLease(root)
+          void git
+            .pushForceWithLease(root)
             .then(() => notify("success", "Force Pushed", "Force-pushed to remote (with-lease)"))
             .catch((e: unknown) => notify("error", "Force Push Failed", String(e)));
         },
@@ -114,7 +118,8 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
         perform: () => {
           const root = useSourceControlStore.getState().repoRoot;
           if (!root) return;
-          void git.stageAll(root)
+          void git
+            .stageAll(root)
             .then(() => notify("success", "Staged", "All changes staged"))
             .catch((e: unknown) => notify("error", "Stage Failed", String(e)));
         },
@@ -127,7 +132,8 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
         perform: () => {
           const root = useSourceControlStore.getState().repoRoot;
           if (!root) return;
-          void git.unstageAll(root)
+          void git
+            .unstageAll(root)
             .then(() => notify("success", "Unstaged", "All changes unstaged"))
             .catch((e: unknown) => notify("error", "Unstage Failed", String(e)));
         },
@@ -140,7 +146,8 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
         perform: () => {
           const root = useSourceControlStore.getState().repoRoot;
           if (!root) return;
-          void git.stashPush(root)
+          void git
+            .stashPush(root)
             .then(() => notify("success", "Stashed", "Changes stashed"))
             .catch((e: unknown) => notify("error", "Stash Failed", String(e)));
         },
@@ -159,7 +166,8 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
           const root = useSourceControlStore.getState().repoRoot;
           const entries = useSourceControlStore.getState().stashEntries;
           if (!root || entries.length === 0) return;
-          void git.stashPop(root, entries[0].hash)
+          void git
+            .stashPop(root, entries[0].hash)
             .then(() => notify("success", "Stash Popped", "Latest stash applied and removed"))
             .catch((e: unknown) => notify("error", "Stash Pop Failed", String(e)));
         },
@@ -167,7 +175,7 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
     }
 
     return actions;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoRoot, stashEntries, cb.openGitGraph, cb.focusSourceControl]);
 
   const branchPage = useMemo<CommandPage>(() => {
@@ -184,7 +192,8 @@ export function useSourceControlCommands(cb: RegistryCallbacks): {
               : () => {
                   const root = useSourceControlStore.getState().repoRoot;
                   if (!root) return;
-                  void git.checkoutBranch(root, b.name)
+                  void git
+                    .checkoutBranch(root, b.name)
                     .then(() => notify("success", "Switched Branch", `Checked out ${b.name}`))
                     .catch((e: unknown) => notify("error", "Checkout Failed", String(e)));
                 },

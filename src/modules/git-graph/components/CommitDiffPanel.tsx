@@ -117,8 +117,7 @@ export function CommitDiffPanel({ hash, repositoryPath, onClose }: CommitDiffPan
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-medium text-foreground/80">
-            Changes in{" "}
-            <code className="font-mono text-foreground">{shortHash}</code>
+            Changes in <code className="font-mono text-foreground">{shortHash}</code>
           </p>
           {filePaths.length > 0 && (
             <p className="text-[10px] text-muted-foreground">{filePaths.length} files changed</p>
@@ -129,14 +128,7 @@ export function CommitDiffPanel({ hash, repositoryPath, onClose }: CommitDiffPan
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground transition-colors"
           onClick={onClose}
         >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
@@ -208,9 +200,7 @@ export function CommitDiffPanel({ hash, repositoryPath, onClose }: CommitDiffPan
                   );
                 }
 
-                return (
-                  <DiffLine key={i} line={line} isInOurs={isInOurs} isInTheirs={isInTheirs} />
-                );
+                return <DiffLine key={i} line={line} isInOurs={isInOurs} isInTheirs={isInTheirs} />;
               });
             })()}
           </div>

@@ -1,9 +1,12 @@
+import { ArrowDown01Icon, Folder01Icon, Home03Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbList,
   BreadcrumbLink,
+  BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -21,25 +24,37 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  ArrowDown01Icon,
-  Folder01Icon,
-  Home03Icon,
-  MoreHorizontalIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useState } from "react";
-import { relativePath, segmentsFromCwd } from "./lib/pathUtils";
+import type { AiAttachFileDetail } from "@/modules/ai/lib/composer";
+import type { FsProvider } from "@/modules/explorer/lib/fsProvider";
+import { createLocalFsProvider } from "@/modules/explorer/lib/providers/localFsProvider";
+import { createRemoteFsProvider } from "@/modules/explorer/lib/providers/remoteFsProvider";
 import type { Segment } from "./lib/pathUtils";
+import { relativePath, segmentsFromCwd } from "./lib/pathUtils";
+
+/** Identifies the SSH session backing the active pane, when it's remote —
+ *  same {hostId, sessionId} shape `ExplorerTarget` uses, so the breadcrumb
+ *  reads/browses through the identical session the sidebar tree already has
+ *  open instead of standing up a second one. */
+export type BreadcrumbRemoteTarget = { hostId: string; sessionId: string };
 
 type Props = {
   cwd: string | null;
   filePath?: string | null;
   home: string | null;
+  remoteTarget?: BreadcrumbRemoteTarget | null;
   onCd: (path: string) => void;
   onCdInNewTab?: (path: string) => void;
 };
+
+const localProvider = createLocalFsProvider();
+
+/** Exported for testability — picks the same provider abstraction the
+ *  explorer sidebar tree uses, keyed off the target resolved for the active
+ *  tab's session, so local/remote directory listing goes through one shared
+ *  code path instead of the breadcrumb reimplementing its own. */
+export function resolveProvider(remoteTarget: BreadcrumbRemoteTarget | null | undefined): FsProvider {
+  return remoteTarget ? createRemoteFsProvider(remoteTarget.sessionId, remoteTarget.hostId) : localProvider;
+}
 
 function dirname(path: string): string {
   const i = path.lastIndexOf("/");
@@ -52,7 +67,7 @@ function basename(path: string): string {
   return i === -1 ? path : path.slice(i + 1);
 }
 
-export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props) {
+export function CwdBreadcrumb({ cwd, filePath, home, remoteTarget, onCd, onCdInNewTab }: Props) {
   // File mode: dir segments navigate; filename is the terminal leaf.
   if (filePath) {
     const dir = dirname(filePath);
@@ -64,14 +79,32 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props
       <Breadcrumb>
         <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
           {first ? (
-            <SegmentWithContextMenu seg={first} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+            <SegmentWithContextMenu
+              seg={first}
+              cwd={cwd}
+              remoteTarget={remoteTarget}
+              onCd={onCd}
+              onCdInNewTab={onCdInNewTab}
+            />
           ) : null}
           {middle.length > 0 ? (
-            <CollapsedSegments segments={middle} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+            <CollapsedSegments
+              segments={middle}
+              cwd={cwd}
+              remoteTarget={remoteTarget}
+              onCd={onCd}
+              onCdInNewTab={onCdInNewTab}
+            />
           ) : null}
           {middle.map((s) => (
             <span key={s.fullPath} className="contents max-md:hidden">
-              <SegmentWithContextMenu seg={s} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+              <SegmentWithContextMenu
+                seg={s}
+                cwd={cwd}
+                remoteTarget={remoteTarget}
+                onCd={onCd}
+                onCdInNewTab={onCdInNewTab}
+              />
             </span>
           ))}
           <BreadcrumbItem>
@@ -83,9 +116,7 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props
   }
 
   if (!cwd) {
-    return (
-      <span className="text-xs text-muted-foreground/70">no directory</span>
-    );
+    return <span className="text-xs text-muted-foreground/70">no directory</span>;
   }
 
   const segments = segmentsFromCwd(cwd, home);
@@ -98,20 +129,39 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props
     <Breadcrumb>
       <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
         {firstParent ? (
-          <SegmentWithContextMenu seg={firstParent} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+          <SegmentWithContextMenu
+            seg={firstParent}
+            cwd={cwd}
+            remoteTarget={remoteTarget}
+            onCd={onCd}
+            onCdInNewTab={onCdInNewTab}
+          />
         ) : null}
         {middleParents.length > 0 ? (
-          <CollapsedSegments segments={middleParents} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+          <CollapsedSegments
+            segments={middleParents}
+            cwd={cwd}
+            remoteTarget={remoteTarget}
+            onCd={onCd}
+            onCdInNewTab={onCdInNewTab}
+          />
         ) : null}
         {middleParents.map((s) => (
           <span key={s.fullPath} className="contents max-md:hidden">
-            <SegmentWithContextMenu seg={s} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+            <SegmentWithContextMenu
+              seg={s}
+              cwd={cwd}
+              remoteTarget={remoteTarget}
+              onCd={onCd}
+              onCdInNewTab={onCdInNewTab}
+            />
           </span>
         ))}
         <BreadcrumbItem>
           <CurrentSegmentWithContextMenu
             seg={current}
             cwd={cwd}
+            remoteTarget={remoteTarget}
             onCd={onCd}
             onCdInNewTab={onCdInNewTab}
           />
@@ -124,11 +174,12 @@ export function CwdBreadcrumb({ cwd, filePath, home, onCd, onCdInNewTab }: Props
 type SegmentMenuProps = {
   seg: Segment;
   cwd: string | null;
+  remoteTarget?: BreadcrumbRemoteTarget | null;
   onCd: (path: string) => void;
   onCdInNewTab?: (path: string) => void;
 };
 
-function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuProps) {
+function SegmentContextMenuContent({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: SegmentMenuProps) {
   const displayName = seg.isHome ? "Home" : seg.label;
   const rel = cwd ? relativePath(cwd, seg.fullPath) : seg.fullPath;
   return (
@@ -141,35 +192,29 @@ function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenu
       >
         Copy absolute path
       </ContextMenuItem>
-      <ContextMenuItem
-        className="text-[12px]"
-        onSelect={() => void navigator.clipboard.writeText(rel)}
-      >
+      <ContextMenuItem className="text-[12px]" onSelect={() => void navigator.clipboard.writeText(rel)}>
         Copy relative path
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem
-        className="text-[12px]"
-        onSelect={() => onCd(seg.fullPath)}
-      >
+      <ContextMenuItem className="text-[12px]" onSelect={() => onCd(seg.fullPath)}>
         Open in current terminal
       </ContextMenuItem>
       {onCdInNewTab && (
-        <ContextMenuItem
-          className="text-[12px]"
-          onSelect={() => onCdInNewTab(seg.fullPath)}
-        >
+        <ContextMenuItem className="text-[12px]" onSelect={() => onCdInNewTab(seg.fullPath)}>
           Open in new terminal
         </ContextMenuItem>
       )}
       <ContextMenuSeparator />
       <ContextMenuItem
         className="text-[12px]"
-        onSelect={() =>
-          window.dispatchEvent(
-            new CustomEvent<string>("labonair:ai-attach-file", { detail: seg.fullPath })
-          )
-        }
+        onSelect={() => {
+          const detail: AiAttachFileDetail = {
+            path: seg.fullPath,
+            sessionId: remoteTarget?.sessionId,
+            hostId: remoteTarget?.hostId,
+          };
+          window.dispatchEvent(new CustomEvent<AiAttachFileDetail>("labonair:ai-attach-file", { detail }));
+        }}
       >
         Reference in AI chat
       </ContextMenuItem>
@@ -177,7 +222,7 @@ function SegmentContextMenuContent({ seg, cwd, onCd, onCdInNewTab }: SegmentMenu
   );
 }
 
-function SegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuProps) {
+function SegmentWithContextMenu({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: SegmentMenuProps) {
   return (
     <>
       <ContextMenu>
@@ -198,22 +243,39 @@ function SegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuPro
             </BreadcrumbLink>
           </BreadcrumbItem>
         </ContextMenuTrigger>
-        <SegmentContextMenuContent seg={seg} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+        <SegmentContextMenuContent
+          seg={seg}
+          cwd={cwd}
+          remoteTarget={remoteTarget}
+          onCd={onCd}
+          onCdInNewTab={onCdInNewTab}
+        />
       </ContextMenu>
       <BreadcrumbSeparator className="[&>svg]:size-3" />
     </>
   );
 }
 
-function CurrentSegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: SegmentMenuProps) {
+function CurrentSegmentWithContextMenu({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: SegmentMenuProps) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <span>
-          <CurrentSegmentDropdown label={seg.label} path={seg.fullPath} onCd={onCd} />
+          <CurrentSegmentDropdown
+            label={seg.label}
+            path={seg.fullPath}
+            remoteTarget={remoteTarget}
+            onCd={onCd}
+          />
         </span>
       </ContextMenuTrigger>
-      <SegmentContextMenuContent seg={seg} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+      <SegmentContextMenuContent
+        seg={seg}
+        cwd={cwd}
+        remoteTarget={remoteTarget}
+        onCd={onCd}
+        onCdInNewTab={onCdInNewTab}
+      />
     </ContextMenu>
   );
 }
@@ -221,10 +283,12 @@ function CurrentSegmentWithContextMenu({ seg, cwd, onCd, onCdInNewTab }: Segment
 function CurrentSegmentDropdown({
   label,
   path,
+  remoteTarget,
   onCd,
 }: {
   label: string;
   path: string;
+  remoteTarget?: BreadcrumbRemoteTarget | null;
   onCd: (p: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -234,13 +298,15 @@ function CurrentSegmentDropdown({
   const load = useCallback(async () => {
     setError(null);
     try {
-      const dirs = await invoke<string[]>("list_subdirs", { path });
+      const provider = resolveProvider(remoteTarget);
+      const page = await provider.readDir(path);
+      const dirs = page.entries.filter((e) => e.kind === "dir").map((e) => e.name);
       setChildren(dirs);
     } catch (e) {
       setError(String(e));
       setChildren([]);
     }
-  }, [path]);
+  }, [path, remoteTarget]);
 
   useEffect(() => {
     if (open) load();
@@ -265,15 +331,10 @@ function CurrentSegmentDropdown({
         {children === null ? (
           <div className="px-2 py-1.5 text-xs text-muted-foreground">Loading…</div>
         ) : children.length === 0 ? (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground">
-            {error ?? "No subfolders"}
-          </div>
+          <div className="px-2 py-1.5 text-xs text-muted-foreground">{error ?? "No subfolders"}</div>
         ) : (
           children.map((name) => (
-            <DropdownMenuItem
-              key={name}
-              onSelect={() => onCd(path === "/" ? `/${name}` : `${path}/${name}`)}
-            >
+            <DropdownMenuItem key={name} onSelect={() => onCd(path === "/" ? `/${name}` : `${path}/${name}`)}>
               <HugeiconsIcon
                 icon={Folder01Icon}
                 className="size-3.5 text-muted-foreground"
@@ -291,11 +352,13 @@ function CurrentSegmentDropdown({
 function CollapsedSegments({
   segments,
   cwd,
+  remoteTarget,
   onCd,
   onCdInNewTab,
 }: {
   segments: Segment[];
   cwd: string | null;
+  remoteTarget?: BreadcrumbRemoteTarget | null;
   onCd: (p: string) => void;
   onCdInNewTab?: (p: string) => void;
 }) {
@@ -325,7 +388,13 @@ function CollapsedSegments({
                     <span className="truncate">{s.isHome ? "Home" : s.label}</span>
                   </DropdownMenuItem>
                 </ContextMenuTrigger>
-                <SegmentContextMenuContent seg={s} cwd={cwd} onCd={onCd} onCdInNewTab={onCdInNewTab} />
+                <SegmentContextMenuContent
+                  seg={s}
+                  cwd={cwd}
+                  remoteTarget={remoteTarget}
+                  onCd={onCd}
+                  onCdInNewTab={onCdInNewTab}
+                />
               </ContextMenu>
             ))}
           </DropdownMenuContent>

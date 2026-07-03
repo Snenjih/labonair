@@ -39,25 +39,23 @@ const IDENT_NAMES = new Set([
   "Name",
 ]);
 
-const FUNC_LIKE = new Set([
-  "ArrowFunction",
-  "FunctionExpression",
-  "ClassExpression",
-]);
+const FUNC_LIKE = new Set(["ArrowFunction", "FunctionExpression", "ClassExpression"]);
 
 export function extractOutline(view: EditorView): OutlineItem[] {
   const items: OutlineItem[] = [];
   // Wait up to 500 ms for an up-to-date parse tree; fall back to whatever is cached.
-  const tree =
-    ensureSyntaxTree(view.state, view.state.doc.length, 500) ??
-    syntaxTree(view.state);
+  const tree = ensureSyntaxTree(view.state, view.state.doc.length, 500) ?? syntaxTree(view.state);
 
   tree.cursor().iterate((node) => {
     // ── Markdown headings ────────────────────────────────────────────────────
     if (HEADING_NAMES.has(node.name)) {
       const level = parseInt(node.name[node.name.length - 1] ?? "1");
       const raw = view.state.sliceDoc(node.from, node.to);
-      const label = raw.replace(/^#+\s*/, "").split("\n")[0]?.trim() ?? "";
+      const label =
+        raw
+          .replace(/^#+\s*/, "")
+          .split("\n")[0]
+          ?.trim() ?? "";
       const line = view.state.doc.lineAt(node.from).number;
       if (label) items.push({ label, level, line, pos: node.from, kind: "heading" });
       return false;

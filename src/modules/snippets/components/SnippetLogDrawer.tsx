@@ -110,7 +110,7 @@ function RunTab({ log, active, onClick }: { log: SnippetRunLog; active: boolean;
       onClick={onClick}
       className={cn(
         "flex items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors",
-        active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50"
+        active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50",
       )}
     >
       <StatusIcon status={log.status} />
@@ -140,14 +140,7 @@ function StatusIcon({ status }: { status: SnippetRunLog["status"] }) {
       />
     );
   }
-  return (
-    <HugeiconsIcon
-      icon={Alert02Icon}
-      size={12}
-      strokeWidth={2}
-      className="shrink-0 text-destructive"
-    />
-  );
+  return <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={2} className="shrink-0 text-destructive" />;
 }
 
 function LogOutput({ log }: { log: SnippetRunLog }) {
@@ -164,12 +157,7 @@ function LogOutput({ log }: { log: SnippetRunLog }) {
           <span className="text-muted-foreground">Running…</span>
         ) : null}
         {log.lines.map((line, i) => (
-          <span
-            key={i}
-            className={cn(
-              line.stream === "stderr" ? "text-error" : "text-foreground/90"
-            )}
-          >
+          <span key={i} className={cn(line.stream === "stderr" ? "text-error" : "text-foreground/90")}>
             {line.data}
           </span>
         ))}
@@ -177,7 +165,7 @@ function LogOutput({ log }: { log: SnippetRunLog }) {
           <span
             className={cn(
               "mt-1 block border-t border-border/40 pt-1 text-muted-foreground",
-              log.exitCode !== 0 && "text-error"
+              log.exitCode !== 0 && "text-error",
             )}
           >
             {`[exit ${log.exitCode}]`}

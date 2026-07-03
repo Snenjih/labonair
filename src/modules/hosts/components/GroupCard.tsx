@@ -20,8 +20,18 @@ interface GroupCardProps {
 }
 
 const iconSvg = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
-    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="text-muted-foreground"
+  >
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
   </svg>
 );
 
@@ -36,14 +46,19 @@ export function GroupCard({ group, isSelected, onClick, hostCount, onDelete, onR
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") { e.preventDefault(); commitRename(); }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitRename();
+    }
     if (e.key === "Escape") setIsRenaming(false);
     e.stopPropagation();
   }
 
   const cardClass = cn(
     "flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm transition-all shrink-0",
-    isSelected ? "ring-2 ring-primary border-primary/40 bg-accent/30" : "hover:bg-accent/60 hover:border-border",
+    isSelected
+      ? "ring-2 ring-primary border-primary/40 bg-accent/30"
+      : "hover:bg-accent/60 hover:border-border",
   );
 
   const badge = (
@@ -88,9 +103,18 @@ export function GroupCard({ group, isSelected, onClick, hostCount, onDelete, onR
         </motion.button>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onSelect={() => { setRenameValue(group.name); setIsRenaming(true); }}>Rename</ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            setRenameValue(group.name);
+            setIsRenaming(true);
+          }}
+        >
+          Rename
+        </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onSelect={onDelete}>Delete</ContextMenuItem>
+        <ContextMenuItem variant="destructive" onSelect={onDelete}>
+          Delete
+        </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   );

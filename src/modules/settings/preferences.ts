@@ -1,10 +1,5 @@
 import { create } from "zustand";
-import {
-  DEFAULT_PREFERENCES,
-  loadPreferences,
-  onPreferencesChange,
-  type Preferences,
-} from "./store";
+import { DEFAULT_PREFERENCES, loadPreferences, onPreferencesChange, type Preferences } from "./store";
 
 type State = Preferences & {
   hydrated: boolean;

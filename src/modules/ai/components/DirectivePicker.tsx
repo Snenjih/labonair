@@ -15,12 +15,7 @@ type Props = {
   onHover: (index: number) => void;
 };
 
-export function DirectivePickerContent({
-  items,
-  activeIndex,
-  onPick,
-  onHover,
-}: Props) {
+export function DirectivePickerContent({ items, activeIndex, onPick, onHover }: Props) {
   const commands = items.filter((it) => it.kind === "command");
   const directives = items.filter((it) => it.kind === "directive");
   let cursor = -1;
@@ -58,9 +53,7 @@ export function DirectivePickerContent({
                         onClick={() => onPick(it)}
                         className={cn(
                           "flex w-full items-center gap-2 px-2 py-1.5 text-left text-[12px]",
-                          i === activeIndex
-                            ? "bg-accent"
-                            : "hover:bg-accent/60",
+                          i === activeIndex ? "bg-accent" : "hover:bg-accent/60",
                         )}
                       >
                         <HugeiconsIcon
@@ -71,9 +64,7 @@ export function DirectivePickerContent({
                         />
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span className="flex items-center gap-1.5">
-                            <span className="font-mono text-muted-foreground">
-                              #{c.name}
-                            </span>
+                            <span className="font-mono text-muted-foreground">#{c.name}</span>
                             <span className="font-medium">{c.label}</span>
                           </span>
                         </span>
@@ -101,15 +92,11 @@ export function DirectivePickerContent({
                         onClick={() => onPick(it)}
                         className={cn(
                           "flex w-full flex-col items-start gap-0.5 px-2 py-1.5 text-left text-[12px]",
-                          i === activeIndex
-                            ? "bg-accent"
-                            : "hover:bg-accent/60",
+                          i === activeIndex ? "bg-accent" : "hover:bg-accent/60",
                         )}
                       >
                         <span className="flex w-full items-center gap-1.5">
-                          <span className="font-mono text-muted-foreground">
-                            #{d.handle}
-                          </span>
+                          <span className="font-mono text-muted-foreground">#{d.handle}</span>
                           <span className="font-medium">{d.name}</span>
                         </span>
                         {d.description ? (

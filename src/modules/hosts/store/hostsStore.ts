@@ -39,7 +39,10 @@ interface HostsState {
 
 let _pingIntervalId: ReturnType<typeof setInterval> | null = null;
 
-async function runPingCycle(get: () => HostsState, set: (fn: (s: HostsState) => Partial<HostsState>) => void) {
+async function runPingCycle(
+  get: () => HostsState,
+  set: (fn: (s: HostsState) => Partial<HostsState>) => void,
+) {
   const { hosts } = get();
   // Deduplicate by address:port to avoid redundant pings
   const seen = new Map<string, string[]>(); // key -> hostIds[]
@@ -55,7 +58,7 @@ async function runPingCycle(get: () => HostsState, set: (fn: (s: HostsState) => 
       const [addr, portStr] = key.split(":");
       const online = await invoke<boolean>("ping_host", { hostAddress: addr, port: parseInt(portStr, 10) });
       return { ids, online };
-    })
+    }),
   );
 
   set((s) => {
@@ -220,9 +223,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
     await invoke("hosts_reorder", { items: items.map((i) => ({ id: i.id, sortOrder: i.sort_order })) });
     set((s) => {
       const orderMap = new Map(items.map((i) => [i.id, i.sort_order]));
-      const hosts = s.hosts.map((h) =>
-        orderMap.has(h.id) ? { ...h, sort_order: orderMap.get(h.id)! } : h
-      );
+      const hosts = s.hosts.map((h) => (orderMap.has(h.id) ? { ...h, sort_order: orderMap.get(h.id)! } : h));
       hosts.sort((a, b) => {
         if (a.pin_to_top !== b.pin_to_top) return a.pin_to_top ? -1 : 1;
         return a.sort_order - b.sort_order;
@@ -249,7 +250,8 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       });
     } else if (mode === "toggle") {
       const next = new Set(selectedHostIds);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       set({ selectedHostIds: next, selectedHostId: null });
     } else if (mode === "range") {
       const ids = hosts.map((h) => h.id);

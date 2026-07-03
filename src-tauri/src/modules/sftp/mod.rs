@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod connection;
+pub(crate) mod net_error;
 pub mod state;
 pub mod worker;
 

@@ -1,11 +1,6 @@
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { CheckmarkSquare02Icon, SquareIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -19,9 +14,7 @@ const EMPTY_TODOS: Todo[] = [];
 
 export function TodoStrip({ sessionId }: Props) {
   const hydrate = useTodosStore((s) => s.hydrate);
-  const todos =
-    useTodosStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ??
-    EMPTY_TODOS;
+  const todos = useTodosStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ?? EMPTY_TODOS;
 
   useEffect(() => {
     if (sessionId) void hydrate(sessionId);
@@ -64,9 +57,7 @@ function TodoRow({ todo }: { todo: Todo }) {
           <Spinner className="size-3" />
         ) : (
           <HugeiconsIcon
-            icon={
-              todo.status === "completed" ? CheckmarkSquare02Icon : SquareIcon
-            }
+            icon={todo.status === "completed" ? CheckmarkSquare02Icon : SquareIcon}
             strokeWidth={1.75}
           />
         )}

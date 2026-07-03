@@ -1,6 +1,12 @@
 import type { UIMessage } from "@ai-sdk/react";
 import { DirectChatTransport } from "ai";
-import { getModelContextLimit, modelKeepsReasoning, TERMINAL_BUFFER_LINES, type ModelId, type ProviderInstance } from "../config";
+import {
+  getModelContextLimit,
+  modelKeepsReasoning,
+  TERMINAL_BUFFER_LINES,
+  type ModelId,
+  type ProviderInstance,
+} from "../config";
 import { createLabonairAgent, type AgentUsageDelta } from "./agent";
 import { compact } from "./compact";
 import type { ProviderKeys } from "./keyring";
@@ -25,9 +31,7 @@ async function readLabonairMd(workspaceRoot: string | null): Promise<string | nu
       return null;
     }
     const content =
-      r.content.length > LABONAIR_MD_MAX_BYTES
-        ? r.content.slice(0, LABONAIR_MD_MAX_BYTES)
-        : r.content;
+      r.content.length > LABONAIR_MD_MAX_BYTES ? r.content.slice(0, LABONAIR_MD_MAX_BYTES) : r.content;
     projectMemoryCache.set(workspaceRoot, { content, mtime: Date.now() });
     return content;
   } catch {
@@ -106,10 +110,7 @@ function prepareMessages(
 
 export function createContextAwareTransport(deps: Deps) {
   return {
-    async sendMessages(options: {
-      messages: UIMessage[];
-      [k: string]: unknown;
-    }) {
+    async sendMessages(options: { messages: UIMessage[]; [k: string]: unknown }) {
       const live = deps.getLive();
       const modelId = deps.getModelId();
       const projectMemory = await readLabonairMd(live.workspaceRoot);
@@ -140,7 +141,13 @@ export function createContextAwareTransport(deps: Deps) {
       });
       const base = new DirectChatTransport({ agent });
       const { modelDefId } = parseModelRef(modelId);
-      const finalMessages = prepareMessages(options.messages, live, bufferLines, modelDefId as ModelId, deps.onCompaction);
+      const finalMessages = prepareMessages(
+        options.messages,
+        live,
+        bufferLines,
+        modelDefId as ModelId,
+        deps.onCompaction,
+      );
       return base.sendMessages({
         ...options,
         messages: finalMessages,
@@ -207,10 +214,7 @@ function formatContextBlock(live: LiveSnapshot, bufferLines: number): string {
   ];
   if (live.activeFile) lines.push(`active_file: ${live.activeFile}`);
   if (live.terminal) {
-    const trimmed = capChars(
-      lastNLines(live.terminal, bufferLines),
-      MAX_TERMINAL_CHARS,
-    );
+    const trimmed = capChars(lastNLines(live.terminal, bufferLines), MAX_TERMINAL_CHARS);
     lines.push("recent_terminal_output:");
     lines.push("```");
     lines.push(trimmed);
@@ -236,8 +240,7 @@ function lastIndex<T>(arr: T[], pred: (x: T) => boolean): number {
   return -1;
 }
 
-export const CONTEXT_BLOCK_RE =
-  /^<terminal-context[^>]*>[\s\S]*?<\/terminal-context>\n*/;
+export const CONTEXT_BLOCK_RE = /^<terminal-context[^>]*>[\s\S]*?<\/terminal-context>\n*/;
 
 export function stripContextBlock(text: string): string {
   return text.replace(CONTEXT_BLOCK_RE, "");

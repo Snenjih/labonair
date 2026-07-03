@@ -2,11 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import {
-  Add01Icon,
-  Message01Icon,
-  Mic01Icon,
-} from "@hugeicons/core-free-icons";
+import { Add01Icon, Message01Icon, Mic01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { motion } from "motion/react";
 import { useRef } from "react";
@@ -55,11 +51,7 @@ export function AiStatusBarControls() {
         }}
       />
 
-      <IconBtn
-        title="Attach file or image"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={c.isBusy}
-      >
+      <IconBtn title="Attach file or image" onClick={() => fileInputRef.current?.click()} disabled={c.isBusy}>
         <HugeiconsIcon icon={Add01Icon} size={13} strokeWidth={2} />
       </IconBtn>
 
@@ -74,14 +66,9 @@ export function AiStatusBarControls() {
                   ? "Transcribing…"
                   : "Voice input"
           }
-          onClick={() =>
-            c.voice.recording ? c.voice.stop() : void c.voice.start()
-          }
+          onClick={() => (c.voice.recording ? c.voice.stop() : void c.voice.start())}
           disabled={c.isBusy || c.voice.transcribing || !c.voice.hasKey}
-          className={cn(
-            c.voice.recording &&
-              "bg-destructive/10 text-destructive hover:bg-destructive/15",
-          )}
+          className={cn(c.voice.recording && "bg-destructive/10 text-destructive hover:bg-destructive/15")}
         >
           {c.voice.recording ? (
             <span className="size-2 animate-pulse rounded-full bg-destructive" />
@@ -140,10 +127,7 @@ function IconBtn({
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className={cn(
-        "size-6 rounded-md text-muted-foreground hover:text-foreground",
-        className,
-      )}
+      className={cn("size-6 rounded-md text-muted-foreground hover:text-foreground", className)}
     >
       {children}
     </Button>

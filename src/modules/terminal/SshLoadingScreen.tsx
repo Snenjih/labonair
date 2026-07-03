@@ -34,21 +34,32 @@ function detectStage(logs: string[]): number {
   const last = logs[logs.length - 1] ?? "";
   if (last.includes("Shell channel") || last.includes("Session established") || last.includes("SFTP ready"))
     return 4;
-  if (last.includes("Authenticat") || last.includes("credentials") || last.includes("keychain"))
-    return 3;
-  if (last.includes("fingerprint") || last.includes("Verifying") || last.includes("handshake") || last.includes("Handshake"))
+  if (last.includes("Authenticat") || last.includes("credentials") || last.includes("keychain")) return 3;
+  if (
+    last.includes("fingerprint") ||
+    last.includes("Verifying") ||
+    last.includes("handshake") ||
+    last.includes("Handshake")
+  )
     return 2;
-  if (last.includes("TCP") || last.includes("Connecting"))
-    return 1;
+  if (last.includes("TCP") || last.includes("Connecting")) return 1;
   return 0;
 }
 
-export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, connectionType = "ssh", initialCols, initialRows, onConnected, onError }: Props) {
+export function SshLoadingScreen({
+  sessionId,
+  hostId,
+  quickConnect,
+  hostName,
+  connectionType = "ssh",
+  initialCols,
+  initialRows,
+  onConnected,
+  onError,
+}: Props) {
   const isQuickConnect = !hostId && !!quickConnect;
 
-  const [status, setStatus] = useState<Status>(
-    isQuickConnect ? "quick_connect_password" : "connecting"
-  );
+  const [status, setStatus] = useState<Status>(isQuickConnect ? "quick_connect_password" : "connecting");
   const [errorMessage, setErrorMessage] = useState("");
   const [fingerprint, setFingerprint] = useState("");
   const [host, setHost] = useState("");
@@ -86,20 +97,20 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
           initialRows: initialRows ?? null,
         })
       : connectionType === "sftp"
-      ? invoke("sftp_connect", {
-          sessionId: sessionId,
-          hostId,
-          passphrase: passphraseArg ?? null,
-          passwordOverride: passwordOverride ?? null,
-        })
-      : invoke("ssh_connect", {
-          sessionId: sessionId,
-          hostId,
-          passphrase: passphraseArg ?? null,
-          passwordOverride: passwordOverride ?? null,
-          initialCols: initialCols ?? null,
-          initialRows: initialRows ?? null,
-        });
+        ? invoke("sftp_connect", {
+            sessionId: sessionId,
+            hostId,
+            passphrase: passphraseArg ?? null,
+            passwordOverride: passwordOverride ?? null,
+          })
+        : invoke("ssh_connect", {
+            sessionId: sessionId,
+            hostId,
+            passphrase: passphraseArg ?? null,
+            passwordOverride: passwordOverride ?? null,
+            initialCols: initialCols ?? null,
+            initialRows: initialRows ?? null,
+          });
 
     p.then(() => {
       // session_established event triggers onConnected
@@ -156,16 +167,13 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
           setStatus("waiting_trust");
         },
       ),
-      listen<{ session_id: string; prompt_message: string; is_2fa: boolean }>(
-        "auth_required",
-        (event) => {
-          if (event.payload.session_id !== sessionId) return;
-          setPromptMessage(event.payload.prompt_message);
-          setPassword("");
-          pendingPasswordRef.current = null;
-          setStatus("waiting_auth");
-        },
-      ),
+      listen<{ session_id: string; prompt_message: string; is_2fa: boolean }>("auth_required", (event) => {
+        if (event.payload.session_id !== sessionId) return;
+        setPromptMessage(event.payload.prompt_message);
+        setPassword("");
+        pendingPasswordRef.current = null;
+        setStatus("waiting_auth");
+      }),
       listen<{ session_id: string }>("passphrase_required", (event) => {
         if (event.payload.session_id !== sessionId) return;
         setPassphrase("");
@@ -184,7 +192,9 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
         }
         // Start tunnels on a dedicated background SSH connection (non-blocking).
         if (hostId) {
-          invoke("ssh_start_tunnels", { hostId }).catch((e) => handleApiError(e, "Failed to start SSH tunnels", "SSH"));
+          invoke("ssh_start_tunnels", { hostId }).catch((e) =>
+            handleApiError(e, "Failed to start SSH tunnels", "SSH"),
+          );
           // Mirror the backend's last_connected_at write locally so "Quick Connect"
           // rankings (e.g. in the command palette) update without a full refetch.
           const connectedAt = Date.now();
@@ -216,8 +226,8 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
   const identityLine = isQuickConnect
     ? `${quickConnect!.username}@${quickConnect!.hostAddress}:${quickConnect!.port}`
     : hostName
-    ? hostName
-    : undefined;
+      ? hostName
+      : undefined;
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-background">
@@ -250,7 +260,9 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
               value={quickPassword}
               onChange={(e) => setQuickPassword(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") { doConnect(undefined, quickPassword); }
+                if (e.key === "Enter") {
+                  doConnect(undefined, quickPassword);
+                }
               }}
               placeholder="Password"
               autoFocus
@@ -308,7 +320,7 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
                       <span
                         className={cn(
                           "text-[10px] transition-colors",
-                          (done || active) ? "text-foreground/70" : "text-muted-foreground/40",
+                          done || active ? "text-foreground/70" : "text-muted-foreground/40",
                         )}
                       >
                         {label}
@@ -354,13 +366,9 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
                 {isMismatch ? "⚠ Host key mismatch — possible MITM!" : "Unknown host — trust this server?"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {isMismatch
-                  ? "The host key for "
-                  : "The authenticity of "}
+                {isMismatch ? "The host key for " : "The authenticity of "}
                 <span className="font-mono text-foreground">{host}</span>
-                {isMismatch
-                  ? " has changed since last connection."
-                  : " can't be established."}
+                {isMismatch ? " has changed since last connection." : " can't be established."}
               </p>
             </div>
             <div className="rounded-lg bg-muted px-4 py-3">
@@ -371,7 +379,9 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
               <button
                 onClick={() => {
                   setStatus("connecting");
-                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: true }).catch((e) => handleApiError(e, "Failed to trust host key", "SSH"));
+                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: true }).catch((e) =>
+                    handleApiError(e, "Failed to trust host key", "SSH"),
+                  );
                 }}
                 className={cn(
                   "flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-opacity",
@@ -384,7 +394,9 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
               </button>
               <button
                 onClick={() => {
-                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: false }).catch((e) => handleApiError(e, "Failed to abort host trust", "SSH"));
+                  invoke("ssh_trust_host", { sessionId: sessionId, accepted: false }).catch((e) =>
+                    handleApiError(e, "Failed to abort host trust", "SSH"),
+                  );
                   onError("User aborted");
                 }}
                 className="flex-1 rounded-lg border border-border px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
@@ -407,15 +419,15 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
           >
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium text-foreground">Authentication required</p>
-              {promptMessage && (
-                <p className="text-xs text-muted-foreground">{promptMessage}</p>
-              )}
+              {promptMessage && <p className="text-xs text-muted-foreground">{promptMessage}</p>}
             </div>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") submitPassword(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitPassword();
+              }}
               placeholder="Password"
               autoFocus
               className={cn(
@@ -461,7 +473,10 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
               value={passphrase}
               onChange={(e) => setPassphrase(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") { doConnect(passphrase); setPassphrase(""); }
+                if (e.key === "Enter") {
+                  doConnect(passphrase);
+                  setPassphrase("");
+                }
               }}
               placeholder="Key passphrase"
               autoFocus
@@ -472,7 +487,10 @@ export function SshLoadingScreen({ sessionId, hostId, quickConnect, hostName, co
             />
             <div className="flex gap-2">
               <button
-                onClick={() => { doConnect(passphrase); setPassphrase(""); }}
+                onClick={() => {
+                  doConnect(passphrase);
+                  setPassphrase("");
+                }}
                 className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
               >
                 Unlock

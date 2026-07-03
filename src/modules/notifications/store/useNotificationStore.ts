@@ -33,10 +33,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       return;
     }
     set((s) => ({
-      notifications: [
-        { ...notif, id: crypto.randomUUID(), timestamp: Date.now() },
-        ...s.notifications,
-      ].slice(0, 100),
+      notifications: [{ ...notif, id: crypto.randomUUID(), timestamp: Date.now() }, ...s.notifications].slice(
+        0,
+        100,
+      ),
     }));
   },
   removeNotification: (id) =>

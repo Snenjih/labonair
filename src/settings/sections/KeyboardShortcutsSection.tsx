@@ -9,19 +9,9 @@ import {
   getLiveModifierDisplay,
 } from "@/modules/shortcuts/lib/captureKeyBinding";
 import { useKeybindsStore } from "@/modules/shortcuts/lib/useKeybindsStore";
-import {
-  SHORTCUT_GROUPS,
-  SHORTCUTS,
-  type Shortcut,
-  type ShortcutId,
-} from "@/modules/shortcuts/shortcuts";
+import { SHORTCUT_GROUPS, SHORTCUTS, type Shortcut, type ShortcutId } from "@/modules/shortcuts/shortcuts";
 import type { KeyBinding, KeyBindingOrDisabled } from "@/modules/shortcuts/types";
-import {
-  AlertCircleIcon,
-  Cancel01Icon,
-  Edit02Icon,
-  RotateClockwiseIcon,
-} from "@hugeicons/core-free-icons";
+import { AlertCircleIcon, Cancel01Icon, Edit02Icon, RotateClockwiseIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -44,9 +34,7 @@ export function KeyboardShortcutsSection() {
   const hasOverrides = Object.keys(overrides).length > 0;
   const trimmed = search.trim().toLowerCase();
 
-  const filtered = trimmed
-    ? SHORTCUTS.filter((s) => s.label.toLowerCase().includes(trimmed))
-    : null;
+  const filtered = trimmed ? SHORTCUTS.filter((s) => s.label.toLowerCase().includes(trimmed)) : null;
 
   const isEmpty = filtered !== null && filtered.length === 0;
 
@@ -82,9 +70,7 @@ export function KeyboardShortcutsSection() {
       {/* Empty search state */}
       {isEmpty && (
         <div className="flex flex-col items-center gap-2 py-10 text-center">
-          <p className="text-[12px] text-muted-foreground">
-            No shortcuts matching &ldquo;{trimmed}&rdquo;
-          </p>
+          <p className="text-[12px] text-muted-foreground">No shortcuts matching &ldquo;{trimmed}&rdquo;</p>
         </div>
       )}
 
@@ -255,10 +241,7 @@ function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
               {/* Binding display */}
               <div className="flex items-center gap-1.5">
                 {hasOverride && (
-                  <span
-                    className="size-1.5 rounded-full bg-accent-foreground/40"
-                    title="Modified"
-                  />
+                  <span className="size-1.5 rounded-full bg-accent-foreground/40" title="Modified" />
                 )}
                 {isDisabled ? (
                   <span className="text-[12px] text-muted-foreground/50">—</span>
@@ -319,9 +302,7 @@ function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
                       ))}
                     </KbdGroup>
                   ) : (
-                    <span className="text-[11px] text-muted-foreground">
-                      Press a key…
-                    </span>
+                    <span className="text-[11px] text-muted-foreground">Press a key…</span>
                   )}
                   <CaptureBlinkCursor />
                 </div>
@@ -368,12 +349,7 @@ function ShortcutRow({ shortcut }: { shortcut: Shortcut }) {
 
               {/* Conflict warning */}
               <div className="flex items-center gap-1.5">
-                <HugeiconsIcon
-                  icon={AlertCircleIcon}
-                  size={10}
-                  strokeWidth={2}
-                  className="text-warning/80"
-                />
+                <HugeiconsIcon icon={AlertCircleIcon} size={10} strokeWidth={2} className="text-warning/80" />
                 <span className="text-[10.5px] text-warning/80">
                   Used by &ldquo;{rowState.conflictLabel}&rdquo;
                 </span>

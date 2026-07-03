@@ -12,10 +12,7 @@ import { createElement } from "react";
 import type { CommandAction, CommandPage } from "../types";
 import type { RegistryCallbacks } from "../types";
 
-export function useLayoutCommands(
-  cb: RegistryCallbacks,
-  activeTabKind: string | undefined,
-): CommandPage {
+export function useLayoutCommands(cb: RegistryCallbacks, activeTabKind: string | undefined): CommandPage {
   const isWorkspace = activeTabKind === "workspace";
 
   const actions: CommandAction[] = [

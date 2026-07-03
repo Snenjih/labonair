@@ -7,9 +7,12 @@ import type { CommandAction, CommandPage, RegistryCallbacks } from "../types";
 
 function execModeLabel(mode: SnippetExecMode): string {
   switch (mode) {
-    case "terminal": return "Terminal";
-    case "silent":   return "Silent";
-    case "inject":   return "Inject";
+    case "terminal":
+      return "Terminal";
+    case "silent":
+      return "Silent";
+    case "inject":
+      return "Inject";
   }
 }
 

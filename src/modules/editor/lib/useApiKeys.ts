@@ -35,7 +35,10 @@ export function useApiKeys() {
     void refresh();
     void refreshCompat();
     let unlistenKeys: (() => void) | undefined;
-    void onKeysChanged(() => { void refresh(); void refreshCompat(); }).then((un) => {
+    void onKeysChanged(() => {
+      void refresh();
+      void refreshCompat();
+    }).then((un) => {
       unlistenKeys = un;
     });
     const unsubPrefs = usePreferencesStore.subscribe((state, prev) => {

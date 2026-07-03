@@ -15,12 +15,19 @@ import type {
 export interface TabActions {
   setActiveId: (id: number) => void;
   newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
-  newSshTab: (hostId: string, title: string, cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newSshTab: (
+    hostId: string,
+    title: string,
+    cwd?: string,
+    initialCommand?: string,
+    sessionId?: string,
+  ) => number;
   newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
   openFileTab: (path: string) => number | null;
   newPreviewTab: (url: string) => number;
   openHomeTab: () => void;
   newSftpTab: (hostId: string, title: string) => number;
+  updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   splitPane: (tabId: number, direction: "horizontal" | "vertical") => void;
   setActivePaneId: (tabId: number, paneId: string) => void;
 }
@@ -72,7 +79,13 @@ async function restoreWorkspaceTab(
         rootSession.id,
       );
     } else if (rootSession.hostId) {
-      tabId = actions.newSshTab(rootSession.hostId, rootSession.title, rootSession.cwd, rootSession.initialCommand, rootSession.id);
+      tabId = actions.newSshTab(
+        rootSession.hostId,
+        rootSession.title,
+        rootSession.cwd,
+        rootSession.initialCommand,
+        rootSession.id,
+      );
     } else {
       tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id);
     }
@@ -82,20 +95,14 @@ async function restoreWorkspaceTab(
 
   // Reconstruct the split pane tree if there are multiple panes
   if (leaves.length > 1) {
-    await reconstructPaneTree(snap.layout, snap.layout, tabId, actions, validatedSessions, rootLeafId);
+    await reconstructPaneTree(snap.layout, tabId, actions);
+    actions.setActivePaneId(tabId, snap.activePaneId);
   }
 
   return tabId;
 }
 
-async function reconstructPaneTree(
-  root: PaneNode,
-  node: PaneNode,
-  tabId: number,
-  actions: TabActions,
-  sessions: WorkspaceTabSnapshot["sessions"],
-  _currentActiveId: string,
-): Promise<void> {
+async function reconstructPaneTree(node: PaneNode, tabId: number, actions: TabActions): Promise<void> {
   if (node.type === "pane") return;
 
   const split = node as PaneSplit;
@@ -104,8 +111,8 @@ async function reconstructPaneTree(
   // Allow React state to settle before recursing
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-  await reconstructPaneTree(root, split.children[0], tabId, actions, sessions, _currentActiveId);
-  await reconstructPaneTree(root, split.children[1], tabId, actions, sessions, _currentActiveId);
+  await reconstructPaneTree(split.children[0], tabId, actions);
+  await reconstructPaneTree(split.children[1], tabId, actions);
 }
 
 async function restoreSftpTab(
@@ -120,6 +127,9 @@ async function restoreSftpTab(
     return null;
   }
   const tabId = actions.newSftpTab(snap.hostId, snap.title);
+  if (snap.remotePath && snap.localPath) {
+    actions.updateSftpPaths(tabId, snap.remotePath, snap.localPath);
+  }
   return tabId;
 }
 

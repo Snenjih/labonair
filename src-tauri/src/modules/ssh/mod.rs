@@ -3,6 +3,8 @@ pub mod config_parser;
 pub mod exec;
 pub mod pty;
 pub mod sftp;
+pub(crate) mod shell;
+pub(crate) mod shell_integration;
 pub mod tunnels;
 
 use std::collections::HashMap;

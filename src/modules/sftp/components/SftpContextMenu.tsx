@@ -15,13 +15,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
 import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
@@ -41,13 +35,18 @@ interface SftpContextMenuProps {
   onRefresh: () => void;
   onStartRename?: (path: string) => void;
   onStartNewFolder?: () => void;
-  onOpenRemoteEditor: (tabId: string, remotePath: string) => Promise<void>;
+  onOpenRemoteEditor: (
+    tabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab",
+  ) => Promise<void>;
   children: React.ReactNode;
 }
 
 export function SftpContextMenu({
   tabId,
-  hostId: _hostId,
+  hostId,
   side,
   selectedPaths,
   currentPath,
@@ -67,7 +66,7 @@ export function SftpContextMenu({
 
   const count = selectedPaths.size;
   const singlePath = count === 1 ? [...selectedPaths][0] : null;
-  const singleFile = singlePath ? files?.find((f) => f.path === singlePath) ?? null : null;
+  const singleFile = singlePath ? (files?.find((f) => f.path === singlePath) ?? null) : null;
 
   async function handleDelete() {
     if (count === 0) return;
@@ -146,7 +145,7 @@ export function SftpContextMenu({
     const path = singlePath ?? currentPath;
     if (!path) return;
     // Use || so an empty string also falls back to "remote" (not just null/undefined).
-    const key = side === "remote" ? (hostAddress || "remote") : "local";
+    const key = side === "remote" ? hostAddress || "remote" : "local";
     void addBookmark(key, path);
   }
 
@@ -155,38 +154,28 @@ export function SftpContextMenu({
       <ContextMenu>
         <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
         <ContextMenuContent className="w-52">
-          <ContextMenuItem onClick={() => onStartNewFolder?.()}>
-            New Folder
-          </ContextMenuItem>
+          <ContextMenuItem onClick={() => onStartNewFolder?.()}>New Folder</ContextMenuItem>
 
           {count === 1 && (
-            <ContextMenuItem onClick={() => onStartRename?.(singlePath!)}>
-              Rename
-            </ContextMenuItem>
+            <ContextMenuItem onClick={() => onStartRename?.(singlePath!)}>Rename</ContextMenuItem>
           )}
 
           <ContextMenuSeparator />
 
           {/* OS-native download (remote → local) */}
           {side === "remote" && count > 0 && (
-            <ContextMenuItem onClick={handleDownloadTo}>
-              Download to…
-            </ContextMenuItem>
+            <ContextMenuItem onClick={handleDownloadTo}>Download to…</ContextMenuItem>
           )}
 
           {/* OS-native upload (local files → remote) */}
           {side === "remote" && (
-            <ContextMenuItem onClick={handleUploadHere}>
-              Upload files here…
-            </ContextMenuItem>
+            <ContextMenuItem onClick={handleUploadHere}>Upload files here…</ContextMenuItem>
           )}
 
-          {(side === "remote" && count >= 0) && <ContextMenuSeparator />}
+          {side === "remote" && count >= 0 && <ContextMenuSeparator />}
 
           {/* Bookmark current path or selected item */}
-          <ContextMenuItem onClick={handleBookmark}>
-            Bookmark this path
-          </ContextMenuItem>
+          <ContextMenuItem onClick={handleBookmark}>Bookmark this path</ContextMenuItem>
 
           <ContextMenuSeparator />
 
@@ -200,27 +189,28 @@ export function SftpContextMenu({
           )}
 
           {count > 0 && (
-            <ContextMenuItem onClick={handleCopyPath}>
-              Copy Path{count > 1 ? "s" : ""}
-            </ContextMenuItem>
+            <ContextMenuItem onClick={handleCopyPath}>Copy Path{count > 1 ? "s" : ""}</ContextMenuItem>
           )}
 
           {side === "remote" && count === 1 && (
             <>
               <ContextMenuSeparator />
-              <ContextMenuItem onClick={() => { setChmodValue("755"); setChmodOpen(true); }}>
+              <ContextMenuItem
+                onClick={() => {
+                  setChmodValue("755");
+                  setChmodOpen(true);
+                }}
+              >
                 Quick Permissions…
               </ContextMenuItem>
               {singleFile && (
-                <ContextMenuItem onClick={() => setPropertiesFile(singleFile)}>
-                  Properties…
-                </ContextMenuItem>
+                <ContextMenuItem onClick={() => setPropertiesFile(singleFile)}>Properties…</ContextMenuItem>
               )}
               <ContextMenuItem
                 onClick={async () => {
-                  if (!singlePath) return;
+                  if (!singlePath || !hostId) return;
                   try {
-                    await onOpenRemoteEditor(tabId, singlePath);
+                    await onOpenRemoteEditor(tabId, singlePath, hostId, "sftp-tab");
                   } catch (e) {
                     handleApiError(e, "Failed to open remote file", "SFTP");
                   }
@@ -241,8 +231,7 @@ export function SftpContextMenu({
               Delete {count} item{count !== 1 ? "s" : ""}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. The{" "}
-              {count === 1 ? "file" : "files"} will be permanently deleted
+              This action cannot be undone. The {count === 1 ? "file" : "files"} will be permanently deleted
               from the {side === "remote" ? "remote server" : "local disk"}.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -260,7 +249,12 @@ export function SftpContextMenu({
 
       {/* Quick chmod dialog — only mounted when open to avoid Radix portal side-effects */}
       {chmodOpen && (
-        <Dialog open onOpenChange={(v) => { if (!v) setChmodOpen(false); }}>
+        <Dialog
+          open
+          onOpenChange={(v) => {
+            if (!v) setChmodOpen(false);
+          }}
+        >
           <DialogContent className="w-72">
             <DialogHeader>
               <DialogTitle className="text-sm">Set Permissions</DialogTitle>
@@ -270,7 +264,10 @@ export function SftpContextMenu({
               value={chmodValue}
               onChange={(e) => setChmodValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") { handleChmod(); setChmodOpen(false); }
+                if (e.key === "Enter") {
+                  handleChmod();
+                  setChmodOpen(false);
+                }
               }}
               placeholder="755"
               maxLength={4}
@@ -285,7 +282,10 @@ export function SftpContextMenu({
                 Cancel
               </button>
               <button
-                onClick={() => { handleChmod(); setChmodOpen(false); }}
+                onClick={() => {
+                  handleChmod();
+                  setChmodOpen(false);
+                }}
                 className="h-7 px-3 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 Apply

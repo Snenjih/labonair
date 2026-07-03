@@ -93,7 +93,9 @@ export function useDocument({ path, isUntitled, onDirtyChange, onSaveAs }: Optio
   }, []);
 
   const onSaveAsRef = useRef(onSaveAs);
-  useEffect(() => { onSaveAsRef.current = onSaveAs; }, [onSaveAs]);
+  useEffect(() => {
+    onSaveAsRef.current = onSaveAs;
+  }, [onSaveAs]);
 
   const pathRef = useRef(path);
   pathRef.current = path;

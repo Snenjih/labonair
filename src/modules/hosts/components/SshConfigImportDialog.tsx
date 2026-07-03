@@ -102,13 +102,16 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
   const totalCount = entries.length;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Import from ~/.ssh/config</DialogTitle>
-          <DialogDescription>
-            Select hosts to import from your SSH config file.
-          </DialogDescription>
+          <DialogDescription>Select hosts to import from your SSH config file.</DialogDescription>
         </DialogHeader>
 
         {/* Entry list area */}
@@ -116,16 +119,8 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
               {/* Spinner */}
-              <svg
-                className="animate-spin h-4 w-4 shrink-0"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12" cy="12" r="10"
-                  stroke="currentColor" strokeWidth="4"
-                />
+              <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path
                   className="opacity-75"
                   fill="currentColor"
@@ -135,9 +130,7 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
               Reading ~/.ssh/config…
             </div>
           ) : error ? (
-            <div className="px-4 py-4 text-sm text-destructive">
-              {error}
-            </div>
+            <div className="px-4 py-4 text-sm text-destructive">{error}</div>
           ) : entries.length === 0 ? (
             <div className="flex flex-col items-center gap-1 px-4 py-10 text-center">
               <p className="text-sm text-muted-foreground">No hosts found in ~/.ssh/config.</p>
@@ -147,17 +140,11 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
             <>
               {/* Select All / Deselect All */}
               <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-                <button
-                  onClick={handleSelectAll}
-                  className="text-xs text-primary hover:underline"
-                >
+                <button onClick={handleSelectAll} className="text-xs text-primary hover:underline">
                   Select All
                 </button>
                 <span className="text-xs text-muted-foreground/40">·</span>
-                <button
-                  onClick={handleDeselectAll}
-                  className="text-xs text-primary hover:underline"
-                >
+                <button onClick={handleDeselectAll} className="text-xs text-primary hover:underline">
                   Deselect All
                 </button>
               </div>
@@ -174,21 +161,25 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
                       onClick={() => handleToggle(entry.alias)}
                       className={cn(
                         "flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent",
-                        isSelected && "bg-accent/40"
+                        isSelected && "bg-accent/40",
                       )}
                     >
                       {/* Checkbox */}
                       <span
                         className={cn(
                           "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                          isSelected
-                            ? "border-primary bg-primary"
-                            : "border-border bg-background"
+                          isSelected ? "border-primary bg-primary" : "border-border bg-background",
                         )}
                       >
                         {isSelected && (
                           <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                            <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            <path
+                              d="M1 3.5L3.5 6L8 1"
+                              stroke="white"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
                           </svg>
                         )}
                       </span>
@@ -197,9 +188,7 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <div className="flex flex-wrap items-center gap-1.5">
                           {/* Alias */}
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {entry.alias}
-                          </span>
+                          <span className="text-sm font-medium text-foreground truncate">{entry.alias}</span>
 
                           {/* Address:port */}
                           <span className="font-mono text-xs text-muted-foreground shrink-0">
@@ -219,7 +208,7 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
                               "inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium shrink-0",
                               entry.auth_method === "key"
                                 ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                                : "bg-muted text-muted-foreground"
+                                : "bg-muted text-muted-foreground",
                             )}
                           >
                             {entry.auth_method === "key" ? "🔑 key" : "🔒 password"}
@@ -250,9 +239,7 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
 
         {/* Error from import attempt */}
         {error && !loading && entries.length > 0 && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {error}
-          </p>
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>
         )}
 
         <DialogFooter>
@@ -266,11 +253,7 @@ export function SshConfigImportDialog({ open, onClose, onImported }: Props) {
           <Button variant="outline" size="sm" onClick={onClose} disabled={importing}>
             Cancel
           </Button>
-          <Button
-            size="sm"
-            onClick={handleImport}
-            disabled={selectedCount === 0 || importing}
-          >
+          <Button size="sm" onClick={handleImport} disabled={selectedCount === 0 || importing}>
             {importing ? "Importing…" : `Import Selected`}
           </Button>
         </DialogFooter>

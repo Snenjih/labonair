@@ -34,21 +34,12 @@ export function ThemeCard(props: ThemeCardProps) {
   if (props.kind === "installed") {
     return <InstalledCard meta={props.meta} isBuiltin={props.isBuiltin} />;
   }
-  return (
-    <CommunityCard remote={props.remote} installedMeta={props.installedMeta} />
-  );
+  return <CommunityCard remote={props.remote} installedMeta={props.installedMeta} />;
 }
 
-function InstalledCard({
-  meta,
-  isBuiltin,
-}: {
-  meta: ThemeMeta;
-  isBuiltin?: boolean;
-}) {
+function InstalledCard({ meta, isBuiltin }: { meta: ThemeMeta; isBuiltin?: boolean }) {
   const savedTheme = usePreferencesStore((s) => s.appTheme);
-  const { previewThemeId, previewTheme, cancelPreview, applyTheme, uninstallTheme } =
-    useThemeStore();
+  const { previewThemeId, previewTheme, cancelPreview, applyTheme, uninstallTheme } = useThemeStore();
 
   const isActive = savedTheme === meta.id;
   const isPreviewing = previewThemeId === meta.id;
@@ -65,9 +56,7 @@ function InstalledCard({
     <div
       className={cn(
         "group relative flex items-start justify-between rounded-lg border border-transparent px-4 py-3 transition-colors",
-        isActive
-          ? "border-primary/30 bg-primary/5"
-          : "hover:bg-accent/50",
+        isActive ? "border-primary/30 bg-primary/5" : "hover:bg-accent/50",
         isPreviewing && "border-accent/50 bg-accent/10",
       )}
     >
@@ -80,25 +69,25 @@ function InstalledCard({
       <div className="flex min-w-0 items-center gap-3 pr-4">
         <ThemeThumbnail colors={meta.colors} />
         <div className="flex min-w-0 flex-col gap-0.5">
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold">{meta.name}</span>
-          {isActive && (
-            <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-              Active
-            </span>
-          )}
-          {isPreviewing && !isActive && (
-            <span className="rounded-full bg-accent/40 px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
-              Previewing
-            </span>
-          )}
-        </div>
-        {meta.author && (
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <HugeiconsIcon icon={User03Icon} size={11} strokeWidth={1.5} />
-            <span>{meta.author}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] font-semibold">{meta.name}</span>
+            {isActive && (
+              <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                Active
+              </span>
+            )}
+            {isPreviewing && !isActive && (
+              <span className="rounded-full bg-accent/40 px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+                Previewing
+              </span>
+            )}
           </div>
-        )}
+          {meta.author && (
+            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <HugeiconsIcon icon={User03Icon} size={11} strokeWidth={1.5} />
+              <span>{meta.author}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -147,13 +136,7 @@ function InstalledCard({
   );
 }
 
-function CommunityCard({
-  remote,
-  installedMeta,
-}: {
-  remote: RemoteTheme;
-  installedMeta?: ThemeMeta;
-}) {
+function CommunityCard({ remote, installedMeta }: { remote: RemoteTheme; installedMeta?: ThemeMeta }) {
   const { installingIds, installTheme, uninstallTheme } = useThemeStore();
   const savedTheme = usePreferencesStore((s) => s.appTheme);
 
