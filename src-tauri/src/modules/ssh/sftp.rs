@@ -647,9 +647,10 @@ pub async fn sftp_deep_search(
         let session_arc = get_sftp_session_arc!(state_inner, &session_id);
         let sess = session_arc.lock().map_err(|e| e.to_string())?;
         let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
-        // Build the glob as a Rust string first, then shell_quote the whole thing.
-        // This prevents any metacharacter in `query` from escaping the -iname argument.
-        let glob = format!("*{}*", query.replace('\'', "'\\''"));
+        // Build the glob as a plain Rust string and let `shell_quote` do the
+        // only escaping pass — pre-escaping `query` here too would double-
+        // escape any embedded `'` once `shell_quote` escapes it again.
+        let glob = format!("*{query}*");
         let cmd = format!(
             "find {} -iname {} -maxdepth 5 -print 2>/dev/null | head -n 200",
             shell_quote(&start_path),
