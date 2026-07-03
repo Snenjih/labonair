@@ -1,6 +1,7 @@
 mod executor;
 
 use crate::modules::sftp::SftpState;
+use crate::modules::sftp::net_error::is_network_error;
 use crate::modules::ssh::shell::shell_quote;
 use executor::{resolve_executor, GitExecutor, GIT_NOT_INSTALLED};
 use serde::{Deserialize, Serialize};
@@ -329,8 +330,9 @@ fn safe_truncate_utf8(bytes: &[u8], max: usize) -> &[u8] {
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
 /// Returns true if the given path is inside a git repository. `Err` is
-/// reserved for the "git binary missing" case (both locally and remotely) —
-/// "not a git repo" is a normal `Ok(false)`, not an error.
+/// reserved for cases where we couldn't actually determine that — the git
+/// binary is missing, or the SSH/SFTP session is dead — so those aren't
+/// mistaken for "not a git repo", which is a normal `Ok(false)`.
 #[tauri::command]
 pub async fn git_is_repo(
     path: String,
@@ -341,7 +343,7 @@ pub async fn git_is_repo(
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
     match executor.run(&["rev-parse", "--git-dir"]).await {
         Ok(_) => Ok(true),
-        Err(e) if e == GIT_NOT_INSTALLED => Err(e),
+        Err(e) if e == GIT_NOT_INSTALLED || is_network_error(&e) => Err(e),
         Err(_) => Ok(false),
     }
 }
