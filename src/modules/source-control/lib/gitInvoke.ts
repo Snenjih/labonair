@@ -29,12 +29,20 @@ export const git = {
     invoke<string>("git_get_current_branch", { path, sessionId: sessionId ?? null }),
   getBranches: (path: string, sessionId?: string) =>
     invoke<Branch[]>("git_get_branches", { path, sessionId: sessionId ?? null }),
-  getDiff: (path: string, file: string, staged: boolean, ignoreWhitespace?: boolean, sessionId?: string) =>
+  getDiff: (
+    path: string,
+    file: string,
+    staged: boolean,
+    ignoreWhitespace?: boolean,
+    sessionId?: string,
+    isUntracked?: boolean,
+  ) =>
     invoke<string>("git_get_diff", {
       path,
       file,
       staged,
       ignoreWhitespace: ignoreWhitespace ?? false,
+      isUntracked: isUntracked ?? false,
       sessionId: sessionId ?? null,
     }),
   stageFile: (path: string, file: string, sessionId?: string) =>

@@ -80,20 +80,28 @@ impl GitExecutor {
     /// (no lossy conversion applied yet) — used by diff-producing commands
     /// that need to truncate at a byte-accurate UTF-8 boundary first.
     pub(crate) async fn run_raw(&self, args: &[&str]) -> Result<Vec<u8>, String> {
+        self.run_raw_tolerant(args, &[]).await
+    }
+
+    /// Same as `run_raw`, but treats the exit codes in `tolerated` as success
+    /// too — needed for `git diff --no-index`, which exits 1 to mean "the
+    /// two sides differ" rather than "the command failed".
+    pub(crate) async fn run_raw_tolerant(&self, args: &[&str], tolerated: &[i32]) -> Result<Vec<u8>, String> {
         match self {
             GitExecutor::Local { cwd } => {
                 let args_owned: Vec<String> = args.iter().map(|s| s.to_string()).collect();
                 let cwd = cwd.clone();
+                let tolerated = tolerated.to_vec();
                 tokio::task::spawn_blocking(move || {
                     let refs: Vec<&str> = args_owned.iter().map(|s| s.as_str()).collect();
-                    run_local_raw(&refs, &cwd)
+                    run_local_raw(&refs, &cwd, &tolerated)
                 })
                 .await
                 .map_err(|e| e.to_string())?
             }
             GitExecutor::Remote { .. } => {
                 let (stdout, stderr, exit_code) = self.exec_remote_args(args).await?;
-                if exit_code == 0 {
+                if exit_code == 0 || tolerated.contains(&exit_code) {
                     Ok(stdout)
                 } else {
                     let err = String::from_utf8_lossy(&stderr).trim_end().to_string();
@@ -192,7 +200,7 @@ fn looks_like_missing_git(exit_code: i32, stderr: &[u8]) -> bool {
 
 // ─── Local execution (argv-based, mirrors the pre-existing run_git_sync) ───
 
-fn run_local_raw(args: &[&str], cwd: &str) -> Result<Vec<u8>, String> {
+fn run_local_raw(args: &[&str], cwd: &str, tolerated: &[i32]) -> Result<Vec<u8>, String> {
     let cwd_path = PathBuf::from(cwd);
     if !cwd_path.is_dir() {
         return Err(format!("not a directory: {cwd}"));
@@ -214,15 +222,12 @@ fn run_local_raw(args: &[&str], cwd: &str) -> Result<Vec<u8>, String> {
             }
         })?;
 
-    if output.status.success() {
+    let code = output.status.code().unwrap_or(-1);
+    if output.status.success() || tolerated.contains(&code) {
         Ok(output.stdout)
     } else {
         let stderr = String::from_utf8_lossy(&output.stderr).trim_end().to_string();
-        Err(if stderr.is_empty() {
-            format!("git exited with code {}", output.status.code().unwrap_or(-1))
-        } else {
-            stderr
-        })
+        Err(if stderr.is_empty() { format!("git exited with code {code}") } else { stderr })
     }
 }
 

@@ -427,12 +427,19 @@ pub async fn git_get_branches(
 }
 
 /// Returns the diff for a specific file, either staged or unstaged.
+///
+/// `is_untracked` files have nothing in the index to diff against, so a
+/// plain `git diff` always returns empty — instead this diffs against
+/// `/dev/null` with `--no-index` so the whole file shows up as additions.
+/// `--no-index` exits 1 when the two sides differ (not just on error), so
+/// that exit code is tolerated here rather than treated as a failure.
 #[tauri::command]
 pub async fn git_get_diff(
     path: String,
     file: String,
     staged: bool,
     ignore_whitespace: Option<bool>,
+    is_untracked: Option<bool>,
     session_id: Option<String>,
     sftp_state: tauri::State<'_, SftpState>,
     app: tauri::AppHandle,
@@ -440,14 +447,25 @@ pub async fn git_get_diff(
     const MAX_DIFF_BYTES: usize = 200 * 1024;
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
 
-    let mut args: Vec<&str> = if staged { vec!["diff", "--cached"] } else { vec!["diff"] };
-    if ignore_whitespace.unwrap_or(false) {
-        args.push("-w");
-    }
-    args.push("--");
-    args.push(&file);
+    let stdout = if is_untracked.unwrap_or(false) {
+        let mut args: Vec<&str> = vec!["diff", "--no-index"];
+        if ignore_whitespace.unwrap_or(false) {
+            args.push("-w");
+        }
+        args.push("--");
+        args.push("/dev/null");
+        args.push(&file);
+        executor.run_raw_tolerant(&args, &[1]).await?
+    } else {
+        let mut args: Vec<&str> = if staged { vec!["diff", "--cached"] } else { vec!["diff"] };
+        if ignore_whitespace.unwrap_or(false) {
+            args.push("-w");
+        }
+        args.push("--");
+        args.push(&file);
+        executor.run_raw(&args).await?
+    };
 
-    let stdout = executor.run_raw(&args).await?;
     Ok(truncate_diff(&stdout, MAX_DIFF_BYTES))
 }
 

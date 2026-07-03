@@ -95,7 +95,7 @@ export function GitDiffPane({ repoRoot, filePath, staged, section, sessionId }: 
     setDiff(null);
 
     git
-      .getDiff(repoRoot, filePath, staged, ignoreWhitespace, sessionId)
+      .getDiff(repoRoot, filePath, staged, ignoreWhitespace, sessionId, section === "untracked")
       .then((content) => {
         if (!cancelRef.current) setDiff(content);
       })
@@ -109,7 +109,7 @@ export function GitDiffPane({ repoRoot, filePath, staged, section, sessionId }: 
     return () => {
       cancelRef.current = true;
     };
-  }, [repoRoot, filePath, staged, ignoreWhitespace, sessionId]);
+  }, [repoRoot, filePath, staged, ignoreWhitespace, sessionId, section]);
 
   const stats = diff ? computeStats(diff) : null;
   const lines = diff ? diff.split("\n") : [];
