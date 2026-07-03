@@ -434,6 +434,7 @@ pub async fn git_get_branches(
 /// `--no-index` exits 1 when the two sides differ (not just on error), so
 /// that exit code is tolerated here rather than treated as a failure.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn git_get_diff(
     path: String,
     file: String,

@@ -26,7 +26,12 @@ import { parentPath } from "./utils";
 interface SftpPaneProps {
   tab: SftpTab;
   onOpenSshTerminal?: (hostId: string, title: string, cwd: string) => void;
-  onOpenRemoteEditor: (tabId: string, remotePath: string, hostId: string, source: "sftp-tab") => Promise<void>;
+  onOpenRemoteEditor: (
+    tabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab",
+  ) => Promise<void>;
   onPathsChange?: (tabId: number, remotePath: string, localPath: string) => void;
 }
 

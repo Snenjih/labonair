@@ -143,7 +143,12 @@ function TreeNodeRow({
         )}
         style={{ paddingLeft: depth * 12 + 8 }}
       >
-        <img src={folderIconUrl(node.name, !isCollapsed)} className="size-[14px] shrink-0" alt="" decoding="sync" />
+        <img
+          src={folderIconUrl(node.name, !isCollapsed)}
+          className="size-[14px] shrink-0"
+          alt=""
+          decoding="sync"
+        />
         <span className={cn("text-[11px]", isRoot ? "font-medium text-foreground/60" : "text-foreground/75")}>
           {node.name}
         </span>

@@ -6,7 +6,12 @@ import { SftpPane } from "./SftpPane";
 
 type Props = {
   onOpenSshTerminal?: (hostId: string, title: string, cwd: string) => void;
-  onOpenRemoteEditor: (sftpTabId: string, remotePath: string, hostId: string, source: "sftp-tab") => Promise<void>;
+  onOpenRemoteEditor: (
+    sftpTabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab",
+  ) => Promise<void>;
   onPathsChange?: (tabId: number, remotePath: string, localPath: string) => void;
 };
 

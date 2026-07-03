@@ -131,7 +131,12 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onPathDeleted: tabs.handlePathDeleted,
     onRevealInTerminal: tabs.cdInNewTab,
     onAttachToAgent: ai.handleAttachFileToAgent,
-    onOpenRemoteFile: (sessionId: string, path: string, hostId: string, source: "sftp-tab" | "lazy-session") => {
+    onOpenRemoteFile: (
+      sessionId: string,
+      path: string,
+      hostId: string,
+      source: "sftp-tab" | "lazy-session",
+    ) => {
       void actions.openRemoteEditorTab(sessionId, path, hostId, source);
     },
     onOpenRemotePreview: (

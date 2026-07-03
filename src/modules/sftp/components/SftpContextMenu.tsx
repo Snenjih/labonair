@@ -35,7 +35,12 @@ interface SftpContextMenuProps {
   onRefresh: () => void;
   onStartRename?: (path: string) => void;
   onStartNewFolder?: () => void;
-  onOpenRemoteEditor: (tabId: string, remotePath: string, hostId: string, source: "sftp-tab") => Promise<void>;
+  onOpenRemoteEditor: (
+    tabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab",
+  ) => Promise<void>;
   children: React.ReactNode;
 }
 
