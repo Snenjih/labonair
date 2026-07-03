@@ -35,13 +35,13 @@ interface SftpContextMenuProps {
   onRefresh: () => void;
   onStartRename?: (path: string) => void;
   onStartNewFolder?: () => void;
-  onOpenRemoteEditor: (tabId: string, remotePath: string) => Promise<void>;
+  onOpenRemoteEditor: (tabId: string, remotePath: string, hostId: string, source: "sftp-tab") => Promise<void>;
   children: React.ReactNode;
 }
 
 export function SftpContextMenu({
   tabId,
-  hostId: _hostId,
+  hostId,
   side,
   selectedPaths,
   currentPath,
@@ -203,9 +203,9 @@ export function SftpContextMenu({
               )}
               <ContextMenuItem
                 onClick={async () => {
-                  if (!singlePath) return;
+                  if (!singlePath || !hostId) return;
                   try {
-                    await onOpenRemoteEditor(tabId, singlePath);
+                    await onOpenRemoteEditor(tabId, singlePath, hostId, "sftp-tab");
                   } catch (e) {
                     handleApiError(e, "Failed to open remote file", "SFTP");
                   }

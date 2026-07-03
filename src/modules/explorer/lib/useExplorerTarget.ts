@@ -7,6 +7,7 @@ import { useHostsStore } from "@/modules/hosts";
 // circular import (explorer -> tabs -> explorer).
 import { selectActiveTab, useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { Tab } from "@/modules/tabs/types";
+import { dirname } from "./useFileTree";
 
 export type ExplorerTarget =
   | { type: "local"; path: string | null }
@@ -46,6 +47,26 @@ export function deriveExplorerTarget(
       path: activeTab.remotePath ?? null,
       source: "sftp-tab",
     };
+  }
+
+  // A remote file opened via the sidebar tree (or the SFTP dual-pane tab)
+  // becomes an editor/preview tab holding a LOCAL temp path — without this
+  // branch the tab falls through to the generic "local" case below and the
+  // sidebar would jump back to the local tree while editing a remote file.
+  // `remoteHostId`/`remoteSource` are snapshotted at open time (same
+  // pinning `GitGraphTab` etc. already do), so the explorer stays anchored
+  // to that file's containing remote folder for as long as the tab is
+  // active, independent of whichever tab/session originally opened it.
+  if (activeTab?.kind === "editor" || activeTab?.kind === "preview") {
+    if (activeTab.remoteHostId && activeTab.remoteHostTabId && activeTab.remotePath) {
+      return {
+        type: "remote",
+        hostId: activeTab.remoteHostId,
+        sessionId: activeTab.remoteHostTabId,
+        path: dirname(activeTab.remotePath),
+        source: activeTab.remoteSource ?? "lazy-session",
+      };
+    }
   }
 
   if (activeTab?.kind === "workspace") {

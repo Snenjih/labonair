@@ -40,8 +40,18 @@ export interface AppShellStoreActions {
   newQuickSshTab: (username: string, hostAddress: string, port: number) => number;
   newSftpTab: (hostId: string, title: string) => number;
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
-  openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
-  openRemotePreviewTab: (sftpTabId: string, remotePath: string) => Promise<void>;
+  openRemoteEditorTab: (
+    sftpTabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => Promise<void>;
+  openRemotePreviewTab: (
+    sftpTabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => Promise<void>;
   openUntitledTab: () => Promise<number>;
   setActiveId: (id: number) => void;
 }
@@ -121,11 +131,16 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onPathDeleted: tabs.handlePathDeleted,
     onRevealInTerminal: tabs.cdInNewTab,
     onAttachToAgent: ai.handleAttachFileToAgent,
-    onOpenRemoteFile: (sessionId: string, path: string) => {
-      void actions.openRemoteEditorTab(sessionId, path);
+    onOpenRemoteFile: (sessionId: string, path: string, hostId: string, source: "sftp-tab" | "lazy-session") => {
+      void actions.openRemoteEditorTab(sessionId, path, hostId, source);
     },
-    onOpenRemotePreview: (sessionId: string, path: string) => {
-      void actions.openRemotePreviewTab(sessionId, path);
+    onOpenRemotePreview: (
+      sessionId: string,
+      path: string,
+      hostId: string,
+      source: "sftp-tab" | "lazy-session",
+    ) => {
+      void actions.openRemotePreviewTab(sessionId, path, hostId, source);
     },
     onOpenSftpTab: (hostId: string, title: string) => {
       actions.newSftpTab(hostId, title);

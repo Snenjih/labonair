@@ -84,7 +84,10 @@ export function useOsFileDrop(
   return { dropTargetPath };
 }
 
-function resolveDropTarget(x: number, y: number, rootPath: string): string {
+/** Shared with `useInternalDrop` — both resolve "which directory is under
+ *  this point" the same way (nearest `[data-fs-path]` row, falling back to
+ *  its parent for a file row or to `rootPath` for empty space). */
+export function resolveDropTarget(x: number, y: number, rootPath: string): string {
   const el = document.elementFromPoint(x, y);
   if (!el) return rootPath;
 

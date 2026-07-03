@@ -37,8 +37,18 @@ export interface SidebarContentProps {
   onPathDeleted: (path: string) => void;
   onRevealInTerminal: (path: string) => void;
   onAttachToAgent: (path: string, remote?: { sessionId: string; hostId: string }) => void;
-  onOpenRemoteFile?: (sessionId: string, path: string) => void;
-  onOpenRemotePreview?: (sessionId: string, path: string) => void;
+  onOpenRemoteFile?: (
+    sessionId: string,
+    path: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => void;
+  onOpenRemotePreview?: (
+    sessionId: string,
+    path: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => void;
   onOpenSftpTab?: (hostId: string, title: string) => void;
   // Snippet
   onSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;

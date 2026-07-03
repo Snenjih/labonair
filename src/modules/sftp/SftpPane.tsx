@@ -26,7 +26,7 @@ import { parentPath } from "./utils";
 interface SftpPaneProps {
   tab: SftpTab;
   onOpenSshTerminal?: (hostId: string, title: string, cwd: string) => void;
-  onOpenRemoteEditor: (tabId: string, remotePath: string) => Promise<void>;
+  onOpenRemoteEditor: (tabId: string, remotePath: string, hostId: string, source: "sftp-tab") => Promise<void>;
   onPathsChange?: (tabId: number, remotePath: string, localPath: string) => void;
 }
 
@@ -138,7 +138,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       loadRemoteDir(tabId, target);
       return;
     }
-    onOpenRemoteEditor(tabId, file.path).catch((e) =>
+    onOpenRemoteEditor(tabId, file.path, tab.hostId, "sftp-tab").catch((e) =>
       handleApiError(e, "Failed to open remote file", "SFTP"),
     );
   }

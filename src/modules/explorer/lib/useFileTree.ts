@@ -74,7 +74,13 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
         const existing = useLocalExplorerStore.getState().nodes[path];
         const offset = append && existing?.status === "loaded" ? existing.entries.length : 0;
 
-        if (!append && !silent) setNode(path, { status: "loading" });
+        // Only show the "loading" placeholder when there's nothing already
+        // rendered for this path — a re-fetch of an already-loaded directory
+        // (manual refresh, OS watcher, remote poll, retrying a stale error)
+        // must not blank out good data just to briefly flash a spinner over
+        // it. `silent` already skipped this for background polls; this
+        // widens the same protection to every re-fetch, not just polls.
+        if (!append && !silent && existing?.status !== "loaded") setNode(path, { status: "loading" });
         try {
           const page = await provider.readDir(path, { showHidden: show_hidden, offset });
           // Discard a response that outlived a scope change (e.g. the user
@@ -342,6 +348,28 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
     [renaming, fetchChildren, options, provider],
   );
 
+  // Drag-and-drop move within the same tree — `rename` on both local and
+  // remote backends is a plain filesystem/SFTP rename, which already moves
+  // across directories, not just renames in place. Distinct from
+  // `commitRename` only in that the destination is a directory the caller
+  // resolved (drop target) rather than a typed name.
+  const movePath = useCallback(
+    async (path: string, destDir: string) => {
+      const name = path.slice(path.lastIndexOf("/") + 1);
+      const to = provider.joinPath(destDir, name);
+      if (to === path) return;
+      try {
+        await provider.rename(path, to);
+        options?.onPathRenamed?.(path, to);
+        await fetchChildren(dirname(path));
+        await fetchChildren(destDir);
+      } catch (e) {
+        handleApiError(e, "Move failed", "File Tree");
+      }
+    },
+    [fetchChildren, options, provider],
+  );
+
   const deletePath = useCallback(
     async (path: string) => {
       try {
@@ -373,6 +401,7 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
     beginRename,
     cancelRename,
     commitRename,
+    movePath,
     deletePath,
     joinPath: provider.joinPath,
   };

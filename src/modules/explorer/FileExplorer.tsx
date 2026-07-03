@@ -10,7 +10,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -35,6 +35,7 @@ import { createLocalFsProvider } from "./lib/providers/localFsProvider";
 import { createRemoteFsProvider } from "./lib/providers/remoteFsProvider";
 import type { ExplorerTarget } from "./lib/useExplorerTarget";
 import { useFileTree } from "./lib/useFileTree";
+import { useInternalDrop } from "./lib/useInternalDrop";
 import { useLazyExplorerSession } from "./lib/useLazyExplorerSession";
 import { useOsFileDrop } from "./lib/useOsFileDrop";
 
@@ -44,11 +45,23 @@ type Props = {
   /** Opens a remote path via the same prepare_remote_edit flow the SFTP dual-pane
    *  tab already uses. Required for remote browsing to do anything useful on
    *  file click — `onOpenFile` alone would try to open the (nonexistent) local
-   *  path. */
-  onOpenRemoteFile?: (sessionId: string, path: string) => void;
+   *  path. `hostId`/`source` are the current explorer target's — pinned onto
+   *  the resulting tab so the sidebar stays anchored to this file's remote
+   *  folder while it's open (see `deriveExplorerTarget`). */
+  onOpenRemoteFile?: (
+    sessionId: string,
+    path: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => void;
   /** Opens a remote path in a preview tab via the same prepare_remote_edit
    *  temp-download `onOpenRemoteFile` uses — read-only, no save-back. */
-  onOpenRemotePreview?: (sessionId: string, path: string) => void;
+  onOpenRemotePreview?: (
+    sessionId: string,
+    path: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => void;
   onOpenPreview?: (path: string) => void;
   onPathRenamed?: (from: string, to: string) => void;
   onPathDeleted?: (path: string) => void;
@@ -119,15 +132,27 @@ export function FileExplorer({
 
   // Native OS drag-drop needs a real local file handle to hand the OS — never
   // wired up for a remote target (see remoteFsProvider's supportsNativeDrag).
-  const { dropTargetPath } = useOsFileDrop(
+  const { dropTargetPath: osDropTargetPath } = useOsFileDrop(
     explorerTarget.type === "local" ? rootPath : null,
     !!query.trim(),
     (destDir) => tree.refresh(destDir),
   );
 
+  // Moving a row within this SAME tree via drag — pure-JS `explorerDrag`, so
+  // it works for both local and remote scopes (unlike native OS drag-out).
+  const treeContainerRef = useRef<HTMLDivElement>(null);
+  const currentHostId = explorerTarget.type === "remote" ? explorerTarget.hostId : null;
+  const { dropTargetPath: internalDropTargetPath } = useInternalDrop(
+    treeContainerRef,
+    rootPath,
+    currentHostId,
+    (path, destDir) => void tree.movePath(path, destDir),
+  );
+  const dropTargetPath = osDropTargetPath ?? internalDropTargetPath;
+
   const handleOpenFile = (path: string) => {
     if (explorerTarget.type === "remote" && activeSessionId) {
-      onOpenRemoteFile?.(activeSessionId, path);
+      onOpenRemoteFile?.(activeSessionId, path, explorerTarget.hostId, explorerTarget.source);
     } else {
       onOpenFile(path);
     }
@@ -148,7 +173,8 @@ export function FileExplorer({
   const effectiveOnOpenPreview =
     explorerTarget.type === "remote" && activeSessionId
       ? onOpenRemotePreview
-        ? (path: string) => onOpenRemotePreview(activeSessionId, path)
+        ? (path: string) =>
+            onOpenRemotePreview(activeSessionId, path, explorerTarget.hostId, explorerTarget.source)
         : undefined
       : onOpenPreview;
 
@@ -468,7 +494,7 @@ export function FileExplorer({
       ) : (
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <div className="relative min-h-0 flex-1">
+            <div ref={treeContainerRef} className="relative min-h-0 flex-1">
               {dropTargetPath === rootPath && (
                 <div className="pointer-events-none absolute inset-0 z-10 rounded-sm ring-2 ring-inset ring-primary/60 bg-primary/5" />
               )}
@@ -501,7 +527,7 @@ export function FileExplorer({
                 Reveal in Finder
               </ContextMenuItem>
             )}
-            <ContextMenuSeparator />
+            {(effectiveOnRevealInTerminal || tree.capabilities.supportsReveal) && <ContextMenuSeparator />}
             <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginCreate(rootPath, "file")}>
               New File
             </ContextMenuItem>

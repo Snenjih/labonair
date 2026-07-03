@@ -31,7 +31,7 @@ export interface WorkspaceAreaProps {
   newQuickSshTab: (username: string, hostAddress: string, port: number) => number;
   newSftpTab: (hostId: string, title: string) => number;
   onOpenSshTerminal: (hostId: string, title: string) => number;
-  onOpenRemoteEditor: (sftpTabId: string, remotePath: string) => Promise<void>;
+  onOpenRemoteEditor: (sftpTabId: string, remotePath: string, hostId: string, source: "sftp-tab") => Promise<void>;
   onSftpPathsChange: (tabId: number, remotePath: string, localPath: string) => void;
   keysLoaded: boolean;
   panelOpen: boolean;

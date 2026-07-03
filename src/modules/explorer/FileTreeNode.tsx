@@ -201,7 +201,7 @@ function FileTreeNodeImpl({
           </button>
         )}
       </ContextMenuTrigger>
-      <ContextMenuContent className={COMPACT_CONTENT}>
+      <ContextMenuContent className={COMPACT_CONTENT} onCloseAutoFocus={(e) => e.preventDefault()}>
         {!isDir && (
           <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onOpenFile(path)}>
             Open
@@ -222,7 +222,10 @@ function FileTreeNodeImpl({
             Reveal in Finder
           </ContextMenuItem>
         )}
-        <ContextMenuSeparator />
+        {(!isDir ||
+          (canPreview && !!onOpenPreview) ||
+          (isDir && !!onRevealInTerminal) ||
+          tree.capabilities.supportsReveal) && <ContextMenuSeparator />}
         <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginCreate(createTarget, "file")}>
           New File
         </ContextMenuItem>

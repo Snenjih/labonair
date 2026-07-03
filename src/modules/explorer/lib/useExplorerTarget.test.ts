@@ -85,10 +85,54 @@ describe("deriveExplorerTarget", () => {
     expect(target).toEqual({ type: "local", path: "/Users/x" });
   });
 
-  it("returns local for a non-workspace, non-sftp tab (e.g. editor)", () => {
+  it("returns local for a plain editor tab with no remote fields", () => {
     const editorTab = { id: 5, kind: "editor", title: "f.ts", path: "/a", dirty: false } as Tab;
     const target = deriveExplorerTarget(editorTab, [HOST], "/Users/x");
     expect(target).toEqual({ type: "local", path: "/Users/x" });
+  });
+
+  it("stays pinned to the remote folder for an editor tab opened from a remote file", () => {
+    const editorTab = {
+      id: 5,
+      kind: "editor",
+      title: "✦ test.ts",
+      path: "/tmp/labonair-remote-edit/test.ts",
+      dirty: false,
+      remoteHostTabId: "explorer:host-1",
+      remotePath: "/projects/projectA/test.ts",
+      remoteHostId: "host-1",
+      remoteSource: "lazy-session",
+    } as Tab;
+    const target = deriveExplorerTarget(editorTab, [HOST], "/Users/x");
+    expect(target).toEqual({
+      type: "remote",
+      hostId: "host-1",
+      sessionId: "explorer:host-1",
+      path: "/projects/projectA",
+      source: "lazy-session",
+    });
+  });
+
+  it("stays pinned to the remote folder for a preview tab opened from a remote file", () => {
+    const previewTab = {
+      id: 6,
+      kind: "preview",
+      title: "✦ image.png",
+      url: "/tmp/labonair-remote-edit/image.png",
+      remoteHostTabId: "7",
+      remotePath: "/var/www/assets/image.png",
+      remoteTempPath: "/tmp/labonair-remote-edit/image.png",
+      remoteHostId: "host-1",
+      remoteSource: "sftp-tab",
+    } as Tab;
+    const target = deriveExplorerTarget(previewTab, [HOST], "/Users/x");
+    expect(target).toEqual({
+      type: "remote",
+      hostId: "host-1",
+      sessionId: "7",
+      path: "/var/www/assets",
+      source: "sftp-tab",
+    });
   });
 
   it("falls back to \"/\" when a known host has no cwd and no default_path_ssh", () => {

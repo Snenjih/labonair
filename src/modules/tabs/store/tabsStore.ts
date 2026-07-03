@@ -64,8 +64,18 @@ export type TabsState = {
   newSftpTab: (hostId: string, title: string) => number;
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   openUntitledTab: () => Promise<number>;
-  openRemoteEditorTab: (sftpTabId: string, remotePath: string) => Promise<void>;
-  openRemotePreviewTab: (sftpTabId: string, remotePath: string) => Promise<void>;
+  openRemoteEditorTab: (
+    sftpTabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => Promise<void>;
+  openRemotePreviewTab: (
+    sftpTabId: string,
+    remotePath: string,
+    hostId: string,
+    source: "sftp-tab" | "lazy-session",
+  ) => Promise<void>;
   openGitGraphTab: (
     repositoryPath: string,
     initialBranch: string,
@@ -465,7 +475,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     return id;
   },
 
-  openRemoteEditorTab: async (sftpTabId, remotePath) => {
+  openRemoteEditorTab: async (sftpTabId, remotePath, hostId, source) => {
     const localTempPath = await prepareRemoteFileForTab(sftpTabId, remotePath, "(editor)");
     const fileName = remotePath.split("/").pop() ?? "remote-file";
     const id = get()._nextId;
@@ -480,6 +490,8 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           dirty: false,
           remoteHostTabId: sftpTabId,
           remotePath,
+          remoteHostId: hostId,
+          remoteSource: source,
         },
       ],
       activeId: id,
@@ -487,7 +499,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }));
   },
 
-  openRemotePreviewTab: async (sftpTabId, remotePath) => {
+  openRemotePreviewTab: async (sftpTabId, remotePath, hostId, source) => {
     // Reuses prepare_remote_edit's temp-download — PreviewPane already
     // detects a local absolute path and converts it via `convertFileSrc`,
     // so no remote-specific rendering path is needed. Same 5 MB cap the
@@ -504,7 +516,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           title: `✦ ${fileName}`,
           url: localTempPath,
           remoteHostTabId: sftpTabId,
+          remotePath,
           remoteTempPath: localTempPath,
+          remoteHostId: hostId,
+          remoteSource: source,
         },
       ],
       activeId: id,
