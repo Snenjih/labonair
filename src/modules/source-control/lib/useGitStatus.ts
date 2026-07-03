@@ -259,10 +259,13 @@ export function useGitStatus(target: ExplorerTarget) {
             content = await git.getDiff(repoRoot!, ".", staged, ignoreWhitespace, sessionId ?? undefined);
           }
         } else if (selectionMode!.type === "all") {
-          // Fetch staged and unstaged in parallel
+          // Fetch staged and unstaged in parallel — let a failure here (e.g.
+          // a dead SSH session) propagate to the outer catch instead of being
+          // swallowed into an empty string, which would be indistinguishable
+          // from a genuinely empty diff.
           const [staged, unstaged] = await Promise.all([
-            git.getDiff(repoRoot!, ".", true, ignoreWhitespace, sessionId ?? undefined).catch(() => ""),
-            git.getDiff(repoRoot!, ".", false, ignoreWhitespace, sessionId ?? undefined).catch(() => ""),
+            git.getDiff(repoRoot!, ".", true, ignoreWhitespace, sessionId ?? undefined),
+            git.getDiff(repoRoot!, ".", false, ignoreWhitespace, sessionId ?? undefined),
           ]);
           const parts = [staged, unstaged].filter(Boolean);
           content = parts.join("\n");
@@ -277,9 +280,10 @@ export function useGitStatus(target: ExplorerTarget) {
         if (!cancelled) {
           setDiffContent(content);
         }
-      } catch {
+      } catch (e) {
         if (!cancelled) {
           setDiffContent(null);
+          setError(String(e));
         }
       } finally {
         if (!cancelled) {
@@ -293,7 +297,7 @@ export function useGitStatus(target: ExplorerTarget) {
     return () => {
       cancelled = true;
     };
-  }, [selectionMode, repoRoot, sessionId, ignoreWhitespace, setDiffContent, setIsDiffLoading]);
+  }, [selectionMode, repoRoot, sessionId, ignoreWhitespace, setDiffContent, setIsDiffLoading, setError]);
 
   return { refresh: () => void doRefresh() };
 }
