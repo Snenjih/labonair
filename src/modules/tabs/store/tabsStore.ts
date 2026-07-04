@@ -37,15 +37,22 @@ export type TabsState = {
 
   // Actions
   setActiveId: (id: number) => void;
-  newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newTab: (cwd?: string, initialCommand?: string, sessionId?: string, cold?: boolean) => number;
   newSshTab: (
     hostId: string,
     title: string,
     cwd?: string,
     initialCommand?: string,
     sessionId?: string,
+    cold?: boolean,
   ) => number;
-  newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
+  newQuickSshTab: (
+    username: string,
+    hostAddress: string,
+    port: number,
+    sessionId?: string,
+    cold?: boolean,
+  ) => number;
   openDefaultTab: () => void;
   openHomeTab: () => void;
   openFileTab: (path: string) => number | null;
@@ -184,9 +191,24 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   activeId: -1,
   _nextId: 1,
 
-  setActiveId: (id) => set({ activeId: id }),
+  // The sole place a `cold` tab wakes up: clears the flag so `WorkspaceStack`
+  // mounts it (spawning its sessions' PTY/SSH connections for the first
+  // time) on the very next render. Every activation path (tab click,
+  // shortcut, restore, cd-into-folder, palette) already funnels through
+  // this one action.
+  setActiveId: (id) =>
+    set((s) => {
+      const target = s.tabs.find((t) => t.id === id);
+      if (target?.kind === "workspace" && (target as WorkspaceTab).cold) {
+        return {
+          activeId: id,
+          tabs: s.tabs.map((t) => (t.id === id ? { ...t, cold: false } : t)),
+        };
+      }
+      return { activeId: id };
+    }),
 
-  newTab: (cwd, initialCommand, sessionId) => {
+  newTab: (cwd, initialCommand, sessionId, cold = false) => {
     const tabId = get()._nextId;
     sessionId = sessionId ?? newSessionId();
     const tab: WorkspaceTab = {
@@ -198,12 +220,21 @@ export const useTabsStore = create<TabsState>((set, get) => ({
       sessions: {
         [sessionId]: { id: sessionId, kind: "local", title: "shell", cwd, initialCommand },
       },
+      cold,
     };
-    set((s) => ({ tabs: [...s.tabs, tab], activeId: tabId, _nextId: s._nextId + 1 }));
+    // A cold tab must not become active on creation — it isn't mounted (see
+    // WorkspaceStack's cold filter), so making it "active" here would leave
+    // activeId pointing at nothing rendered until a later setActiveId fixes
+    // it up (restore.ts's job once every tab has been created).
+    set((s) => ({
+      tabs: [...s.tabs, tab],
+      activeId: cold ? s.activeId : tabId,
+      _nextId: s._nextId + 1,
+    }));
     return tabId;
   },
 
-  newSshTab: (hostId, title, cwd, initialCommand, sessionId) => {
+  newSshTab: (hostId, title, cwd, initialCommand, sessionId, cold = false) => {
     const tabId = get()._nextId;
     sessionId = sessionId ?? newSessionId();
 
@@ -238,12 +269,17 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           startupSnippet,
         },
       },
+      cold,
     };
-    set((s) => ({ tabs: [...s.tabs, tab], activeId: tabId, _nextId: s._nextId + 1 }));
+    set((s) => ({
+      tabs: [...s.tabs, tab],
+      activeId: cold ? s.activeId : tabId,
+      _nextId: s._nextId + 1,
+    }));
     return tabId;
   },
 
-  newQuickSshTab: (username, hostAddress, port, sessionId) => {
+  newQuickSshTab: (username, hostAddress, port, sessionId, cold = false) => {
     const tabId = get()._nextId;
     sessionId = sessionId ?? newSessionId();
     const title = `${username}@${hostAddress}`;
@@ -261,8 +297,13 @@ export const useTabsStore = create<TabsState>((set, get) => ({
           quickConnect: { username, hostAddress, port },
         },
       },
+      cold,
     };
-    set((s) => ({ tabs: [...s.tabs, tab], activeId: tabId, _nextId: s._nextId + 1 }));
+    set((s) => ({
+      tabs: [...s.tabs, tab],
+      activeId: cold ? s.activeId : tabId,
+      _nextId: s._nextId + 1,
+    }));
     return tabId;
   },
 

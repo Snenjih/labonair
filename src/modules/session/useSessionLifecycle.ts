@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTabsStore, type WorkspaceTab } from "@/modules/tabs";
 import { captureAndSave, clearSnapshot, restoreIfEnabled } from "@/modules/session";
-import { saveAllScrollbacks, cleanupScrollbacks, flushAllSuspendedScrollbacks } from "./scrollback";
+import { saveAllScrollbacks, cleanupScrollbacks, flushAllDormantScrollbacks } from "./scrollback";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -81,7 +81,7 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
       await captureAndSave();
       if (sessionRestore) {
         void saveAllScrollbacks(collectAllSessionIds());
-        void flushAllSuspendedScrollbacks();
+        void flushAllDormantScrollbacks();
       }
     }, 30_000);
     const unsub = useTabsStore.subscribe(() => {
@@ -140,7 +140,7 @@ export function useSessionLifecycle(): SessionLifecycleReturn {
           if (sessionRestore) {
             await captureAndSave();
             await saveAllScrollbacks(collectAllSessionIds());
-            await flushAllSuspendedScrollbacks();
+            await flushAllDormantScrollbacks();
           }
         } finally {
           await invoke("quit_app");

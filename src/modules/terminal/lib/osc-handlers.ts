@@ -1,7 +1,25 @@
 import type { IDisposable, IMarker, Terminal } from "@xterm/xterm";
 
-export function registerCwdHandler(term: Terminal, onCwd: (cwd: string) => void): () => void {
+/** Tracks whether a foreground command is currently executing, derived from
+ *  OSC 133 C/D. Shared between registerCwdHandler (to reject untrusted OSC 7
+ *  from command output) and registerPromptTracker (which drives it) — one
+ *  instance per session, persists across renderer-pool slot rebinds since
+ *  it lives in the session record, not on the Terminal itself. */
+export type ShellIntegrationState = { inCommand: boolean };
+
+export function createShellIntegrationState(): ShellIntegrationState {
+  return { inCommand: false };
+}
+
+export function registerCwdHandler(
+  term: Terminal,
+  onCwd: (cwd: string) => void,
+  state?: ShellIntegrationState,
+): () => void {
   const d = term.parser.registerOscHandler(7, (data) => {
+    // Untrusted command output (remote SSH, `cat` of an attacker-controlled
+    // file, …) can emit its own OSC 7 — ignore while a command owns the tty.
+    if (state?.inCommand) return true;
     const cwd = parseOsc7(data);
     if (cwd) onCwd(cwd);
     return true;
@@ -14,12 +32,33 @@ export type PromptTracker = {
   dispose: () => void;
 };
 
-export function registerPromptTracker(term: Terminal): PromptTracker {
+/**
+ * `onCommandState` fires on OSC 133 C (pre-exec — a command starts running,
+ * `running=true`) and D (command finished, `running=false`). This is the
+ * primary "is this session busy" signal for both local and SSH sessions
+ * (renderer-pool eviction scoring, hidden-release gating) — it works
+ * identically over either transport since it's parsed purely from the shell's
+ * own OSC stream. OSC 133 B (end of prompt / command line begins) is parsed
+ * but has no callback — the pool cares about *executing*, not *typing*.
+ */
+export function registerPromptTracker(
+  term: Terminal,
+  state?: ShellIntegrationState,
+  onCommandState?: (running: boolean) => void,
+): PromptTracker {
   let marker: IMarker | null = null;
   const d = term.parser.registerOscHandler(133, (data) => {
     if (data.startsWith("A")) {
       marker?.dispose();
       marker = term.registerMarker(0);
+      if (state) state.inCommand = false;
+      onCommandState?.(false);
+    } else if (data.startsWith("C")) {
+      if (state) state.inCommand = true;
+      onCommandState?.(true);
+    } else if (data.startsWith("D")) {
+      if (state) state.inCommand = false;
+      onCommandState?.(false);
     }
     return true;
   });

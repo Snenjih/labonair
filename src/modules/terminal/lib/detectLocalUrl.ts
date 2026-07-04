@@ -2,8 +2,8 @@
 // on a word boundary so we don't catch substrings of longer paths.
 //
 // Deliberately dependency-free (no xterm imports) so it can be pulled into
-// both the live terminal-output path (useTerminalSession.ts) and the
-// suspended-session buffer scan (suspendedSessionBuffer.ts) without dragging
+// terminalSessionRegistry.ts's deliverBytes/deliverText (used regardless of
+// whether a session currently has a bound renderer slot) without dragging
 // the whole xterm/addon stack into contexts — like unit tests — that only
 // need the regex.
 export const LOCAL_URL_RE =

@@ -35,6 +35,9 @@ pub struct Session {
     pub master: Mutex<Box<dyn MasterPty + Send>>,
     pub writer: Mutex<Box<dyn Write + Send>>,
     pub killer: Mutex<Box<dyn ChildKiller + Send + Sync>>,
+    /// Shell's own PID, used by `pty_has_foreground_job` to compare against
+    /// the tty's foreground process group leader (see mod.rs).
+    pub shell_pid: u32,
 }
 
 impl Drop for Session {
@@ -70,6 +73,7 @@ pub fn spawn(
     drop(pair.slave);
 
     let killer = child.clone_killer();
+    let shell_pid = child.process_id().unwrap_or(0);
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
@@ -77,6 +81,7 @@ pub fn spawn(
         master: Mutex::new(pair.master),
         writer: Mutex::new(writer),
         killer: Mutex::new(killer),
+        shell_pid,
     });
 
     let pending: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::with_capacity(READ_BUF)));

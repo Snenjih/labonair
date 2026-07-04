@@ -5,13 +5,11 @@ import { useShallow } from "zustand/react/shallow";
 import type { EditorPaneHandle } from "@/modules/editor";
 import { PREVIEW_EXTENSIONS } from "@/modules/explorer";
 import type { PreviewPaneHandle } from "@/modules/preview";
-import { flushSuspendedScrollback } from "@/modules/session/scrollback";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { type CommandSnippet, type SnippetExecMode, useSnippetExec } from "@/modules/snippets";
 import type { TerminalPaneHandle, WorkspacePaneHandle } from "@/modules/terminal";
-import { closeSuspendedSession, isSuspended } from "@/modules/terminal/lib/suspendedSessionBuffer";
+import { disposeSession } from "@/modules/terminal/lib/terminalSessionRegistry";
 import { selectActivePaneId, selectActiveTabKind, useTabsStore } from "../store/tabsStore";
-import { removeTabFromVirtualization } from "../store/tabVirtualization";
 import type { AiDiffTab, WorkspaceTab } from "../types";
 
 export interface UseTabManagementOptions {
@@ -157,31 +155,16 @@ export function useTabManagement({
       const { tabs } = useTabsStore.getState();
       const tab = tabs.find((t) => t.id === id);
       if (tab?.kind === "workspace") {
-        for (const [sessionId, session] of Object.entries((tab as WorkspaceTab).sessions)) {
-          // A suspended session's pane was already unmounted (no live effect
-          // cleanup to call ssh_disconnect/pty_close for it) — the registry
-          // is the only place left holding its connection, so tear it down
-          // here instead, flushing whatever it buffered while backgrounded
-          // onto disk first.
-          if (isSuspended(sessionId)) {
-            void flushSuspendedScrollback(sessionId).finally(() => {
-              const held = closeSuspendedSession(sessionId);
-              if (!held) return;
-              if (session.kind === "ssh") {
-                invoke("ssh_disconnect", { sessionId }).catch(console.error);
-                if (session.hostId) {
-                  invoke("ssh_stop_tunnels", { hostId: session.hostId }).catch(console.error);
-                }
-              } else if (held.backendId !== undefined) {
-                invoke("pty_close", { id: held.backendId }).catch(console.error);
-              }
-            });
-          }
+        for (const sessionId of Object.keys((tab as WorkspaceTab).sessions)) {
+          // Frees a bound or merely-retained renderer-pool slot (no-op if
+          // neither exists) before the store removes the tab and its owning
+          // component unmounts — the component's own unmount cleanup still
+          // closes the actual pty/SSH connection, exactly as before pooling.
+          disposeSession(sessionId);
           terminalRefs.current.delete(sessionId);
           detectedUrls.current.delete(sessionId);
         }
         workspacePaneRefs.current.delete(id);
-        removeTabFromVirtualization(id);
       }
       // Best-effort cleanup of the local temp file `prepare_remote_edit`
       // staged for a remote editor/preview tab — fire-and-forget, a

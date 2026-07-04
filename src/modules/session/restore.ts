@@ -14,15 +14,22 @@ import type {
 
 export interface TabActions {
   setActiveId: (id: number) => void;
-  newTab: (cwd?: string, initialCommand?: string, sessionId?: string) => number;
+  newTab: (cwd?: string, initialCommand?: string, sessionId?: string, cold?: boolean) => number;
   newSshTab: (
     hostId: string,
     title: string,
     cwd?: string,
     initialCommand?: string,
     sessionId?: string,
+    cold?: boolean,
   ) => number;
-  newQuickSshTab: (username: string, hostAddress: string, port: number, sessionId?: string) => number;
+  newQuickSshTab: (
+    username: string,
+    hostAddress: string,
+    port: number,
+    sessionId?: string,
+    cold?: boolean,
+  ) => number;
   openFileTab: (path: string) => number | null;
   newPreviewTab: (url: string) => number;
   openHomeTab: () => void;
@@ -41,6 +48,7 @@ async function restoreWorkspaceTab(
   snap: WorkspaceTabSnapshot,
   actions: TabActions,
   failedTabs: RestoreResult["failedTabs"],
+  cold: boolean,
 ): Promise<number | null> {
   const leaves = collectLeaves(snap.layout);
   if (leaves.length === 0) return null;
@@ -77,6 +85,7 @@ async function restoreWorkspaceTab(
         rootSession.quickConnect.hostAddress,
         rootSession.quickConnect.port,
         rootSession.id,
+        cold,
       );
     } else if (rootSession.hostId) {
       tabId = actions.newSshTab(
@@ -85,15 +94,20 @@ async function restoreWorkspaceTab(
         rootSession.cwd,
         rootSession.initialCommand,
         rootSession.id,
+        cold,
       );
     } else {
-      tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id);
+      tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id, cold);
     }
   } else {
-    tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id);
+    tabId = actions.newTab(rootSession.cwd, rootSession.initialCommand, rootSession.id, cold);
   }
 
-  // Reconstruct the split pane tree if there are multiple panes
+  // Reconstruct the split pane tree if there are multiple panes.
+  // `splitPane`/`setActivePaneId` are pure Zustand store updates — no PTY/SSH
+  // connection is spawned by them (only `WorkspaceStack` mounting a pane
+  // does that) — so this is safe to do even for a cold tab that isn't
+  // mounted at all yet.
   if (leaves.length > 1) {
     await reconstructPaneTree(snap.layout, tabId, actions);
     actions.setActivePaneId(tabId, snap.activePaneId);
@@ -137,6 +151,7 @@ async function restoreTab(
   snap: TabSnapshot,
   actions: TabActions,
   failedTabs: RestoreResult["failedTabs"],
+  cold: boolean,
 ): Promise<number | null> {
   switch (snap.kind) {
     case "home": {
@@ -173,7 +188,7 @@ async function restoreTab(
     }
 
     case "workspace": {
-      return restoreWorkspaceTab(snap, actions, failedTabs);
+      return restoreWorkspaceTab(snap, actions, failedTabs, cold);
     }
 
     case "sftp": {
@@ -190,14 +205,24 @@ export async function restoreSnapshot(
   let restoredCount = 0;
   const newTabIds: (number | null)[] = [];
 
-  for (const snap of snapshot.tabs) {
-    const tabId = await restoreTab(snap, actions, failedTabs);
+  for (const [index, snap] of snapshot.tabs.entries()) {
+    // Only the previously-active tab connects immediately; every other
+    // workspace tab is restored `cold` (see tabsStore's `newTab`/
+    // `WorkspaceStack`'s mount filter) — spawning a PTY/SSH connection per
+    // restored tab regardless of visibility is what made restoring 40+ tabs
+    // slow/heavy in the first place.
+    const cold = index !== snapshot.activeTabIndex;
+    const tabId = await restoreTab(snap, actions, failedTabs, cold);
     newTabIds.push(tabId);
     if (tabId !== null) restoredCount++;
   }
 
-  // Restore the active tab
-  const targetNewId = newTabIds[snapshot.activeTabIndex];
+  // Restore the active tab. If the snapshotted active tab specifically
+  // failed to restore (e.g. its SSH host was deleted), fall back to the
+  // first tab that did restore — otherwise activeId stays unset and, under
+  // cold-gating, *nothing* ever warms (every other tab is cold and only
+  // setActiveId clears that).
+  const targetNewId = newTabIds[snapshot.activeTabIndex] ?? newTabIds.find((id) => id !== null);
   if (targetNewId !== null && targetNewId !== undefined) {
     actions.setActiveId(targetNewId);
   }

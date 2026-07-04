@@ -38,6 +38,14 @@ export type WorkspaceTab = {
   activePaneId: string;
   layout: PaneNode;
   sessions: Record<string, TerminalSessionData>;
+  /** True for a tab restored from a session snapshot that hasn't been
+   *  activated yet — no PTY/SSH connection has been spawned for any of its
+   *  sessions. `WorkspaceStack` doesn't mount a cold tab at all, so its panes
+   *  never call `useTerminalSession`/`SshTerminalPane`'s connect logic.
+   *  Cleared exactly once, by `setActiveId`, the moment the tab is first
+   *  activated. Never set for interactively-created tabs (only restore.ts
+   *  passes `cold: true`), so it's always `false`/absent outside restore. */
+  cold?: boolean;
 };
 
 export type EditorTab = {

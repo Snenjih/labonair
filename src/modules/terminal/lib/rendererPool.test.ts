@@ -1,0 +1,67 @@
+import { describe, expect, it } from "vitest";
+import {
+  computePoolCeiling,
+  POOL_BASE_SIZE,
+  POOL_HARD_CAP,
+  RESERVED_HEADROOM,
+  selectEvictionCandidate,
+  type EvictionCandidate,
+} from "./rendererPoolSizing";
+
+describe("computePoolCeiling", () => {
+  it("stays at the base size when few sessions are visible", () => {
+    expect(computePoolCeiling(0)).toBe(POOL_BASE_SIZE);
+    expect(computePoolCeiling(1)).toBe(POOL_BASE_SIZE);
+  });
+
+  it("grows with visible-session count plus headroom once past the base size", () => {
+    const visible = POOL_BASE_SIZE + 2;
+    expect(computePoolCeiling(visible)).toBe(visible + RESERVED_HEADROOM);
+  });
+
+  it("clamps at the hard cap for pathological split-pane counts", () => {
+    expect(computePoolCeiling(1000)).toBe(POOL_HARD_CAP);
+  });
+
+  it("never returns less than the base size, even for zero visible sessions", () => {
+    expect(computePoolCeiling(0)).toBeGreaterThanOrEqual(POOL_BASE_SIZE);
+  });
+});
+
+describe("selectEvictionCandidate", () => {
+  it("returns null for an empty candidate list", () => {
+    expect(selectEvictionCandidate([])).toBeNull();
+  });
+
+  it("picks the lowest-scoring non-visible candidate over a higher-scoring one", () => {
+    const candidates: EvictionCandidate[] = [
+      { sessionId: "a", visible: false, score: 50 },
+      { sessionId: "b", visible: false, score: 10 },
+    ];
+    expect(selectEvictionCandidate(candidates)).toBe("b");
+  });
+
+  it("never picks a visible candidate while a non-visible one exists, regardless of score", () => {
+    const candidates: EvictionCandidate[] = [
+      { sessionId: "visible-low-score", visible: true, score: 1 },
+      { sessionId: "hidden-high-score", visible: false, score: 999 },
+    ];
+    expect(selectEvictionCandidate(candidates)).toBe("hidden-high-score");
+  });
+
+  it("falls back to the lowest-scoring visible candidate when every candidate is visible", () => {
+    const candidates: EvictionCandidate[] = [
+      { sessionId: "a", visible: true, score: 1200 },
+      { sessionId: "b", visible: true, score: 1005 },
+    ];
+    expect(selectEvictionCandidate(candidates)).toBe("b");
+  });
+
+  it("breaks ties deterministically by picking the first minimum encountered", () => {
+    const candidates: EvictionCandidate[] = [
+      { sessionId: "first", visible: false, score: 5 },
+      { sessionId: "second", visible: false, score: 5 },
+    ];
+    expect(selectEvictionCandidate(candidates)).toBe("first");
+  });
+});
