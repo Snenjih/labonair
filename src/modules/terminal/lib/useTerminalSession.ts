@@ -11,8 +11,10 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { containsSchemeSeparator, LOCAL_URL_RE, stripTrailingPunct } from "./detectLocalUrl";
 import { registerCwdHandler, registerPromptTracker, registerTerminalQueryHandlers } from "./osc-handlers";
-import { openPty, type PtySession } from "./pty-bridge";
+import { attachToPty, decodeBase64, openPty, type PtyEvent, type PtySession } from "./pty-bridge";
+import { resumeSession, suspendSession, type DecodedChunk } from "./suspendedSessionBuffer";
 
 type Options = {
   container: React.RefObject<HTMLDivElement | null>;
@@ -20,15 +22,15 @@ type Options = {
   sessionId?: string;
   initialCwd?: string;
   initialCommand?: string;
+  /** True while this tab is backgrounded and past the suspend threshold (see
+   *  tabVirtualization.ts). Tears down the xterm/WebGL renderer but keeps the
+   *  underlying PTY process and its Channel alive — see suspendedSessionBuffer.ts. */
+  suspended?: boolean;
   onSearchReady?: (addon: SearchAddon) => void;
   onExit?: (code: number) => void;
   onCwd?: (cwd: string) => void;
   onDetectedLocalUrl?: (url: string) => void;
 };
-
-// Matches dev-server-style local URLs (vite, next dev, webpack, …). Anchors
-// on a word boundary so we don't catch substrings of longer paths.
-const LOCAL_URL_RE = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d{1,5})?(?:\/[^\s\x1b]*)?/g;
 
 const FONT_WEIGHT_MAP: Record<string, string | number> = {
   normal: "normal",
@@ -63,6 +65,7 @@ export function useTerminalSession({
   sessionId,
   initialCwd,
   initialCommand,
+  suspended = false,
   onSearchReady,
   onExit,
   onCwd,
@@ -83,6 +86,13 @@ export function useTerminalSession({
   const fitRef = useRef<FitAddon | null>(null);
   const serializeRef = useRef<SerializeAddon | null>(null);
   const ptyRef = useRef<PtySession | null>(null);
+  // Mirrors `suspended` synchronously during render (not in an effect) so the
+  // mount effect's cleanup — which runs in the SAME commit as the prop flip —
+  // can tell "cleaning up because we're suspending" (hand off to the
+  // suspend registry) apart from "cleaning up because we're really
+  // unmounting while still live" (close the pty for real).
+  const suspendedRef = useRef(suspended);
+  suspendedRef.current = suspended;
 
   // Apply terminal preference changes to the live xterm instance.
   useEffect(() => {
@@ -148,8 +158,45 @@ export function useTerminalSession({
   }, []);
 
   useEffect(() => {
+    // Suspended: nothing to (re)create here — the previous (live) run's
+    // cleanup below already handed the pty off to suspendedSessionBuffer
+    // instead of closing it.
+    if (suspended) return;
+
     let disposed = false;
     const cleanups: Array<() => void> = [];
+
+    // Hoisted above the async IIFE (and independent of the `term` it builds)
+    // so both the mid-attach "disposed" race below and this effect's own
+    // cleanup — neither of which can see the IIFE's locals — can reach them.
+    const playBell = () => {
+      if (!usePreferencesStore.getState().terminalBell) return;
+      try {
+        const ctx = getBellAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 800;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+      } catch {
+        /* ignore AudioContext errors */
+      }
+    };
+    // Persistent across every chunk of one suspend cycle so a multi-byte
+    // UTF-8 codepoint split across two channel messages decodes correctly.
+    const suspendDecoder = new TextDecoder("utf-8", { fatal: false });
+    const decodeLocalPtyEvent = (event: unknown): DecodedChunk => {
+      const e = event as PtyEvent;
+      if (e.type === "data") {
+        return { text: suspendDecoder.decode(decodeBase64(e.data), { stream: true }) };
+      }
+      if (e.type === "exit") return { exitCode: e.code };
+      return {};
+    };
 
     (async () => {
       const prefs = usePreferencesStore.getState();
@@ -218,23 +265,8 @@ export function useTerminalSession({
       };
       document.addEventListener("copy", onCopy, { capture: true });
       cleanups.push(() => document.removeEventListener("copy", onCopy, { capture: true }));
-      term.onBell(() => {
-        if (!usePreferencesStore.getState().terminalBell) return;
-        try {
-          const ctx = getBellAudioContext();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.frequency.value = 800;
-          gain.gain.setValueAtTime(0.3, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.15);
-        } catch {
-          /* ignore AudioContext errors */
-        }
-      });
+      // playBell is hoisted above (shared with the suspend-hand-off path below).
+      term.onBell(playBell);
 
       const fit = new FitAddon();
       fitRef.current = fit;
@@ -255,6 +287,10 @@ export function useTerminalSession({
       serializeRef.current = serializeAddon;
       term.loadAddon(serializeAddon);
 
+      // Resuming a suspended session? Grab it before the scrollback restore
+      // below so we know whether there's live replay content to append after.
+      const resumed = sessionId ? resumeSession(sessionId) : null;
+
       // Restore scrollback before opening PTY so history appears first
       if (sessionId && !disposed) {
         try {
@@ -268,6 +304,7 @@ export function useTerminalSession({
           /* graceful degradation — terminal starts normally */
         }
       }
+      if (resumed?.replay) term.write(resumed.replay);
 
       if (prefs.terminalUseWebGL) {
         let webglRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -301,39 +338,49 @@ export function useTerminalSession({
       // a multi-byte UTF-8 codepoint between unrelated streams.
       const urlDecoder = new TextDecoder("utf-8", { fatal: false });
 
+      const handleExit = (code: number) => {
+        term.write(`\r\n\x1b[2m[process exited: ${code}]\x1b[0m\r\n`);
+        term.options.disableStdin = true;
+        onExitRef.current?.(code);
+      };
+      if (resumed?.exitCode !== undefined) handleExit(resumed.exitCode);
+
       const shellPref = usePreferencesStore.getState().terminalShell;
-      const pty = await openPty(
-        term.cols,
-        term.rows,
-        {
-          onData: (bytes) => {
-            term.write(bytes);
-            // Sniff for dev-server URLs in raw output. Byte-level prefilter
-            // (':' '/' '/') skips decode+regex on the overwhelming majority
-            // of chunks (ordinary terminal output, log tails, test runs).
-            if (onDetectedRef.current && containsSchemeSeparator(bytes)) {
-              const text = urlDecoder.decode(bytes, { stream: true });
-              const matches = text.match(LOCAL_URL_RE);
-              if (matches && matches.length > 0) {
-                const url = stripTrailingPunct(matches[matches.length - 1]);
-                if (url && url !== detectedRef.current) {
-                  detectedRef.current = url;
-                  onDetectedRef.current(url);
-                }
+      const handlers = {
+        onData: (bytes: Uint8Array) => {
+          term.write(bytes);
+          // Sniff for dev-server URLs in raw output. Byte-level prefilter
+          // (':' '/' '/') skips decode+regex on the overwhelming majority
+          // of chunks (ordinary terminal output, log tails, test runs).
+          if (onDetectedRef.current && containsSchemeSeparator(bytes)) {
+            const text = urlDecoder.decode(bytes, { stream: true });
+            const matches = text.match(LOCAL_URL_RE);
+            if (matches && matches.length > 0) {
+              const url = stripTrailingPunct(matches[matches.length - 1]);
+              if (url && url !== detectedRef.current) {
+                detectedRef.current = url;
+                onDetectedRef.current(url);
               }
             }
-          },
-          onExit: (code) => {
-            term.write(`\r\n\x1b[2m[process exited: ${code}]\x1b[0m\r\n`);
-            term.options.disableStdin = true;
-            onExitRef.current?.(code);
-          },
+          }
         },
-        initialCwd,
-        shellPref || undefined,
-      );
+        onExit: handleExit,
+      };
+      const pty = resumed
+        ? attachToPty(resumed.channel, resumed.backendId ?? 0, handlers)
+        : await openPty(term.cols, term.rows, handlers, initialCwd, shellPref || undefined);
       if (disposed) {
-        pty.close();
+        if (resumed && sessionId) {
+          // Unmounted again before we finished reattaching (e.g. a very fast
+          // tab-switch) — put it back rather than closing a still-wanted
+          // background session for real.
+          suspendSession(sessionId, pty.channel, decodeLocalPtyEvent, {
+            onUrlDetected: (url) => onDetectedRef.current?.(url),
+            onBell: playBell,
+          });
+        } else {
+          pty.close();
+        }
         return;
       }
       ptyRef.current = pty;
@@ -415,7 +462,16 @@ export function useTerminalSession({
     return () => {
       disposed = true;
       cleanups.forEach((fn) => fn());
-      ptyRef.current?.close();
+      if (suspendedRef.current && sessionId && ptyRef.current) {
+        // Suspending, not really closing — hand the live channel off so
+        // output keeps flowing (buffered) while this pane is torn down.
+        suspendSession(sessionId, ptyRef.current.channel, decodeLocalPtyEvent, {
+          onUrlDetected: (url) => onDetectedRef.current?.(url),
+          onBell: playBell,
+        });
+      } else {
+        ptyRef.current?.close();
+      }
       ptyRef.current = null;
       termRef.current?.dispose();
       termRef.current = null;
@@ -423,7 +479,7 @@ export function useTerminalSession({
       serializeRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [suspended]);
 
   useLayoutEffect(() => {
     if (!visible) return;
@@ -485,21 +541,4 @@ export function useTerminalSession({
   }, []);
 
   return { write, focus, getBuffer, getSelection, clear, applyTheme, serialize };
-}
-
-function stripTrailingPunct(url: string): string {
-  return url.replace(/[.,);\]]+$/, "");
-}
-
-// Looks for the literal byte sequence ":" "/" "/" — the cheapest signal
-// that a chunk *might* contain a URL. Avoids per-chunk UTF-8 decode + regex
-// scan when running noisy commands.
-function containsSchemeSeparator(bytes: Uint8Array): boolean {
-  const n = bytes.length;
-  for (let i = 0; i < n - 2; i++) {
-    if (bytes[i] === 0x3a && bytes[i + 1] === 0x2f && bytes[i + 2] === 0x2f) {
-      return true;
-    }
-  }
-  return false;
 }

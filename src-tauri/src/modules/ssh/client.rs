@@ -1,4 +1,5 @@
 use tauri::Emitter;
+use tauri::ipc::Channel;
 use crate::modules::errors::LabonairError;
 
 macro_rules! log_step {
@@ -36,6 +37,7 @@ pub async fn ssh_connect(
     password_override: Option<String>,
     initial_cols: Option<u32>,
     initial_rows: Option<u32>,
+    on_event: Channel<super::pty::SshPtyEvent>,
     state: tauri::State<'_, super::SshState>,
     trust_state: tauri::State<'_, super::TrustState>,
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
@@ -209,7 +211,7 @@ pub async fn ssh_connect(
             default_path_ssh, password, cols, rows,
             jump_host_address, jump_port, jump_username, jump_auth_method,
             jump_private_key_path, jump_password, jump_keep_alive_interval,
-            state_inner, trust_inner, app_clone,
+            state_inner, trust_inner, app_clone, on_event,
         )
     })
     .await
@@ -266,6 +268,7 @@ pub async fn ssh_connect_quick(
     passphrase: Option<String>,
     initial_cols: Option<u32>,
     initial_rows: Option<u32>,
+    on_event: Channel<super::pty::SshPtyEvent>,
     state: tauri::State<'_, super::SshState>,
     trust_state: tauri::State<'_, super::TrustState>,
     app: tauri::AppHandle,
@@ -303,6 +306,7 @@ pub async fn ssh_connect_quick(
             state_inner,
             trust_inner,
             app_clone,
+            on_event,
         )
     })
     .await
@@ -617,6 +621,7 @@ fn ssh_connect_blocking(
     state: super::SshState,
     trust_state: super::TrustState,
     app: tauri::AppHandle,
+    on_event: Channel<super::pty::SshPtyEvent>,
 ) -> Result<(), String> {
     // Establish TCP stream — either direct or via a jump host tunnel.
     let (tcp, jump_bridge) = if let (
@@ -687,6 +692,7 @@ fn ssh_connect_blocking(
         initial_rows,
         keep_alive_interval.map(|v| v as u32),
         keep_alive_tries.map(|v| v as u32),
+        on_event,
     )?;
     log_step!(app, session_id, "Shell channel open ✓");
 

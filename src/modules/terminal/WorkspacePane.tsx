@@ -25,6 +25,11 @@ export type WorkspacePaneHandle = {
 interface Props {
   tab: WorkspaceTab;
   tabVisible: boolean;
+  /** True once this tab has been backgrounded past the suspend threshold
+   *  (see tabVirtualization.ts) — passed straight through to every pane so
+   *  each can tear down its own xterm/WebGL renderer while keeping its
+   *  PTY/SSH connection alive (see suspendedSessionBuffer.ts). */
+  suspended?: boolean;
   onSetActivePane: (paneId: string) => void;
   onRegisterHandle: (sessionId: string, handle: TerminalPaneHandle | null) => void;
   onCwd: (sessionId: string, cwd: string) => void;
@@ -35,7 +40,16 @@ interface Props {
 type PaneRect = { x: number; y: number; w: number; h: number };
 
 export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function WorkspacePane(
-  { tab, tabVisible, onSetActivePane, onRegisterHandle, onCwd, onClosePane, onDetectedLocalUrl },
+  {
+    tab,
+    tabVisible,
+    suspended = false,
+    onSetActivePane,
+    onRegisterHandle,
+    onCwd,
+    onClosePane,
+    onDetectedLocalUrl,
+  },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -222,6 +236,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                     visible={tabVisible}
                     initialCwd={session.cwd}
                     initialCommand={session.initialCommand}
+                    suspended={suspended}
                     ref={(h) => registerHandle(paneId, h)}
                     onSearchReady={(_, addon) => handleSearchReady(paneId, addon)}
                     onCwd={(_, cwd) => onCwd(paneId, cwd)}
@@ -234,6 +249,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                     session={session}
                     isActive={isActive}
                     tabVisible={tabVisible}
+                    suspended={suspended}
                     ref={(h) => registerHandle(paneId, h)}
                     onSearchReady={(addon) => handleSearchReady(paneId, addon)}
                     onCwd={(cwd) => onCwd(paneId, cwd)}

@@ -27,6 +27,10 @@ type Props = {
   visible: boolean;
   initialCwd?: string;
   initialCommand?: string;
+  /** True while this tab is backgrounded and past the suspend threshold (see
+   *  tabVirtualization.ts). Tears down the xterm/WebGL renderer but keeps the
+   *  underlying pty process and its Channel alive. */
+  suspended?: boolean;
   onSearchReady?: (tabId: string, addon: SearchAddon) => void;
   onExit?: (tabId: string, code: number) => void;
   onCwd?: (tabId: string, cwd: string) => void;
@@ -34,7 +38,17 @@ type Props = {
 };
 
 export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(function TerminalPane(
-  { tabId, visible, initialCwd, initialCommand, onSearchReady, onExit, onCwd, onDetectedLocalUrl },
+  {
+    tabId,
+    visible,
+    initialCwd,
+    initialCommand,
+    suspended = false,
+    onSearchReady,
+    onExit,
+    onCwd,
+    onDetectedLocalUrl,
+  },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +63,7 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(function Termi
     sessionId: tabId,
     initialCwd,
     initialCommand,
+    suspended,
     onSearchReady: (a) => onSearchReady?.(tabId, a),
     onExit: (c) => onExit?.(tabId, c),
     onCwd: (c) => onCwd?.(tabId, c),

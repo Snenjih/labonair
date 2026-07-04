@@ -2,10 +2,51 @@ use std::io::{Read, Write};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
+use serde::Serialize;
 use tauri::Emitter;
+use tauri::ipc::Channel;
 
 const SSH_BATCH_BYTES: usize = 16 * 1024;
 const SSH_BATCH_MS: Duration = Duration::from_millis(4);
+
+// Idle-poll backoff: an idle reader thread starts at IDLE_POLL_MIN_MS and steps
+// up by IDLE_POLL_STEP_MS every idle iteration once it has been idle for more
+// than IDLE_BACKOFF_THRESHOLD consecutive iterations, capping at
+// IDLE_POLL_MAX_MS. Any successful data read resets it to IDLE_POLL_MIN_MS
+// immediately, so interactive typing/echo latency never regresses — only
+// genuinely idle sessions (e.g. a background tab sitting on a shell prompt)
+// back off, which cuts their wakeup/lock-acquisition rate on the shared
+// `SshState` mutex by up to 5x (200/s -> 40/s per idle session).
+const IDLE_POLL_MIN_MS: u64 = 5;
+const IDLE_POLL_MAX_MS: u64 = 25;
+const IDLE_POLL_STEP_MS: u64 = 5;
+const IDLE_BACKOFF_THRESHOLD: u32 = 4;
+
+/// Event sent through the per-session `Channel<SshPtyEvent>` established by
+/// `ssh_connect`/`ssh_connect_quick`. Point-to-point delivery — replaces the
+/// old global `ssh_pty_output` broadcast event, which fanned out to every
+/// mounted SSH terminal pane regardless of which session the data belonged to
+/// (O(open sessions) wasted JS invocations per chunk). `data` is already
+/// UTF-8-repaired (see `flush_carry`) so, unlike local PTY's `PtyEvent`, no
+/// base64 encoding is needed here.
+#[derive(Serialize, Clone)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum SshPtyEvent {
+    Data { data: String },
+}
+
+/// Computes the next idle-poll interval (in ms) given the current interval and
+/// how many *consecutive* idle iterations have elapsed. Pure so it can be unit
+/// tested without spinning up threads/channels. Callers reset to
+/// `IDLE_POLL_MIN_MS` (and `idle_iterations` to 0) on the iteration after any
+/// data is read — that reset is trivial state, not part of this function.
+fn step_idle_poll(current_ms: u64, idle_iterations: u32) -> u64 {
+    if idle_iterations > IDLE_BACKOFF_THRESHOLD {
+        (current_ms + IDLE_POLL_STEP_MS).min(IDLE_POLL_MAX_MS)
+    } else {
+        current_ms
+    }
+}
 
 #[tauri::command]
 pub fn ssh_pty_write(
@@ -38,7 +79,8 @@ pub fn ssh_pty_resize(
 }
 
 /// Opens a PTY shell channel on an authenticated session and spawns a
-/// background reader thread that streams output via the `ssh_pty_output` event.
+/// background reader thread that streams output directly into the caller-
+/// supplied `on_event` channel (point-to-point — see `SshPtyEvent`'s docs).
 ///
 /// Returns `(channel, shutdown_flag)`. The caller must:
 /// 1. Store both in `SshSession` and insert it into `SshState`.
@@ -56,6 +98,7 @@ pub fn open_shell_channel(
     rows: u32,
     keep_alive_interval: Option<u32>,
     keep_alive_tries: Option<u32>,
+    on_event: Channel<SshPtyEvent>,
 ) -> Result<(ssh2::Channel, Arc<AtomicBool>), String> {
     let sess = session_arc.lock().map_err(|e| e.to_string())?;
     let mut channel = sess.0.channel_session().map_err(|e| e.to_string())?;
@@ -95,7 +138,9 @@ pub fn open_shell_channel(
         let mut ka_consecutive_fails: u32 = 0;
 
         // Tracks the reason for an unexpected exit so we can notify the frontend.
-        // None means the loop ended normally (ssh_disconnect set the shutdown flag).
+        // None means the loop ended normally (ssh_disconnect set the shutdown
+        // flag, or the frontend's Channel was dropped/closed — neither is an
+        // unexpected disconnect worth surfacing via ssh_connection_lost).
         let mut disconnect_reason: Option<String> = None;
 
         // Carry buffer for incomplete multi-byte UTF-8 sequences. When a read ends
@@ -111,7 +156,11 @@ pub fn open_shell_channel(
         let mut pending_output = String::new();
         let mut last_flush = Instant::now();
 
-        loop {
+        // Idle-poll backoff state (see the constants' doc comment above).
+        let mut idle_iterations: u32 = 0;
+        let mut current_poll_ms: u64 = IDLE_POLL_MIN_MS;
+
+        'reader: loop {
             if shutdown_clone.load(Ordering::Relaxed) {
                 break; // clean shutdown via ssh_disconnect
             }
@@ -140,6 +189,10 @@ pub fn open_shell_channel(
                     Ok(0) => None,
                     Ok(n) => {
                         ka_consecutive_fails = 0; // live data proves connection is alive
+                        // Real I/O activity — snap the poll interval back to the
+                        // minimum immediately so echo/typing latency never regresses.
+                        idle_iterations = 0;
+                        current_poll_ms = IDLE_POLL_MIN_MS;
                         carry.extend_from_slice(&buf[..n]);
                         flush_carry(&mut carry)
                     }
@@ -156,13 +209,19 @@ pub fn open_shell_channel(
                 let should_flush = pending_output.len() >= SSH_BATCH_BYTES
                     || last_flush.elapsed() >= SSH_BATCH_MS;
                 if should_flush {
-                    emit_ssh_output(&app_clone, &session_id_clone, std::mem::take(&mut pending_output));
+                    let chunk = std::mem::take(&mut pending_output);
+                    if !send_ssh_output(&on_event, chunk) {
+                        break 'reader; // frontend unmounted/closed the channel — not a real disconnect
+                    }
                     last_flush = Instant::now();
                 }
             } else {
                 // WouldBlock / idle — flush pending output if the timer elapsed.
                 if !pending_output.is_empty() && last_flush.elapsed() >= SSH_BATCH_MS {
-                    emit_ssh_output(&app_clone, &session_id_clone, std::mem::take(&mut pending_output));
+                    let chunk = std::mem::take(&mut pending_output);
+                    if !send_ssh_output(&on_event, chunk) {
+                        break 'reader;
+                    }
                     last_flush = Instant::now();
                 }
                 if last_keepalive.elapsed() >= ka_interval {
@@ -188,7 +247,7 @@ pub fn open_shell_channel(
                                     if ka_consecutive_fails >= ka_max_fails {
                                         disconnect_reason =
                                             Some(humanize_disconnect_reason(&e.to_string()));
-                                        break;
+                                        break 'reader;
                                     }
                                     last_keepalive = Instant::now();
                                 }
@@ -196,14 +255,17 @@ pub fn open_shell_channel(
                         }
                     }
                 }
-                std::thread::sleep(Duration::from_millis(5));
+                idle_iterations = idle_iterations.saturating_add(1);
+                current_poll_ms = step_idle_poll(current_poll_ms, idle_iterations);
+                std::thread::sleep(Duration::from_millis(current_poll_ms));
             }
         }
 
         // Flush any remaining buffered output before the disconnect event so no
-        // bytes are lost when the connection closes mid-stream.
+        // bytes are lost when the connection closes mid-stream. If the channel is
+        // already closed this is a harmless no-op (ignored return value).
         if !pending_output.is_empty() {
-            emit_ssh_output(&app_clone, &session_id_clone, pending_output);
+            send_ssh_output(&on_event, pending_output);
         }
 
         // Emit disconnect event only for unexpected exits.
@@ -271,11 +333,17 @@ fn flush_carry(carry: &mut Vec<u8>) -> Option<String> {
     if out.is_empty() { None } else { Some(out) }
 }
 
-fn emit_ssh_output(app: &tauri::AppHandle, session_id: &str, data: String) {
-    let _ = app.emit(
-        "ssh_pty_output",
-        serde_json::json!({ "session_id": session_id, "data": data }),
-    );
+/// Sends a data chunk through the per-session channel. Returns `false` if the
+/// channel is closed (frontend unmounted/suspended-and-torn-down) — the caller
+/// treats that as a clean, silent exit, not an `ssh_connection_lost` event.
+fn send_ssh_output(channel: &Channel<SshPtyEvent>, data: String) -> bool {
+    match channel.send(SshPtyEvent::Data { data }) {
+        Ok(()) => true,
+        Err(e) => {
+            log::debug!("ssh pty channel closed, ending reader thread: {e}");
+            false
+        }
+    }
 }
 
 fn humanize_disconnect_reason(raw: &str) -> String {
@@ -301,5 +369,91 @@ fn humanize_disconnect_reason(raw: &str) -> String {
             None => String::new(),
             Some(c) => c.to_uppercase().to_string() + chars.as_str(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn flush_carry_completes_split_multibyte_char() {
+        // "é" = 0xC3 0xA9 — split across two reads.
+        let mut carry = vec![0xC3];
+        assert_eq!(flush_carry(&mut carry), None);
+        assert_eq!(carry, vec![0xC3]); // left in place, waiting for the rest
+
+        carry.push(0xA9);
+        assert_eq!(flush_carry(&mut carry), Some("é".to_string()));
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn flush_carry_replaces_invalid_bytes_with_replacement_char() {
+        // 0xE9 alone is not valid UTF-8 (Latin-1 'é', not decodable as-is).
+        let mut carry = vec![b'a', 0xE9, b'b'];
+        let out = flush_carry(&mut carry).unwrap();
+        assert_eq!(out, "a\u{FFFD}b");
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn flush_carry_passes_through_valid_ascii() {
+        let mut carry = b"hello world".to_vec();
+        assert_eq!(flush_carry(&mut carry), Some("hello world".to_string()));
+        assert!(carry.is_empty());
+    }
+
+    #[test]
+    fn flush_carry_empty_input_returns_none() {
+        let mut carry: Vec<u8> = Vec::new();
+        assert_eq!(flush_carry(&mut carry), None);
+    }
+
+    #[test]
+    fn humanize_disconnect_reason_maps_known_patterns() {
+        assert!(humanize_disconnect_reason("transport read error").contains("Network transport failure"));
+        assert_eq!(humanize_disconnect_reason("Connection reset by peer"), "Connection reset by the server");
+        assert_eq!(humanize_disconnect_reason("broken pipe"), "Connection interrupted — the pipe to the server was broken");
+        assert_eq!(humanize_disconnect_reason("operation timed out"), "Connection timed out");
+        assert_eq!(humanize_disconnect_reason("network is unreachable"), "Network unreachable — no route to host");
+        assert_eq!(humanize_disconnect_reason("no route to host"), "Network unreachable — no route to host");
+        assert_eq!(humanize_disconnect_reason("connection refused"), "Connection refused by the server");
+        assert_eq!(humanize_disconnect_reason("unexpected eof"), "Connection closed by the remote host (EOF)");
+    }
+
+    #[test]
+    fn humanize_disconnect_reason_capitalizes_unknown_errors() {
+        assert_eq!(humanize_disconnect_reason("something weird happened"), "Something weird happened");
+    }
+
+    #[test]
+    fn step_idle_poll_stays_at_current_below_threshold() {
+        let mut poll = IDLE_POLL_MIN_MS;
+        for iter in 1..=IDLE_BACKOFF_THRESHOLD {
+            poll = step_idle_poll(poll, iter);
+            assert_eq!(poll, IDLE_POLL_MIN_MS, "should not step up at iteration {iter}");
+        }
+    }
+
+    #[test]
+    fn step_idle_poll_steps_up_past_threshold_and_caps() {
+        let mut poll = IDLE_POLL_MIN_MS;
+        for iter in 1..=20u32 {
+            poll = step_idle_poll(poll, iter);
+        }
+        assert_eq!(poll, IDLE_POLL_MAX_MS, "should cap at the max after many idle iterations");
+    }
+
+    #[test]
+    fn step_idle_poll_ramps_gradually() {
+        // Iterations 1-4 (<= threshold) hold at min; iteration 5 takes the first step.
+        let mut poll = IDLE_POLL_MIN_MS;
+        for iter in 1..=4u32 {
+            poll = step_idle_poll(poll, iter);
+        }
+        assert_eq!(poll, IDLE_POLL_MIN_MS);
+        poll = step_idle_poll(poll, 5);
+        assert_eq!(poll, IDLE_POLL_MIN_MS + IDLE_POLL_STEP_MS);
     }
 }

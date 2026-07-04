@@ -2,7 +2,8 @@ import { cn } from "@/lib/utils";
 import { handleApiError } from "@/lib/errors";
 import type { QuickConnectParams } from "@/modules/tabs";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
-import { invoke } from "@tauri-apps/api/core";
+import type { SshPtyEvent } from "@/modules/terminal/lib/ssh-pty-bridge";
+import { invoke, type Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -15,6 +16,12 @@ interface Props {
   connectionType?: "ssh" | "sftp";
   initialCols?: number;
   initialRows?: number;
+  /** Per-session output channel, owned by the parent `SshTerminalPane`, passed
+   *  as `onEvent` to `ssh_connect`/`ssh_connect_quick` so PTY output is
+   *  delivered point-to-point instead of via a global broadcast event. Not
+   *  used for `sftp_connect` (a separate connection kind) — optional since
+   *  `SftpPane` only ever uses `connectionType="sftp"` and never sets it. */
+  channel?: Channel<SshPtyEvent>;
   onConnected: () => void;
   onError: (message: string) => void;
 }
@@ -54,6 +61,7 @@ export function SshLoadingScreen({
   connectionType = "ssh",
   initialCols,
   initialRows,
+  channel,
   onConnected,
   onError,
 }: Props) {
@@ -95,6 +103,7 @@ export function SshLoadingScreen({
           passphrase: passphraseArg ?? null,
           initialCols: initialCols ?? null,
           initialRows: initialRows ?? null,
+          onEvent: channel,
         })
       : connectionType === "sftp"
         ? invoke("sftp_connect", {
@@ -110,6 +119,7 @@ export function SshLoadingScreen({
             passwordOverride: passwordOverride ?? null,
             initialCols: initialCols ?? null,
             initialRows: initialRows ?? null,
+            onEvent: channel,
           });
 
     p.then(() => {

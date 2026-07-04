@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import { useTabVirtualizationStore } from "@/modules/tabs/store/tabVirtualization";
 import type { WorkspaceTab } from "@/modules/tabs/types";
 import React, { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
@@ -30,6 +31,7 @@ function WorkspacePaneContainer({
 }: ContainerProps) {
   const tab = useTabsStore((s) => s.tabs.find((t) => t.id === tabId) as WorkspaceTab | undefined);
   const isActive = useTabsStore((s) => s.activeId === tabId);
+  const suspended = useTabVirtualizationStore((s) => s.suspendedTabIds.has(tabId));
   const terminalShowPaneFooter = usePreferencesStore((s) => s.terminalShowPaneFooter);
 
   const registerPaneRef = useCallback(
@@ -79,6 +81,7 @@ function WorkspacePaneContainer({
         ref={registerPaneRef}
         tab={tab}
         tabVisible={isActive}
+        suspended={suspended}
         onSetActivePane={onSetActivePane}
         onRegisterHandle={onRegisterHandle}
         onCwd={onCwd}

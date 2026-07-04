@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, type Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FitAddon } from "@xterm/addon-fit";
@@ -37,6 +37,8 @@ import { registerCwdHandler, registerTerminalQueryHandlers } from "@/modules/ter
 import { useTheme } from "@/modules/theme";
 import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { dropPaths } from "./lib/drop-paths";
+import { createSshOutputChannel, type SshPtyEvent } from "./lib/ssh-pty-bridge";
+import { resumeSession, suspendSession, type DecodedChunk } from "./lib/suspendedSessionBuffer";
 import { SshLoadingScreen } from "./SshLoadingScreen";
 import { SudoFillPopup } from "./SudoFillPopup";
 import type { TerminalPaneHandle } from "./TerminalPane";
@@ -91,6 +93,10 @@ interface Props {
   session: TerminalSessionData;
   isActive: boolean;
   tabVisible?: boolean;
+  /** True while this tab is backgrounded and past the suspend threshold (see
+   *  tabVirtualization.ts). Tears down the xterm/WebGL renderer but keeps the
+   *  SSH connection and its Channel alive — see suspendedSessionBuffer.ts. */
+  suspended?: boolean;
   onSearchReady?: (addon: SearchAddon) => void;
   /** OSC 7 cwd reports from the remote shell — see ssh::shell_integration on
    *  the Rust side for how the hook gets installed. Lets the sidebar
@@ -100,7 +106,7 @@ interface Props {
 }
 
 export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function SshTerminalPane(
-  { sessionId, session, isActive, tabVisible = true, onSearchReady, onCwd },
+  { sessionId, session, isActive, tabVisible = true, suspended = false, onSearchReady, onCwd },
   ref,
 ) {
   const [isConnected, setIsConnected] = useState(false);
@@ -126,6 +132,12 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
   useEffect(() => {
     tabVisibleRef.current = tabVisible;
   }, [tabVisible]);
+  // Mirrors `suspended` synchronously during render (not in an effect) so the
+  // connected-effect's cleanup — which runs in the SAME commit as the prop
+  // flip — can tell "suspending" (hand the channel to the registry) apart
+  // from "really disconnecting" (call ssh_disconnect for real).
+  const suspendedRef = useRef(suspended);
+  suspendedRef.current = suspended;
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const serializeRef = useRef<SerializeAddon | null>(null);
@@ -141,6 +153,21 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
   const reconnectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const intentionalDisconnectRef = useRef(false);
   const reconnectAttemptRef = useRef(0);
+
+  // Per-session output channel — point-to-point delivery from the Rust reader
+  // thread (replaces the old global "ssh_pty_output" broadcast event that fanned
+  // out to every mounted SSH pane). Its `onmessage` starts out buffering into
+  // `preConnectBufferRef` (data can start flowing before `isConnected` flips
+  // true — see the connected-effect below, which hands off to live rendering
+  // and drains this buffer). `handleReconnect` replaces the channel with a
+  // fresh one so a stale channel from a dead connection is never reused.
+  const preConnectBufferRef = useRef<string[]>([]);
+  const handlePreConnectData = useCallback((data: string) => {
+    preConnectBufferRef.current.push(data);
+  }, []);
+  const [channel, setChannel] = useState<Channel<SshPtyEvent>>(() =>
+    createSshOutputChannel(handlePreConnectData),
+  );
 
   // Measure the real container dimensions once the pane is actually visible.
   // We use a ResizeObserver instead of a one-shot useLayoutEffect because
@@ -211,10 +238,14 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     if (session.hostId) {
       invoke("ssh_stop_tunnels", { hostId: session.hostId }).catch(console.error);
     }
+    // Fresh channel for the new connection attempt — the old one belonged to
+    // a now-dead reader thread and must not be reused.
+    preConnectBufferRef.current = [];
+    setChannel(createSshOutputChannel(handlePreConnectData));
     setIsDisconnected(false);
     setIsConnected(false);
     setHasError(false);
-  }, [sessionId, session.hostId]);
+  }, [sessionId, session.hostId, handlePreConnectData]);
 
   const handleCancelReconnect = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -410,7 +441,12 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
 
   // Initialize xterm.js once connected
   useEffect(() => {
-    if (!isConnected) return;
+    // Suspended: nothing to (re)create — the previous (live) run's cleanup
+    // below already handed the channel off to suspendedSessionBuffer instead
+    // of disconnecting. `isConnected` itself is untouched by suspend/resume,
+    // so this effect naturally re-runs (and reattaches, see `resumed` below)
+    // once `suspended` flips back to false.
+    if (!isConnected || suspended) return;
 
     let disposed = false;
     const cleanups: Array<() => void> = [];
@@ -418,47 +454,88 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     const earlyBuffer: string[] = [];
     let term: Terminal | null = null;
 
+    // Hoisted above the async IIFE so both it and this effect's own cleanup
+    // (neither of which can see the IIFE's locals) can reach them.
+    const playBell = () => {
+      if (!usePreferencesStore.getState().terminalBell) return;
+      try {
+        const ctx = getBellAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 800;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+      } catch {
+        /* ignore AudioContext errors */
+      }
+    };
+    const decodeSshPtyEvent = (event: unknown): DecodedChunk => {
+      const e = event as SshPtyEvent;
+      return e?.type === "data" ? { text: e.data } : {};
+    };
+
     (async () => {
       const prefs = usePreferencesStore.getState();
 
-      // Register all three listeners concurrently — sequential awaits would open a
+      // Resuming a suspended session? Its buffered output is replayed via
+      // earlyBuffer below, in the same "old content first" order the
+      // scrollback restore + pre-connect-race handling already uses.
+      const resumed = resumeSession(sessionId);
+      if (resumed?.replay) earlyBuffer.push(resumed.replay);
+
+      // Hand the channel off from "buffer until connected" (createSshOutputChannel's
+      // initial handler, wired in the state initializer above) to live rendering.
+      // Reassigning `onmessage` is synchronous, so no message can be dropped
+      // between draining the pre-connect buffer and taking over for good — any
+      // chunk that arrived before this point is replayed into `earlyBuffer`
+      // exactly like the pre-`term`-construction case below already handles.
+      if (preConnectBufferRef.current.length > 0) {
+        earlyBuffer.push(...preConnectBufferRef.current);
+        preConnectBufferRef.current = [];
+      }
+      channel.onmessage = (event) => {
+        if (event.type !== "data") return;
+        const { data } = event;
+        if (term) {
+          term.write(data);
+        } else {
+          earlyBuffer.push(data);
+        }
+
+        if (session.hostId) {
+          const stripped = stripAnsi(data);
+          outputTailRef.current = (outputTailRef.current + stripped).slice(-TAIL_MAX);
+
+          if (SUDO_PROMPT_RE.test(outputTailRef.current)) {
+            if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
+            sudoDebounceRef.current = setTimeout(async () => {
+              sudoDebounceRef.current = null;
+              if (sudoPopupRef.current) return;
+              try {
+                const pw = await invoke<string | null>("get_sudo_password", { hostId: session.hostId });
+                if (!pw) return;
+                sudoPasswordRef.current = pw;
+                const pos =
+                  term && containerRef.current
+                    ? getCursorPixelPos(term, containerRef.current)
+                    : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+                showSudoPopup(pos);
+              } catch {
+                // keychain unavailable — silent no-op
+              }
+            }, 300);
+          }
+        }
+      };
+
+      // Register both listeners concurrently — a sequential await would open a
       // window where ssh_connection_lost or session_established could fire before
       // their listener is live, silently dropping the event.
-      const [unlistenOutput, unlistenLost, unlistenEstablished] = await Promise.all([
-        listen<{ session_id: string; data: string }>("ssh_pty_output", (event) => {
-          if (event.payload.session_id !== sessionId) return;
-          const { data } = event.payload;
-          if (term) {
-            term.write(data);
-          } else {
-            earlyBuffer.push(data);
-          }
-
-          if (session.hostId) {
-            const stripped = stripAnsi(data);
-            outputTailRef.current = (outputTailRef.current + stripped).slice(-TAIL_MAX);
-
-            if (SUDO_PROMPT_RE.test(outputTailRef.current)) {
-              if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
-              sudoDebounceRef.current = setTimeout(async () => {
-                sudoDebounceRef.current = null;
-                if (sudoPopupRef.current) return;
-                try {
-                  const pw = await invoke<string | null>("get_sudo_password", { hostId: session.hostId });
-                  if (!pw) return;
-                  sudoPasswordRef.current = pw;
-                  const pos =
-                    term && containerRef.current
-                      ? getCursorPixelPos(term, containerRef.current)
-                      : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-                  showSudoPopup(pos);
-                } catch {
-                  // keychain unavailable — silent no-op
-                }
-              }, 300);
-            }
-          }
-        }),
+      const [unlistenLost, unlistenEstablished] = await Promise.all([
         listen<{ session_id: string; reason: string }>("ssh_connection_lost", ({ payload }) => {
           if (payload.session_id !== sessionId) return;
           setIsDisconnected(true);
@@ -485,12 +562,11 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
         }),
       ]);
       if (disposed) {
-        unlistenOutput();
         unlistenLost();
         unlistenEstablished();
         return;
       }
-      cleanups.push(unlistenOutput, unlistenLost, unlistenEstablished);
+      cleanups.push(unlistenLost, unlistenEstablished);
 
       await document.fonts.load(`${prefs.terminalFontSize}px "JetBrains Mono"`);
       if (disposed || !containerRef.current) return;
@@ -554,23 +630,8 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
       cleanups.push(() => document.removeEventListener("copy", onCopy, { capture: true }));
       term = t;
       termRef.current = t;
-      t.onBell(() => {
-        if (!usePreferencesStore.getState().terminalBell) return;
-        try {
-          const ctx = getBellAudioContext();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.frequency.value = 800;
-          gain.gain.setValueAtTime(0.3, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.15);
-        } catch {
-          /* ignore AudioContext errors */
-        }
-      });
+      // playBell is hoisted above (shared with the suspend-hand-off path below).
+      t.onBell(playBell);
 
       const fit = new FitAddon();
       fitRef.current = fit;
@@ -725,14 +786,24 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
       cleanups.forEach((fn) => fn());
       if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
       if (reconnectTimerRef.current) {
+        // Cleared unconditionally: a pending auto-reconnect countdown must
+        // never fire after this cleanup, suspending or not — if it fired
+        // later during a suspend, handleReconnect() would tear down the very
+        // session suspend is trying to keep alive.
         clearInterval(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
       sudoPopupRef.current = null;
       sudoPasswordRef.current = null;
-      invoke("ssh_disconnect", { sessionId }).catch(console.error);
-      if (session.hostId) {
-        invoke("ssh_stop_tunnels", { hostId: session.hostId }).catch(console.error);
+      if (suspendedRef.current) {
+        // Suspending, not really disconnecting — hand the live channel off
+        // so output keeps flowing (buffered) while this pane is torn down.
+        suspendSession(sessionId, channel, decodeSshPtyEvent, { onBell: playBell });
+      } else {
+        invoke("ssh_disconnect", { sessionId }).catch(console.error);
+        if (session.hostId) {
+          invoke("ssh_stop_tunnels", { hostId: session.hostId }).catch(console.error);
+        }
       }
       termRef.current?.dispose();
       termRef.current = null;
@@ -740,7 +811,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
       serializeRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected]);
+  }, [isConnected, channel, suspended]);
 
   useLayoutEffect(() => {
     if (!isConnected) return;
@@ -781,6 +852,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
               connectionType="ssh"
               initialCols={initialDims.cols}
               initialRows={initialDims.rows}
+              channel={channel}
               onConnected={() => setIsConnected(true)}
               onError={() => setHasError(true)}
             />
