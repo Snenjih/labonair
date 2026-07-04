@@ -8,7 +8,6 @@ pub fn setup(_app: &tauri::AppHandle) {
     use objc2::{msg_send, sel};
     use objc2_app_kit::{NSApplication, NSMenu, NSMenuItem};
     use objc2_foundation::{MainThreadMarker, NSString};
-    use std::ffi::CStr;
     use std::sync::OnceLock;
 
     // Store the NSMenu address as usize — raw pointers are Send+Sync.
@@ -64,7 +63,7 @@ pub fn setup(_app: &tauri::AppHandle) {
         }
 
         // "@@:" — returns id, takes self + cmd + id (the NSApplication sender).
-        let types = CStr::from_bytes_with_nul(b"@:@\0").unwrap();
+        let types = c"@:@";
         class_add_method(
             cls,
             sel!(applicationDockMenu:),
