@@ -21,7 +21,13 @@ const FONT_WEIGHT_MAP: Record<string, string | number> = {
   bold: "bold",
 };
 
-export { computePoolCeiling, selectEvictionCandidate, POOL_BASE_SIZE, RESERVED_HEADROOM, POOL_HARD_CAP } from "./rendererPoolSizing";
+export {
+  computePoolCeiling,
+  selectEvictionCandidate,
+  POOL_BASE_SIZE,
+  RESERVED_HEADROOM,
+  POOL_HARD_CAP,
+} from "./rendererPoolSizing";
 export type { EvictionCandidate } from "./rendererPoolSizing";
 
 export type SlotAdapter = {

@@ -45,10 +45,7 @@ function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, "");
 }
 
-function getCursorPixelPos(
-  sessionId: string,
-  container: HTMLDivElement,
-): { x: number; y: number } {
+function getCursorPixelPos(sessionId: string, container: HTMLDivElement): { x: number; y: number } {
   const term = getSlotForLeaf(sessionId)?.term;
   if (!term) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   const rect = container.getBoundingClientRect();

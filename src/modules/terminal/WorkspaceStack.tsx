@@ -108,9 +108,7 @@ export const WorkspaceStack = React.memo(function WorkspaceStack({
   // spawned for them until `setActiveId` clears the flag on first activation.
   const workspaceTabIds = useTabsStore(
     useShallow((s) =>
-      s.tabs
-        .filter((t) => t.kind === "workspace" && !(t as WorkspaceTab).cold)
-        .map((t) => t.id),
+      s.tabs.filter((t) => t.kind === "workspace" && !(t as WorkspaceTab).cold).map((t) => t.id),
     ),
   );
 
