@@ -18,6 +18,7 @@ import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setSidebarPosition } from "@/modules/settings/store";
 import { TabBar } from "@/modules/tabs";
+import type { Tab } from "@/modules/tabs";
 import {
   KeyboardIcon,
   Settings01Icon,
@@ -43,6 +44,7 @@ type Props = {
   onClose: (id: number) => void;
   onCloseOthers: (id: number) => void;
   onCloseAll: () => void;
+  onCloseByKind: (kind: Tab["kind"]) => void;
   onDuplicate: (id: number) => void;
   onRename: (id: number, label: string) => void;
   onOpenShortcuts: () => void;
@@ -63,6 +65,7 @@ export const Header = React.memo(function Header({
   onClose,
   onCloseOthers,
   onCloseAll,
+  onCloseByKind,
   onDuplicate,
   onRename,
   onOpenShortcuts,
@@ -184,6 +187,7 @@ export const Header = React.memo(function Header({
             onClose={onClose}
             onCloseOthers={onCloseOthers}
             onCloseAll={onCloseAll}
+            onCloseByKind={onCloseByKind}
             onDuplicate={onDuplicate}
             onRename={onRename}
             onNewGitGraph={onNewGitGraph}

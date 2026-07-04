@@ -123,6 +123,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     onClose: tabs.handleClose,
     onCloseOthers: tabs.handleCloseOthers,
     onCloseAll: tabs.handleCloseAll,
+    onCloseByKind: tabs.handleCloseByKind,
     onDuplicate: tabs.handleDuplicateTab,
     onRename: tabs.handleRenameTab,
     onOpenFile: tabs.handleOpenFile,
@@ -173,6 +174,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onClose={tabs.handleClose}
                 onCloseOthers={tabs.handleCloseOthers}
                 onCloseAll={tabs.handleCloseAll}
+                onCloseByKind={tabs.handleCloseByKind}
                 onDuplicate={tabs.handleDuplicateTab}
                 onRename={tabs.handleRenameTab}
                 onOpenShortcuts={() => ctrl.setShortcutsOpen(true)}

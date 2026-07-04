@@ -50,6 +50,31 @@ export function labelFor(t: Tab): string {
   return wt.title;
 }
 
+// --- Shared plural kind label (for "Close all …" menu items) ---
+
+export function pluralLabelFor(kind: Tab["kind"]): string {
+  switch (kind) {
+    case "workspace":
+      return "Terminals";
+    case "editor":
+      return "Editors";
+    case "preview":
+      return "Previews";
+    case "ai-diff":
+      return "AI Diffs";
+    case "home":
+      return "Home Tabs";
+    case "sftp":
+      return "SFTP Tabs";
+    case "git-graph":
+      return "Git Graphs";
+    case "git-diff":
+      return "Git Diffs";
+    case "commit-diff":
+      return "Commit Diffs";
+  }
+}
+
 // --- Shared icon component ---
 
 export function TabIconFor({ tab, active }: { tab: Tab; active: boolean }) {

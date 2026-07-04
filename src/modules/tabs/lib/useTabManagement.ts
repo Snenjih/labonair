@@ -10,7 +10,7 @@ import { type CommandSnippet, type SnippetExecMode, useSnippetExec } from "@/mod
 import type { TerminalPaneHandle, WorkspacePaneHandle } from "@/modules/terminal";
 import { disposeSession } from "@/modules/terminal/lib/terminalSessionRegistry";
 import { selectActivePaneId, selectActiveTabKind, useTabsStore } from "../store/tabsStore";
-import type { AiDiffTab, WorkspaceTab } from "../types";
+import type { AiDiffTab, Tab, WorkspaceTab } from "../types";
 
 export interface UseTabManagementOptions {
   home: string | null;
@@ -44,6 +44,7 @@ export interface TabManagementReturn {
   handleClose: (id: number) => void;
   handleCloseOthers: (keepId: number) => void;
   handleCloseAll: () => void;
+  handleCloseByKind: (kind: Tab["kind"]) => void;
   handleDuplicateTab: (id: number) => void;
   handleRenameTab: (id: number, label: string) => void;
   cycleTab: (delta: 1 | -1) => void;
@@ -220,6 +221,14 @@ export function useTabManagement({
     const { tabs } = useTabsStore.getState();
     tabs.forEach((t) => handleClose(t.id));
   }, [handleClose]);
+
+  const handleCloseByKind = useCallback(
+    (kind: Tab["kind"]) => {
+      const { tabs } = useTabsStore.getState();
+      tabs.filter((t) => t.kind === kind).forEach((t) => handleClose(t.id));
+    },
+    [handleClose],
+  );
 
   const handleRenameTab = useCallback((id: number, label: string) => {
     useTabsStore.getState().renameTab(id, label);
@@ -426,6 +435,7 @@ export function useTabManagement({
     handleClose,
     handleCloseOthers,
     handleCloseAll,
+    handleCloseByKind,
     handleDuplicateTab,
     handleRenameTab,
     cycleTab,

@@ -24,7 +24,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTabsStore } from "./store/tabsStore";
-import { TabIconFor, labelFor, NewTabDropdownItems } from "./lib/tabUtils";
+import { TabIconFor, labelFor, pluralLabelFor, NewTabDropdownItems } from "./lib/tabUtils";
+import type { Tab } from "./types";
 
 type Props = {
   onSelect: (id: number) => void;
@@ -37,6 +38,7 @@ type Props = {
   onClose: (id: number) => void;
   onCloseOthers: (id: number) => void;
   onCloseAll: () => void;
+  onCloseByKind: (kind: Tab["kind"]) => void;
   onDuplicate: (id: number) => void;
   onRename: (id: number, label: string) => void;
   onNewGitGraph?: () => void;
@@ -54,6 +56,7 @@ export function TabBar({
   onClose,
   onCloseOthers,
   onCloseAll,
+  onCloseByKind,
   onDuplicate,
   onRename,
   onNewGitGraph,
@@ -286,6 +289,9 @@ export function TabBar({
                                   <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.75} />
                                   <span className="flex-1">Close</span>
                                 </ContextMenuItem>
+                                <ContextMenuItem onSelect={() => onCloseByKind(t.kind)}>
+                                  <span className="flex-1">Close All {pluralLabelFor(t.kind)}</span>
+                                </ContextMenuItem>
                               </>
                             )}
                           </ContextMenuContent>
@@ -310,6 +316,9 @@ export function TabBar({
                           )}
                           <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>Close Others</ContextMenuItem>
                           <ContextMenuItem onSelect={onCloseAll}>Close All</ContextMenuItem>
+                          <ContextMenuItem onSelect={() => onCloseByKind(t.kind)}>
+                            Close All {pluralLabelFor(t.kind)}
+                          </ContextMenuItem>
                         </ContextMenuContent>
                       </ContextMenu>
                     </SortableTabWrapper>

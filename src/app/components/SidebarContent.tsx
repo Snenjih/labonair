@@ -9,6 +9,7 @@ import { SnippetsPanel } from "@/modules/snippets";
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SidebarPanel } from "@/modules/statusbar";
 import { SidebarTabList } from "@/modules/tabs";
+import type { Tab } from "@/modules/tabs";
 
 export interface SidebarContentProps {
   side: "left" | "right";
@@ -28,6 +29,7 @@ export interface SidebarContentProps {
   onClose: (id: number) => void;
   onCloseOthers: (keepId: number) => void;
   onCloseAll: () => void;
+  onCloseByKind: (kind: Tab["kind"]) => void;
   onDuplicate: (id: number) => void;
   onRename: (id: number, label: string) => void;
   // Explorer callbacks
@@ -73,6 +75,7 @@ export function SidebarContent({
   onClose,
   onCloseOthers,
   onCloseAll,
+  onCloseByKind,
   onDuplicate,
   onRename,
   onOpenFile,
@@ -117,6 +120,7 @@ export function SidebarContent({
             onClose={onClose}
             onCloseOthers={onCloseOthers}
             onCloseAll={onCloseAll}
+            onCloseByKind={onCloseByKind}
             onDuplicate={onDuplicate}
             onRename={onRename}
             onNewGitGraph={onNewGitGraph}
