@@ -108,6 +108,30 @@ pub fn pty_resize(
     result
 }
 
+/// Renderer-pool hidden-release gate: true while a foreground job (not the
+/// shell itself) owns the tty, i.e. the shell handed off its process group
+/// to a running command. Stricter/cheaper than counting all children (which
+/// would also count background jobs) — compares the tty's foreground process
+/// group leader to the shell's own pid.
+///
+/// Unix-only (`#[cfg(unix)]`): Labonair's release CI only builds macOS and
+/// Linux (no Windows target) — a Windows port would need the ConPTY/
+/// Toolhelp32-snapshot approach instead of `tcgetpgrp`.
+#[cfg(unix)]
+#[tauri::command]
+pub fn pty_has_foreground_job(state: tauri::State<PtyState>, id: u32) -> Result<bool, String> {
+    let sessions = state.sessions.read().unwrap();
+    let session = sessions.get(&id).ok_or_else(|| {
+        log::warn!("pty_has_foreground_job: unknown session id={id}");
+        "no session".to_string()
+    })?;
+    if session.shell_pid == 0 {
+        return Ok(false);
+    }
+    let leader = session.master.lock().unwrap().process_group_leader();
+    Ok(matches!(leader, Some(pid) if pid > 0 && pid as u32 != session.shell_pid))
+}
+
 #[tauri::command]
 pub fn pty_close(state: tauri::State<PtyState>, id: u32) -> Result<(), String> {
     let session = state.sessions.write().unwrap().remove(&id);

@@ -1,18 +1,24 @@
-import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { invoke } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { FitAddon } from "@xterm/addon-fit";
-import { ImageAddon } from "@xterm/addon-image";
-import { LigaturesAddon } from "@xterm/addon-ligatures";
-import { SearchAddon } from "@xterm/addon-search";
-import { SerializeAddon } from "@xterm/addon-serialize";
-import { WebLinksAddon } from "@xterm/addon-web-links";
-import { WebglAddon } from "@xterm/addon-webgl";
-import { Terminal } from "@xterm/xterm";
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import { registerCwdHandler, registerPromptTracker, registerTerminalQueryHandlers } from "./osc-handlers";
+import type { SearchAddon } from "@xterm/addon-search";
+import { useCallback, useEffect, useRef } from "react";
 import { openPty, type PtySession } from "./pty-bridge";
+import { applyTheme as poolApplyTheme } from "./rendererPool";
+import {
+  clear as registryClear,
+  deliverBytes,
+  focus as registryFocus,
+  getBuffer as registryGetBuffer,
+  getSelection as registryGetSelection,
+  registerSession,
+  serialize as registrySerialize,
+  setContainer,
+  setFocused,
+  setShellExited,
+  setVisible,
+  write as registryWrite,
+  type SessionBridge,
+} from "./terminalSessionRegistry";
 
 type Options = {
   container: React.RefObject<HTMLDivElement | null>;
@@ -26,37 +32,6 @@ type Options = {
   onDetectedLocalUrl?: (url: string) => void;
 };
 
-// Matches dev-server-style local URLs (vite, next dev, webpack, …). Anchors
-// on a word boundary so we don't catch substrings of longer paths.
-const LOCAL_URL_RE = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d{1,5})?(?:\/[^\s\x1b]*)?/g;
-
-const FONT_WEIGHT_MAP: Record<string, string | number> = {
-  normal: "normal",
-  medium: 500,
-  bold: "bold",
-};
-
-// WebGL context loss leaves _renderer.value undefined for ~1000ms during recovery.
-// Any fit() call in that window crashes with "undefined is not an object (evaluating
-// 'this._renderer.value.dimensions')". Safe to swallow — the next successful fit()
-// after WebGL re-attaches corrects dimensions.
-function safeFit(fit: FitAddon | null | undefined): void {
-  if (!fit) return;
-  try {
-    fit.fit();
-  } catch {
-    /* renderer not ready */
-  }
-}
-
-let _bellAudioCtx: AudioContext | null = null;
-function getBellAudioContext(): AudioContext {
-  if (!_bellAudioCtx || _bellAudioCtx.state === "closed") {
-    _bellAudioCtx = new AudioContext();
-  }
-  return _bellAudioCtx;
-}
-
 export function useTerminalSession({
   container,
   visible,
@@ -68,7 +43,6 @@ export function useTerminalSession({
   onCwd,
   onDetectedLocalUrl,
 }: Options) {
-  const detectedRef = useRef<string | null>(null);
   const onDetectedRef = useRef(onDetectedLocalUrl);
   const onCwdRef = useRef(onCwd);
   const onExitRef = useRef(onExit);
@@ -79,253 +53,78 @@ export function useTerminalSession({
     onExitRef.current = onExit;
     onSearchReadyRef.current = onSearchReady;
   }, [onDetectedLocalUrl, onCwd, onExit, onSearchReady]);
-  const termRef = useRef<Terminal | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
-  const serializeRef = useRef<SerializeAddon | null>(null);
+
   const ptyRef = useRef<PtySession | null>(null);
+  const pendingInputRef = useRef("");
+  // The renderer pool may bind (and therefore fit + resize) this session
+  // before `openPty` resolves — resizePty stashes the latest known size here
+  // regardless of whether the pty exists yet, so the size isn't silently
+  // dropped; a catch-up resize fires once the pty is actually open.
+  const pendingSizeRef = useRef<{ cols: number; rows: number } | null>(null);
 
-  // Apply terminal preference changes to the live xterm instance.
+  // Registers this session once per mount and wires visibility/focus through
+  // to the renderer pool. `sessionId` is stable for a pane's lifetime.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally sessionId-only — initialCwd/initialCommand only ever seed the first spawn, re-running on their change would tear down and respawn a live pty
   useEffect(() => {
-    const unsub = usePreferencesStore.subscribe((state, prev) => {
-      const term = termRef.current;
-      const fit = fitRef.current;
-      if (!term) return;
-
-      if (state.terminalCursorBlink !== prev.terminalCursorBlink) {
-        term.options.cursorBlink = state.terminalCursorBlink;
-      }
-      // bellStyle was removed in xterm v6; bell is handled via onBell listener
-      if (state.terminalCursorStyle !== prev.terminalCursorStyle) {
-        term.options.cursorStyle = state.terminalCursorStyle;
-      }
-      if (state.terminalFontFamily !== prev.terminalFontFamily) {
-        term.options.fontFamily = state.terminalFontFamily;
-        safeFit(fit);
-      }
-      if (state.terminalFontSize !== prev.terminalFontSize) {
-        term.options.fontSize = state.terminalFontSize;
-        safeFit(fit);
-      }
-      if (state.terminalLetterSpacing !== prev.terminalLetterSpacing) {
-        term.options.letterSpacing = state.terminalLetterSpacing;
-        safeFit(fit);
-      }
-      if (state.terminalLineHeight !== prev.terminalLineHeight) {
-        term.options.lineHeight = state.terminalLineHeight;
-        safeFit(fit);
-      }
-      if (state.terminalFontWeight !== prev.terminalFontWeight) {
-        term.options.fontWeight = FONT_WEIGHT_MAP[state.terminalFontWeight] as
-          | "normal"
-          | "bold"
-          | "100"
-          | "200"
-          | "300"
-          | "400"
-          | "500"
-          | "600"
-          | "700"
-          | "800"
-          | "900"
-          | undefined;
-      }
-      if (state.terminalRightClickPastes !== prev.terminalRightClickPastes) {
-        term.options.rightClickSelectsWord = state.terminalRightClickPastes;
-      }
-      if (state.terminalWordSeparator !== prev.terminalWordSeparator) {
-        term.options.wordSeparator = state.terminalWordSeparator;
-      }
-      if (state.terminalScrollSensitivity !== prev.terminalScrollSensitivity) {
-        term.options.scrollSensitivity = state.terminalScrollSensitivity;
-      }
-      if (state.terminalFastScrollModifier !== prev.terminalFastScrollModifier) {
-        // fastScrollModifier exists at runtime in xterm v6 but is not in the public types
-        (term.options as Record<string, unknown>).fastScrollModifier =
-          state.terminalFastScrollModifier === "none" ? undefined : state.terminalFastScrollModifier;
-      }
-    });
-    return unsub;
-  }, []);
-
-  useEffect(() => {
+    if (!sessionId) return;
     let disposed = false;
-    const cleanups: Array<() => void> = [];
+
+    const bridge: SessionBridge = {
+      writeToPty: (data) => {
+        if (ptyRef.current) void ptyRef.current.write(data);
+        else pendingInputRef.current += data;
+      },
+      resizePty: (cols, rows) => {
+        pendingSizeRef.current = { cols, rows };
+        void ptyRef.current?.resize(cols, rows);
+      },
+      kickPty: (cols, rows) => {
+        const pty = ptyRef.current;
+        if (!pty || cols <= 0 || rows <= 0) return;
+        // Linux only emits SIGWINCH when the winsize ioctl actually changes
+        // dims, so bump +1 row then restore to force a TUI repaint.
+        pty
+          .resize(cols, rows + 1)
+          .then(() => pty.resize(cols, rows))
+          .catch((e) => console.warn("[labonair] kickPty failed:", e));
+      },
+    };
+
+    registerSession({
+      sessionId,
+      bridge,
+      callbacks: {
+        onSearchReady: (a) => onSearchReadyRef.current?.(a),
+        onExit: (c) => onExitRef.current?.(c),
+        onCwd: (c) => onCwdRef.current?.(c),
+        onDetectedLocalUrl: (u) => onDetectedRef.current?.(u),
+      },
+      checkForegroundJob: async () => {
+        const pty = ptyRef.current;
+        if (!pty) return false;
+        try {
+          return await invoke<boolean>("pty_has_foreground_job", { id: pty.id });
+        } catch {
+          return false;
+        }
+      },
+    });
+
+    if (container.current) setContainer(sessionId, container.current);
+    setFocused(sessionId, visible);
+    setVisible(sessionId, visible);
 
     (async () => {
-      const prefs = usePreferencesStore.getState();
-      const fontFamily = prefs.terminalFontFamily;
-      const fontSize = prefs.terminalFontSize;
-
-      await document.fonts.load(`${fontSize}px "JetBrains Mono"`);
-      if (disposed || !container.current) return;
-
-      const term = new Terminal({
-        fontFamily,
-        fontSize,
-        lineHeight: prefs.terminalLineHeight,
-        letterSpacing: prefs.terminalLetterSpacing,
-        theme: buildTerminalTheme(),
-        cursorBlink: prefs.terminalCursorBlink,
-        cursorStyle: prefs.terminalCursorStyle,
-        cursorInactiveStyle: "outline",
-        scrollback: prefs.terminalScrollback,
-        fontWeight: FONT_WEIGHT_MAP[prefs.terminalFontWeight] as
-          | "normal"
-          | "bold"
-          | "100"
-          | "200"
-          | "300"
-          | "400"
-          | "500"
-          | "600"
-          | "700"
-          | "800"
-          | "900"
-          | undefined,
-        allowProposedApi: true,
-        rightClickSelectsWord: prefs.terminalRightClickPastes,
-        wordSeparator: prefs.terminalWordSeparator,
-        scrollSensitivity: prefs.terminalScrollSensitivity,
-        // fastScrollModifier is a runtime option in xterm v6 but not in public types
-        ...({
-          fastScrollModifier:
-            prefs.terminalFastScrollModifier === "none" ? undefined : prefs.terminalFastScrollModifier,
-        } as Record<string, unknown>),
-        // OSC 8 hyperlinks — open in the system browser, not the Tauri webview
-        linkHandler: {
-          activate: (_e: MouseEvent, uri: string) => {
-            openUrl(uri).catch(console.error);
-          },
-        },
-      });
-      termRef.current = term;
-
-      // copyOnSelect: not a built-in option in xterm v6 — implement via selection event
-      term.onSelectionChange(() => {
-        if (!usePreferencesStore.getState().terminalCopyOnSelect) return;
-        const text = term.getSelection();
-        if (text) void navigator.clipboard.writeText(text).catch(() => undefined);
-      });
-
-      // On macOS in WKWebView, Cmd+C triggers the native Copy menu command which
-      // copies DOM selection (empty for canvas-based xterm). Intercept the `copy`
-      // event and write xterm's internal selection instead.
-      const onCopy = (e: ClipboardEvent) => {
-        const text = term.getSelection();
-        if (!text) return;
-        e.clipboardData?.setData("text/plain", text);
-        e.preventDefault();
-      };
-      document.addEventListener("copy", onCopy, { capture: true });
-      cleanups.push(() => document.removeEventListener("copy", onCopy, { capture: true }));
-      term.onBell(() => {
-        if (!usePreferencesStore.getState().terminalBell) return;
-        try {
-          const ctx = getBellAudioContext();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.frequency.value = 800;
-          gain.gain.setValueAtTime(0.3, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.15);
-        } catch {
-          /* ignore AudioContext errors */
-        }
-      });
-
-      const fit = new FitAddon();
-      fitRef.current = fit;
-      term.loadAddon(fit);
-
-      const search = new SearchAddon();
-      term.loadAddon(search);
-      term.loadAddon(new WebLinksAddon((_e, uri) => openUrl(uri).catch(console.error)));
-      term.loadAddon(new ImageAddon({ storageLimit: 32 }));
-
-      term.open(container.current);
-      fit.fit();
-      // LigaturesAddon measures font metrics and must be loaded after open()
-      term.loadAddon(new LigaturesAddon());
-
-      // SerializeAddon must also be loaded after open()
-      const serializeAddon = new SerializeAddon();
-      serializeRef.current = serializeAddon;
-      term.loadAddon(serializeAddon);
-
-      // Restore scrollback before opening PTY so history appears first
-      if (sessionId && !disposed) {
-        try {
-          const ansi = await invoke<string | null>("scrollback_load", { sessionId });
-          if (ansi && !disposed) {
-            term.write(ansi);
-            const sepLen = Math.max(20, term.cols - 20);
-            term.write(`\r\n\x1b[2m\x1b[90m${"─".repeat(sepLen)} session restored \x1b[0m\r\n\r\n`);
-          }
-        } catch {
-          /* graceful degradation — terminal starts normally */
-        }
-      }
-
-      if (prefs.terminalUseWebGL) {
-        let webglRetryTimer: ReturnType<typeof setTimeout> | null = null;
-        const attachWebGL = () => {
-          if (disposed) return;
-          try {
-            const webgl = new WebglAddon();
-            webgl.onContextLoss(() => {
-              webgl.dispose();
-              if (!disposed) webglRetryTimer = setTimeout(attachWebGL, 1000);
-            });
-            term.loadAddon(webgl);
-          } catch (e) {
-            console.warn("WebGL renderer unavailable:", e);
-          }
-        };
-        attachWebGL();
-        cleanups.push(() => {
-          if (webglRetryTimer) clearTimeout(webglRetryTimer);
-        });
-      }
-
-      const prompt = registerPromptTracker(term);
-      cleanups.push(
-        registerCwdHandler(term, (cwd) => onCwdRef.current?.(cwd)),
-        prompt.dispose,
-      );
-      onSearchReadyRef.current?.(search);
-
-      // Per-session decoder so interleaved chunks across tabs don't splice
-      // a multi-byte UTF-8 codepoint between unrelated streams.
-      const urlDecoder = new TextDecoder("utf-8", { fatal: false });
-
       const shellPref = usePreferencesStore.getState().terminalShell;
+      const startCols = pendingSizeRef.current?.cols ?? 80;
+      const startRows = pendingSizeRef.current?.rows ?? 24;
       const pty = await openPty(
-        term.cols,
-        term.rows,
+        startCols,
+        startRows,
         {
-          onData: (bytes) => {
-            term.write(bytes);
-            // Sniff for dev-server URLs in raw output. Byte-level prefilter
-            // (':' '/' '/') skips decode+regex on the overwhelming majority
-            // of chunks (ordinary terminal output, log tails, test runs).
-            if (onDetectedRef.current && containsSchemeSeparator(bytes)) {
-              const text = urlDecoder.decode(bytes, { stream: true });
-              const matches = text.match(LOCAL_URL_RE);
-              if (matches && matches.length > 0) {
-                const url = stripTrailingPunct(matches[matches.length - 1]);
-                if (url && url !== detectedRef.current) {
-                  detectedRef.current = url;
-                  onDetectedRef.current(url);
-                }
-              }
-            }
-          },
+          onData: (bytes) => deliverBytes(sessionId, bytes),
           onExit: (code) => {
-            term.write(`\r\n\x1b[2m[process exited: ${code}]\x1b[0m\r\n`);
-            term.options.disableStdin = true;
+            setShellExited(sessionId, true);
             onExitRef.current?.(code);
           },
         },
@@ -337,169 +136,76 @@ export function useTerminalSession({
         return;
       }
       ptyRef.current = pty;
-      cleanups.push(registerTerminalQueryHandlers(term, (d) => pty.write(d)));
-
+      if (pendingInputRef.current) {
+        void pty.write(pendingInputRef.current);
+        pendingInputRef.current = "";
+      }
+      // Catch up if the real size (measured by the pool's first bind) arrived
+      // — or changed again — while the pty was still spawning.
+      const pending = pendingSizeRef.current;
+      if (pending && (pending.cols !== startCols || pending.rows !== startRows)) {
+        void pty.resize(pending.cols, pending.rows);
+      }
       if (initialCommand) {
-        const cmd = initialCommand.endsWith("\n") ? initialCommand : initialCommand + "\n";
+        const cmd = initialCommand.endsWith("\n") ? initialCommand : `${initialCommand}\n`;
         setTimeout(() => {
-          if (!disposed) pty.write(cmd);
+          if (!disposed) void pty.write(cmd);
         }, 150);
       }
-
-      term.onData((data) => pty.write(data));
-
-      // Shift+Enter → send ESC + CR (\x1b\r) so Claude Code and similar
-      // CLI tools can distinguish it from plain Enter and insert a newline
-      // instead of submitting. Without this, xterm sends \r for both.
-      term.attachCustomKeyEventHandler((e: KeyboardEvent) => {
-        if (e.key === "Enter" && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-          if (e.type === "keydown") pty.write("\x1b\r");
-          return false; // prevent xterm from also sending \r
-        }
-        return true;
-      });
-
-      // Two-stage debounce:
-      //  - FIT runs frequently (~one frame) so xterm visually keeps up with
-      //    the window during drag. Local, no IPC.
-      //  - PTY_RESIZE only fires on the trailing edge of the drag, because
-      //    SIGWINCH is what causes shells / fancy prompts (powerlevel10k,
-      //    starship) to redraw mid-resize, which the user perceives as
-      //    blinking. The shell only cares about the FINAL size.
-      const FIT_DEBOUNCE_MS = 8;
-      const PTY_RESIZE_DEBOUNCE_MS = 256;
-      let lastSentCols = term.cols;
-      let lastSentRows = term.rows;
-      let lastW = container.current.clientWidth;
-      let lastH = container.current.clientHeight;
-      let fitTimer: ReturnType<typeof setTimeout> | null = null;
-      let ptyTimer: ReturnType<typeof setTimeout> | null = null;
-
-      const el = container.current;
-      const flushPtyResize = () => {
-        ptyTimer = null;
-        if (disposed) return;
-        if (term.cols === lastSentCols && term.rows === lastSentRows) return;
-        lastSentCols = term.cols;
-        lastSentRows = term.rows;
-        pty.resize(term.cols, term.rows);
-      };
-
-      const observer = new ResizeObserver(() => {
-        if (fitTimer) clearTimeout(fitTimer);
-        fitTimer = setTimeout(() => {
-          fitTimer = null;
-          if (disposed) return;
-          const w = el.clientWidth;
-          const h = el.clientHeight;
-          if (w === lastW && h === lastH) return;
-          lastW = w;
-          lastH = h;
-          safeFit(fit);
-          // Schedule (or re-schedule) a single trailing pty.resize. The
-          // shell sees one SIGWINCH after the drag settles, not 60+/s.
-          if (ptyTimer) clearTimeout(ptyTimer);
-          ptyTimer = setTimeout(flushPtyResize, PTY_RESIZE_DEBOUNCE_MS);
-        }, FIT_DEBOUNCE_MS);
-      });
-      observer.observe(el);
-      cleanups.push(() => {
-        observer.disconnect();
-        if (fitTimer) clearTimeout(fitTimer);
-        if (ptyTimer) clearTimeout(ptyTimer);
-      });
-
-      if (visible) term.focus();
     })();
 
     return () => {
       disposed = true;
-      cleanups.forEach((fn) => fn());
       ptyRef.current?.close();
       ptyRef.current = null;
-      termRef.current?.dispose();
-      termRef.current = null;
-      fitRef.current = null;
-      serializeRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sessionId]);
 
-  useLayoutEffect(() => {
-    if (!visible) return;
-    const term = termRef.current;
-    const fit = fitRef.current;
-    const pty = ptyRef.current;
-    if (term && fit) {
-      const prevCols = term.cols;
-      const prevRows = term.rows;
-      safeFit(fit);
-      if (pty && (term.cols !== prevCols || term.rows !== prevRows)) {
-        pty.resize(term.cols, term.rows);
-      }
-    }
-    term?.focus();
-  }, [visible]);
+  useEffect(() => {
+    if (!sessionId) return;
+    setFocused(sessionId, visible);
+    setVisible(sessionId, visible);
+  }, [sessionId, visible]);
 
-  const write = useCallback((data: string) => {
-    ptyRef.current?.write(data);
-  }, []);
+  // Live preference changes (font/cursor/scrollback/WebGL/…) are applied to
+  // every pool slot by a single module-level subscription in rendererPool.ts
+  // (see bindPreferencesListener) — not per-hook-instance, so it keeps
+  // working even for a workspace with only SSH tabs mounted.
+
+  const write = useCallback(
+    (data: string) => {
+      if (sessionId) registryWrite(sessionId, data);
+    },
+    [sessionId],
+  );
 
   const focus = useCallback(() => {
-    termRef.current?.focus();
-  }, []);
+    if (sessionId) registryFocus(sessionId);
+  }, [sessionId]);
 
-  const getBuffer = useCallback((maxLines = 200): string | null => {
-    const t = termRef.current;
-    if (!t) return null;
-    const buf = t.buffer.active;
-    const total = buf.length;
-    const lines: string[] = [];
-    const start = Math.max(0, total - maxLines);
-    for (let i = start; i < total; i++) {
-      lines.push(buf.getLine(i)?.translateToString(true) ?? "");
-    }
-    while (lines.length && lines[lines.length - 1] === "") lines.pop();
-    return lines.join("\n");
-  }, []);
+  const getBuffer = useCallback(
+    (maxLines = 200): string | null => (sessionId ? registryGetBuffer(sessionId, maxLines) : null),
+    [sessionId],
+  );
 
-  const getSelection = useCallback((): string | null => {
-    const sel = termRef.current?.getSelection() ?? "";
-    return sel.length > 0 ? sel : null;
-  }, []);
+  const getSelection = useCallback(
+    (): string | null => (sessionId ? registryGetSelection(sessionId) : null),
+    [sessionId],
+  );
 
   const clear = useCallback(() => {
-    termRef.current?.clear();
-  }, []);
+    if (sessionId) registryClear(sessionId);
+  }, [sessionId]);
 
   const applyTheme = useCallback(() => {
-    const term = termRef.current;
-    if (!term) return;
-    term.options.theme = buildTerminalTheme();
+    poolApplyTheme();
   }, []);
 
-  const serialize = useCallback((scrollback?: number): string | null => {
-    const addon = serializeRef.current;
-    if (!addon) return null;
-    return scrollback && scrollback > 0 ? addon.serialize({ scrollback }) : addon.serialize();
-  }, []);
+  const serialize = useCallback(
+    (scrollbackLines?: number): string | null =>
+      sessionId ? registrySerialize(sessionId, scrollbackLines) : null,
+    [sessionId],
+  );
 
   return { write, focus, getBuffer, getSelection, clear, applyTheme, serialize };
-}
-
-function stripTrailingPunct(url: string): string {
-  return url.replace(/[.,);\]]+$/, "");
-}
-
-// Looks for the literal byte sequence ":" "/" "/" — the cheapest signal
-// that a chunk *might* contain a URL. Avoids per-chunk UTF-8 decode + regex
-// scan when running noisy commands.
-function containsSchemeSeparator(bytes: Uint8Array): boolean {
-  const n = bytes.length;
-  for (let i = 0; i < n - 2; i++) {
-    if (bytes[i] === 0x3a && bytes[i + 1] === 0x2f && bytes[i + 2] === 0x2f) {
-      return true;
-    }
-  }
-  return false;
 }

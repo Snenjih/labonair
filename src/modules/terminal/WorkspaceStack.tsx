@@ -4,6 +4,7 @@ import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { WorkspaceTab } from "@/modules/tabs/types";
 import React, { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { disposeSession } from "./lib/terminalSessionRegistry";
 import { WorkspacePane, type WorkspacePaneHandle } from "./WorkspacePane";
 import type { TerminalPaneHandle } from "./TerminalPane";
 
@@ -59,7 +60,13 @@ function WorkspacePaneContainer({
   );
 
   const onClosePane = useCallback(
-    (paneId: string) => useTabsStore.getState().closePane(tabId, paneId),
+    (paneId: string) => {
+      // Frees a bound or merely-retained renderer-pool slot (no-op if
+      // neither exists — a backgrounded pane may have neither) before the
+      // store removes the pane and its owning component unmounts.
+      disposeSession(paneId);
+      useTabsStore.getState().closePane(tabId, paneId);
+    },
     [tabId],
   );
 
@@ -96,8 +103,13 @@ export const WorkspaceStack = React.memo(function WorkspaceStack({
   terminalRefs,
   onDetectedLocalUrl,
 }: Props) {
+  // Cold tabs (restored but never activated — see tabsStore's `newTab`/
+  // `setActiveId`) simply don't mount here, so no PTY/SSH connection is
+  // spawned for them until `setActiveId` clears the flag on first activation.
   const workspaceTabIds = useTabsStore(
-    useShallow((s) => s.tabs.filter((t) => t.kind === "workspace").map((t) => t.id)),
+    useShallow((s) =>
+      s.tabs.filter((t) => t.kind === "workspace" && !(t as WorkspaceTab).cold).map((t) => t.id),
+    ),
   );
 
   return (

@@ -1,24 +1,8 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, type Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { FitAddon } from "@xterm/addon-fit";
-import { ImageAddon } from "@xterm/addon-image";
-import { LigaturesAddon } from "@xterm/addon-ligatures";
-import { SearchAddon } from "@xterm/addon-search";
-import { SerializeAddon } from "@xterm/addon-serialize";
-import { WebLinksAddon } from "@xterm/addon-web-links";
-import { WebglAddon } from "@xterm/addon-webgl";
-import { Terminal } from "@xterm/xterm";
+import type { SearchAddon } from "@xterm/addon-search";
 import { AnimatePresence } from "motion/react";
-import {
-  forwardRef,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -27,46 +11,31 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { handleApiError } from "@/lib/errors";
 import { useChatStore } from "@/modules/ai/store/chatStore";
 import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { TerminalSessionData } from "@/modules/tabs";
-import { registerCwdHandler, registerTerminalQueryHandlers } from "@/modules/terminal/lib/osc-handlers";
 import { useTheme } from "@/modules/theme";
-import { buildTerminalTheme } from "@/styles/terminalTheme";
 import { dropPaths } from "./lib/drop-paths";
+import { applyTheme as poolApplyTheme, getSlotForLeaf } from "./lib/rendererPool";
+import { createSshOutputChannel, type SshPtyEvent } from "./lib/ssh-pty-bridge";
+import {
+  deliverText,
+  focus as registryFocus,
+  getBuffer as registryGetBuffer,
+  getSelection as registryGetSelection,
+  registerSession,
+  resetForReconnect,
+  serialize as registrySerialize,
+  setContainer,
+  setFocused,
+  setVisible,
+  type SessionBridge,
+} from "./lib/terminalSessionRegistry";
 import { SshLoadingScreen } from "./SshLoadingScreen";
 import { SudoFillPopup } from "./SudoFillPopup";
 import type { TerminalPaneHandle } from "./TerminalPane";
-
-const FONT_WEIGHT_MAP: Record<string, string | number> = {
-  normal: "normal",
-  medium: 500,
-  bold: "bold",
-};
-
-// WebGL context loss leaves _renderer.value undefined for ~1000ms during recovery.
-// Any fit() call in that window crashes with "undefined is not an object (evaluating
-// 'this._renderer.value.dimensions')". Safe to swallow — the next successful fit()
-// after WebGL re-attaches corrects dimensions.
-function safeFit(fit: FitAddon | null | undefined): void {
-  if (!fit) return;
-  try {
-    fit.fit();
-  } catch {
-    /* renderer not ready */
-  }
-}
-
-let _bellAudioCtx: AudioContext | null = null;
-function getBellAudioContext(): AudioContext {
-  if (!_bellAudioCtx || _bellAudioCtx.state === "closed") {
-    _bellAudioCtx = new AudioContext();
-  }
-  return _bellAudioCtx;
-}
 
 const ANSI_RE = /\x1B\[[0-9;]*[mGKHFJA-Za-z]|\x1B\][^\x07]*\x07|\x1B[@-_][0-?]*[ -/]*[@-~]/g;
 const SUDO_PROMPT_RE = /\[sudo\] password for [^:]+:|sudo password:/i;
@@ -76,7 +45,9 @@ function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, "");
 }
 
-function getCursorPixelPos(term: Terminal, container: HTMLDivElement): { x: number; y: number } {
+function getCursorPixelPos(sessionId: string, container: HTMLDivElement): { x: number; y: number } {
+  const term = getSlotForLeaf(sessionId)?.term;
+  if (!term) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   const rect = container.getBoundingClientRect();
   const cellW = rect.width / term.cols;
   const cellH = rect.height / term.rows;
@@ -126,10 +97,6 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
   useEffect(() => {
     tabVisibleRef.current = tabVisible;
   }, [tabVisible]);
-  const termRef = useRef<Terminal | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
-  const serializeRef = useRef<SerializeAddon | null>(null);
-  const searchRef = useRef<SearchAddon | null>(null);
   const onSearchReadyRef = useRef(onSearchReady);
   onSearchReadyRef.current = onSearchReady;
   const onCwdRef = useRef(onCwd);
@@ -141,6 +108,20 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
   const reconnectTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const intentionalDisconnectRef = useRef(false);
   const reconnectAttemptRef = useRef(0);
+
+  // Per-session output channel — point-to-point delivery from the Rust reader
+  // thread. Its `onmessage` starts out buffering into `preConnectBufferRef`
+  // (data can start flowing before `isConnected` flips true — see the
+  // connected-effect below, which hands off to live delivery and drains this
+  // buffer). `handleReconnect` replaces the channel with a fresh one so a
+  // stale channel from a dead connection is never reused.
+  const preConnectBufferRef = useRef<string[]>([]);
+  const handlePreConnectData = useCallback((data: string) => {
+    preConnectBufferRef.current.push(data);
+  }, []);
+  const [channel, setChannel] = useState<Channel<SshPtyEvent>>(() =>
+    createSshOutputChannel(handlePreConnectData),
+  );
 
   // Measure the real container dimensions once the pane is actually visible.
   // We use a ResizeObserver instead of a one-shot useLayoutEffect because
@@ -180,7 +161,6 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     });
     obs.observe(el);
     return () => obs.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showSudoPopup = useCallback((pos: { x: number; y: number }) => {
@@ -203,18 +183,23 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     intentionalDisconnectRef.current = false;
     setReconnectCountdown(0);
     setAutoReconnectFailed(false);
-    // existing cleanup:
-    termRef.current?.dispose();
-    termRef.current = null;
-    fitRef.current = null;
+    // Reset in place rather than releasing the renderer-pool slot back to the
+    // pool — the session identity (sessionId) never changes across a
+    // reconnect, so there's no reason to pay for a full slot teardown/rebuild
+    // on the next bind.
+    resetForReconnect(sessionId);
     invoke("ssh_disconnect", { sessionId }).catch(console.error);
     if (session.hostId) {
       invoke("ssh_stop_tunnels", { hostId: session.hostId }).catch(console.error);
     }
+    // Fresh channel for the new connection attempt — the old one belonged to
+    // a now-dead reader thread and must not be reused.
+    preConnectBufferRef.current = [];
+    setChannel(createSshOutputChannel(handlePreConnectData));
     setIsDisconnected(false);
     setIsConnected(false);
     setHasError(false);
-  }, [sessionId, session.hostId]);
+  }, [sessionId, session.hostId, handlePreConnectData]);
 
   const handleCancelReconnect = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -272,7 +257,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     invoke("ssh_pty_write", { sessionId, data: pw + "\n" }).catch(console.error);
   }, [sessionId]);
 
-  const getSelection = useCallback(() => termRef.current?.getSelection() ?? null, []);
+  const getSelection = useCallback(() => registryGetSelection(sessionId), [sessionId]);
 
   useImperativeHandle(
     ref,
@@ -280,33 +265,14 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
       write: (data: string) => {
         // Sends to the remote shell (matches local TerminalPane's `write`,
         // which forwards to the pty process, not the local render buffer).
-        // Writing to `termRef` directly here would only ever paint the text
-        // onto the screen — it never reaches the shell, so e.g. the
-        // breadcrumb's `cd <path>\n` would sit unexecuted in the prompt.
         invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
       },
-      focus: () => {
-        termRef.current?.focus();
-      },
-      getBuffer: (maxLines?: number) => {
-        const term = termRef.current;
-        if (!term) return null;
-        const buf = term.buffer.active;
-        const start = maxLines ? Math.max(0, buf.length - maxLines) : 0;
-        const lines: string[] = [];
-        for (let i = start; i < buf.length; i++) {
-          lines.push(buf.getLine(i)?.translateToString(true) ?? "");
-        }
-        return lines.join("\n");
-      },
+      focus: () => registryFocus(sessionId),
+      getBuffer: (maxLines?: number) => registryGetBuffer(sessionId, maxLines),
       getSelection,
-      serialize: (scrollback?: number) => {
-        const addon = serializeRef.current;
-        if (!addon) return null;
-        return scrollback && scrollback > 0 ? addon.serialize({ scrollback }) : addon.serialize();
-      },
+      serialize: (scrollback?: number) => registrySerialize(sessionId, scrollback),
     }),
-    [getSelection],
+    [sessionId, getSelection],
   );
 
   // Explorer drag-to-terminal (pointer events, WKWebView-safe)
@@ -322,7 +288,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
       const r = el.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
         invoke("ssh_pty_write", { sessionId, data: dropPaths(drag.paths) }).catch(console.error);
-        termRef.current?.focus();
+        registryFocus(sessionId);
       }
     }
     document.addEventListener("pointerup", onUp, { capture: true });
@@ -339,126 +305,90 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     return () => window.removeEventListener("labonair:ssh-reconnect", onReconnect);
   }, [sessionId, handleReconnect]);
 
-  // Apply live preference changes
-  useEffect(() => {
-    const unsub = usePreferencesStore.subscribe((state, prev) => {
-      const term = termRef.current;
-      const fit = fitRef.current;
-      if (!term) return;
-
-      if (state.terminalCursorBlink !== prev.terminalCursorBlink)
-        term.options.cursorBlink = state.terminalCursorBlink;
-      // bellStyle was removed in xterm v6; bell is handled via onBell listener
-      if (state.terminalCursorStyle !== prev.terminalCursorStyle)
-        term.options.cursorStyle = state.terminalCursorStyle;
-      if (state.terminalFontFamily !== prev.terminalFontFamily) {
-        term.options.fontFamily = state.terminalFontFamily;
-        safeFit(fit);
-      }
-      if (state.terminalFontSize !== prev.terminalFontSize) {
-        term.options.fontSize = state.terminalFontSize;
-        safeFit(fit);
-      }
-      if (state.terminalLetterSpacing !== prev.terminalLetterSpacing) {
-        term.options.letterSpacing = state.terminalLetterSpacing;
-        safeFit(fit);
-      }
-      if (state.terminalLineHeight !== prev.terminalLineHeight) {
-        term.options.lineHeight = state.terminalLineHeight;
-        safeFit(fit);
-      }
-      if (state.terminalFontWeight !== prev.terminalFontWeight) {
-        term.options.fontWeight = FONT_WEIGHT_MAP[state.terminalFontWeight] as
-          | "normal"
-          | "bold"
-          | "100"
-          | "200"
-          | "300"
-          | "400"
-          | "500"
-          | "600"
-          | "700"
-          | "800"
-          | "900"
-          | undefined;
-      }
-      if (state.terminalRightClickPastes !== prev.terminalRightClickPastes) {
-        term.options.rightClickSelectsWord = state.terminalRightClickPastes;
-      }
-      if (state.terminalWordSeparator !== prev.terminalWordSeparator) {
-        term.options.wordSeparator = state.terminalWordSeparator;
-      }
-      if (state.terminalScrollSensitivity !== prev.terminalScrollSensitivity) {
-        term.options.scrollSensitivity = state.terminalScrollSensitivity;
-      }
-      if (state.terminalFastScrollModifier !== prev.terminalFastScrollModifier) {
-        (term.options as Record<string, unknown>).fastScrollModifier =
-          state.terminalFastScrollModifier === "none" ? undefined : state.terminalFastScrollModifier;
-      }
-    });
-    return unsub;
-  }, []);
-
-  // Re-apply theme when app theme changes
-  useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      const term = termRef.current;
-      if (term) term.options.theme = buildTerminalTheme();
-    });
-    return () => cancelAnimationFrame(id);
-  }, [resolvedTheme]);
-
-  // Initialize xterm.js once connected
+  // Register with the renderer-pool session registry and wire the output
+  // channel once connected. Font/theme/WebGL/addon setup, the resize
+  // observer, bell, copy-on-select and key handling all live on the shared
+  // pool slot now (rendererPool.ts) — this effect only owns SSH-specific
+  // concerns: the connection lifecycle, sudo-prompt detection, and the
+  // scrollback-then-live-output ordering on (re)connect.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: session/sessionId/callback refs are intentionally excluded — this effect keys only off connection identity (isConnected, channel), reading the rest fresh via refs/closures each run
   useEffect(() => {
     if (!isConnected) return;
 
     let disposed = false;
     const cleanups: Array<() => void> = [];
-
     const earlyBuffer: string[] = [];
-    let term: Terminal | null = null;
+
+    const bridge: SessionBridge = {
+      writeToPty: (data) => {
+        if (sudoPopupRef.current) hideSudoPopup();
+        invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
+      },
+      resizePty: (cols, rows) => {
+        invoke("ssh_pty_resize", { sessionId, cols, rows }).catch(console.error);
+      },
+      kickPty: (cols, rows) => {
+        invoke("ssh_pty_resize", { sessionId, cols, rows: rows + 1 })
+          .then(() => invoke("ssh_pty_resize", { sessionId, cols, rows }))
+          .catch((e) => console.warn("[labonair] kickPty failed:", e));
+      },
+    };
+
+    registerSession({
+      sessionId,
+      bridge,
+      callbacks: {
+        onSearchReady: (a) => onSearchReadyRef.current?.(a),
+        onCwd: (c) => onCwdRef.current?.(c),
+      },
+    });
+    if (containerRef.current) setContainer(sessionId, containerRef.current);
+    setFocused(sessionId, isActive && tabVisible);
+    setVisible(sessionId, tabVisible);
+
+    const scanForSudoPrompt = (data: string) => {
+      if (!session.hostId) return;
+      const stripped = stripAnsi(data);
+      outputTailRef.current = (outputTailRef.current + stripped).slice(-TAIL_MAX);
+      if (SUDO_PROMPT_RE.test(outputTailRef.current)) {
+        if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
+        sudoDebounceRef.current = setTimeout(async () => {
+          sudoDebounceRef.current = null;
+          if (sudoPopupRef.current) return;
+          try {
+            const pw = await invoke<string | null>("get_sudo_password", { hostId: session.hostId });
+            if (!pw) return;
+            sudoPasswordRef.current = pw;
+            const pos = containerRef.current
+              ? getCursorPixelPos(sessionId, containerRef.current)
+              : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+            showSudoPopup(pos);
+          } catch {
+            // keychain unavailable — silent no-op
+          }
+        }, 300);
+      }
+    };
+
+    // Hand the channel off from "buffer until connected" (createSshOutputChannel's
+    // initial handler, wired in the state initializer above) to a local
+    // buffer that preserves ordering until scrollback has loaded — mirrors
+    // the pre-connect-race handling this pane already does.
+    if (preConnectBufferRef.current.length > 0) {
+      earlyBuffer.push(...preConnectBufferRef.current);
+      preConnectBufferRef.current = [];
+    }
+    channel.onmessage = (event) => {
+      if (event.type !== "data") return;
+      earlyBuffer.push(event.data);
+      scanForSudoPrompt(event.data);
+    };
 
     (async () => {
-      const prefs = usePreferencesStore.getState();
-
-      // Register all three listeners concurrently — sequential awaits would open a
+      // Register both listeners concurrently — a sequential await would open a
       // window where ssh_connection_lost or session_established could fire before
       // their listener is live, silently dropping the event.
-      const [unlistenOutput, unlistenLost, unlistenEstablished] = await Promise.all([
-        listen<{ session_id: string; data: string }>("ssh_pty_output", (event) => {
-          if (event.payload.session_id !== sessionId) return;
-          const { data } = event.payload;
-          if (term) {
-            term.write(data);
-          } else {
-            earlyBuffer.push(data);
-          }
-
-          if (session.hostId) {
-            const stripped = stripAnsi(data);
-            outputTailRef.current = (outputTailRef.current + stripped).slice(-TAIL_MAX);
-
-            if (SUDO_PROMPT_RE.test(outputTailRef.current)) {
-              if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
-              sudoDebounceRef.current = setTimeout(async () => {
-                sudoDebounceRef.current = null;
-                if (sudoPopupRef.current) return;
-                try {
-                  const pw = await invoke<string | null>("get_sudo_password", { hostId: session.hostId });
-                  if (!pw) return;
-                  sudoPasswordRef.current = pw;
-                  const pos =
-                    term && containerRef.current
-                      ? getCursorPixelPos(term, containerRef.current)
-                      : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-                  showSudoPopup(pos);
-                } catch {
-                  // keychain unavailable — silent no-op
-                }
-              }, 300);
-            }
-          }
-        }),
+      const [unlistenLost, unlistenEstablished] = await Promise.all([
         listen<{ session_id: string; reason: string }>("ssh_connection_lost", ({ payload }) => {
           if (payload.session_id !== sessionId) return;
           setIsDisconnected(true);
@@ -485,161 +415,33 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
         }),
       ]);
       if (disposed) {
-        unlistenOutput();
         unlistenLost();
         unlistenEstablished();
         return;
       }
-      cleanups.push(unlistenOutput, unlistenLost, unlistenEstablished);
+      cleanups.push(unlistenLost, unlistenEstablished);
 
-      await document.fonts.load(`${prefs.terminalFontSize}px "JetBrains Mono"`);
-      if (disposed || !containerRef.current) return;
-
-      const t = new Terminal({
-        fontFamily: prefs.terminalFontFamily,
-        fontSize: prefs.terminalFontSize,
-        lineHeight: prefs.terminalLineHeight,
-        letterSpacing: prefs.terminalLetterSpacing,
-        theme: buildTerminalTheme(),
-        cursorBlink: prefs.terminalCursorBlink,
-        cursorStyle: prefs.terminalCursorStyle,
-        cursorInactiveStyle: "outline",
-        scrollback: prefs.terminalScrollback,
-        fontWeight: FONT_WEIGHT_MAP[prefs.terminalFontWeight] as
-          | "normal"
-          | "bold"
-          | "100"
-          | "200"
-          | "300"
-          | "400"
-          | "500"
-          | "600"
-          | "700"
-          | "800"
-          | "900"
-          | undefined,
-        allowProposedApi: true,
-        rightClickSelectsWord: prefs.terminalRightClickPastes,
-        wordSeparator: prefs.terminalWordSeparator,
-        scrollSensitivity: prefs.terminalScrollSensitivity,
-        // fastScrollModifier is a runtime option in xterm v6 but not in public types
-        ...({
-          fastScrollModifier:
-            prefs.terminalFastScrollModifier === "none" ? undefined : prefs.terminalFastScrollModifier,
-        } as Record<string, unknown>),
-        // OSC 8 hyperlinks — open in the system browser, not the Tauri webview
-        linkHandler: {
-          activate: (_e: MouseEvent, uri: string) => {
-            openUrl(uri).catch((e) => handleApiError(e, "Failed to open URL", "SSH"));
-          },
-        },
-      });
-      // copyOnSelect: not a built-in option in xterm v6 — implement via selection event
-      t.onSelectionChange(() => {
-        if (!usePreferencesStore.getState().terminalCopyOnSelect) return;
-        const text = t.getSelection();
-        if (text) void navigator.clipboard.writeText(text).catch(() => undefined);
-      });
-
-      // On macOS in WKWebView, Cmd+C triggers the native Copy menu command which
-      // copies DOM selection (empty for canvas-based xterm). Intercept the `copy`
-      // event and write xterm's internal selection instead.
-      const onCopy = (e: ClipboardEvent) => {
-        const text = t.getSelection();
-        if (!text) return;
-        e.clipboardData?.setData("text/plain", text);
-        e.preventDefault();
-      };
-      document.addEventListener("copy", onCopy, { capture: true });
-      cleanups.push(() => document.removeEventListener("copy", onCopy, { capture: true }));
-      term = t;
-      termRef.current = t;
-      t.onBell(() => {
-        if (!usePreferencesStore.getState().terminalBell) return;
-        try {
-          const ctx = getBellAudioContext();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.frequency.value = 800;
-          gain.gain.setValueAtTime(0.3, ctx.currentTime);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.15);
-        } catch {
-          /* ignore AudioContext errors */
+      // Restore scrollback BEFORE flushing earlyBuffer so old content appears first.
+      try {
+        const ansi = await invoke<string | null>("scrollback_load", { sessionId });
+        if (ansi && !disposed) {
+          deliverText(sessionId, ansi);
+          const cols = getSlotForLeaf(sessionId)?.term.cols ?? 80;
+          const sepLen = Math.max(20, cols - 20);
+          deliverText(sessionId, `\r\n\x1b[2m\x1b[90m${"─".repeat(sepLen)} session restored \x1b[0m\r\n\r\n`);
         }
-      });
-
-      const fit = new FitAddon();
-      fitRef.current = fit;
-      t.loadAddon(fit);
-      const search = new SearchAddon();
-      searchRef.current = search;
-      t.loadAddon(search);
-      t.loadAddon(
-        new WebLinksAddon((_e, uri) =>
-          openUrl(uri).catch((e) => handleApiError(e, "Failed to open URL", "SSH")),
-        ),
-      );
-      t.loadAddon(new ImageAddon({ storageLimit: 32 }));
-      t.open(containerRef.current);
-      fit.fit();
-      // LigaturesAddon measures font metrics and must be loaded after open()
-      t.loadAddon(new LigaturesAddon());
-
-      // SerializeAddon must be loaded after open()
-      const serializeAddon = new SerializeAddon();
-      serializeRef.current = serializeAddon;
-      t.loadAddon(serializeAddon);
-
-      // Restore scrollback BEFORE flushing earlyBuffer so old content appears first
-      if (!disposed) {
-        try {
-          const ansi = await invoke<string | null>("scrollback_load", { sessionId });
-          if (ansi && !disposed) {
-            t.write(ansi);
-            const sepLen = Math.max(20, t.cols - 20);
-            t.write(`\r\n\x1b[2m\x1b[90m${"─".repeat(sepLen)} session restored \x1b[0m\r\n\r\n`);
-          }
-        } catch {
-          /* graceful degradation */
-        }
+      } catch {
+        /* graceful degradation */
       }
+      if (disposed) return;
 
-      // estCols/estRows are rough pixel estimates; send the real dimensions
-      // immediately so TUI apps (claude, vim, htop, …) get the correct size.
-      invoke("ssh_pty_resize", {
-        sessionId,
-        cols: t.cols,
-        rows: t.rows,
-      }).catch(console.error);
-      onSearchReadyRef.current?.(search);
-
-      if (prefs.terminalUseWebGL) {
-        let webglRetryTimer: ReturnType<typeof setTimeout> | null = null;
-        const attachWebGL = () => {
-          if (disposed) return;
-          try {
-            const webgl = new WebglAddon();
-            webgl.onContextLoss(() => {
-              webgl.dispose();
-              if (!disposed) webglRetryTimer = setTimeout(attachWebGL, 1000);
-            });
-            t.loadAddon(webgl);
-          } catch (e) {
-            console.warn("WebGL unavailable:", e);
-          }
-        };
-        attachWebGL();
-        cleanups.push(() => {
-          if (webglRetryTimer) clearTimeout(webglRetryTimer);
-        });
-      }
-
-      for (const chunk of earlyBuffer) t.write(chunk);
+      for (const chunk of earlyBuffer) deliverText(sessionId, chunk);
       earlyBuffer.length = 0;
+      channel.onmessage = (event) => {
+        if (event.type !== "data") return;
+        deliverText(sessionId, event.data);
+        scanForSudoPrompt(event.data);
+      };
 
       if (session.cwd) {
         invoke("ssh_pty_write", { sessionId, data: `cd ${session.cwd}\n` }).catch(console.error);
@@ -659,65 +461,6 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
           if (!disposed) invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
         }, 300);
       }
-
-      t.onData((data) => {
-        if (sudoPopupRef.current) hideSudoPopup();
-        invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
-      });
-      cleanups.push(
-        registerTerminalQueryHandlers(t, (d) =>
-          invoke("ssh_pty_write", { sessionId, data: d }).catch(console.error),
-        ),
-      );
-      cleanups.push(registerCwdHandler(t, (cwd) => onCwdRef.current?.(cwd)));
-
-      const FIT_DEBOUNCE_MS = 8;
-      const PTY_RESIZE_DEBOUNCE_MS = 256;
-      let lastSentCols = t.cols;
-      let lastSentRows = t.rows;
-      let lastW = containerRef.current.clientWidth;
-      let lastH = containerRef.current.clientHeight;
-      let fitTimer: ReturnType<typeof setTimeout> | null = null;
-      let ptyTimer: ReturnType<typeof setTimeout> | null = null;
-
-      const el = containerRef.current;
-
-      const flushPtyResize = () => {
-        ptyTimer = null;
-        if (disposed) return;
-        if (t.cols === lastSentCols && t.rows === lastSentRows) return;
-        lastSentCols = t.cols;
-        lastSentRows = t.rows;
-        invoke("ssh_pty_resize", {
-          sessionId,
-          cols: t.cols,
-          rows: t.rows,
-        }).catch(console.error);
-      };
-
-      const observer = new ResizeObserver(() => {
-        if (fitTimer) clearTimeout(fitTimer);
-        fitTimer = setTimeout(() => {
-          fitTimer = null;
-          if (disposed) return;
-          const w = el.clientWidth;
-          const h = el.clientHeight;
-          if (w === lastW && h === lastH) return;
-          lastW = w;
-          lastH = h;
-          safeFit(fit);
-          if (ptyTimer) clearTimeout(ptyTimer);
-          ptyTimer = setTimeout(flushPtyResize, PTY_RESIZE_DEBOUNCE_MS);
-        }, FIT_DEBOUNCE_MS);
-      });
-      observer.observe(el);
-      cleanups.push(() => {
-        observer.disconnect();
-        if (fitTimer) clearTimeout(fitTimer);
-        if (ptyTimer) clearTimeout(ptyTimer);
-      });
-
-      if (isActive) t.focus();
     })().catch(console.error);
 
     return () => {
@@ -725,6 +468,9 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
       cleanups.forEach((fn) => fn());
       if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
       if (reconnectTimerRef.current) {
+        // Cleared unconditionally: a pending auto-reconnect countdown must
+        // never fire after this cleanup — it would call handleReconnect()
+        // against a session that's already tearing down.
         clearInterval(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
@@ -734,34 +480,21 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
       if (session.hostId) {
         invoke("ssh_stop_tunnels", { hostId: session.hostId }).catch(console.error);
       }
-      termRef.current?.dispose();
-      termRef.current = null;
-      fitRef.current = null;
-      serializeRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected]);
+  }, [isConnected, channel]);
 
-  useLayoutEffect(() => {
-    if (!isConnected) return;
-    const term = termRef.current;
-    const fit = fitRef.current;
-    if (term && fit) {
-      const prevCols = term.cols;
-      const prevRows = term.rows;
-      // fit() runs on all panes (not just isActive) so that when tabVisible
-      // transitions true, every pane in the workspace is already correctly sized.
-      safeFit(fit);
-      if (term.cols !== prevCols || term.rows !== prevRows) {
-        invoke("ssh_pty_resize", {
-          sessionId,
-          cols: term.cols,
-          rows: term.rows,
-        }).catch(console.error);
-      }
-    }
-    if (isActive && tabVisible) term?.focus();
-  }, [isActive, isConnected, tabVisible, sessionId]);
+  useEffect(() => {
+    setFocused(sessionId, isActive && tabVisible);
+    setVisible(sessionId, tabVisible);
+  }, [sessionId, isActive, tabVisible]);
+
+  // Re-apply theme when app theme changes — a global pool-wide operation, but
+  // something has to trigger it, and a pure-SSH workspace (no local tabs
+  // mounted) would otherwise never call it at all.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resolvedTheme isn't read in the body — it's the intentional re-run trigger for the global poolApplyTheme() call
+  useEffect(() => {
+    poolApplyTheme();
+  }, [resolvedTheme]);
 
   const paneContent = (
     <div ref={wrapperRef} className="relative h-full w-full">
@@ -781,6 +514,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
               connectionType="ssh"
               initialCols={initialDims.cols}
               initialRows={initialDims.rows}
+              channel={channel}
               onConnected={() => setIsConnected(true)}
               onError={() => setHasError(true)}
             />

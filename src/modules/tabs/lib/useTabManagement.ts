@@ -8,6 +8,7 @@ import type { PreviewPaneHandle } from "@/modules/preview";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { type CommandSnippet, type SnippetExecMode, useSnippetExec } from "@/modules/snippets";
 import type { TerminalPaneHandle, WorkspacePaneHandle } from "@/modules/terminal";
+import { disposeSession } from "@/modules/terminal/lib/terminalSessionRegistry";
 import { selectActivePaneId, selectActiveTabKind, useTabsStore } from "../store/tabsStore";
 import type { AiDiffTab, WorkspaceTab } from "../types";
 
@@ -155,6 +156,11 @@ export function useTabManagement({
       const tab = tabs.find((t) => t.id === id);
       if (tab?.kind === "workspace") {
         for (const sessionId of Object.keys((tab as WorkspaceTab).sessions)) {
+          // Frees a bound or merely-retained renderer-pool slot (no-op if
+          // neither exists) before the store removes the tab and its owning
+          // component unmounts — the component's own unmount cleanup still
+          // closes the actual pty/SSH connection, exactly as before pooling.
+          disposeSession(sessionId);
           terminalRefs.current.delete(sessionId);
           detectedUrls.current.delete(sessionId);
         }

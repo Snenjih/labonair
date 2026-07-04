@@ -464,7 +464,7 @@ pub fn run() {
             app.set_menu(menu)?;
 
             #[cfg(target_os = "macos")]
-            modules::dock_menu::setup(&app.app_handle());
+            modules::dock_menu::setup(app.app_handle());
 
             app.on_menu_event(|app, event| {
                 match event.id().as_ref() {
@@ -499,6 +499,7 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             pty::pty_close,
+            pty::pty_has_foreground_job,
             fs::tree::list_subdirs,
             fs::tree::fs_read_dir,
             fs::tree::fs_resolve_path,
