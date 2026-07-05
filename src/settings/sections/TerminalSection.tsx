@@ -6,6 +6,9 @@ import {
   setTerminalCursorBlink,
   setTerminalCursorBlinkInterval,
   setTerminalCursorStyle,
+  setTerminalComposerEnabled,
+  setTerminalBlocksEnabled,
+  setTerminalBlocksAutoCollapseOnAltScreen,
   setTerminalFontFamily,
   setTerminalFontSize,
   setTerminalFontWeight,
@@ -34,6 +37,11 @@ export function TerminalSection() {
   const terminalCursorBlink = usePreferencesStore((s) => s.terminalCursorBlink);
   const terminalCursorBlinkInterval = usePreferencesStore((s) => s.terminalCursorBlinkInterval);
   const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
+  const terminalComposerEnabled = usePreferencesStore((s) => s.terminalComposerEnabled);
+  const terminalBlocksEnabled = usePreferencesStore((s) => s.terminalBlocksEnabled);
+  const terminalBlocksAutoCollapseOnAltScreen = usePreferencesStore(
+    (s) => s.terminalBlocksAutoCollapseOnAltScreen,
+  );
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
   const terminalFontWeight = usePreferencesStore((s) => s.terminalFontWeight);
@@ -221,6 +229,43 @@ export function TerminalSection() {
             onCheckedChange={(v) => void setTerminalShowPaneFooter(v)}
           />
         </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Composer &amp; Blocks</Label>
+        <SettingRow
+          title="Command composer"
+          description="Show a command input for the active terminal in the bottom bar, with history-based ghost-text suggestions. Works for both local and SSH terminals, independently of AI."
+        >
+          <Switch
+            checked={terminalComposerEnabled}
+            onCheckedChange={(v) => void setTerminalComposerEnabled(v)}
+          />
+        </SettingRow>
+        {terminalComposerEnabled && (
+          <>
+            <SettingRow
+              title="Block terminal"
+              description="Group each executed command and its output into a block with cwd, exit code, and duration. Only available while the command composer is on."
+            >
+              <Switch
+                checked={terminalBlocksEnabled}
+                onCheckedChange={(v) => void setTerminalBlocksEnabled(v)}
+              />
+            </SettingRow>
+            {terminalBlocksEnabled && (
+              <SettingRow
+                title="Auto-collapse for full-screen apps"
+                description="Suppress block chrome while a full-screen terminal app (vim, htop, less, …) is running."
+              >
+                <Switch
+                  checked={terminalBlocksAutoCollapseOnAltScreen}
+                  onCheckedChange={(v) => void setTerminalBlocksAutoCollapseOnAltScreen(v)}
+                />
+              </SettingRow>
+            )}
+          </>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">

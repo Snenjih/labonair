@@ -85,6 +85,9 @@ export type Preferences = {
   terminalCursorBlink: boolean;
   terminalCursorBlinkInterval: number;
   terminalCursorStyle: "block" | "underline" | "bar";
+  terminalComposerEnabled: boolean;
+  terminalBlocksEnabled: boolean;
+  terminalBlocksAutoCollapseOnAltScreen: boolean;
   terminalFontFamily: string;
   terminalFontSize: number;
   terminalScrollback: number;
@@ -252,6 +255,9 @@ const KEY_TERMINAL_DEFAULT_PATH = "terminalDefaultPath";
 const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
 const KEY_TERMINAL_CURSOR_BLINK_INTERVAL = "terminalCursorBlinkInterval";
 const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
+const KEY_TERMINAL_COMPOSER_ENABLED = "terminalComposerEnabled";
+const KEY_TERMINAL_BLOCKS_ENABLED = "terminalBlocksEnabled";
+const KEY_TERMINAL_BLOCKS_AUTO_COLLAPSE_ON_ALT_SCREEN = "terminalBlocksAutoCollapseOnAltScreen";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
 const KEY_TERMINAL_FONT_SIZE = "terminalFontSize";
 const KEY_TERMINAL_SCROLLBACK = "terminalScrollback";
@@ -388,6 +394,9 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalCursorBlink: true,
   terminalCursorBlinkInterval: 1000,
   terminalCursorStyle: "bar",
+  terminalComposerEnabled: false,
+  terminalBlocksEnabled: false,
+  terminalBlocksAutoCollapseOnAltScreen: true,
   terminalFontFamily: '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
   terminalFontSize: 14,
   terminalScrollback: 5000,
@@ -560,6 +569,13 @@ export async function loadPreferences(): Promise<Preferences> {
         get<number>(KEY_TERMINAL_CURSOR_BLINK_INTERVAL) ?? DEFAULT_PREFERENCES.terminalCursorBlinkInterval,
       ),
     ),
+    terminalComposerEnabled:
+      get<boolean>(KEY_TERMINAL_COMPOSER_ENABLED) ?? DEFAULT_PREFERENCES.terminalComposerEnabled,
+    terminalBlocksEnabled:
+      get<boolean>(KEY_TERMINAL_BLOCKS_ENABLED) ?? DEFAULT_PREFERENCES.terminalBlocksEnabled,
+    terminalBlocksAutoCollapseOnAltScreen:
+      get<boolean>(KEY_TERMINAL_BLOCKS_AUTO_COLLAPSE_ON_ALT_SCREEN) ??
+      DEFAULT_PREFERENCES.terminalBlocksAutoCollapseOnAltScreen,
     terminalCursorStyle:
       get<"block" | "underline" | "bar">(KEY_TERMINAL_CURSOR_STYLE) ??
       DEFAULT_PREFERENCES.terminalCursorStyle,
@@ -934,6 +950,27 @@ export async function setTerminalCursorBlinkInterval(value: number): Promise<voi
 
 export async function setTerminalCursorStyle(value: "block" | "underline" | "bar"): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_CURSOR_STYLE, value);
+  await (await getStore()).save();
+}
+
+// Blocks require the composer (the command text comes from what the user
+// typed into it, not from re-parsing shell echo — see terminal/block).
+// Turning the composer off would leave Blocks in an unreachable state, so
+// disabling it also disables Blocks.
+export async function setTerminalComposerEnabled(value: boolean): Promise<void> {
+  const store = await getStore();
+  await store.set(KEY_TERMINAL_COMPOSER_ENABLED, value);
+  if (!value) await store.set(KEY_TERMINAL_BLOCKS_ENABLED, false);
+  await store.save();
+}
+
+export async function setTerminalBlocksEnabled(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_BLOCKS_ENABLED, value);
+  await (await getStore()).save();
+}
+
+export async function setTerminalBlocksAutoCollapseOnAltScreen(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_BLOCKS_AUTO_COLLAPSE_ON_ALT_SCREEN, value);
   await (await getStore()).save();
 }
 
@@ -1440,6 +1477,9 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_TERMINAL_CURSOR_BLINK]: "terminalCursorBlink",
     [KEY_TERMINAL_CURSOR_BLINK_INTERVAL]: "terminalCursorBlinkInterval",
     [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
+    [KEY_TERMINAL_COMPOSER_ENABLED]: "terminalComposerEnabled",
+    [KEY_TERMINAL_BLOCKS_ENABLED]: "terminalBlocksEnabled",
+    [KEY_TERMINAL_BLOCKS_AUTO_COLLAPSE_ON_ALT_SCREEN]: "terminalBlocksAutoCollapseOnAltScreen",
     [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",
     [KEY_TERMINAL_FONT_SIZE]: "terminalFontSize",
     [KEY_TERMINAL_SCROLLBACK]: "terminalScrollback",

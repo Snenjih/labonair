@@ -257,6 +257,30 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     ],
   },
   {
+    id: "terminalComposerEnabled",
+    label: "Command composer",
+    description:
+      "Show a command input for the active terminal in the bottom bar, with history-based suggestions. Works independently of AI.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "terminalBlocksEnabled",
+    label: "Block terminal",
+    description:
+      "Group each executed command and its output into a collapsible block with cwd, exit code, and duration. Requires the command composer.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "terminalBlocksAutoCollapseOnAltScreen",
+    label: "Auto-collapse blocks for full-screen apps",
+    description:
+      "Suppress block chrome while a full-screen terminal app (vim, htop, less, …) is running.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
     id: "terminalCursorBlink",
     label: "Cursor blink",
     description: "Animate the terminal cursor with a blinking effect.",
