@@ -23,16 +23,24 @@ pub fn ssh_exec_command(
     let mut channel = sess.0.channel_session().map_err(|e| e.to_string())?;
     channel.exec(&command).map_err(|e| e.to_string())?;
 
-    let mut stdout = String::new();
+    // read_to_end + lossy UTF-8 rather than read_to_string (which requires
+    // strictly valid UTF-8 and errors out the whole call otherwise) — remote
+    // command output can legitimately contain non-UTF8 bytes (e.g. `cat`ing
+    // a shell history file with meta-quoted special characters), and failing
+    // the entire exec over a few bad bytes in otherwise-useful output is
+    // worse than showing it with U+FFFD replacements.
+    let mut stdout_bytes = Vec::new();
     channel
-        .read_to_string(&mut stdout)
+        .read_to_end(&mut stdout_bytes)
         .map_err(|e| e.to_string())?;
+    let stdout = String::from_utf8_lossy(&stdout_bytes).into_owned();
 
-    let mut stderr_buf = String::new();
+    let mut stderr_bytes = Vec::new();
     channel
         .stderr()
-        .read_to_string(&mut stderr_buf)
+        .read_to_end(&mut stderr_bytes)
         .map_err(|e| e.to_string())?;
+    let stderr_buf = String::from_utf8_lossy(&stderr_bytes).into_owned();
 
     channel.wait_close().map_err(|e| e.to_string())?;
     let exit_code = channel.exit_status().unwrap_or(-1);
