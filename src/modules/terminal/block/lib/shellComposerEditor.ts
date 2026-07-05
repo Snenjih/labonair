@@ -231,7 +231,10 @@ export function createShellComposerEditor(
             callbacks.history.runSelected();
             return true;
           }
-          if (ghostSuggestionOf(view)) return acceptGhost(view);
+          // Enter always submits exactly what's typed, ignoring any ghost
+          // suggestion — only Tab (below) accepts it. The ghost text is a
+          // decoration, not part of the document, so it's never included in
+          // `text` regardless.
           const text = view.state.doc.toString();
           if (!text.trim()) return false;
           resetHistoryNav(sessionId);
