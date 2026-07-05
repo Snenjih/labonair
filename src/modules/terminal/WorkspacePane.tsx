@@ -15,6 +15,7 @@ import { FindWidget } from "@/modules/search";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { PaneNode, TerminalSessionData, WorkspaceTab } from "@/modules/tabs";
 import { BlockOverlay } from "./block";
+import { focusComposer, shouldBlockTerminalClick } from "./lib/terminalSessionRegistry";
 import { SshTerminalPane } from "./SshTerminalPane";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 
@@ -197,6 +198,20 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                 rect ? { left: rect.x, top: rect.y, width: rect.w, height: rect.h } : { display: "none" }
               }
               onClick={() => onSetActivePane(paneId)}
+              onMouseDownCapture={(e) => {
+                // Blocks-active + idle-at-a-prompt: the composer is the only
+                // input surface, so a click on the raw terminal must not
+                // steal keyboard focus onto it (stopping this in capture
+                // phase, before xterm's own mousedown-focus handler ever
+                // sees it). The moment a command is actually running — vim,
+                // htop, a sudo prompt, any interactive program — this no-ops
+                // and the terminal behaves exactly as it always has.
+                if (shouldBlockTerminalClick(paneId)) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  focusComposer(paneId);
+                }
+              }}
             >
               {showPaneHeader && (
                 <PaneHeader

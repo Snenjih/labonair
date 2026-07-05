@@ -94,6 +94,13 @@ type SessionRecord = {
 const sessions = new Map<string, SessionRecord>();
 const blockSubscribers = new Map<string, Set<() => void>>();
 const integrationSubscribers = new Map<string, Set<() => void>>();
+/** One imperative focus() per session, registered by `ShellComposerInput`
+ *  while it's mounted (phase "ready"). Lets `WorkspacePane`'s click
+ *  interceptor (see `shouldBlockTerminalClick`) redirect focus to the
+ *  composer instead of letting a click fall through to xterm's own
+ *  focus-on-mousedown — a plain function ref rather than a React context
+ *  since the click handler lives in a different component tree branch. */
+const composerFocusHandlers = new Map<string, () => void>();
 
 function notifyBlocks(sessionId: string): void {
   for (const cb of blockSubscribers.get(sessionId) ?? []) cb();
@@ -338,6 +345,37 @@ export function hasShellIntegration(sessionId: string): boolean {
 
 export function isCommandRunning(sessionId: string): boolean {
   return sessions.get(sessionId)?.commandRunning ?? false;
+}
+
+/** Whether a click on this session's raw terminal surface should be
+ *  swallowed (and focus redirected to the composer) instead of being allowed
+ *  to focus xterm itself. Requires Blocks baked in, shell integration
+ *  actually confirmed live (`shellIntegrationSeen` — same gate
+ *  `ShellComposerInput` itself uses; an unsupported remote shell that never
+ *  graduates never renders a composer editor to redirect focus to either, so
+ *  blocking clicks there would leave the session permanently unclickable),
+ *  and idle at a prompt — the moment a command starts running (vim, htop, a
+ *  sudo password prompt, any interactive program), normal click/keyboard
+ *  interaction with the terminal must work exactly like today, since that's
+ *  the whole point of running something interactive. */
+export function shouldBlockTerminalClick(sessionId: string): boolean {
+  const s = sessions.get(sessionId);
+  return !!s && s.blocksBakedIn && s.shellIntegrationSeen && !s.commandRunning;
+}
+
+/** Registers the composer's imperative `focus()` for this session — called
+ *  by `WorkspacePane`'s click interceptor when `shouldBlockTerminalClick` is
+ *  true, so a click on the (now non-interactive) terminal surface lands the
+ *  user back in the composer instead of doing nothing. */
+export function registerComposerFocus(sessionId: string, fn: () => void): () => void {
+  composerFocusHandlers.set(sessionId, fn);
+  return () => {
+    if (composerFocusHandlers.get(sessionId) === fn) composerFocusHandlers.delete(sessionId);
+  };
+}
+
+export function focusComposer(sessionId: string): void {
+  composerFocusHandlers.get(sessionId)?.();
 }
 
 /** Subscribe to composer-relevant session state — `commandRunning` toggling
@@ -630,6 +668,7 @@ export function disposeSession(sessionId: string): void {
   sessions.delete(sessionId);
   blockSubscribers.delete(sessionId);
   integrationSubscribers.delete(sessionId);
+  composerFocusHandlers.delete(sessionId);
 }
 
 export function terminalDebugStats() {

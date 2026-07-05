@@ -4,6 +4,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   hasShellIntegration,
   isCommandRunning,
+  registerComposerFocus,
   subscribeIntegrationState,
   write,
 } from "../lib/terminalSessionRegistry";
@@ -125,11 +126,17 @@ export function ShellComposerInput({ sessionId, kind }: { sessionId: string; kin
     if (draft) handle.setValue(draft);
     handle.focus();
     handleRef.current = handle;
+    // Lets WorkspacePane's click interceptor land focus back here instead of
+    // on the raw terminal while Blocks is active and idle (see
+    // shouldBlockTerminalClick) — registered only while an editor actually
+    // exists to receive it.
+    const unregisterFocus = registerComposerFocus(sessionId, () => handleRef.current?.focus());
 
     return () => {
       const value = handle.getValue();
       if (value.trim()) drafts.set(sessionId, value);
       else drafts.delete(sessionId);
+      unregisterFocus();
       handle.destroy();
       handleRef.current = null;
       setHistoryOpen(false);
