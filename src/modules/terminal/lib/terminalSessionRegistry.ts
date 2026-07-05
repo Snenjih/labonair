@@ -299,10 +299,16 @@ function onShellIntegrationEvent(
     applyComposerCursor(s, term);
     focus(sessionId);
     // Confirm the optimistic block `beginBlock` opened (composer submit) and
-    // anchor it to a live buffer row.
+    // anchor it to a live buffer row. Replaces `s.blockState` with a new
+    // object rather than mutating the existing one in place — BlockOverlay
+    // reads it through useSyncExternalStore, which detects changes via
+    // Object.is on the snapshot; mutating in place would leave it pointing
+    // at the same (now-stale-looking) reference forever, so React would
+    // never re-render even though notifyBlocks fires correctly.
     const cur = s.blockState.current;
     if (cur && !cur.startMarker) {
-      cur.startMarker = term.registerMarker(0);
+      const confirmed: BlockRecord = { ...cur, startMarker: term.registerMarker(0) };
+      s.blockState = { ...s.blockState, current: confirmed };
       notifyBlocks(sessionId);
     }
     if (firstTime) notifyIntegrationState(sessionId);
@@ -321,12 +327,13 @@ function onShellIntegrationEvent(
   // and would just be noise if pushed.
   const cur = s.blockState.current;
   if (cur?.startMarker) {
-    cur.finishedAt = Date.now();
-    cur.exitCode = exitCode;
-    s.blockState.blocks.push(cur);
-    if (s.blockState.blocks.length > MAX_BLOCKS_PER_SESSION) s.blockState.blocks.shift();
+    const finished: BlockRecord = { ...cur, finishedAt: Date.now(), exitCode };
+    const blocks = [...s.blockState.blocks, finished];
+    if (blocks.length > MAX_BLOCKS_PER_SESSION) blocks.shift();
+    s.blockState = { blocks, current: null };
+  } else {
+    s.blockState = { ...s.blockState, current: null };
   }
-  s.blockState.current = null;
   applyComposerCursor(s, term);
   notifyBlocks(sessionId);
   if (firstTime) notifyIntegrationState(sessionId);
@@ -339,7 +346,7 @@ function onShellIntegrationEvent(
 export function beginBlock(sessionId: string, command: string, cwd: string | null): void {
   const s = sessions.get(sessionId);
   if (!s) return;
-  s.blockState.current = {
+  const block: BlockRecord = {
     id: crypto.randomUUID(),
     command,
     cwd,
@@ -348,6 +355,7 @@ export function beginBlock(sessionId: string, command: string, cwd: string | nul
     exitCode: null,
     startMarker: null,
   };
+  s.blockState = { ...s.blockState, current: block };
   notifyBlocks(sessionId);
 }
 
