@@ -13,6 +13,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { BlockOverlay } from "./block";
 import { SshTerminalPane } from "./SshTerminalPane";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import type { SearchAddon } from "@xterm/addon-search";
@@ -239,6 +240,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                     onCwd={(cwd) => onCwd(paneId, cwd)}
                   />
                 )}
+                <BlockOverlay sessionId={paneId} />
               </div>
             </div>
           );
