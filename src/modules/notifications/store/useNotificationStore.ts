@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 export type NotificationType = "error" | "warning" | "info" | "success";
 
@@ -21,6 +22,9 @@ interface NotificationState {
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   addNotification: (notif) => {
+    if (notif.type === "error" && !usePreferencesStore.getState().notifyOnErrors) {
+      return;
+    }
     const { notifications } = get();
     // Spam guard: ignore if newest notification has same message+type within 2s
     const newest = notifications[0];

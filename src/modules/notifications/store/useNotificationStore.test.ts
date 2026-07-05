@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useNotificationStore } from "./useNotificationStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 // Reset store state between tests
 beforeEach(() => {
   useNotificationStore.setState({ notifications: [] });
+  usePreferencesStore.setState({ notifyOnErrors: true });
 });
 
 afterEach(() => {
@@ -121,5 +123,19 @@ describe("clearAll", () => {
     useNotificationStore.getState().addNotification({ ...baseNotif, message: "Another" });
     useNotificationStore.getState().clearAll();
     expect(useNotificationStore.getState().notifications).toHaveLength(0);
+  });
+});
+
+describe("notifyOnErrors gating", () => {
+  it("suppresses error notifications when notifyOnErrors is false", () => {
+    usePreferencesStore.setState({ notifyOnErrors: false });
+    useNotificationStore.getState().addNotification({ ...baseNotif, type: "error" });
+    expect(useNotificationStore.getState().notifications).toHaveLength(0);
+  });
+
+  it("allows error notifications when notifyOnErrors is true", () => {
+    usePreferencesStore.setState({ notifyOnErrors: true });
+    useNotificationStore.getState().addNotification({ ...baseNotif, type: "error" });
+    expect(useNotificationStore.getState().notifications).toHaveLength(1);
   });
 });

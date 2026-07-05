@@ -18,6 +18,7 @@ import {
   setNewTabInheritsCwd,
   setConfirmCloseTerminalTab,
   setConfirmQuitWithSsh,
+  setNotifyOnErrors,
 } from "@/modules/settings/store";
 import { useUpdater } from "@/modules/updater";
 import { AlertDiamondIcon, GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
@@ -98,6 +99,7 @@ export function GeneralSection() {
   const newTabInheritsCwd = usePreferencesStore((s) => s.newTabInheritsCwd);
   const confirmCloseTerminalTab = usePreferencesStore((s) => s.confirmCloseTerminalTab);
   const confirmQuitWithSsh = usePreferencesStore((s) => s.confirmQuitWithSsh);
+  const notifyOnErrors = usePreferencesStore((s) => s.notifyOnErrors);
 
   const { status, check, install } = useUpdater({ autoCheck: false });
   const checking = status.kind === "checking";
@@ -397,6 +399,16 @@ export function GeneralSection() {
           description="Disable all UI animations. Useful for motion sensitivity or older hardware."
         >
           <Switch checked={reduceMotion} onCheckedChange={(v) => void setReduceMotion(v)} />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Notifications</Label>
+        <SettingRow
+          title="Notify on errors"
+          description="Show a notification whenever an error occurs. Disabled by default."
+        >
+          <Switch checked={notifyOnErrors} onCheckedChange={(v) => void setNotifyOnErrors(v)} />
         </SettingRow>
       </div>
     </div>

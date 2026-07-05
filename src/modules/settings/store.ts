@@ -64,6 +64,7 @@ export type Preferences = {
   startupTerminalCount: 1 | 2 | 3;
   sessionRestore: boolean;
   sessionScrollbackLines: number;
+  notifyOnErrors: boolean;
 
   // --- App Appearance ---
   appTheme: string;
@@ -231,6 +232,7 @@ const KEY_VIM_MODE = "vimMode";
 const KEY_DEFAULT_STARTUP_TAB = "defaultStartupTab";
 const KEY_SESSION_RESTORE = "sessionRestore";
 const KEY_SESSION_SCROLLBACK_LINES = "sessionScrollbackLines";
+const KEY_NOTIFY_ON_ERRORS = "notifyOnErrors";
 
 const KEY_APP_THEME = "appTheme";
 const KEY_APP_FONT_FAMILY = "appFontFamily";
@@ -366,6 +368,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   startupTerminalCount: 1,
   sessionRestore: false,
   sessionScrollbackLines: 1000,
+  notifyOnErrors: false,
 
   appTheme: "default",
   appFontFamily: "system-ui",
@@ -530,6 +533,7 @@ export async function loadPreferences(): Promise<Preferences> {
     sessionRestore: get<boolean>(KEY_SESSION_RESTORE) ?? DEFAULT_PREFERENCES.sessionRestore,
     sessionScrollbackLines:
       get<number>(KEY_SESSION_SCROLLBACK_LINES) ?? DEFAULT_PREFERENCES.sessionScrollbackLines,
+    notifyOnErrors: get<boolean>(KEY_NOTIFY_ON_ERRORS) ?? DEFAULT_PREFERENCES.notifyOnErrors,
 
     appTheme: get<string>(KEY_APP_THEME) ?? DEFAULT_PREFERENCES.appTheme,
     appFontFamily: get<string>(KEY_APP_FONT_FAMILY) ?? DEFAULT_PREFERENCES.appFontFamily,
@@ -849,6 +853,11 @@ export async function setSessionRestore(value: boolean): Promise<void> {
 
 export async function setSessionScrollbackLines(value: number): Promise<void> {
   await (await getStore()).set(KEY_SESSION_SCROLLBACK_LINES, value);
+  await (await getStore()).save();
+}
+
+export async function setNotifyOnErrors(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_NOTIFY_ON_ERRORS, value);
   await (await getStore()).save();
 }
 
@@ -1411,6 +1420,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_STARTUP_TERMINAL_COUNT]: "startupTerminalCount",
     [KEY_SESSION_RESTORE]: "sessionRestore",
     [KEY_SESSION_SCROLLBACK_LINES]: "sessionScrollbackLines",
+    [KEY_NOTIFY_ON_ERRORS]: "notifyOnErrors",
 
     [KEY_APP_THEME]: "appTheme",
     [KEY_APP_FONT_FAMILY]: "appFontFamily",
