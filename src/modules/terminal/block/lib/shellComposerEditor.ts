@@ -2,7 +2,14 @@ import { defaultKeymap, history as cmHistory, historyKeymap } from "@codemirror/
 import { shell } from "@codemirror/legacy-modes/mode/shell";
 import { StreamLanguage } from "@codemirror/language";
 import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
-import { Decoration, type DecorationSet, EditorView, keymap, placeholder, WidgetType } from "@codemirror/view";
+import {
+  Decoration,
+  type DecorationSet,
+  EditorView,
+  keymap,
+  placeholder,
+  WidgetType,
+} from "@codemirror/view";
 import { historyList, recordCommand, suggest } from "./commandHistory";
 
 // ─── Ghost text (inline history suggestion, Tab to accept) ───────────────────
@@ -34,7 +41,9 @@ const ghostField = StateField.define<{ suggestion: string | null; deco: Decorati
     if (tr.docChanged && !tr.effects.some((e) => e.is(setGhost))) suggestion = null;
     if (!suggestion) return { suggestion: null, deco: Decoration.none };
     const pos = tr.state.doc.length;
-    const deco = Decoration.set([Decoration.widget({ widget: new GhostWidget(suggestion), side: 1 }).range(pos)]);
+    const deco = Decoration.set([
+      Decoration.widget({ widget: new GhostWidget(suggestion), side: 1 }).range(pos),
+    ]);
     return { suggestion, deco };
   },
   provide: (f) => EditorView.decorations.from(f, (v) => v.deco),

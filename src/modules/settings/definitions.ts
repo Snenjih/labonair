@@ -275,8 +275,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "terminalBlocksAutoCollapseOnAltScreen",
     label: "Auto-collapse blocks for full-screen apps",
-    description:
-      "Suppress block chrome while a full-screen terminal app (vim, htop, less, …) is running.",
+    description: "Suppress block chrome while a full-screen terminal app (vim, htop, less, …) is running.",
     category: "Terminal",
     controlType: "Switch",
   },

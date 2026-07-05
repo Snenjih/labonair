@@ -122,7 +122,9 @@ export function AiInputBar() {
         aria-label="AI chat"
         className={cn(
           "flex size-6 items-center justify-center rounded transition-colors",
-          mode === "ai" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground",
+          mode === "ai"
+            ? "bg-background shadow-sm text-foreground"
+            : "text-muted-foreground hover:text-foreground",
         )}
       >
         <HugeiconsIcon icon={SparklesIcon} size={13} strokeWidth={1.75} />

@@ -20,10 +20,7 @@ export function BlockChrome({ block }: { block: BlockRecord }) {
   const title = `${block.command}${block.cwd ? `\n${block.cwd}` : ""}\nexit ${block.exitCode}`;
 
   return (
-    <div
-      title={title}
-      className="flex h-full items-center justify-end gap-1 pr-1 text-[10px] leading-none"
-    >
+    <div title={title} className="flex h-full items-center justify-end gap-1 pr-1 text-[10px] leading-none">
       <button
         type="button"
         className="pointer-events-auto rounded p-0.5 text-muted-foreground/70 opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
