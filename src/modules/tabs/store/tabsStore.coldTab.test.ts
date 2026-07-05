@@ -75,3 +75,80 @@ describe("tabsStore cold-tab support", () => {
     expect(workspaceTabs().find((t) => t.id === coldB)?.cold).toBe(true);
   });
 });
+
+// `activate` on openHomeTab/openFileTab/newPreviewTab/newSftpTab mirrors the
+// `cold` mechanism above for the four tab types that aren't workspace tabs —
+// used only by session restore so it doesn't hijack `activeId` away from the
+// snapshot's actual target tab mid-restore (see restore.test.ts). Every
+// other caller keeps calling these with no extra argument, so they must keep
+// activating by default.
+describe("activate param on openHomeTab/openFileTab/newPreviewTab/newSftpTab", () => {
+  beforeEach(() => {
+    useTabsStore.setState({ tabs: [], activeId: -1, _nextId: 1 });
+  });
+
+  it("openHomeTab() defaults to activating the newly created home tab", () => {
+    useTabsStore.getState().openHomeTab();
+    const homeTab = useTabsStore.getState().tabs.find((t) => t.kind === "home");
+    expect(useTabsStore.getState().activeId).toBe(homeTab?.id);
+  });
+
+  it("openHomeTab(false) creates the tab without stealing activeId", () => {
+    const firstId = useTabsStore.getState().newTab();
+    useTabsStore.getState().openHomeTab(false);
+    expect(useTabsStore.getState().activeId).toBe(firstId);
+    expect(useTabsStore.getState().tabs.some((t) => t.kind === "home")).toBe(true);
+  });
+
+  it("openHomeTab(false) does not activate an already-existing home tab either", () => {
+    useTabsStore.getState().openHomeTab();
+    const otherId = useTabsStore.getState().newTab();
+    useTabsStore.getState().openHomeTab(false);
+    expect(useTabsStore.getState().activeId).toBe(otherId);
+  });
+
+  it("openFileTab defaults to activating", () => {
+    useTabsStore.getState().newTab();
+    const fileId = useTabsStore.getState().openFileTab("/tmp/a.txt");
+    expect(useTabsStore.getState().activeId).toBe(fileId);
+  });
+
+  it("openFileTab(path, false) creates the tab without stealing activeId", () => {
+    const firstId = useTabsStore.getState().newTab();
+    const fileId = useTabsStore.getState().openFileTab("/tmp/a.txt", false);
+    expect(useTabsStore.getState().activeId).toBe(firstId);
+    expect(fileId).not.toBeNull();
+  });
+
+  it("openFileTab(path, false) does not activate an already-open editor tab either", () => {
+    const path = "/tmp/a.txt";
+    useTabsStore.getState().openFileTab(path);
+    const otherId = useTabsStore.getState().newTab();
+    useTabsStore.getState().openFileTab(path, false);
+    expect(useTabsStore.getState().activeId).toBe(otherId);
+  });
+
+  it("newPreviewTab(url, title, false) does not steal activeId", () => {
+    const firstId = useTabsStore.getState().newTab();
+    useTabsStore.getState().newPreviewTab("https://example.com", undefined, false);
+    expect(useTabsStore.getState().activeId).toBe(firstId);
+  });
+
+  it("newPreviewTab defaults to activating", () => {
+    useTabsStore.getState().newTab();
+    const previewId = useTabsStore.getState().newPreviewTab("https://example.com");
+    expect(useTabsStore.getState().activeId).toBe(previewId);
+  });
+
+  it("newSftpTab(hostId, title, false) does not steal activeId", () => {
+    const firstId = useTabsStore.getState().newTab();
+    useTabsStore.getState().newSftpTab("host-1", "prod", false);
+    expect(useTabsStore.getState().activeId).toBe(firstId);
+  });
+
+  it("newSftpTab defaults to activating", () => {
+    useTabsStore.getState().newTab();
+    const sftpId = useTabsStore.getState().newSftpTab("host-1", "prod");
+    expect(useTabsStore.getState().activeId).toBe(sftpId);
+  });
+});

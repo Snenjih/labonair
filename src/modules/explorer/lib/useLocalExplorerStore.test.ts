@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { selectScopesToEvict, shouldHydrateFromCache } from "./useLocalExplorerStore";
+import { beforeEach, describe, expect, it } from "vitest";
+import { selectScopesToEvict, shouldHydrateFromCache, useLocalExplorerStore } from "./useLocalExplorerStore";
 
 function scope(scopeKey: string, lastAccessedAt: number) {
   return { scopeKey, lastAccessedAt };
@@ -49,5 +49,44 @@ describe("shouldHydrateFromCache", () => {
 
   it("returns true when the cached root path exactly matches the requested one", () => {
     expect(shouldHydrateFromCache(snapshot, "/home/user")).toBe(true);
+  });
+});
+
+// Characterization tests for `setScope`'s current behavior — `useFileTree`'s
+// generation-drop retry (`shouldRetryDroppedFetch`) depends on both of these
+// holding: every scope/root change bumps `generation` (even a round-trip back
+// to an already-seen root), and a non-cache-hit change wipes `nodes`
+// entirely. Not a behavior change; guards against `setScope` being "fixed"
+// later without re-checking the retry logic that relies on it.
+describe("setScope", () => {
+  beforeEach(() => {
+    useLocalExplorerStore.setState({
+      scopeKey: "local",
+      rootPath: null,
+      nodes: {},
+      expanded: new Set(),
+      generation: 0,
+      remoteScopeCache: {},
+    });
+  });
+
+  it("bumps generation on every call, even when returning to a previously seen root", () => {
+    const { setScope } = useLocalExplorerStore.getState();
+    setScope("local", "/home/user");
+    expect(useLocalExplorerStore.getState().generation).toBe(1);
+    setScope("local", "/home/user/projects");
+    expect(useLocalExplorerStore.getState().generation).toBe(2);
+    setScope("local", "/home/user");
+    expect(useLocalExplorerStore.getState().generation).toBe(3);
+  });
+
+  it("clears nodes entirely on a non-cache-hit scope change (local scopes are never cached)", () => {
+    const { setScope, setNode } = useLocalExplorerStore.getState();
+    setScope("local", "/home/user");
+    setNode("/home/user", { status: "loaded", entries: [], hasMore: false });
+    expect(useLocalExplorerStore.getState().nodes["/home/user"]).toBeDefined();
+
+    setScope("local", "/home/user/projects");
+    expect(useLocalExplorerStore.getState().nodes).toEqual({});
   });
 });

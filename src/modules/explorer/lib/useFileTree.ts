@@ -3,8 +3,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { handleApiError } from "@/lib/errors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { isLabonairError } from "@/types";
+import type { AsyncQueue } from "./asyncQueue";
 import { createAsyncQueue } from "./asyncQueue";
 import type { FsProvider } from "./fsProvider";
+import type { ChildrenState } from "./useLocalExplorerStore";
 import { useLocalExplorerStore } from "./useLocalExplorerStore";
 
 export type PendingCreate = {
@@ -30,6 +32,155 @@ export function dirname(path: string): string {
 // instead of piling up blocked on the backend's lock.
 const READDIR_CONCURRENCY = 3;
 
+// A response can be dropped because `generation` moved on (scope/root
+// changed) while the request was in flight, and then moved BACK to the same
+// path before the request resolved (e.g. session-restore's activeId
+// thrashing through several tabs, or pane-reconstruction jumping back to the
+// original leaf). Without a retry, that path is stuck on "loading" forever —
+// the dedupe below only clears its `inFlightRef` entry once the doomed
+// promise settles, so nothing else will ever re-request it. Only retry once
+// we're clearly back in the exact same scope+path (not just a coincidentally
+// identical path string in a different scope), and only once per path
+// between clean completions — these triggers are one-time restore churn, not
+// steady-state instability.
+const MAX_DROP_RETRIES = 1;
+
+export function shouldRetryDroppedFetch(
+  path: string,
+  live: { scopeKey: string; rootPath: string | null },
+  providerId: string,
+  attempts: number,
+  maxRetries: number = MAX_DROP_RETRIES,
+): boolean {
+  if (live.scopeKey !== providerId || live.rootPath !== path) return false;
+  return attempts < maxRetries;
+}
+
+type FetchChildrenDeps = {
+  provider: FsProvider;
+  setNode: (path: string, state: ChildrenState) => void;
+  queue: AsyncQueue;
+  inFlight: Map<string, Promise<void>>;
+  retryCounts: Map<string, number>;
+};
+
+/**
+ * Core `fetchChildren` logic, extracted out of the `useFileTree` hook so it
+ * can be exercised directly in tests without mounting the hook (this repo
+ * has no `renderHook`/`@testing-library/react` — see `useFileTree.test.ts`).
+ * `useFileTree` below is a thin wrapper that supplies its ref-backed deps.
+ */
+export function runFetchChildren(
+  deps: FetchChildrenDeps,
+  path: string,
+  opts?: { append?: boolean; silent?: boolean },
+): Promise<void> {
+  const { provider, setNode, queue, inFlight, retryCounts } = deps;
+  const append = opts?.append ?? false;
+  // Dedupe only applies to plain re-fetches — a `loadMore` (append) call
+  // is a distinct request even if a base fetch for the same path happens
+  // to be in flight. NOTE: dedup is keyed on `path` alone, not
+  // `(path, silent)` — if a silent background revalidation is already
+  // in flight when a caller requests a non-silent fetch for the same
+  // path, the caller piggybacks the silent one's promise/behavior (no
+  // loading state, a toast instead of an inline error on failure). This
+  // is a rare, cosmetic-only edge case (requires landing inside the same
+  // sub-second window as a poll/revalidation for the exact same path)
+  // — not worth a compound dedup key.
+  const silent = opts?.silent ?? false;
+  if (!append) {
+    const existing = inFlight.get(path);
+    if (existing) return existing;
+  }
+
+  // Set when a response is dropped for having outlived a generation
+  // bump — read after this task's own promise settles (see the second
+  // `.finally()` below), never synchronously, so a retry doesn't dedupe
+  // against its own still-registered `inFlight` entry.
+  let droppedForRetry = false;
+
+  const promise = queue.run(async () => {
+    const show_hidden = useLocalExplorerStore.getState().showHidden;
+    const requestGeneration = useLocalExplorerStore.getState().generation;
+    const existing = useLocalExplorerStore.getState().nodes[path];
+    const offset = append && existing?.status === "loaded" ? existing.entries.length : 0;
+
+    // Only show the "loading" placeholder when there's nothing already
+    // rendered for this path — a re-fetch of an already-loaded directory
+    // (manual refresh, OS watcher, remote poll, retrying a stale error)
+    // must not blank out good data just to briefly flash a spinner over
+    // it. `silent` already skipped this for background polls; this
+    // widens the same protection to every re-fetch, not just polls.
+    if (!append && !silent && existing?.status !== "loaded") setNode(path, { status: "loading" });
+    try {
+      const page = await provider.readDir(path, { showHidden: show_hidden, offset });
+      // Discard a response that outlived a scope change (e.g. the user
+      // switched away from this host/root while the request was in
+      // flight) — applying it now would write into whatever scope is
+      // active by the time it resolves. If we're back on this exact
+      // path by the time this settles, `shouldRetryDroppedFetch` below
+      // fires a fresh request instead of leaving the node stuck.
+      if (useLocalExplorerStore.getState().generation !== requestGeneration) {
+        droppedForRetry = true;
+        return;
+      }
+      if (!append) retryCounts.delete(path);
+      const current = useLocalExplorerStore.getState().nodes[path];
+      const priorEntries = append && current?.status === "loaded" ? current.entries : [];
+      setNode(path, {
+        status: "loaded",
+        entries: [...priorEntries, ...page.entries],
+        hasMore: page.hasMore,
+      });
+    } catch (e) {
+      if (useLocalExplorerStore.getState().generation !== requestGeneration) {
+        droppedForRetry = true;
+        return;
+      }
+      if (!append) retryCounts.delete(path);
+      if (silent) {
+        // A silent (background/revalidation) fetch must never destroy
+        // already-good cached data — surface the problem as a toast and
+        // leave the last-known-good `status:"loaded"` node in place.
+        handleApiError(e, "Failed to refresh directory", "File Tree");
+      } else if (!append) {
+        setNode(path, {
+          status: "error",
+          // Remote (SFTP) commands reject with a LabonairError object
+          // ({ code, message }), not a string — String(e) on that
+          // stringifies to the literal text "[object Object]" instead
+          // of the actual message. Local commands reject with a plain
+          // string, where this is a no-op.
+          message: isLabonairError(e) ? e.message : String(e),
+        });
+      } else {
+        handleApiError(e, "Failed to load more entries", "File Tree");
+      }
+    }
+  });
+
+  if (!append) {
+    inFlight.set(path, promise);
+    void promise.finally(() => {
+      inFlight.delete(path);
+    });
+    // A second `.finally()` attached on the same promise — Promise
+    // reactions fire in attachment order, so this always runs after the
+    // one above has already cleared `inFlight`, meaning the retry call
+    // below issues a genuinely new request instead of deduping against
+    // itself.
+    void promise.finally(() => {
+      if (!droppedForRetry) return;
+      const live = useLocalExplorerStore.getState();
+      const attempts = retryCounts.get(path) ?? 0;
+      if (!shouldRetryDroppedFetch(path, live, provider.id, attempts)) return;
+      retryCounts.set(path, attempts + 1);
+      void runFetchChildren(deps, path, opts);
+    });
+  }
+  return promise;
+}
+
 export function useFileTree(provider: FsProvider, rootPath: string | null, options?: Options) {
   // Remote providers have no push-based watch — poll expanded directories at
   // a conservative interval instead so browsing doesn't go completely stale
@@ -48,84 +199,25 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
   // path (e.g. a double-click racing a keyboard toggle) — callers piggyback
   // on the same in-flight request instead of firing a second one.
   const inFlightRef = useRef<Map<string, Promise<void>>>(new Map());
+  // Tracks how many times a dropped (generation-mismatched) response for a
+  // path has already triggered a retry — reset on any clean (non-dropped)
+  // completion so unrelated future drops for the same path aren't blocked by
+  // stale state. See `shouldRetryDroppedFetch`.
+  const retryCountRef = useRef<Map<string, number>>(new Map());
 
   const fetchChildren = useCallback(
-    (path: string, opts?: { append?: boolean; silent?: boolean }): Promise<void> => {
-      const append = opts?.append ?? false;
-      // Dedupe only applies to plain re-fetches — a `loadMore` (append) call
-      // is a distinct request even if a base fetch for the same path happens
-      // to be in flight. NOTE: dedup is keyed on `path` alone, not
-      // `(path, silent)` — if a silent background revalidation is already
-      // in flight when a caller requests a non-silent fetch for the same
-      // path, the caller piggybacks the silent one's promise/behavior (no
-      // loading state, a toast instead of an inline error on failure). This
-      // is a rare, cosmetic-only edge case (requires landing inside the same
-      // sub-second window as a poll/revalidation for the exact same path)
-      // — not worth a compound dedup key.
-      const silent = opts?.silent ?? false;
-      if (!append) {
-        const inFlight = inFlightRef.current.get(path);
-        if (inFlight) return inFlight;
-      }
-
-      const promise = queueRef.current.run(async () => {
-        const show_hidden = useLocalExplorerStore.getState().showHidden;
-        const requestGeneration = useLocalExplorerStore.getState().generation;
-        const existing = useLocalExplorerStore.getState().nodes[path];
-        const offset = append && existing?.status === "loaded" ? existing.entries.length : 0;
-
-        // Only show the "loading" placeholder when there's nothing already
-        // rendered for this path — a re-fetch of an already-loaded directory
-        // (manual refresh, OS watcher, remote poll, retrying a stale error)
-        // must not blank out good data just to briefly flash a spinner over
-        // it. `silent` already skipped this for background polls; this
-        // widens the same protection to every re-fetch, not just polls.
-        if (!append && !silent && existing?.status !== "loaded") setNode(path, { status: "loading" });
-        try {
-          const page = await provider.readDir(path, { showHidden: show_hidden, offset });
-          // Discard a response that outlived a scope change (e.g. the user
-          // switched away from this host/root while the request was in
-          // flight) — applying it now would write into whatever scope is
-          // active by the time it resolves.
-          if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
-          const current = useLocalExplorerStore.getState().nodes[path];
-          const priorEntries = append && current?.status === "loaded" ? current.entries : [];
-          setNode(path, {
-            status: "loaded",
-            entries: [...priorEntries, ...page.entries],
-            hasMore: page.hasMore,
-          });
-        } catch (e) {
-          if (useLocalExplorerStore.getState().generation !== requestGeneration) return;
-          if (silent) {
-            // A silent (background/revalidation) fetch must never destroy
-            // already-good cached data — surface the problem as a toast and
-            // leave the last-known-good `status:"loaded"` node in place.
-            handleApiError(e, "Failed to refresh directory", "File Tree");
-          } else if (!append) {
-            setNode(path, {
-              status: "error",
-              // Remote (SFTP) commands reject with a LabonairError object
-              // ({ code, message }), not a string — String(e) on that
-              // stringifies to the literal text "[object Object]" instead
-              // of the actual message. Local commands reject with a plain
-              // string, where this is a no-op.
-              message: isLabonairError(e) ? e.message : String(e),
-            });
-          } else {
-            handleApiError(e, "Failed to load more entries", "File Tree");
-          }
-        }
-      });
-
-      if (!append) {
-        inFlightRef.current.set(path, promise);
-        void promise.finally(() => {
-          inFlightRef.current.delete(path);
-        });
-      }
-      return promise;
-    },
+    (path: string, opts?: { append?: boolean; silent?: boolean }): Promise<void> =>
+      runFetchChildren(
+        {
+          provider,
+          setNode,
+          queue: queueRef.current,
+          inFlight: inFlightRef.current,
+          retryCounts: retryCountRef.current,
+        },
+        path,
+        opts,
+      ),
     [setNode, provider],
   );
 

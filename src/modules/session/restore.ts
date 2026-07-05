@@ -30,10 +30,10 @@ export interface TabActions {
     sessionId?: string,
     cold?: boolean,
   ) => number;
-  openFileTab: (path: string) => number | null;
-  newPreviewTab: (url: string) => number;
-  openHomeTab: () => void;
-  newSftpTab: (hostId: string, title: string) => number;
+  openFileTab: (path: string, activate?: boolean) => number | null;
+  newPreviewTab: (url: string, title?: string, activate?: boolean) => number;
+  openHomeTab: (activate?: boolean) => void;
+  newSftpTab: (hostId: string, title: string, activate?: boolean) => number;
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   splitPane: (tabId: number, direction: "horizontal" | "vertical") => void;
   setActivePaneId: (tabId: number, paneId: string) => void;
@@ -133,6 +133,7 @@ async function restoreSftpTab(
   snap: SftpTabSnapshot,
   actions: TabActions,
   failedTabs: RestoreResult["failedTabs"],
+  cold: boolean,
 ): Promise<number | null> {
   const hosts = useHostsStore.getState().hosts;
   const hostExists = hosts.some((h) => h.id === snap.hostId);
@@ -140,7 +141,7 @@ async function restoreSftpTab(
     failedTabs.push({ title: snap.title, reason: "Host no longer exists" });
     return null;
   }
-  const tabId = actions.newSftpTab(snap.hostId, snap.title);
+  const tabId = actions.newSftpTab(snap.hostId, snap.title, !cold);
   if (snap.remotePath && snap.localPath) {
     actions.updateSftpPaths(tabId, snap.remotePath, snap.localPath);
   }
@@ -155,14 +156,14 @@ async function restoreTab(
 ): Promise<number | null> {
   switch (snap.kind) {
     case "home": {
-      actions.openHomeTab();
+      actions.openHomeTab(!cold);
       const homeTab = useTabsStore.getState().tabs.find((t) => t.kind === "home");
       return homeTab?.id ?? null;
     }
 
     case "preview": {
       if (!snap.url) return null;
-      return actions.newPreviewTab(snap.url);
+      return actions.newPreviewTab(snap.url, undefined, !cold);
     }
 
     case "editor": {
@@ -180,7 +181,7 @@ async function restoreTab(
           failedTabs.push({ title: snap.title, reason: `File not found: ${snap.path}` });
           return null;
         }
-        return actions.openFileTab(snap.path);
+        return actions.openFileTab(snap.path, !cold);
       } catch {
         failedTabs.push({ title: snap.title, reason: `Could not check file: ${snap.path}` });
         return null;
@@ -192,7 +193,7 @@ async function restoreTab(
     }
 
     case "sftp": {
-      return restoreSftpTab(snap, actions, failedTabs);
+      return restoreSftpTab(snap, actions, failedTabs, cold);
     }
   }
 }

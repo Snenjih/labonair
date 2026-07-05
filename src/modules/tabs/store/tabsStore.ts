@@ -54,8 +54,8 @@ export type TabsState = {
     cold?: boolean,
   ) => number;
   openDefaultTab: () => void;
-  openHomeTab: () => void;
-  openFileTab: (path: string) => number | null;
+  openHomeTab: (activate?: boolean) => void;
+  openFileTab: (path: string, activate?: boolean) => number | null;
   openAiDiffTab: (input: {
     path: string;
     originalContent: string;
@@ -64,11 +64,11 @@ export type TabsState = {
     isNewFile: boolean;
   }) => number | null;
   setAiDiffStatus: (approvalId: string, status: AiDiffStatus) => void;
-  newPreviewTab: (url: string, title?: string) => number;
+  newPreviewTab: (url: string, title?: string, activate?: boolean) => number;
   closeTab: (id: number) => void;
   updateTab: (id: number, patch: TabPatch) => void;
   selectByIndex: (idx: number) => void;
-  newSftpTab: (hostId: string, title: string) => number;
+  newSftpTab: (hostId: string, title: string, activate?: boolean) => number;
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (
@@ -347,30 +347,30 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }
   },
 
-  openHomeTab: () => {
+  openHomeTab: (activate = true) => {
     const existing = get().tabs.find((t) => t.kind === "home");
     if (existing) {
-      set({ activeId: existing.id });
+      if (activate) set({ activeId: existing.id });
       return;
     }
     const id = get()._nextId;
     set((s) => ({
       tabs: [{ id, kind: "home" as const, title: "Home" }, ...s.tabs],
-      activeId: id,
+      activeId: activate ? id : s.activeId,
       _nextId: s._nextId + 1,
     }));
   },
 
-  openFileTab: (path) => {
+  openFileTab: (path, activate = true) => {
     const existing = get().tabs.find((t) => t.kind === "editor" && t.path === path);
     if (existing) {
-      set({ activeId: existing.id });
+      if (activate) set({ activeId: existing.id });
       return existing.id;
     }
     const id = get()._nextId;
     set((s) => ({
       tabs: [...s.tabs, { id, kind: "editor" as const, title: basename(path), path, dirty: false }],
-      activeId: id,
+      activeId: activate ? id : s.activeId,
       _nextId: s._nextId + 1,
     }));
     return id;
@@ -411,11 +411,11 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     }));
   },
 
-  newPreviewTab: (url, title) => {
+  newPreviewTab: (url, title, activate = true) => {
     const id = get()._nextId;
     set((s) => ({
       tabs: [...s.tabs, { id, kind: "preview" as const, title: title ?? titleFromUrl(url), url }],
-      activeId: id,
+      activeId: activate ? id : s.activeId,
       _nextId: s._nextId + 1,
     }));
     return id;
@@ -477,11 +477,11 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (t) set({ activeId: t.id });
   },
 
-  newSftpTab: (hostId, title) => {
+  newSftpTab: (hostId, title, activate = true) => {
     const id = get()._nextId;
     set((s) => ({
       tabs: [...s.tabs, { id, kind: "sftp" as const, title, hostId }],
-      activeId: id,
+      activeId: activate ? id : s.activeId,
       _nextId: s._nextId + 1,
     }));
     return id;

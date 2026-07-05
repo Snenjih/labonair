@@ -1,7 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Host } from "@/modules/hosts";
+import { useHostsStore } from "@/modules/hosts";
 import { makeLeaf } from "@/modules/tabs/types";
 import { restoreSnapshot, type TabActions } from "./restore";
-import type { SessionSnapshot, WorkspaceTabSnapshot } from "./types";
+import type {
+  EditorTabSnapshot,
+  HomeTabSnapshot,
+  PreviewTabSnapshot,
+  SessionSnapshot,
+  SftpTabSnapshot,
+  WorkspaceTabSnapshot,
+} from "./types";
 
 function workspaceSnap(id: string, title = "shell"): WorkspaceTabSnapshot {
   return {
@@ -12,6 +22,24 @@ function workspaceSnap(id: string, title = "shell"): WorkspaceTabSnapshot {
     sessions: { [id]: { id, kind: "local", title } },
   };
 }
+
+function homeSnap(): HomeTabSnapshot {
+  return { kind: "home" };
+}
+
+function previewSnap(url = "https://example.com"): PreviewTabSnapshot {
+  return { kind: "preview", title: "preview", url };
+}
+
+function sftpSnap(hostId = "host-1"): SftpTabSnapshot {
+  return { kind: "sftp", title: "prod", hostId };
+}
+
+function editorSnap(path = "/tmp/a.txt"): EditorTabSnapshot {
+  return { kind: "editor", title: "a.txt", path, isRemote: false };
+}
+
+const HOST: Host = { id: "host-1", name: "prod", pin_to_top: false } as Host;
 
 function makeActions(overrides: Partial<TabActions> = {}): TabActions {
   let nextId = 1;
@@ -98,5 +126,102 @@ describe("restoreSnapshot cold-tab threading", () => {
     await restoreSnapshot(snapshot, actions);
 
     expect(actions.setActiveId).not.toHaveBeenCalled();
+  });
+});
+
+// openHomeTab/openFileTab/newPreviewTab/newSftpTab aren't cold-gated like
+// newTab/newSshTab/newQuickSshTab — they used to steal `activeId`
+// unconditionally the moment any home/editor/preview/sftp tab in the
+// snapshot restored, even if it wasn't the snapshot's actual target. Restore
+// now threads `!cold` through to each as `activate`, so only the snapshot's
+// designated active tab activates.
+describe("restoreSnapshot activate-threading for home/editor/preview/sftp", () => {
+  beforeEach(() => {
+    useHostsStore.setState({ hosts: [HOST] });
+    vi.mocked(invoke).mockResolvedValue(true);
+  });
+
+  it("passes activate=false for a cold-restored home tab, true for the warm one", async () => {
+    const actions = makeActions();
+    const snapshot: SessionSnapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      activeTabIndex: 1,
+      tabs: [homeSnap(), workspaceSnap("a")],
+    };
+
+    await restoreSnapshot(snapshot, actions);
+
+    expect(actions.openHomeTab).toHaveBeenCalledWith(false);
+  });
+
+  it("passes activate=true for a warm-restored home tab", async () => {
+    const actions = makeActions();
+    const snapshot: SessionSnapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      activeTabIndex: 0,
+      tabs: [homeSnap()],
+    };
+
+    await restoreSnapshot(snapshot, actions);
+
+    expect(actions.openHomeTab).toHaveBeenCalledWith(true);
+  });
+
+  it("passes activate=false for a cold-restored preview tab", async () => {
+    const actions = makeActions();
+    const snapshot: SessionSnapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      activeTabIndex: 1,
+      tabs: [previewSnap(), workspaceSnap("a")],
+    };
+
+    await restoreSnapshot(snapshot, actions);
+
+    expect(actions.newPreviewTab).toHaveBeenCalledWith("https://example.com", undefined, false);
+  });
+
+  it("passes activate=false for a cold-restored editor tab", async () => {
+    const actions = makeActions();
+    const snapshot: SessionSnapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      activeTabIndex: 1,
+      tabs: [editorSnap(), workspaceSnap("a")],
+    };
+
+    await restoreSnapshot(snapshot, actions);
+
+    expect(actions.openFileTab).toHaveBeenCalledWith("/tmp/a.txt", false);
+  });
+
+  it("passes activate=false for a cold-restored sftp tab", async () => {
+    const actions = makeActions();
+    const snapshot: SessionSnapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      activeTabIndex: 1, // the workspace tab (index 1) is the target; sftp (index 0) is cold
+      tabs: [sftpSnap(), workspaceSnap("a")],
+    };
+
+    await restoreSnapshot(snapshot, actions);
+
+    expect(actions.newSftpTab).toHaveBeenCalledWith("host-1", "prod", false);
+  });
+
+  it("passes activate=true for a warm-restored sftp tab", async () => {
+    const actions = makeActions();
+    const snapshot: SessionSnapshot = {
+      version: 1,
+      savedAt: Date.now(),
+      activeTabIndex: 0,
+      tabs: [sftpSnap()],
+    };
+
+    await restoreSnapshot(snapshot, actions);
+
+    expect(actions.newSftpTab).toHaveBeenCalledWith("host-1", "prod", true);
   });
 });
