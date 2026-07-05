@@ -4,12 +4,26 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { IS_MAC } from "@/lib/platform";
 import { useLocalExplorerStore } from "@/modules/explorer/lib/useLocalExplorerStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
+import {
+  selectActivePaneId,
+  selectActiveTab,
+  useTabsStore,
+  type TerminalSessionData,
+  type WorkspaceTab,
+} from "@/modules/tabs";
+import { ShellComposerInput } from "@/modules/terminal/block";
 import {
   ArrowUpIcon,
   Cancel01Icon,
   CodeIcon,
+  ComputerTerminal02Icon,
+  Folder01Icon,
+  GitBranchIcon,
   HashtagIcon,
   Key01Icon,
+  SparklesIcon,
   StopCircleIcon,
   TerminalIcon,
 } from "@hugeicons/core-free-icons";
@@ -68,6 +82,67 @@ export function AiInputBar() {
   const c = useComposer();
   const directives = useDirectivesStore((s) => s.directives);
   const explorerRoot = useLocalExplorerStore((s) => s.rootPath);
+
+  // ── AI / Command mode switch ──────────────────────────────────────────────
+  // Command mode is a per-terminal-session concern (draft, mode selection),
+  // not a per-tab one — a split-pane workspace tab has one session per pane,
+  // and each keeps its own state independently. See ShellComposerInput for
+  // the draft side of this; `modeBySession` here only remembers which mode
+  // was last showing for a given session.
+  const terminalComposerEnabled = usePreferencesStore((s) => s.terminalComposerEnabled);
+  const activeTab = useTabsStore(selectActiveTab);
+  const activePaneId = useTabsStore(selectActivePaneId);
+  const currentBranch = useSourceControlStore((s) => s.currentBranch);
+  const activeWorkspaceTab = activeTab?.kind === "workspace" ? (activeTab as WorkspaceTab) : null;
+  const activeSession = activeWorkspaceTab && activePaneId ? activeWorkspaceTab.sessions[activePaneId] : null;
+  const canUseCommandMode = terminalComposerEnabled && !!activeSession;
+
+  const modeBySessionRef = useRef(new Map<string, "ai" | "command">());
+  const [mode, setModeState] = useState<"ai" | "command">("ai");
+
+  useEffect(() => {
+    if (!canUseCommandMode || !activePaneId) {
+      setModeState("ai");
+      return;
+    }
+    setModeState(modeBySessionRef.current.get(activePaneId) ?? "command");
+  }, [activePaneId, canUseCommandMode]);
+
+  const setMode = (m: "ai" | "command") => {
+    setModeState(m);
+    if (activePaneId) modeBySessionRef.current.set(activePaneId, m);
+  };
+
+  const modeSwitch = canUseCommandMode ? (
+    <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-muted/50 p-0.5">
+      <button
+        type="button"
+        onClick={() => setMode("ai")}
+        title="AI chat"
+        aria-label="AI chat"
+        className={cn(
+          "flex size-6 items-center justify-center rounded transition-colors",
+          mode === "ai" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <HugeiconsIcon icon={SparklesIcon} size={13} strokeWidth={1.75} />
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode("command")}
+        title="Run command"
+        aria-label="Run command"
+        className={cn(
+          "flex size-6 items-center justify-center rounded transition-colors",
+          mode === "command"
+            ? "bg-background shadow-sm text-foreground"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <HugeiconsIcon icon={TerminalIcon} size={13} strokeWidth={1.75} />
+      </button>
+    </div>
+  ) : null;
 
   const [trigger, setTrigger] = useState<DirectiveTrigger | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -221,6 +296,20 @@ export function AiInputBar() {
 
   const voiceLabel = c.voice.recording ? "Listening…" : c.voice.transcribing ? "Transcribing…" : null;
 
+  if (mode === "command" && activeSession && activePaneId) {
+    return (
+      <div className="shrink-0 border-t border-border/60 bg-card/40 px-3 py-2">
+        <div className="flex flex-col gap-1.5 rounded-lg px-1 py-1">
+          <ContextPillsRow session={activeSession} branch={currentBranch} />
+          <div className="flex items-center gap-2">
+            <ShellComposerInput sessionId={activePaneId} cwd={activeSession.cwd ?? null} />
+            {modeSwitch}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="shrink-0 border-t border-border/60 bg-card/40 px-3 py-2">
       <div className="flex flex-col gap-1.5 rounded-lg px-1 py-1">
@@ -318,6 +407,7 @@ export function AiInputBar() {
                   "placeholder:text-muted-foreground/60",
                 )}
               />
+              {modeSwitch}
               <AgentSwitcher />
               {c.isBusy ? (
                 <Button
@@ -398,6 +488,45 @@ export function AiInputBar() {
           )}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+
+function shortCwd(cwd: string): string {
+  const parts = cwd.split("/").filter(Boolean);
+  if (parts.length === 0) return "~";
+  return `~/${parts.slice(-2).join("/")}`;
+}
+
+/** Small read-only context strip shown above the composer in Command mode —
+ *  cwd / git branch / connection kind. Reuses the same data StatusBar's
+ *  CwdBreadcrumb/GitBranchIcon pills already surface elsewhere, just
+ *  condensed for the composer's cramped footprint. */
+function ContextPillsRow({ session, branch }: { session: TerminalSessionData; branch: string }) {
+  const terminalShell = usePreferencesStore((s) => s.terminalShell);
+  const localShellLabel = terminalShell.split("/").filter(Boolean).pop() || "shell";
+  return (
+    <div className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground/80">
+      <span className="flex items-center gap-1">
+        <HugeiconsIcon
+          icon={session.kind === "ssh" ? ComputerTerminal02Icon : TerminalIcon}
+          size={11}
+          strokeWidth={1.75}
+        />
+        {session.kind === "ssh" ? session.title : localShellLabel}
+      </span>
+      {session.cwd && (
+        <span className="flex items-center gap-1 truncate">
+          <HugeiconsIcon icon={Folder01Icon} size={11} strokeWidth={1.75} />
+          <span className="truncate">{shortCwd(session.cwd)}</span>
+        </span>
+      )}
+      {branch && (
+        <span className="flex items-center gap-1 shrink-0">
+          <HugeiconsIcon icon={GitBranchIcon} size={11} strokeWidth={1.75} />
+          {branch}
+        </span>
+      )}
     </div>
   );
 }

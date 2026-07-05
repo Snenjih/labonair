@@ -9,6 +9,7 @@ import { HomeDashboard } from "@/modules/hosts";
 import { PreviewStack } from "@/modules/preview";
 import type { PreviewPaneHandle } from "@/modules/preview";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { SftpStack } from "@/modules/sftp/SftpStack";
 import { GitGraphStack, CommitDiffStack } from "@/modules/git-graph";
 import { useTabsStore, selectActiveTabKind } from "@/modules/tabs";
@@ -70,6 +71,11 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
   onOpenGitGraphFile,
 }: WorkspaceAreaProps) {
   const activeTabKind = useTabsStore(selectActiveTabKind);
+  // The command composer works without any AI provider configured — it must
+  // not be gated behind `aiEnabled`/`hasComposer`/`panelOpen` (all AI-specific
+  // concerns), only behind its own setting and having a terminal to target.
+  const terminalComposerEnabled = usePreferencesStore((s) => s.terminalComposerEnabled);
+  const showComposerBar = terminalComposerEnabled && activeTabKind === "workspace";
   const isEditorTab = activeTabKind === "editor";
   const isPreviewTab = activeTabKind === "preview";
   const isAiDiffTab = activeTabKind === "ai-diff";
@@ -159,17 +165,19 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
         <motion.div
           data-ai-input-bar
           initial={false}
-          animate={{ height: panelOpen ? "auto" : 0, opacity: panelOpen ? 1 : 0 }}
+          animate={{
+            height: panelOpen || showComposerBar ? "auto" : 0,
+            opacity: panelOpen || showComposerBar ? 1 : 0,
+          }}
           transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           className="overflow-hidden"
-          aria-hidden={!panelOpen}
+          aria-hidden={!(panelOpen || showComposerBar)}
         >
-          {aiEnabled &&
-            (hasComposer ? (
-              <AiInputBar />
-            ) : (
-              <AiInputBarConnect onAdd={() => void openSettingsWindow("ai")} />
-            ))}
+          {(aiEnabled && panelOpen && hasComposer) || showComposerBar ? (
+            <AiInputBar />
+          ) : aiEnabled && panelOpen ? (
+            <AiInputBarConnect onAdd={() => void openSettingsWindow("ai")} />
+          ) : null}
         </motion.div>
       ) : null}
     </div>
