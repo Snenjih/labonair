@@ -310,7 +310,11 @@ export function AiInputBar() {
 
         {showCommandMode ? (
           <div className="flex items-start gap-2">
-            <ShellComposerInput sessionId={activePaneId} cwd={activeSession.cwd ?? null} />
+            <ShellComposerInput
+              sessionId={activePaneId}
+              cwd={activeSession.cwd ?? null}
+              kind={activeSession.kind}
+            />
             {modeSwitch}
           </div>
         ) : (

@@ -1,16 +1,18 @@
 import { useEffect, useRef } from "react";
 import { PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Clock01Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { Clock01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 type Props = {
-  /** Oldest-first, matching commandHistory.historyList(). */
+  /** Oldest-first, matching commandHistory.historyListFor(). This is the
+   *  shell's own real history (read from ~/.zsh_history etc.), not a
+   *  separate Nexum-managed list — there is nothing here to "clear" without
+   *  touching the user's actual shell history file, so no clear action. */
   items: string[];
   selectedIndex: number;
   onHover: (index: number) => void;
   onSelect: (command: string) => void;
-  onClear: () => void;
 };
 
 /** Alternative to inline Up/Down history cycling — see
@@ -18,7 +20,7 @@ type Props = {
  *  ShellComposerInput/shellComposerEditor (the editor keeps DOM focus the
  *  whole time); this component is purely presentational plus mouse
  *  interaction. */
-export function HistoryPopover({ items, selectedIndex, onHover, onSelect, onClear }: Props) {
+export function HistoryPopover({ items, selectedIndex, onHover, onSelect }: Props) {
   const listRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
@@ -41,8 +43,8 @@ export function HistoryPopover({ items, selectedIndex, onHover, onSelect, onClea
       ) : (
         <ul ref={listRef} className="max-h-64 overflow-y-auto py-1">
           {items.map((cmd, i) => (
-            // `cmd` alone is a safe key — commandHistory.recordCommand()
-            // de-duplicates before pushing, so each string appears once.
+            // `cmd` alone is a safe key — commandHistory de-duplicates
+            // before caching, so each string appears once.
             <li key={cmd}>
               <button
                 type="button"
@@ -66,17 +68,8 @@ export function HistoryPopover({ items, selectedIndex, onHover, onSelect, onClea
           ))}
         </ul>
       )}
-      <div className="flex items-center justify-between border-t border-border/60 px-2.5 py-1.5 text-[10px] text-muted-foreground">
-        <button
-          type="button"
-          onClick={onClear}
-          title="Clear history"
-          aria-label="Clear history"
-          className="hover:text-foreground"
-        >
-          <HugeiconsIcon icon={Delete02Icon} size={12} strokeWidth={1.75} />
-        </button>
-        <span>↑↓ navigate · ↵ run · esc</span>
+      <div className="border-t border-border/60 px-2.5 py-1.5 text-center text-[10px] text-muted-foreground">
+        ↑↓ navigate · ↵ run · esc
       </div>
     </PopoverContent>
   );

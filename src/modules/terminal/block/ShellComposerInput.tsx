@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { HistoryPopover } from "./HistoryPopover";
-import { clearHistory, historyList } from "./lib/commandHistory";
+import { historyListFor, loadHistory } from "./lib/commandHistory";
 import { createShellComposerEditor, type ShellComposerHandle } from "./lib/shellComposerEditor";
 import {
   beginBlock,
@@ -30,7 +30,15 @@ function phaseOf(sessionId: string): SessionPhase {
  *  keyboard focus belongs to the terminal itself (see
  *  terminalSessionRegistry's applyComposerCursor/focus-on-"C"), so there is
  *  nothing useful for this input to do until it's idle again. */
-export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd: string | null }) {
+export function ShellComposerInput({
+  sessionId,
+  cwd,
+  kind,
+}: {
+  sessionId: string;
+  cwd: string | null;
+  kind: "local" | "ssh";
+}) {
   const blocksEnabled = usePreferencesStore((s) => s.terminalBlocksEnabled);
   const fontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const historyPopupEnabled = usePreferencesStore((s) => s.terminalComposerHistoryPopup);
@@ -70,7 +78,7 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
   historyIndexRef.current = historyIndex;
 
   const runSelected = () => {
-    const list = historyList();
+    const list = historyListFor(sessionId);
     const cmd = list[historyIndexRef.current];
     setHistoryOpen(false);
     if (!cmd) return;
@@ -87,6 +95,11 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
     const el = containerRef.current;
     if (!el || phase !== "ready") return;
 
+    // Re-fetches every time the session goes idle again (i.e. after every
+    // command, since this effect re-runs on phase changes) — this is what
+    // makes newly-run commands show up with no explicit "record" step.
+    void loadHistory(sessionId, kind === "ssh" ? { kind: "ssh", sessionId } : { kind: "local" });
+
     const handle = createShellComposerEditor(
       el,
       sessionId,
@@ -96,7 +109,7 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
           ? {
               isOpen: () => historyOpenRef.current,
               open: () => {
-                const list = historyList();
+                const list = historyListFor(sessionId);
                 if (list.length === 0) return;
                 historyIndexRef.current = list.length - 1;
                 setHistoryIndex(list.length - 1);
@@ -104,7 +117,7 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
               },
               close: () => setHistoryOpen(false),
               move: (direction) => {
-                const list = historyList();
+                const list = historyListFor(sessionId);
                 if (list.length === 0) return;
                 const next = Math.min(Math.max(historyIndexRef.current + direction, 0), list.length - 1);
                 historyIndexRef.current = next;
@@ -129,7 +142,7 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
       handleRef.current = null;
       setHistoryOpen(false);
     };
-  }, [sessionId, phase]);
+  }, [sessionId, phase, kind]);
 
   const arrow = (
     <span className="shrink-0 select-none font-mono text-sm leading-none text-foreground group-focus-within:text-primary">
@@ -151,13 +164,13 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
   return (
     <div className="group flex min-w-0 flex-1 items-center gap-2">
       {arrow}
-      <Popover open={historyOpen}>
+      <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
         <PopoverAnchor asChild>
           <div ref={containerRef} className="nexum-shell-composer min-w-0 flex-1" />
         </PopoverAnchor>
         {historyPopupEnabled && (
           <HistoryPopover
-            items={historyList()}
+            items={historyListFor(sessionId)}
             selectedIndex={historyIndex}
             onHover={(i) => {
               historyIndexRef.current = i;
@@ -168,7 +181,6 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
               submitCommand(cmd);
               handleRef.current?.setValue("");
             }}
-            onClear={() => void clearHistory()}
           />
         )}
       </Popover>

@@ -11,7 +11,7 @@ import {
   placeholder,
   WidgetType,
 } from "@codemirror/view";
-import { historyList, recordCommand, suggest } from "./commandHistory";
+import { historyListFor, suggestFor } from "./commandHistory";
 
 // ─── Ghost text (inline history suggestion, Tab to accept) ───────────────────
 
@@ -54,14 +54,14 @@ function ghostSuggestionOf(view: EditorView): string | null {
   return view.state.field(ghostField).suggestion;
 }
 
-function scheduleGhostLookup(view: EditorView): void {
+function scheduleGhostLookup(view: EditorView, sessionId: string): void {
   const text = view.state.doc.toString();
   const atEnd = view.state.selection.main.head === view.state.doc.length;
   if (!atEnd || !text.trim()) {
     view.dispatch({ effects: setGhost.of(null) });
     return;
   }
-  const found = suggest(text);
+  const found = suggestFor(sessionId, text);
   const remainder = found ? found.slice(text.length) : null;
   view.dispatch({ effects: setGhost.of(remainder) });
 }
@@ -85,7 +85,7 @@ type NavState = { index: number | null; draft: string };
 const navBySession = new Map<string, NavState>();
 
 function navigateHistory(view: EditorView, sessionId: string, direction: -1 | 1): boolean {
-  const list = historyList();
+  const list = historyListFor(sessionId);
   if (list.length === 0) return false;
   let nav = navBySession.get(sessionId);
   if (!nav) {
@@ -201,7 +201,6 @@ export function createShellComposerEditor(
           if (ghostSuggestionOf(view)) return acceptGhost(view);
           const text = view.state.doc.toString();
           if (!text.trim()) return false;
-          void recordCommand(text);
           resetHistoryNav(sessionId);
           callbacks.onSubmit(text);
           view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "" } });
@@ -262,7 +261,7 @@ export function createShellComposerEditor(
     // user input, not a popup-driven update).
     if (callbacks.history?.isOpen()) callbacks.history.close();
     if (ghostTimer) clearTimeout(ghostTimer);
-    ghostTimer = setTimeout(() => scheduleGhostLookup(update.view), 80);
+    ghostTimer = setTimeout(() => scheduleGhostLookup(update.view, sessionId), 80);
   });
 
   const { fontFamily, cursorStyle, cursorBlink, cursorBlinkInterval } = options;
