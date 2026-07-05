@@ -44,6 +44,10 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
     return subscribeIntegrationState(sessionId, () => setPhase(phaseOf(sessionId)));
   }, [sessionId]);
 
+  // fontFamily intentionally excluded from deps — live font changes don't
+  // warrant tearing down and losing composer focus; the editor picks up the
+  // current font fresh next time it's (re)created for a phase/session change.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   useEffect(() => {
     const el = containerRef.current;
     if (!el || phase !== "ready") return;
@@ -72,10 +76,6 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
       handle.destroy();
       handleRef.current = null;
     };
-    // fontFamily intentionally excluded — live font changes don't warrant
-    // tearing down and losing composer focus; the editor picks it up fresh
-    // next time it's (re)created for a phase/session change.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   }, [sessionId, phase]);
 
   if (phase !== "ready") {

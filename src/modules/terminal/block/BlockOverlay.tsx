@@ -74,7 +74,7 @@ function BlockDecorationPortal({ sessionId, block }: { sessionId: string; block:
       decoration.dispose();
       setEl(null);
     };
-  }, [sessionId, block.id, block.startMarker]);
+  }, [sessionId, block.startMarker]);
 
   if (!el) return null;
   return createPortal(<BlockChrome block={block} />, el);
