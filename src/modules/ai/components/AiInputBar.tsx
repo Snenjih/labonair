@@ -121,13 +121,14 @@ export function AiInputBar() {
         title="AI chat"
         aria-label="AI chat"
         className={cn(
-          "flex size-6 items-center justify-center rounded transition-colors",
+          "flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium transition-colors",
           mode === "ai"
             ? "bg-background shadow-sm text-foreground"
             : "text-muted-foreground hover:text-foreground",
         )}
       >
-        <HugeiconsIcon icon={SparklesIcon} size={13} strokeWidth={1.75} />
+        <HugeiconsIcon icon={SparklesIcon} size={12} strokeWidth={1.75} />
+        AI
       </button>
       <button
         type="button"
@@ -135,13 +136,14 @@ export function AiInputBar() {
         title="Run command"
         aria-label="Run command"
         className={cn(
-          "flex size-6 items-center justify-center rounded transition-colors",
+          "flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium transition-colors",
           mode === "command"
             ? "bg-background shadow-sm text-foreground"
             : "text-muted-foreground hover:text-foreground",
         )}
       >
-        <HugeiconsIcon icon={TerminalIcon} size={13} strokeWidth={1.75} />
+        <HugeiconsIcon icon={TerminalIcon} size={12} strokeWidth={1.75} />
+        Shell
       </button>
     </div>
   ) : null;
@@ -298,197 +300,199 @@ export function AiInputBar() {
 
   const voiceLabel = c.voice.recording ? "Listening…" : c.voice.transcribing ? "Transcribing…" : null;
 
-  if (mode === "command" && activeSession && activePaneId) {
-    return (
-      <div className="shrink-0 border-t border-border/60 bg-card/40 px-3 py-2">
-        <div className="flex flex-col gap-1.5 rounded-lg px-1 py-1">
-          <ContextPillsRow session={activeSession} branch={currentBranch} />
-          <div className="flex items-center gap-2">
-            <ShellComposerInput sessionId={activePaneId} cwd={activeSession.cwd ?? null} />
-            {modeSwitch}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const showCommandMode = mode === "command" && activeSession && activePaneId;
 
   return (
     <div className="shrink-0 border-t border-border/60 bg-card/40 px-3 py-2">
       <div className="flex flex-col gap-1.5 rounded-lg px-1 py-1">
-        <ChipsRow
-          files={c.files}
-          onRemoveFile={c.removeFile}
-          directives={c.pickedDirectives}
-          onRemoveDirective={(id) => {
-            const dir = c.pickedDirectives.find((d) => d.id === id);
-            c.removeDirective(id);
-            if (!dir) return;
-            const re = new RegExp(`(^|\\s)#${dir.handle}\\b ?`);
-            c.setValue((v) => v.replace(re, (_m, lead: string) => lead));
-          }}
-          commands={c.pickedCommands}
-          onRemoveCommand={(name) => c.removeCommand(name)}
-        />
+        {/* Shown identically in both modes — only the row below it changes. */}
+        {activeSession && <ContextPillsRow session={activeSession} branch={currentBranch} />}
 
-        <Popover open={pickerOpen}>
-          <PopoverAnchor asChild>
-            <div className="flex items-start gap-2">
-              <textarea
-                ref={c.textareaRef}
-                value={c.value}
-                onChange={(e) => c.setValue(e.target.value)}
-                onKeyUp={updateTrigger}
-                onClick={updateTrigger}
-                onSelect={updateTrigger}
-                onKeyDown={(e) => {
-                  if (fileTrigger !== null) {
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setFileActiveIndex((i) => Math.min(i + 1, Math.max(0, fileHits.length - 1)));
-                      return;
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setFileActiveIndex((i) => Math.max(0, i - 1));
-                      return;
-                    }
-                    if (e.key === "Tab" || e.key === "Enter") {
-                      const hit = fileHits[fileActiveIndex];
-                      if (hit) {
-                        e.preventDefault();
-                        onPickFile(hit);
-                        return;
-                      }
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setFileTrigger(null);
-                      return;
-                    }
-                  } else if (trigger !== null) {
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setActiveIndex((i) => Math.min(i + 1, Math.max(0, filteredItems.length - 1)));
-                      return;
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setActiveIndex((i) => Math.max(0, i - 1));
-                      return;
-                    }
-                    if (e.key === "Tab" || e.key === "Enter") {
-                      if (filteredItems.length > 0) {
-                        e.preventDefault();
-                        pickActive();
-                        return;
-                      }
-                    }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setTrigger(null);
-                      return;
-                    }
-                  }
-                  if (e.key === "Enter") {
-                    const isModEnter = e.metaKey || e.ctrlKey;
-                    if (c.isBusy) {
-                      e.preventDefault();
-                      if (isModEnter && !pickerOpen) c.enqueue();
-                      return;
-                    }
-                    if (!e.shiftKey) {
-                      e.preventDefault();
-                      c.submit();
-                    }
-                  }
-                }}
-                placeholder="Ask Labonair anything   ·   @ files   ·   # directives"
-                rows={1}
-                className={cn(
-                  "max-h-40 flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none",
-                  "placeholder:text-muted-foreground/60",
-                )}
-              />
-              {modeSwitch}
-              <AgentSwitcher />
-              {c.isBusy ? (
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  onClick={c.stop}
-                  className="size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
-                  title="Stop"
-                >
-                  <HugeiconsIcon icon={StopCircleIcon} size={13} strokeWidth={1.75} />
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  size="icon"
-                  onClick={c.submit}
-                  disabled={!c.canSend}
-                  className="size-7 shrink-0 rounded-md"
-                  title="Send (Enter)"
-                >
-                  <HugeiconsIcon icon={ArrowUpIcon} size={13} strokeWidth={1.75} />
-                </Button>
-              )}
-            </div>
-          </PopoverAnchor>
-          {fileTrigger !== null ? (
-            <FilePickerContent
-              hits={fileHits}
-              loading={fileLoading}
-              query={fileTrigger.query}
-              activeIndex={fileActiveIndex}
-              onPick={onPickFile}
-              onHover={setFileActiveIndex}
+        {showCommandMode ? (
+          <div className="flex items-start gap-2">
+            <ShellComposerInput sessionId={activePaneId} cwd={activeSession.cwd ?? null} />
+            {modeSwitch}
+          </div>
+        ) : (
+          <>
+            <ChipsRow
+              files={c.files}
+              onRemoveFile={c.removeFile}
+              directives={c.pickedDirectives}
+              onRemoveDirective={(id) => {
+                const dir = c.pickedDirectives.find((d) => d.id === id);
+                c.removeDirective(id);
+                if (!dir) return;
+                const re = new RegExp(`(^|\\s)#${dir.handle}\\b ?`);
+                c.setValue((v) => v.replace(re, (_m, lead: string) => lead));
+              }}
+              commands={c.pickedCommands}
+              onRemoveCommand={(name) => c.removeCommand(name)}
             />
-          ) : (
-            <DirectivePickerContent
-              items={filteredItems}
-              activeIndex={activeIndex}
-              onPick={onPickItem}
-              onHover={setActiveIndex}
-            />
-          )}
-        </Popover>
 
-        <AnimatePresence initial={false}>
-          {voiceLabel && (
-            <motion.div
-              key={voiceLabel}
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.08 }}
-              className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground"
-            >
-              {c.voice.recording ? (
-                <span className="size-1.5 animate-pulse rounded-full bg-destructive" />
+            <Popover open={pickerOpen}>
+              <PopoverAnchor asChild>
+                <div className="flex items-start gap-2">
+                  <textarea
+                    ref={c.textareaRef}
+                    value={c.value}
+                    onChange={(e) => c.setValue(e.target.value)}
+                    onKeyUp={updateTrigger}
+                    onClick={updateTrigger}
+                    onSelect={updateTrigger}
+                    onKeyDown={(e) => {
+                      if (fileTrigger !== null) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setFileActiveIndex((i) => Math.min(i + 1, Math.max(0, fileHits.length - 1)));
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setFileActiveIndex((i) => Math.max(0, i - 1));
+                          return;
+                        }
+                        if (e.key === "Tab" || e.key === "Enter") {
+                          const hit = fileHits[fileActiveIndex];
+                          if (hit) {
+                            e.preventDefault();
+                            onPickFile(hit);
+                            return;
+                          }
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setFileTrigger(null);
+                          return;
+                        }
+                      } else if (trigger !== null) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setActiveIndex((i) => Math.min(i + 1, Math.max(0, filteredItems.length - 1)));
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setActiveIndex((i) => Math.max(0, i - 1));
+                          return;
+                        }
+                        if (e.key === "Tab" || e.key === "Enter") {
+                          if (filteredItems.length > 0) {
+                            e.preventDefault();
+                            pickActive();
+                            return;
+                          }
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setTrigger(null);
+                          return;
+                        }
+                      }
+                      if (e.key === "Enter") {
+                        const isModEnter = e.metaKey || e.ctrlKey;
+                        if (c.isBusy) {
+                          e.preventDefault();
+                          if (isModEnter && !pickerOpen) c.enqueue();
+                          return;
+                        }
+                        if (!e.shiftKey) {
+                          e.preventDefault();
+                          c.submit();
+                        }
+                      }
+                    }}
+                    placeholder="Ask Labonair anything   ·   @ files   ·   # directives"
+                    rows={1}
+                    className={cn(
+                      "max-h-40 flex-1 resize-none bg-transparent text-[13px] leading-relaxed outline-none",
+                      "placeholder:text-muted-foreground/60",
+                    )}
+                  />
+                  {modeSwitch}
+                  <AgentSwitcher />
+                  {c.isBusy ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={c.stop}
+                      className="size-7 shrink-0 rounded-md text-muted-foreground hover:text-foreground"
+                      title="Stop"
+                    >
+                      <HugeiconsIcon icon={StopCircleIcon} size={13} strokeWidth={1.75} />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="icon"
+                      onClick={c.submit}
+                      disabled={!c.canSend}
+                      className="size-7 shrink-0 rounded-md"
+                      title="Send (Enter)"
+                    >
+                      <HugeiconsIcon icon={ArrowUpIcon} size={13} strokeWidth={1.75} />
+                    </Button>
+                  )}
+                </div>
+              </PopoverAnchor>
+              {fileTrigger !== null ? (
+                <FilePickerContent
+                  hits={fileHits}
+                  loading={fileLoading}
+                  query={fileTrigger.query}
+                  activeIndex={fileActiveIndex}
+                  onPick={onPickFile}
+                  onHover={setFileActiveIndex}
+                />
               ) : (
-                <Spinner className="size-3" />
+                <DirectivePickerContent
+                  items={filteredItems}
+                  activeIndex={activeIndex}
+                  onPick={onPickItem}
+                  onHover={setActiveIndex}
+                />
               )}
-              <span className="truncate">{voiceLabel}</span>
-            </motion.div>
-          )}
-          {c.isBusy && (
-            <motion.div
-              key="queue-hint"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.08 }}
-              className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground/60"
-            >
-              <span>{IS_MAC ? "⌘↵" : "Ctrl+↵"} to queue a follow-up</span>
-              {c.queuedCount > 0 && (
-                <span className="rounded bg-muted px-1 font-mono text-[10px]">{c.queuedCount} queued</span>
+            </Popover>
+
+            <AnimatePresence initial={false}>
+              {voiceLabel && (
+                <motion.div
+                  key={voiceLabel}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.08 }}
+                  className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground"
+                >
+                  {c.voice.recording ? (
+                    <span className="size-1.5 animate-pulse rounded-full bg-destructive" />
+                  ) : (
+                    <Spinner className="size-3" />
+                  )}
+                  <span className="truncate">{voiceLabel}</span>
+                </motion.div>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {c.isBusy && (
+                <motion.div
+                  key="queue-hint"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.08 }}
+                  className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground/60"
+                >
+                  <span>{IS_MAC ? "⌘↵" : "Ctrl+↵"} to queue a follow-up</span>
+                  {c.queuedCount > 0 && (
+                    <span className="rounded bg-muted px-1 font-mono text-[10px]">
+                      {c.queuedCount} queued
+                    </span>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        )}
       </div>
     </div>
   );
@@ -500,16 +504,22 @@ function shortCwd(cwd: string): string {
   return `~/${parts.slice(-2).join("/")}`;
 }
 
-/** Small read-only context strip shown above the composer in Command mode —
- *  cwd / git branch / connection kind. Reuses the same data StatusBar's
- *  CwdBreadcrumb/GitBranchIcon pills already surface elsewhere, just
- *  condensed for the composer's cramped footprint. */
+const contextPillClass =
+  "flex items-center gap-1 rounded-md border border-border/60 bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground";
+
+/** Small read-only context strip shown above the composer — cwd / git branch
+ *  / connection kind. Shown identically in AI and Command mode (only the row
+ *  below it changes). Same bordered-pill treatment as the tab bar's tab
+ *  chips and ChipsRow's attachment chips, for a consistent chip language
+ *  across the app. Reuses the same data StatusBar's CwdBreadcrumb/
+ *  GitBranchIcon pills already surface elsewhere, just condensed for the
+ *  composer's cramped footprint. */
 function ContextPillsRow({ session, branch }: { session: TerminalSessionData; branch: string }) {
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
   const localShellLabel = terminalShell.split("/").filter(Boolean).pop() || "shell";
   return (
-    <div className="flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground/80">
-      <span className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1 px-1">
+      <span className={contextPillClass}>
         <HugeiconsIcon
           icon={session.kind === "ssh" ? ComputerTerminal02Icon : TerminalIcon}
           size={11}
@@ -518,13 +528,13 @@ function ContextPillsRow({ session, branch }: { session: TerminalSessionData; br
         {session.kind === "ssh" ? session.title : localShellLabel}
       </span>
       {session.cwd && (
-        <span className="flex items-center gap-1 truncate">
-          <HugeiconsIcon icon={Folder01Icon} size={11} strokeWidth={1.75} />
+        <span className={cn(contextPillClass, "max-w-48 truncate")}>
+          <HugeiconsIcon icon={Folder01Icon} size={11} strokeWidth={1.75} className="shrink-0" />
           <span className="truncate">{shortCwd(session.cwd)}</span>
         </span>
       )}
       {branch && (
-        <span className="flex items-center gap-1 shrink-0">
+        <span className={cn(contextPillClass, "shrink-0")}>
           <HugeiconsIcon icon={GitBranchIcon} size={11} strokeWidth={1.75} />
           {branch}
         </span>

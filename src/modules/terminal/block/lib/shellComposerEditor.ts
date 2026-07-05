@@ -202,10 +202,18 @@ export function createShellComposerEditor(
         ghostField,
         updateListener,
         placeholder("Run a command…"),
+        // Matches AiInputBar's plain <textarea> look exactly (transparent,
+        // no border/focus ring) — CodeMirror's base theme otherwise draws a
+        // focus outline and a hardcoded black caret, neither themeable via
+        // Tailwind classes on the wrapper since they're inside CodeMirror's
+        // own shadow-less content root.
         EditorView.theme({
-          "&": { fontSize: "13px" },
-          ".cm-content": { fontFamily, padding: "0" },
+          "&": { fontSize: "13px", backgroundColor: "transparent" },
+          "&.cm-editor": { outline: "none", border: "none" },
+          "&.cm-focused": { outline: "none" },
+          ".cm-content": { fontFamily, padding: "0", caretColor: "var(--cursor)" },
           ".cm-line": { padding: "0" },
+          ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--cursor)", borderLeftWidth: "1.5px" },
         }),
         EditorView.lineWrapping,
       ],
