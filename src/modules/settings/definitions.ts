@@ -265,6 +265,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "Switch",
   },
   {
+    id: "terminalComposerHistoryPopup",
+    label: "History popup",
+    description:
+      "Pressing ↑ in the command composer opens a scrollable history menu instead of cycling commands inline.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
     id: "terminalBlocksEnabled",
     label: "Block terminal",
     description:

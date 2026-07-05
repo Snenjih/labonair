@@ -86,6 +86,7 @@ export type Preferences = {
   terminalCursorBlinkInterval: number;
   terminalCursorStyle: "block" | "underline" | "bar";
   terminalComposerEnabled: boolean;
+  terminalComposerHistoryPopup: boolean;
   terminalBlocksEnabled: boolean;
   terminalBlocksAutoCollapseOnAltScreen: boolean;
   terminalFontFamily: string;
@@ -256,6 +257,7 @@ const KEY_TERMINAL_CURSOR_BLINK = "terminalCursorBlink";
 const KEY_TERMINAL_CURSOR_BLINK_INTERVAL = "terminalCursorBlinkInterval";
 const KEY_TERMINAL_CURSOR_STYLE = "terminalCursorStyle";
 const KEY_TERMINAL_COMPOSER_ENABLED = "terminalComposerEnabled";
+const KEY_TERMINAL_COMPOSER_HISTORY_POPUP = "terminalComposerHistoryPopup";
 const KEY_TERMINAL_BLOCKS_ENABLED = "terminalBlocksEnabled";
 const KEY_TERMINAL_BLOCKS_AUTO_COLLAPSE_ON_ALT_SCREEN = "terminalBlocksAutoCollapseOnAltScreen";
 const KEY_TERMINAL_FONT_FAMILY = "terminalFontFamily";
@@ -395,6 +397,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   terminalCursorBlinkInterval: 1000,
   terminalCursorStyle: "bar",
   terminalComposerEnabled: false,
+  terminalComposerHistoryPopup: false,
   terminalBlocksEnabled: false,
   terminalBlocksAutoCollapseOnAltScreen: true,
   terminalFontFamily: '"JetBrains Mono", SFMono-Regular, Menlo, monospace',
@@ -571,6 +574,8 @@ export async function loadPreferences(): Promise<Preferences> {
     ),
     terminalComposerEnabled:
       get<boolean>(KEY_TERMINAL_COMPOSER_ENABLED) ?? DEFAULT_PREFERENCES.terminalComposerEnabled,
+    terminalComposerHistoryPopup:
+      get<boolean>(KEY_TERMINAL_COMPOSER_HISTORY_POPUP) ?? DEFAULT_PREFERENCES.terminalComposerHistoryPopup,
     terminalBlocksEnabled:
       get<boolean>(KEY_TERMINAL_BLOCKS_ENABLED) ?? DEFAULT_PREFERENCES.terminalBlocksEnabled,
     terminalBlocksAutoCollapseOnAltScreen:
@@ -962,6 +967,11 @@ export async function setTerminalComposerEnabled(value: boolean): Promise<void> 
   await store.set(KEY_TERMINAL_COMPOSER_ENABLED, value);
   if (!value) await store.set(KEY_TERMINAL_BLOCKS_ENABLED, false);
   await store.save();
+}
+
+export async function setTerminalComposerHistoryPopup(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_TERMINAL_COMPOSER_HISTORY_POPUP, value);
+  await (await getStore()).save();
 }
 
 export async function setTerminalBlocksEnabled(value: boolean): Promise<void> {
@@ -1478,6 +1488,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_TERMINAL_CURSOR_BLINK_INTERVAL]: "terminalCursorBlinkInterval",
     [KEY_TERMINAL_CURSOR_STYLE]: "terminalCursorStyle",
     [KEY_TERMINAL_COMPOSER_ENABLED]: "terminalComposerEnabled",
+    [KEY_TERMINAL_COMPOSER_HISTORY_POPUP]: "terminalComposerHistoryPopup",
     [KEY_TERMINAL_BLOCKS_ENABLED]: "terminalBlocksEnabled",
     [KEY_TERMINAL_BLOCKS_AUTO_COLLAPSE_ON_ALT_SCREEN]: "terminalBlocksAutoCollapseOnAltScreen",
     [KEY_TERMINAL_FONT_FAMILY]: "terminalFontFamily",

@@ -63,3 +63,8 @@ export function suggest(prefix: string): string | null {
 export function historyList(): string[] {
   return cache ?? [];
 }
+
+export async function clearHistory(): Promise<void> {
+  cache = [];
+  await (await getStore()).set(KEY_HISTORY, []);
+}

@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { HistoryPopover } from "./HistoryPopover";
+import { clearHistory, historyList } from "./lib/commandHistory";
+import { createShellComposerEditor, type ShellComposerHandle } from "./lib/shellComposerEditor";
 import {
   beginBlock,
   hasShellIntegration,
@@ -7,7 +11,6 @@ import {
   subscribeIntegrationState,
   write,
 } from "../lib/terminalSessionRegistry";
-import { createShellComposerEditor, type ShellComposerHandle } from "./lib/shellComposerEditor";
 
 const drafts = new Map<string, string>();
 
@@ -30,6 +33,11 @@ function phaseOf(sessionId: string): SessionPhase {
 export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd: string | null }) {
   const blocksEnabled = usePreferencesStore((s) => s.terminalBlocksEnabled);
   const fontFamily = usePreferencesStore((s) => s.terminalFontFamily);
+  const historyPopupEnabled = usePreferencesStore((s) => s.terminalComposerHistoryPopup);
+  const cursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
+  const cursorBlink = usePreferencesStore((s) => s.terminalCursorBlink);
+  const cursorBlinkInterval = usePreferencesStore((s) => s.terminalCursorBlinkInterval);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<ShellComposerHandle | null>(null);
   const cwdRef = useRef(cwd);
@@ -44,9 +52,36 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
     return subscribeIntegrationState(sessionId, () => setPhase(phaseOf(sessionId)));
   }, [sessionId]);
 
-  // fontFamily intentionally excluded from deps — live font changes don't
-  // warrant tearing down and losing composer focus; the editor picks up the
-  // current font fresh next time it's (re)created for a phase/session change.
+  const submitCommand = (text: string) => {
+    if (blocksEnabledRef.current) beginBlock(sessionId, text, cwdRef.current);
+    write(sessionId, text.endsWith("\n") ? text : `${text}\n`);
+    drafts.delete(sessionId);
+  };
+
+  // ── History popup (terminalComposerHistoryPopup setting) ──────────────────
+  // State lives here (React), read/driven imperatively by the CodeMirror
+  // keymap via refs — the keymap closures are created once per editor
+  // instance (see the effect below) and would otherwise read stale values.
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const historyOpenRef = useRef(false);
+  historyOpenRef.current = historyOpen;
+  const historyIndexRef = useRef(0);
+  historyIndexRef.current = historyIndex;
+
+  const runSelected = () => {
+    const list = historyList();
+    const cmd = list[historyIndexRef.current];
+    setHistoryOpen(false);
+    if (!cmd) return;
+    submitCommand(cmd);
+    handleRef.current?.setValue("");
+  };
+
+  // fontFamily/cursor*/historyPopupEnabled intentionally excluded from
+  // deps — live setting changes don't warrant tearing down and losing
+  // composer focus; the editor picks up current values fresh next time
+  // it's (re)created for a phase/session change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   useEffect(() => {
     const el = containerRef.current;
@@ -56,13 +91,30 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
       el,
       sessionId,
       {
-        onSubmit: (text) => {
-          if (blocksEnabledRef.current) beginBlock(sessionId, text, cwdRef.current);
-          write(sessionId, text.endsWith("\n") ? text : `${text}\n`);
-          drafts.delete(sessionId);
-        },
+        onSubmit: submitCommand,
+        history: historyPopupEnabled
+          ? {
+              isOpen: () => historyOpenRef.current,
+              open: () => {
+                const list = historyList();
+                if (list.length === 0) return;
+                historyIndexRef.current = list.length - 1;
+                setHistoryIndex(list.length - 1);
+                setHistoryOpen(true);
+              },
+              close: () => setHistoryOpen(false),
+              move: (direction) => {
+                const list = historyList();
+                if (list.length === 0) return;
+                const next = Math.min(Math.max(historyIndexRef.current + direction, 0), list.length - 1);
+                historyIndexRef.current = next;
+                setHistoryIndex(next);
+              },
+              runSelected,
+            }
+          : undefined,
       },
-      fontFamily,
+      { fontFamily, cursorStyle, cursorBlink, cursorBlinkInterval },
     );
     const draft = drafts.get(sessionId);
     if (draft) handle.setValue(draft);
@@ -75,16 +127,51 @@ export function ShellComposerInput({ sessionId, cwd }: { sessionId: string; cwd:
       else drafts.delete(sessionId);
       handle.destroy();
       handleRef.current = null;
+      setHistoryOpen(false);
     };
   }, [sessionId, phase]);
 
+  const arrow = (
+    <span className="shrink-0 select-none font-mono text-sm leading-none text-foreground group-focus-within:text-primary">
+      ❯
+    </span>
+  );
+
   if (phase !== "ready") {
     return (
-      <div className="flex h-7 flex-1 items-center text-[13px] text-muted-foreground/50">
-        {phase === "running" ? "Command running…" : "Waiting for shell integration…"}
+      <div className="group flex flex-1 items-center gap-2">
+        {arrow}
+        <div className="flex h-7 flex-1 items-center text-[13px] text-muted-foreground/50">
+          {phase === "running" ? "Command running…" : "Waiting for shell integration…"}
+        </div>
       </div>
     );
   }
 
-  return <div ref={containerRef} className="nexum-shell-composer flex-1 min-w-0" />;
+  return (
+    <div className="group flex min-w-0 flex-1 items-center gap-2">
+      {arrow}
+      <Popover open={historyOpen}>
+        <PopoverAnchor asChild>
+          <div ref={containerRef} className="nexum-shell-composer min-w-0 flex-1" />
+        </PopoverAnchor>
+        {historyPopupEnabled && (
+          <HistoryPopover
+            items={historyList()}
+            selectedIndex={historyIndex}
+            onHover={(i) => {
+              historyIndexRef.current = i;
+              setHistoryIndex(i);
+            }}
+            onSelect={(cmd) => {
+              setHistoryOpen(false);
+              submitCommand(cmd);
+              handleRef.current?.setValue("");
+            }}
+            onClear={() => void clearHistory()}
+          />
+        )}
+      </Popover>
+    </div>
+  );
 }

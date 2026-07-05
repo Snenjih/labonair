@@ -5,6 +5,7 @@ import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
+  drawSelection,
   EditorView,
   keymap,
   placeholder,
@@ -77,6 +78,8 @@ function acceptGhost(view: EditorView): boolean {
 }
 
 // ─── History navigation (Up/Down at doc boundary) ─────────────────────────────
+// Only used when the "history popup" setting is off — see
+// ShellComposerCallbacks.history for the popup-driven alternative.
 
 type NavState = { index: number | null; draft: string };
 const navBySession = new Map<string, NavState>();
@@ -134,13 +137,55 @@ export type ShellComposerCallbacks = {
    *  for beginBlock()/write() — this module only owns editing/history/ghost
    *  text, not what happens to a submitted command. */
   onSubmit: (text: string) => void;
+  /** Only set when the "history popup" setting is on. When present, ArrowUp
+   *  at the document start opens the popup (instead of the inline
+   *  navigateHistory behavior above); while it reports `isOpen() === true`,
+   *  ArrowUp/ArrowDown/Enter/Escape are fully delegated to it instead of
+   *  their normal editor behavior. All state (open/selected index) lives in
+   *  the React component that renders the popup — this module only ever
+   *  reads it through these callbacks, never owns it, since the keymap
+   *  closures here are created once per editor instance and would
+   *  otherwise go stale. */
+  history?: {
+    isOpen: () => boolean;
+    open: () => void;
+    close: () => void;
+    move: (direction: -1 | 1) => void;
+    runSelected: () => void;
+  };
 };
+
+export type ShellComposerCursorOptions = {
+  fontFamily: string;
+  cursorStyle: "block" | "underline" | "bar";
+  cursorBlink: boolean;
+  cursorBlinkInterval: number;
+};
+
+function cursorCss(style: ShellComposerCursorOptions["cursorStyle"]): Record<string, string> {
+  switch (style) {
+    case "block":
+      return {
+        borderLeft: "none",
+        width: "1ch",
+        backgroundColor: "color-mix(in oklch, var(--cursor) 55%, transparent)",
+      };
+    case "underline":
+      return {
+        borderLeft: "none",
+        width: "1ch",
+        borderBottom: "2px solid var(--cursor)",
+      };
+    default:
+      return { borderLeftColor: "var(--cursor)", borderLeftWidth: "1.5px" };
+  }
+}
 
 export function createShellComposerEditor(
   parent: HTMLElement,
   sessionId: string,
   callbacks: ShellComposerCallbacks,
-  fontFamily: string,
+  options: ShellComposerCursorOptions,
 ): ShellComposerHandle {
   let ghostTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -149,6 +194,10 @@ export function createShellComposerEditor(
       {
         key: "Enter",
         run: (view) => {
+          if (callbacks.history?.isOpen()) {
+            callbacks.history.runSelected();
+            return true;
+          }
           if (ghostSuggestionOf(view)) return acceptGhost(view);
           const text = view.state.doc.toString();
           if (!text.trim()) return false;
@@ -168,8 +217,25 @@ export function createShellComposerEditor(
       },
       { key: "Tab", run: acceptGhost },
       {
+        key: "Escape",
+        run: () => {
+          if (!callbacks.history?.isOpen()) return false;
+          callbacks.history.close();
+          return true;
+        },
+      },
+      {
         key: "ArrowUp",
         run: (view) => {
+          if (callbacks.history) {
+            if (callbacks.history.isOpen()) {
+              callbacks.history.move(-1);
+              return true;
+            }
+            if (view.state.selection.main.head !== 0) return false;
+            callbacks.history.open();
+            return true;
+          }
           if (view.state.selection.main.head !== 0) return false;
           return navigateHistory(view, sessionId, -1);
         },
@@ -177,6 +243,10 @@ export function createShellComposerEditor(
       {
         key: "ArrowDown",
         run: (view) => {
+          if (callbacks.history?.isOpen()) {
+            callbacks.history.move(1);
+            return true;
+          }
           if (view.state.selection.main.head !== view.state.doc.length) return false;
           return navigateHistory(view, sessionId, 1);
         },
@@ -186,9 +256,16 @@ export function createShellComposerEditor(
 
   const updateListener = EditorView.updateListener.of((update) => {
     if (!update.docChanged) return;
+    // Genuine typing while the history popup is open means the user wants
+    // to type, not browse — close it and let the keystroke through normally
+    // (the popup never edits the doc itself, so any doc change here is real
+    // user input, not a popup-driven update).
+    if (callbacks.history?.isOpen()) callbacks.history.close();
     if (ghostTimer) clearTimeout(ghostTimer);
     ghostTimer = setTimeout(() => scheduleGhostLookup(update.view), 80);
   });
+
+  const { fontFamily, cursorStyle, cursorBlink, cursorBlinkInterval } = options;
 
   const view = new EditorView({
     parent,
@@ -201,19 +278,27 @@ export function createShellComposerEditor(
         cmHistory(),
         ghostField,
         updateListener,
-        placeholder("Run a command…"),
+        // Draws its own cursor overlay (synced to focus/selection state, not
+        // the browser's native caret) — the native caret is what caused the
+        // "cursor gets stuck after deleting back to empty" bug and the
+        // hardcoded-black color, since CodeMirror's base theme only styles
+        // the native caret's `caret-color`. drawSelection replaces it
+        // entirely with a `.cm-cursor` element that behaves correctly.
+        drawSelection({ cursorBlinkRate: cursorBlink ? cursorBlinkInterval : 0 }),
+        placeholder("Run a command…   ·   ↑ history"),
         // Matches AiInputBar's plain <textarea> look exactly (transparent,
         // no border/focus ring) — CodeMirror's base theme otherwise draws a
-        // focus outline and a hardcoded black caret, neither themeable via
-        // Tailwind classes on the wrapper since they're inside CodeMirror's
-        // own shadow-less content root.
+        // focus outline, neither themeable via Tailwind classes on the
+        // wrapper since they're inside CodeMirror's own shadow-less content
+        // root. Cursor color/shape mirror the terminalCursor* preferences
+        // the real xterm terminal already uses, via the same --cursor token.
         EditorView.theme({
           "&": { fontSize: "13px", backgroundColor: "transparent" },
           "&.cm-editor": { outline: "none", border: "none" },
           "&.cm-focused": { outline: "none" },
-          ".cm-content": { fontFamily, padding: "0", caretColor: "var(--cursor)" },
+          ".cm-content": { fontFamily, padding: "0" },
           ".cm-line": { padding: "0" },
-          ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--cursor)", borderLeftWidth: "1.5px" },
+          ".cm-cursor": cursorCss(cursorStyle),
         }),
         EditorView.lineWrapping,
       ],

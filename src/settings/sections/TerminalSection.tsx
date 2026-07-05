@@ -7,6 +7,7 @@ import {
   setTerminalCursorBlinkInterval,
   setTerminalCursorStyle,
   setTerminalComposerEnabled,
+  setTerminalComposerHistoryPopup,
   setTerminalBlocksEnabled,
   setTerminalBlocksAutoCollapseOnAltScreen,
   setTerminalFontFamily,
@@ -38,6 +39,7 @@ export function TerminalSection() {
   const terminalCursorBlinkInterval = usePreferencesStore((s) => s.terminalCursorBlinkInterval);
   const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
   const terminalComposerEnabled = usePreferencesStore((s) => s.terminalComposerEnabled);
+  const terminalComposerHistoryPopup = usePreferencesStore((s) => s.terminalComposerHistoryPopup);
   const terminalBlocksEnabled = usePreferencesStore((s) => s.terminalBlocksEnabled);
   const terminalBlocksAutoCollapseOnAltScreen = usePreferencesStore(
     (s) => s.terminalBlocksAutoCollapseOnAltScreen,
@@ -244,6 +246,15 @@ export function TerminalSection() {
         </SettingRow>
         {terminalComposerEnabled && (
           <>
+            <SettingRow
+              title="History popup"
+              description="Pressing ↑ opens a scrollable history menu instead of cycling commands inline in the composer itself."
+            >
+              <Switch
+                checked={terminalComposerHistoryPopup}
+                onCheckedChange={(v) => void setTerminalComposerHistoryPopup(v)}
+              />
+            </SettingRow>
             <SettingRow
               title="Block terminal"
               description="Group each executed command and its output into a block with cwd, exit code, and duration. Only available while the command composer is on."
