@@ -1,7 +1,7 @@
 import { defaultKeymap, history as cmHistory, historyKeymap } from "@codemirror/commands";
 import { shell } from "@codemirror/legacy-modes/mode/shell";
 import { StreamLanguage } from "@codemirror/language";
-import { EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
+import { EditorState, Prec, StateEffect, StateField, type Transaction } from "@codemirror/state";
 import {
   Decoration,
   type DecorationSet,
@@ -32,14 +32,47 @@ class GhostWidget extends WidgetType {
   }
 }
 
+/** When the just-typed text exactly continues the current ghost suggestion
+ *  (the common case: typing into a match that's already being suggested),
+ *  shrink it in place instead of clearing it — the debounced re-lookup in
+ *  scheduleGhostLookup takes ~80ms, and clearing-then-reappearing every
+ *  single keystroke in that window is a visible flicker. Returns `undefined`
+ *  when the edit doesn't cleanly continue the suggestion (a deletion, a
+ *  mismatched character, a multi-change transaction like a paste) — the
+ *  caller falls back to clearing until the next lookup resolves, same as
+ *  before. This is a pure local slice of a string CodeMirror already has in
+ *  hand, so it can never disagree with the debounced lookup that follows;
+ *  it just avoids waiting for it in the overwhelmingly common case. */
+function predictShrunkGhost(current: string | null, tr: Transaction): string | null | undefined {
+  if (!current) return undefined;
+  let deletedAny = false;
+  let insertedText = "";
+  let changeCount = 0;
+  tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    changeCount += 1;
+    if (toA > fromA) deletedAny = true;
+    insertedText += inserted.toString();
+  });
+  if (changeCount !== 1 || deletedAny || !insertedText) return undefined;
+  if (!current.startsWith(insertedText)) return undefined;
+  return current.slice(insertedText.length) || null;
+}
+
 const ghostField = StateField.define<{ suggestion: string | null; deco: DecorationSet }>({
   create: () => ({ suggestion: null, deco: Decoration.none }),
   update(value, tr) {
     let suggestion = value.suggestion;
+    let explicit = false;
     for (const e of tr.effects) {
-      if (e.is(setGhost)) suggestion = e.value;
+      if (e.is(setGhost)) {
+        suggestion = e.value;
+        explicit = true;
+      }
     }
-    if (tr.docChanged && !tr.effects.some((e) => e.is(setGhost))) suggestion = null;
+    if (tr.docChanged && !explicit) {
+      const predicted = predictShrunkGhost(value.suggestion, tr);
+      suggestion = predicted === undefined ? null : predicted;
+    }
     if (!suggestion) return { suggestion: null, deco: Decoration.none };
     const pos = tr.state.doc.length;
     const deco = Decoration.set([

@@ -97,17 +97,28 @@ async function readSshHistory(sessionId: string): Promise<string[]> {
     // One-shot exec on the existing SSH session (ssh_exec_command opens its
     // own channel — doesn't touch the visible interactive PTY). `~` expands
     // via the remote shell itself, so this works regardless of remote shell
-    // type without needing to know it. Errors from missing files are
-    // suppressed so the command still exits 0 with whatever did exist. The
-    // remote gets the same ZDOTDIR override for the same reason (see
-    // ssh/shell_integration.rs's build_bootstrap_script) so its history can
-    // land in the same cache-relative spot.
+    // type without needing to know it. No `2>/dev/null` — that depends on
+    // the exec channel actually running through a shell that interprets
+    // redirection, which isn't guaranteed for every server; `cat` printing
+    // "no such file" to stderr for a missing candidate is harmless since
+    // only stdout is read below, and it still prints the other files' real
+    // content regardless. The remote gets the same ZDOTDIR override for the
+    // same reason (see ssh/shell_integration.rs's build_bootstrap_script) so
+    // its history can land in the same cache-relative spot.
     const r = await invoke<{ stdout: string; stderr: string; exit_code: number }>("ssh_exec_command", {
       sessionId,
-      command: `cat ~/.zsh_history ~/.bash_history ${ZDOTDIR_OVERRIDE_ZSH_HISTORY} 2>/dev/null`,
+      command: `cat ~/.zsh_history ~/.bash_history ${ZDOTDIR_OVERRIDE_ZSH_HISTORY}`,
     });
-    return dedupeKeepLast(parseHistoryContent(r.stdout), MAX_HISTORY);
-  } catch {
+    const list = dedupeKeepLast(parseHistoryContent(r.stdout), MAX_HISTORY);
+    if (list.length === 0) {
+      console.warn(
+        `[labonair] ssh history: cat returned nothing usable for session ${sessionId} ` +
+          `(exit ${r.exit_code}). stdout len=${r.stdout.length}, stderr: ${r.stderr.slice(0, 300) || "(empty)"}`,
+      );
+    }
+    return list;
+  } catch (e) {
+    console.warn(`[labonair] ssh history: ssh_exec_command threw for session ${sessionId}:`, e);
     return [];
   }
 }
