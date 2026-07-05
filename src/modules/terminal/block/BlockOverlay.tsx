@@ -1,81 +1,93 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getSlotForLeaf, isLeafAltScreen } from "../lib/rendererPool";
-import { getBlockState, subscribeBlocks, type BlockRecord } from "../lib/terminalSessionRegistry";
-import { BlockChrome } from "./BlockChrome";
+import { getBlockEngine, isBlocksBakedIn, subscribeBlocks } from "../lib/terminalSessionRegistry";
+import { BlockChrome, StickyHeader } from "./BlockChrome";
+import type { VisibleBlocks } from "./lib/blockDecorations";
 
-/** Renders a small metadata pill (BlockChrome) for every finished block in a
- *  session, anchored to its start row via xterm's decoration API (auto-
- *  repositions on scroll/resize, auto-disposes when the marker's row is
- *  eventually trimmed from scrollback — no manual pixel math needed).
- *  Non-visual otherwise: doesn't own layout, just portals into elements
- *  xterm hands back, so it can be mounted anywhere near the pane it
- *  corresponds to (see WorkspacePane.tsx). */
+const EMPTY: VisibleBlocks = { blocks: [], sticky: null };
+
+// Cheap string signature of the geometry that actually matters for a
+// re-render — avoids a React re-render on every rAF-driven recompute tick
+// (scroll/typing fire far more often than a block's rounded pixel position
+// actually changes).
+function signature(v: VisibleBlocks): string {
+  let s = v.sticky?.id ?? "";
+  for (const b of v.blocks) s += `|${b.id}:${Math.round(b.top)}:${Math.round(b.bottom)}:${b.running}`;
+  return s;
+}
+
+/** Floating header/divider chrome for a session's finished blocks, positioned
+ *  by pixel math against the live `.xterm-screen` element (see
+ *  blockDecorations.ts's `visibleBlocks`) rather than an xterm decoration —
+ *  a decoration-based pill was the previous (broken) approach: it painted
+ *  over real output because it could only anchor to a fixed buffer row, not
+ *  redraw into the blank rows the shell script now reserves for a header.
+ *
+ *  Gates on `isBlocksBakedIn`, a per-session flag fixed at spawn time — NOT
+ *  the live `terminalBlocksEnabled` preference. The shell's PS1 rewrite is
+ *  baked into its env at spawn and can't be un-baked mid-session, so this
+ *  session keeps showing chrome for its own lifetime regardless of a later
+ *  settings toggle (which only affects newly-opened terminals — see the
+ *  toast in TerminalSection.tsx). Gating on the live preference instead would
+ *  desync the two: disabling the setting would unmount this overlay while
+ *  the shell keeps blanking its own prompt, leaving a bare, cursor-less-
+ *  looking prompt line with nothing compensating for it. */
 export function BlockOverlay({ sessionId }: { sessionId: string }) {
-  const blocksEnabled = usePreferencesStore((s) => s.terminalBlocksEnabled);
+  const blocksBakedIn = isBlocksBakedIn(sessionId);
   const autoCollapseOnAltScreen = usePreferencesStore((s) => s.terminalBlocksAutoCollapseOnAltScreen);
 
-  const state = useSyncExternalStore(
-    (cb) => subscribeBlocks(sessionId, cb),
-    () => getBlockState(sessionId),
-    () => null,
-  );
-
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastSig = useRef("");
+  const [vis, setVis] = useState<VisibleBlocks>(EMPTY);
   const [altScreen, setAltScreen] = useState(false);
+
   useEffect(() => {
-    if (!blocksEnabled) return;
+    if (!blocksBakedIn) return;
+
+    const update = () => {
+      const engine = getBlockEngine(sessionId);
+      const container = containerRef.current;
+      const screen = getSlotForLeaf(sessionId)?.term.element?.querySelector<HTMLElement>(".xterm-screen");
+      if (!engine || !container || !screen) {
+        if (lastSig.current !== "") {
+          lastSig.current = "";
+          setVis(EMPTY);
+        }
+        return;
+      }
+      // Offset against this overlay's own mount node rather than xterm's
+      // `.xterm` root — correct regardless of any wrapper padding between
+      // the two, since `top: …` styles below are relative to this container.
+      const offset = screen.getBoundingClientRect().top - container.getBoundingClientRect().top;
+      const next = engine.visibleBlocks(offset);
+      const sig = signature(next);
+      if (sig === lastSig.current) return;
+      lastSig.current = sig;
+      setVis(next);
+    };
+
+    update();
+    return subscribeBlocks(sessionId, update);
+  }, [sessionId, blocksBakedIn]);
+
+  useEffect(() => {
+    if (!blocksBakedIn) return;
     const term = getSlotForLeaf(sessionId)?.term;
     if (!term) return;
     const check = () => setAltScreen(isLeafAltScreen(sessionId));
     check();
     const disposable = term.onRender(check);
     return () => disposable.dispose();
-  }, [sessionId, blocksEnabled]);
+  }, [sessionId, blocksBakedIn]);
 
-  if (!blocksEnabled || !state) return null;
-  if (autoCollapseOnAltScreen && altScreen) return null;
-
-  const finished = state.blocks.filter(
-    (b) => b.startMarker && !b.startMarker.isDisposed && b.finishedAt !== null,
-  );
+  if (!blocksBakedIn) return null;
+  const collapsed = autoCollapseOnAltScreen && altScreen;
 
   return (
-    <>
-      {finished.map((b) => (
-        <BlockDecorationPortal key={b.id} sessionId={sessionId} block={b} />
-      ))}
-    </>
+    <div ref={containerRef} className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+      {!collapsed && vis.blocks.map((b) => <BlockChrome key={b.id} sessionId={sessionId} block={b} />)}
+      {!collapsed && vis.sticky && <StickyHeader sessionId={sessionId} block={vis.sticky} />}
+    </div>
   );
-}
-
-function BlockDecorationPortal({ sessionId, block }: { sessionId: string; block: BlockRecord }) {
-  const [el, setEl] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const term = getSlotForLeaf(sessionId)?.term;
-    if (!term || !block.startMarker || block.startMarker.isDisposed) return;
-    // Right-anchored, small — overlays only the tail of the echoed command
-    // line instead of covering real terminal content (see BlockChrome).
-    const decoration = term.registerDecoration({
-      marker: block.startMarker,
-      anchor: "right",
-      width: 14,
-      height: 1,
-    });
-    if (!decoration) return;
-    const onRender = decoration.onRender((element) => {
-      element.style.pointerEvents = "none";
-      element.classList.add("group");
-      setEl(element);
-    });
-    return () => {
-      onRender.dispose();
-      decoration.dispose();
-      setEl(null);
-    };
-  }, [sessionId, block.startMarker]);
-
-  if (!el) return null;
-  return createPortal(<BlockChrome block={block} />, el);
 }

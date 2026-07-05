@@ -90,6 +90,8 @@ export function useTerminalSession({
       },
     };
 
+    const blocksPref = usePreferencesStore.getState().terminalBlocksEnabled;
+
     registerSession({
       sessionId,
       bridge,
@@ -99,6 +101,7 @@ export function useTerminalSession({
         onCwd: (c) => onCwdRef.current?.(c),
         onDetectedLocalUrl: (u) => onDetectedRef.current?.(u),
       },
+      blocksBakedIn: blocksPref,
       checkForegroundJob: async () => {
         const pty = ptyRef.current;
         if (!pty) return false;
@@ -130,6 +133,7 @@ export function useTerminalSession({
         },
         initialCwd,
         shellPref || undefined,
+        blocksPref,
       );
       if (disposed) {
         pty.close();

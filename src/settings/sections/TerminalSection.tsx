@@ -1,35 +1,36 @@
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  setSshAutoReconnect,
+  setSshAutoReconnectDelay,
+  setSshAutoReconnectMaxAttempts,
+  setTerminalBell,
+  setTerminalBlocksAutoCollapseOnAltScreen,
+  setTerminalBlocksEnabled,
+  setTerminalComposerEnabled,
+  setTerminalComposerHistoryPopup,
+  setTerminalCopyOnSelect,
   setTerminalCursorBlink,
   setTerminalCursorBlinkInterval,
   setTerminalCursorStyle,
-  setTerminalComposerEnabled,
-  setTerminalComposerHistoryPopup,
-  setTerminalBlocksEnabled,
-  setTerminalBlocksAutoCollapseOnAltScreen,
+  setTerminalDefaultPath,
+  setTerminalFastScrollModifier,
   setTerminalFontFamily,
   setTerminalFontSize,
   setTerminalFontWeight,
   setTerminalLetterSpacing,
   setTerminalLineHeight,
-  setTerminalScrollback,
-  setTerminalShowPaneHeader,
-  setTerminalShowPaneFooter,
-  setTerminalUseWebGL,
-  setTerminalBell,
-  setTerminalCopyOnSelect,
   setTerminalRightClickPastes,
-  setTerminalWordSeparator,
+  setTerminalScrollback,
   setTerminalScrollSensitivity,
-  setTerminalFastScrollModifier,
   setTerminalShell,
-  setTerminalDefaultPath,
-  setSshAutoReconnect,
-  setSshAutoReconnectDelay,
-  setSshAutoReconnectMaxAttempts,
+  setTerminalShowPaneFooter,
+  setTerminalShowPaneHeader,
+  setTerminalUseWebGL,
+  setTerminalWordSeparator,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -261,7 +262,20 @@ export function TerminalSection() {
             >
               <Switch
                 checked={terminalBlocksEnabled}
-                onCheckedChange={(v) => void setTerminalBlocksEnabled(v)}
+                onCheckedChange={(v) => {
+                  void setTerminalBlocksEnabled(v);
+                  // The shell script that reserves header rows is baked in
+                  // once at spawn time (env var, no live side-channel into an
+                  // already-running shell) — this can't retroactively change
+                  // already-open tabs.
+                  useNotificationStore.getState().addNotification({
+                    type: "info",
+                    title: "Block terminal",
+                    message: v
+                      ? "Applies to newly opened terminals — reopen existing tabs to enable blocks there."
+                      : "Applies to newly opened terminals — existing tabs keep showing blocks until reopened.",
+                  });
+                }}
               />
             </SettingRow>
             {terminalBlocksEnabled && (

@@ -65,6 +65,7 @@ impl Shell {
 pub fn build_command(
     cwd: Option<String>,
     shell_override: Option<String>,
+    blocks: bool,
 ) -> Result<CommandBuilder, String> {
     let (shell, shell_path) = match shell_override {
         Some(ref p) if !p.trim().is_empty() => {
@@ -84,6 +85,15 @@ pub fn build_command(
     cmd.env("COLORTERM", "truecolor");
     cmd.env("LABONAIR_TERMINAL", "1");
     cmd.env("TERM_PROGRAM", "Labonair");
+    // Baked in once at spawn time — the shell scripts read this on every
+    // precmd/preexec to decide whether to reserve blank prompt rows for a
+    // block header. There is no live side-channel into an already-running
+    // shell (pty_write/ssh_pty_write only deliver raw, echoed bytes), so
+    // toggling the "Block terminal" setting only ever affects newly spawned
+    // sessions — this is the single point where that decision is made.
+    if blocks {
+        cmd.env("LABONAIR_BLOCKS", "1");
+    }
 
     let resolved_cwd = cwd
         .map(PathBuf::from)

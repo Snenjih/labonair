@@ -1,19 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverAnchor } from "@/components/ui/popover";
-import { Spinner } from "@/components/ui/spinner";
-import { cn } from "@/lib/utils";
-import { IS_MAC } from "@/lib/platform";
-import { useLocalExplorerStore } from "@/modules/explorer/lib/useLocalExplorerStore";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
-import {
-  selectActivePaneId,
-  selectActiveTab,
-  useTabsStore,
-  type TerminalSessionData,
-  type WorkspaceTab,
-} from "@/modules/tabs";
-import { ShellComposerInput } from "@/modules/terminal/block";
 import {
   ArrowUpIcon,
   Cancel01Icon,
@@ -31,9 +15,25 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useComposer, type FileAttachment } from "../lib/composer";
-import { SLASH_COMMANDS } from "../lib/slashCommands";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverAnchor } from "@/components/ui/popover";
+import { Spinner } from "@/components/ui/spinner";
+import { IS_MAC } from "@/lib/platform";
+import { cn } from "@/lib/utils";
+import { useLocalExplorerStore } from "@/modules/explorer/lib/useLocalExplorerStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
+import {
+  selectActivePaneId,
+  selectActiveTab,
+  type TerminalSessionData,
+  useTabsStore,
+  type WorkspaceTab,
+} from "@/modules/tabs";
+import { ShellComposerInput } from "@/modules/terminal/block";
+import { type FileAttachment, useComposer } from "../lib/composer";
 import type { Directive } from "../lib/directives";
+import { SLASH_COMMANDS } from "../lib/slashCommands";
 import { useDirectivesStore } from "../store/directivesStore";
 import { AgentSwitcher } from "./AgentSwitcher";
 import { DirectivePickerContent, type PickerItem } from "./DirectivePicker";
@@ -310,11 +310,7 @@ export function AiInputBar() {
 
         {showCommandMode ? (
           <div className="flex items-start gap-2">
-            <ShellComposerInput
-              sessionId={activePaneId}
-              cwd={activeSession.cwd ?? null}
-              kind={activeSession.kind}
-            />
+            <ShellComposerInput sessionId={activePaneId} kind={activeSession.kind} />
             {modeSwitch}
           </div>
         ) : (

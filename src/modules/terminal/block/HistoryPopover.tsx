@@ -1,8 +1,8 @@
+import { Clock01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef } from "react";
 import { PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Clock01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 
 type Props = {
   /** Oldest-first, matching commandHistory.historyListFor(). This is the

@@ -1,22 +1,22 @@
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { cn } from "@/lib/utils";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { FindWidget } from "@/modules/search";
-import type { PaneNode, TerminalSessionData, WorkspaceTab } from "@/modules/tabs";
+import type { SearchAddon } from "@xterm/addon-search";
 import {
   forwardRef,
+  type ReactNode,
   useCallback,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { cn } from "@/lib/utils";
+import { FindWidget } from "@/modules/search";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { PaneNode, TerminalSessionData, WorkspaceTab } from "@/modules/tabs";
 import { BlockOverlay } from "./block";
 import { SshTerminalPane } from "./SshTerminalPane";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
-import type { SearchAddon } from "@xterm/addon-search";
 
 export type WorkspacePaneHandle = {
   getSessionHandle: (sessionId: string) => TerminalPaneHandle | null;

@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { HistoryPopover } from "./HistoryPopover";
-import { historyListFor, loadHistory } from "./lib/commandHistory";
-import { createShellComposerEditor, type ShellComposerHandle } from "./lib/shellComposerEditor";
 import {
-  beginBlock,
   hasShellIntegration,
   isCommandRunning,
   subscribeIntegrationState,
   write,
 } from "../lib/terminalSessionRegistry";
+import { HistoryPopover } from "./HistoryPopover";
+import { historyListFor, loadHistory } from "./lib/commandHistory";
+import { createShellComposerEditor, type ShellComposerHandle } from "./lib/shellComposerEditor";
 
 const drafts = new Map<string, string>();
 
@@ -30,16 +29,7 @@ function phaseOf(sessionId: string): SessionPhase {
  *  keyboard focus belongs to the terminal itself (see
  *  terminalSessionRegistry's applyComposerCursor/focus-on-"C"), so there is
  *  nothing useful for this input to do until it's idle again. */
-export function ShellComposerInput({
-  sessionId,
-  cwd,
-  kind,
-}: {
-  sessionId: string;
-  cwd: string | null;
-  kind: "local" | "ssh";
-}) {
-  const blocksEnabled = usePreferencesStore((s) => s.terminalBlocksEnabled);
+export function ShellComposerInput({ sessionId, kind }: { sessionId: string; kind: "local" | "ssh" }) {
   const fontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const historyPopupEnabled = usePreferencesStore((s) => s.terminalComposerHistoryPopup);
   const cursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
@@ -48,10 +38,6 @@ export function ShellComposerInput({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<ShellComposerHandle | null>(null);
-  const cwdRef = useRef(cwd);
-  cwdRef.current = cwd;
-  const blocksEnabledRef = useRef(blocksEnabled);
-  blocksEnabledRef.current = blocksEnabled;
 
   const [phase, setPhase] = useState<SessionPhase>(() => phaseOf(sessionId));
 
@@ -60,8 +46,11 @@ export function ShellComposerInput({
     return subscribeIntegrationState(sessionId, () => setPhase(phaseOf(sessionId)));
   }, [sessionId]);
 
+  // Blocks (when enabled) are created purely from the shell's own OSC 133 C
+  // payload now — see blockDecorations.ts — so submitting here doesn't need
+  // to separately announce anything; it works identically whether the
+  // command came from this composer or was typed directly into the terminal.
   const submitCommand = (text: string) => {
-    if (blocksEnabledRef.current) beginBlock(sessionId, text, cwdRef.current);
     write(sessionId, text.endsWith("\n") ? text : `${text}\n`);
     drafts.delete(sessionId);
   };

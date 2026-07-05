@@ -37,6 +37,7 @@ pub async fn ssh_connect(
     password_override: Option<String>,
     initial_cols: Option<u32>,
     initial_rows: Option<u32>,
+    blocks: bool,
     on_event: Channel<super::pty::SshPtyEvent>,
     state: tauri::State<'_, super::SshState>,
     trust_state: tauri::State<'_, super::TrustState>,
@@ -211,7 +212,7 @@ pub async fn ssh_connect(
             default_path_ssh, password, cols, rows,
             jump_host_address, jump_port, jump_username, jump_auth_method,
             jump_private_key_path, jump_password, jump_keep_alive_interval,
-            state_inner, trust_inner, app_clone, on_event,
+            blocks, state_inner, trust_inner, app_clone, on_event,
         )
     })
     .await
@@ -268,6 +269,7 @@ pub async fn ssh_connect_quick(
     passphrase: Option<String>,
     initial_cols: Option<u32>,
     initial_rows: Option<u32>,
+    blocks: bool,
     on_event: Channel<super::pty::SshPtyEvent>,
     state: tauri::State<'_, super::SshState>,
     trust_state: tauri::State<'_, super::TrustState>,
@@ -303,6 +305,7 @@ pub async fn ssh_connect_quick(
             None,
             None,
             None,
+            blocks,
             state_inner,
             trust_inner,
             app_clone,
@@ -618,6 +621,7 @@ fn ssh_connect_blocking(
     jump_private_key_path: Option<String>,
     jump_password: Option<String>,
     jump_keep_alive_interval: Option<i64>,
+    blocks: bool,
     state: super::SshState,
     trust_state: super::TrustState,
     app: tauri::AppHandle,
@@ -692,6 +696,7 @@ fn ssh_connect_blocking(
         initial_rows,
         keep_alive_interval.map(|v| v as u32),
         keep_alive_tries.map(|v| v as u32),
+        blocks,
         on_event,
     )?;
     log_step!(app, session_id, "Shell channel open ✓");

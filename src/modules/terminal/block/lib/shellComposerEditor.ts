@@ -1,6 +1,6 @@
-import { defaultKeymap, history as cmHistory, historyKeymap } from "@codemirror/commands";
-import { shell } from "@codemirror/legacy-modes/mode/shell";
+import { history as cmHistory, defaultKeymap, historyKeymap } from "@codemirror/commands";
 import { StreamLanguage } from "@codemirror/language";
+import { shell } from "@codemirror/legacy-modes/mode/shell";
 import { EditorState, Prec, StateEffect, StateField, type Transaction } from "@codemirror/state";
 import {
   Decoration,

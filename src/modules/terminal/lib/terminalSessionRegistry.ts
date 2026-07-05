@@ -1,6 +1,7 @@
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SearchAddon } from "@xterm/addon-search";
-import type { IMarker, Terminal } from "@xterm/xterm";
+import type { Terminal } from "@xterm/xterm";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { BlockDecorations } from "../block/lib/blockDecorations";
 import { containsSchemeSeparator, LOCAL_URL_RE, stripTrailingPunct } from "./detectLocalUrl";
 import { DormantRing } from "./dormantRing";
 import {
@@ -15,15 +16,15 @@ import {
   configureRendererPool,
   discardRetainedSlot,
   disposeLeafSlot,
-  focusSlot as poolFocusSlot,
   getLiveSlotForLeaf,
   getSlotForLeaf,
   isLeafAltScreen,
+  type LeafBridge,
   parkLeafSlot,
   playBell,
+  focusSlot as poolFocusSlot,
   refreshLeafSlot,
   releaseSlot,
-  type LeafBridge,
 } from "./rendererPool";
 
 /** What a session supplies to write/resize/kick its underlying connection.
@@ -47,32 +48,14 @@ export type RegisterOptions = {
   /** Local-only: invokes `pty_has_foreground_job`. Omitted for SSH — SSH busy
    *  detection is OSC-133-only (no local shell PID to check via tcgetpgrp). */
   checkForegroundJob?: () => Promise<boolean>;
+  /** Whether `LABONAIR_BLOCKS=1` was baked into this session's shell at spawn
+   *  time (see pty-bridge.ts's `openPty`/ssh_connect's `blocks` arg). Fixed
+   *  for the session's lifetime — there is no live channel into an
+   *  already-running shell, so block chrome must key off what THIS session
+   *  was actually spawned with, not the current (possibly since-toggled)
+   *  `terminalBlocksEnabled` preference. See `isBlocksBakedIn`. */
+  blocksBakedIn?: boolean;
 };
-
-/** One command submitted through the block-terminal composer. `command`/`cwd`
- *  come from the composer at submit time (see `beginBlock`) — never
- *  re-parsed from shell echo, since Blocks only exist alongside the composer.
- *  `startMarker` anchors the block to a buffer row for the *current* live
- *  binding only; it does not survive a renderer-pool cold rebind (see
- *  rendererPool.ts's bindSlot — snapshot/ring replay runs before `registerOsc`
- *  re-attaches), so a finished block from before an eviction just renders as
- *  plain scrollback text — an accepted v1 limitation. */
-export type BlockRecord = {
-  id: string;
-  command: string;
-  cwd: string | null;
-  startedAt: number;
-  finishedAt: number | null;
-  exitCode: number | null;
-  startMarker: IMarker | null;
-};
-
-export type BlockState = {
-  blocks: BlockRecord[];
-  current: BlockRecord | null;
-};
-
-const MAX_BLOCKS_PER_SESSION = 500;
 
 type SessionRecord = {
   bridge: SessionBridge;
@@ -98,7 +81,12 @@ type SessionRecord = {
    *  unrecognized remote shell — see ssh/shell_integration.rs — never do,
    *  and simply never get block/composer takeover). */
   shellIntegrationSeen: boolean;
-  blockState: BlockState;
+  /** Only constructed when `blocksBakedIn` — see registerOsc/registerSession.
+   *  Recreated (never mutated-and-reused) on every `registerOsc` re-run,
+   *  since a cold rebind can hand this session a different (or freshly
+   *  reset) `Terminal` object whose old markers would be meaningless. */
+  blockEngine: BlockDecorations | null;
+  blocksBakedIn: boolean;
   urlDecoder: TextDecoder;
   lastDetectedUrl: string | null;
 };
@@ -189,11 +177,26 @@ function bindLeafToSlot(sessionId: string, s: SessionRecord): void {
     rows: s.rows,
     registerOsc: (term) => {
       applyComposerCursor(s, term);
-      const prompt = registerPromptTracker(term, s.shellState, (running, exitCode) => {
+      // A cold bind either hands this session its first Terminal or reuses a
+      // pool slot's Terminal that just had `.clear()`/`.reset()` run on it
+      // (see rendererPool.ts's bindSlot) — either way, any prior engine's
+      // markers are meaningless now, so it's always replaced, never reused.
+      s.blockEngine?.dispose();
+      s.blockEngine = s.blocksBakedIn
+        ? new BlockDecorations(term, { onViewport: () => notifyBlocks(sessionId) })
+        : null;
+      const prompt = registerPromptTracker(term, s.shellState, (running, exitCode, commandText) => {
         setCommandRunning(sessionId, running);
-        onShellIntegrationEvent(sessionId, s, term, running, exitCode);
+        onShellIntegrationEvent(sessionId, s, term, running, exitCode, commandText);
       });
-      const cwd = registerCwdHandler(term, (next) => s.callbacks.onCwd?.(next), s.shellState);
+      const cwd = registerCwdHandler(
+        term,
+        (next) => {
+          s.callbacks.onCwd?.(next);
+          s.blockEngine?.setCwd(next);
+        },
+        s.shellState,
+      );
       const query = registerTerminalQueryHandlers(term, (d) => s.bridge.writeToPty(d));
       return [prompt.dispose, cwd, query];
     },
@@ -269,10 +272,20 @@ export function registerSession(opts: RegisterOptions): void {
     hasSlot: false,
     shellState: createShellIntegrationState(),
     shellIntegrationSeen: false,
-    blockState: { blocks: [], current: null },
+    blockEngine: null,
+    blocksBakedIn: opts.blocksBakedIn ?? false,
     urlDecoder: new TextDecoder("utf-8", { fatal: false }),
     lastDetectedUrl: null,
   });
+}
+
+/** Whether this session's shell was actually spawned with block-mode PS1
+ *  reservation active — see `RegisterOptions.blocksBakedIn`. `BlockOverlay`
+ *  gates on this instead of the live `terminalBlocksEnabled` preference so a
+ *  mid-session setting flip can't desync the shell (which can't un-bake its
+ *  env var) from the overlay (which would otherwise just unmount). */
+export function isBlocksBakedIn(sessionId: string): boolean {
+  return sessions.get(sessionId)?.blocksBakedIn ?? false;
 }
 
 /** Wired into every `registerOsc` call as part of the same `onCommandState`
@@ -288,9 +301,11 @@ function onShellIntegrationEvent(
   term: Terminal,
   running: boolean,
   exitCode?: number,
+  commandText?: string,
 ): void {
   const firstTime = !s.shellIntegrationSeen;
   s.shellIntegrationSeen = true;
+  s.blockEngine?.handleCommandState(running, exitCode, commandText);
   if (running) {
     // OSC 133 C: the shell actually started executing. Real terminal focus +
     // normal cursor take over immediately — synchronously, in the same tick
@@ -298,69 +313,23 @@ function onShellIntegrationEvent(
     // and a fast Ctrl+C right after submit never land in the wrong place.
     applyComposerCursor(s, term);
     focus(sessionId);
-    // Confirm the optimistic block `beginBlock` opened (composer submit) and
-    // anchor it to a live buffer row. Replaces `s.blockState` with a new
-    // object rather than mutating the existing one in place — BlockOverlay
-    // reads it through useSyncExternalStore, which detects changes via
-    // Object.is on the snapshot; mutating in place would leave it pointing
-    // at the same (now-stale-looking) reference forever, so React would
-    // never re-render even though notifyBlocks fires correctly.
-    const cur = s.blockState.current;
-    if (cur && !cur.startMarker) {
-      const confirmed: BlockRecord = { ...cur, startMarker: term.registerMarker(0) };
-      s.blockState = { ...s.blockState, current: confirmed };
-      notifyBlocks(sessionId);
-    }
     if (firstTime) notifyIntegrationState(sessionId);
     return;
   }
-  if (exitCode === undefined) {
-    // OSC 133 A (new prompt) — nothing to finalize, but the composer may now
-    // be able to take over (first integration event, or back to idle).
-    applyComposerCursor(s, term);
-    if (firstTime) notifyIntegrationState(sessionId);
-    return;
-  }
-  // OSC 133 D: command finished. Only finalize a block that was actually
-  // confirmed running (has a startMarker) — an unconfirmed `current` means
-  // beginBlock fired but C never arrived, which shouldn't normally happen
-  // and would just be noise if pushed.
-  const cur = s.blockState.current;
-  if (cur?.startMarker) {
-    const finished: BlockRecord = { ...cur, finishedAt: Date.now(), exitCode };
-    const blocks = [...s.blockState.blocks, finished];
-    if (blocks.length > MAX_BLOCKS_PER_SESSION) blocks.shift();
-    s.blockState = { blocks, current: null };
-  } else {
-    s.blockState = { ...s.blockState, current: null };
-  }
+  // OSC 133 A (new prompt, exitCode undefined) or D (finished) — either way
+  // the composer may now be able to take over (first integration event, or
+  // back to idle).
   applyComposerCursor(s, term);
-  notifyBlocks(sessionId);
   if (firstTime) notifyIntegrationState(sessionId);
 }
 
-/** Called by the command composer right before writing to the pty — this is
- *  how block metadata gets the literal command text without re-parsing shell
- *  echo (see BlockRecord doc comment). No-op if Blocks isn't in use for this
- *  session; the record just sits unconfirmed until GC'd by disposeSession. */
-export function beginBlock(sessionId: string, command: string, cwd: string | null): void {
-  const s = sessions.get(sessionId);
-  if (!s) return;
-  const block: BlockRecord = {
-    id: crypto.randomUUID(),
-    command,
-    cwd,
-    startedAt: Date.now(),
-    finishedAt: null,
-    exitCode: null,
-    startMarker: null,
-  };
-  s.blockState = { ...s.blockState, current: block };
-  notifyBlocks(sessionId);
-}
-
-export function getBlockState(sessionId: string): BlockState | null {
-  return sessions.get(sessionId)?.blockState ?? null;
+/** The block engine for this session, or `null` if Blocks wasn't baked in at
+ *  spawn time (see `isBlocksBakedIn`) or shell integration hasn't graduated
+ *  yet. `BlockOverlay` calls `.visibleBlocks()`/`.blockAt()`/etc. on this
+ *  directly rather than the registry exposing a duplicate surface for each
+ *  method. */
+export function getBlockEngine(sessionId: string): BlockDecorations | null {
+  return sessions.get(sessionId)?.blockEngine ?? null;
 }
 
 export function hasShellIntegration(sessionId: string): boolean {
@@ -544,8 +513,6 @@ export function resetForReconnect(sessionId: string): void {
   s.commandRunning = false;
   s.shellExited = false;
   s.shellIntegrationSeen = false;
-  s.blockState = { blocks: [], current: null };
-  notifyBlocks(sessionId);
   notifyIntegrationState(sessionId);
   cancelHiddenRelease(s);
   const slot = getSlotForLeaf(sessionId);
@@ -553,9 +520,23 @@ export function resetForReconnect(sessionId: string): void {
     slot.term.options.disableStdin = false;
     slot.term.clear();
     slot.term.reset();
+    // Unlike a cold rebind, resetting a still-bound slot in place does NOT
+    // go through `registerOsc` — so the block engine has to be explicitly
+    // torn down and recreated here, or it would keep believing whatever
+    // command was running is still running forever (no shell left to ever
+    // send its D). The Terminal object itself is untouched by the reset, so
+    // rebinding a fresh engine to it (rather than leaving it null until some
+    // future cold rebind that may never come) is safe and immediate.
+    s.blockEngine?.dispose();
+    s.blockEngine = s.blocksBakedIn
+      ? new BlockDecorations(slot.term, { onViewport: () => notifyBlocks(sessionId) })
+      : null;
   } else {
     discardRetainedSlot(sessionId);
+    s.blockEngine?.dispose();
+    s.blockEngine = null;
   }
+  notifyBlocks(sessionId);
 }
 
 export function write(sessionId: string, data: string): void {
@@ -644,6 +625,8 @@ export function disposeSession(sessionId: string): void {
   disposeLeafSlot(sessionId);
   s.hasSlot = false;
   s.snapshot = null;
+  s.blockEngine?.dispose();
+  s.blockEngine = null;
   sessions.delete(sessionId);
   blockSubscribers.delete(sessionId);
   integrationSubscribers.delete(sessionId);
