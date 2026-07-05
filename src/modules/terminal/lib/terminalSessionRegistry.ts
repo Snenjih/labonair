@@ -1,3 +1,4 @@
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SearchAddon } from "@xterm/addon-search";
 import type { IMarker, Terminal } from "@xterm/xterm";
 import { containsSchemeSeparator, LOCAL_URL_RE, stripTrailingPunct } from "./detectLocalUrl";
@@ -104,9 +105,28 @@ type SessionRecord = {
 
 const sessions = new Map<string, SessionRecord>();
 const blockSubscribers = new Map<string, Set<() => void>>();
+const integrationSubscribers = new Map<string, Set<() => void>>();
 
 function notifyBlocks(sessionId: string): void {
   for (const cb of blockSubscribers.get(sessionId) ?? []) cb();
+}
+
+function notifyIntegrationState(sessionId: string): void {
+  for (const cb of integrationSubscribers.get(sessionId) ?? []) cb();
+}
+
+/** Keeps the terminal cursor hidden while the composer owns input for this
+ *  session (idle prompt, composer setting on, shell integration confirmed)
+ *  and normal otherwise — see the focus/cursor routing design in
+ *  block-terminals plan §4. Called both at bind time (`registerOsc`, so a
+ *  cold-rebound slot — possibly previously showing a *different* session's
+ *  "none" cursor — starts from the right state) and on every subsequent OSC
+ *  133 event while already bound, so it never needs its own React
+ *  subscription or risks going stale across renderer-pool slot reuse. */
+function applyComposerCursor(s: SessionRecord, term: Terminal): void {
+  const composerEnabled = usePreferencesStore.getState().terminalComposerEnabled;
+  const active = composerEnabled && s.shellIntegrationSeen && !s.commandRunning;
+  term.options.cursorInactiveStyle = active ? "none" : "outline";
 }
 
 const HIDDEN_RELEASE_DELAY_MS = 300;
@@ -168,6 +188,7 @@ function bindLeafToSlot(sessionId: string, s: SessionRecord): void {
     cols: s.cols,
     rows: s.rows,
     registerOsc: (term) => {
+      applyComposerCursor(s, term);
       const prompt = registerPromptTracker(term, s.shellState, (running, exitCode) => {
         setCommandRunning(sessionId, running);
         onShellIntegrationEvent(sessionId, s, term, running, exitCode);
@@ -268,19 +289,32 @@ function onShellIntegrationEvent(
   running: boolean,
   exitCode?: number,
 ): void {
+  const firstTime = !s.shellIntegrationSeen;
   s.shellIntegrationSeen = true;
   if (running) {
-    // OSC 133 C: the shell actually started executing. Confirm the
-    // optimistic block `beginBlock` opened (composer submit) and anchor it
-    // to a live buffer row.
+    // OSC 133 C: the shell actually started executing. Real terminal focus +
+    // normal cursor take over immediately — synchronously, in the same tick
+    // as the OSC parse — so interactive programs (vim, sudo prompts, REPLs)
+    // and a fast Ctrl+C right after submit never land in the wrong place.
+    applyComposerCursor(s, term);
+    focus(sessionId);
+    // Confirm the optimistic block `beginBlock` opened (composer submit) and
+    // anchor it to a live buffer row.
     const cur = s.blockState.current;
     if (cur && !cur.startMarker) {
       cur.startMarker = term.registerMarker(0);
       notifyBlocks(sessionId);
     }
+    if (firstTime) notifyIntegrationState(sessionId);
     return;
   }
-  if (exitCode === undefined) return; // OSC 133 A (new prompt) — nothing to finalize
+  if (exitCode === undefined) {
+    // OSC 133 A (new prompt) — nothing to finalize, but the composer may now
+    // be able to take over (first integration event, or back to idle).
+    applyComposerCursor(s, term);
+    if (firstTime) notifyIntegrationState(sessionId);
+    return;
+  }
   // OSC 133 D: command finished. Only finalize a block that was actually
   // confirmed running (has a startMarker) — an unconfirmed `current` means
   // beginBlock fired but C never arrived, which shouldn't normally happen
@@ -293,7 +327,9 @@ function onShellIntegrationEvent(
     if (s.blockState.blocks.length > MAX_BLOCKS_PER_SESSION) s.blockState.blocks.shift();
   }
   s.blockState.current = null;
+  applyComposerCursor(s, term);
   notifyBlocks(sessionId);
+  if (firstTime) notifyIntegrationState(sessionId);
 }
 
 /** Called by the command composer right before writing to the pty — this is
@@ -321,6 +357,28 @@ export function getBlockState(sessionId: string): BlockState | null {
 
 export function hasShellIntegration(sessionId: string): boolean {
   return sessions.get(sessionId)?.shellIntegrationSeen ?? false;
+}
+
+export function isCommandRunning(sessionId: string): boolean {
+  return sessions.get(sessionId)?.commandRunning ?? false;
+}
+
+/** Subscribe to composer-relevant session state — `commandRunning` toggling
+ *  or shell integration graduating for the first time (see
+ *  `hasShellIntegration`). The command composer (AiInputBar's Command mode)
+ *  uses this to know when it should enable/disable itself for the active
+ *  session, independent of the block-list subscription above. */
+export function subscribeIntegrationState(sessionId: string, cb: () => void): () => void {
+  let set = integrationSubscribers.get(sessionId);
+  if (!set) {
+    set = new Set();
+    integrationSubscribers.set(sessionId, set);
+  }
+  set.add(cb);
+  return () => {
+    set?.delete(cb);
+    if (set && set.size === 0) integrationSubscribers.delete(sessionId);
+  };
 }
 
 /** Subscribe to block-list changes for a session (new/updated/finalized
@@ -377,6 +435,7 @@ export function setCommandRunning(sessionId: string, running: boolean): void {
   const s = sessions.get(sessionId);
   if (!s || s.commandRunning === running) return;
   s.commandRunning = running;
+  notifyIntegrationState(sessionId);
   if (!running) {
     scheduleHiddenRelease(sessionId, s);
     return;
@@ -479,6 +538,7 @@ export function resetForReconnect(sessionId: string): void {
   s.shellIntegrationSeen = false;
   s.blockState = { blocks: [], current: null };
   notifyBlocks(sessionId);
+  notifyIntegrationState(sessionId);
   cancelHiddenRelease(s);
   const slot = getSlotForLeaf(sessionId);
   if (slot) {
@@ -578,6 +638,7 @@ export function disposeSession(sessionId: string): void {
   s.snapshot = null;
   sessions.delete(sessionId);
   blockSubscribers.delete(sessionId);
+  integrationSubscribers.delete(sessionId);
 }
 
 export function terminalDebugStats() {
