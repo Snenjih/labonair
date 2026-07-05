@@ -56,19 +56,39 @@ function dedupeKeepLast(list: string[], cap: number): string[] {
   return rev;
 }
 
-async function readLocalHistory(): Promise<string[]> {
-  let combined = "";
-  // Shell type isn't reliably known frontend-side (terminalShell may be
-  // empty = auto-detect) — reading both and merging is simpler and more
-  // robust than guessing which one is actually in use.
-  for (const path of ["~/.zsh_history", "~/.bash_history"]) {
-    try {
-      const r = await invoke<ReadResult>("fs_read_file", { path });
-      if (r.kind === "text") combined += `${r.content}\n`;
-    } catch {
-      // File doesn't exist or isn't readable — try the next candidate.
-    }
+// macOS's system-wide /etc/zshrc (and several zsh frameworks) set
+// `HISTFILE=${ZDOTDIR:-$HOME}/.zsh_history`. Nexum's own shell-integration
+// overrides $ZDOTDIR for every local/SSH session it spawns (see
+// pty::shell_init / ssh::shell_integration on the Rust side) so its hooks
+// can install without clobbering the user's real rc files — but that means
+// HISTFILE also resolves under Nexum's cache dir for the whole session
+// unless the user's own .zshrc/framework later resets it back to $HOME.
+// Reading only "~/.zsh_history" therefore silently misses everything typed
+// inside Nexum itself on a very common setup (verified: this is macOS's
+// literal default). Read both locations and merge — whichever one the
+// active session's zsh actually wrote to will have the real content, the
+// other just contributes nothing.
+const ZDOTDIR_OVERRIDE_ZSH_HISTORY = "~/.cache/labonair/shell-integration/zsh/.zsh_history";
+
+async function readTextFile(path: string): Promise<string | null> {
+  try {
+    const r = await invoke<ReadResult>("fs_read_file", { path });
+    return r.kind === "text" ? r.content : null;
+  } catch {
+    return null; // doesn't exist / unreadable — not fatal, just skip it
   }
+}
+
+async function readLocalHistory(): Promise<string[]> {
+  // Shell type isn't reliably known frontend-side (terminalShell may be
+  // empty = auto-detect) — reading all candidates and merging is simpler
+  // and more robust than guessing which one is actually in use. The
+  // ZDOTDIR-override path is read last so its entries win ties in
+  // dedupeKeepLast (it's the one Nexum's own sessions actually write to).
+  const contents = await Promise.all(
+    ["~/.zsh_history", "~/.bash_history", ZDOTDIR_OVERRIDE_ZSH_HISTORY].map(readTextFile),
+  );
+  const combined = contents.filter((c): c is string => c !== null).join("\n");
   return dedupeKeepLast(parseHistoryContent(combined), MAX_HISTORY);
 }
 
@@ -78,10 +98,13 @@ async function readSshHistory(sessionId: string): Promise<string[]> {
     // own channel — doesn't touch the visible interactive PTY). `~` expands
     // via the remote shell itself, so this works regardless of remote shell
     // type without needing to know it. Errors from missing files are
-    // suppressed so the command still exits 0 with whatever did exist.
+    // suppressed so the command still exits 0 with whatever did exist. The
+    // remote gets the same ZDOTDIR override for the same reason (see
+    // ssh/shell_integration.rs's build_bootstrap_script) so its history can
+    // land in the same cache-relative spot.
     const r = await invoke<{ stdout: string; stderr: string; exit_code: number }>("ssh_exec_command", {
       sessionId,
-      command: "cat ~/.zsh_history ~/.bash_history 2>/dev/null",
+      command: `cat ~/.zsh_history ~/.bash_history ${ZDOTDIR_OVERRIDE_ZSH_HISTORY} 2>/dev/null`,
     });
     return dedupeKeepLast(parseHistoryContent(r.stdout), MAX_HISTORY);
   } catch {

@@ -86,10 +86,13 @@ export function ShellComposerInput({
     handleRef.current?.setValue("");
   };
 
-  // fontFamily/cursor*/historyPopupEnabled intentionally excluded from
-  // deps — live setting changes don't warrant tearing down and losing
-  // composer focus; the editor picks up current values fresh next time
-  // it's (re)created for a phase/session change.
+  // fontFamily/cursor* intentionally excluded from deps — purely cosmetic,
+  // live changes don't warrant tearing down and losing composer focus; the
+  // editor picks up current values fresh next time it's (re)created for a
+  // phase/session change. historyPopupEnabled IS in deps below (unlike
+  // those) — it changes which keymap branch runs (popup vs inline nav), so
+  // toggling it should take effect immediately rather than waiting for an
+  // unrelated phase/session change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   useEffect(() => {
     const el = containerRef.current;
@@ -142,7 +145,7 @@ export function ShellComposerInput({
       handleRef.current = null;
       setHistoryOpen(false);
     };
-  }, [sessionId, phase, kind]);
+  }, [sessionId, phase, kind, historyPopupEnabled]);
 
   const arrow = (
     <span className="shrink-0 select-none font-mono text-sm leading-none text-foreground group-focus-within:text-primary">
