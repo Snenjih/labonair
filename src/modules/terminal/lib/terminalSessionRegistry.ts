@@ -1,4 +1,5 @@
 import type { SearchAddon } from "@xterm/addon-search";
+import type { IMarker, Terminal } from "@xterm/xterm";
 import { containsSchemeSeparator, LOCAL_URL_RE, stripTrailingPunct } from "./detectLocalUrl";
 import { DormantRing } from "./dormantRing";
 import {
@@ -47,6 +48,31 @@ export type RegisterOptions = {
   checkForegroundJob?: () => Promise<boolean>;
 };
 
+/** One command submitted through the block-terminal composer. `command`/`cwd`
+ *  come from the composer at submit time (see `beginBlock`) — never
+ *  re-parsed from shell echo, since Blocks only exist alongside the composer.
+ *  `startMarker` anchors the block to a buffer row for the *current* live
+ *  binding only; it does not survive a renderer-pool cold rebind (see
+ *  rendererPool.ts's bindSlot — snapshot/ring replay runs before `registerOsc`
+ *  re-attaches), so a finished block from before an eviction just renders as
+ *  plain scrollback text — an accepted v1 limitation. */
+export type BlockRecord = {
+  id: string;
+  command: string;
+  cwd: string | null;
+  startedAt: number;
+  finishedAt: number | null;
+  exitCode: number | null;
+  startMarker: IMarker | null;
+};
+
+export type BlockState = {
+  blocks: BlockRecord[];
+  current: BlockRecord | null;
+};
+
+const MAX_BLOCKS_PER_SESSION = 500;
+
 type SessionRecord = {
   bridge: SessionBridge;
   callbacks: SessionCallbacks;
@@ -65,11 +91,23 @@ type SessionRecord = {
   hiddenReleaseTimer: ReturnType<typeof setTimeout> | null;
   hasSlot: boolean;
   shellState: ShellIntegrationState;
+  /** True once this session has observed at least one OSC 133 event of any
+   *  kind — proof that shell integration is actually live for it (local
+   *  zsh/bash always graduate almost instantly; SSH sessions to an
+   *  unrecognized remote shell — see ssh/shell_integration.rs — never do,
+   *  and simply never get block/composer takeover). */
+  shellIntegrationSeen: boolean;
+  blockState: BlockState;
   urlDecoder: TextDecoder;
   lastDetectedUrl: string | null;
 };
 
 const sessions = new Map<string, SessionRecord>();
+const blockSubscribers = new Map<string, Set<() => void>>();
+
+function notifyBlocks(sessionId: string): void {
+  for (const cb of blockSubscribers.get(sessionId) ?? []) cb();
+}
 
 const HIDDEN_RELEASE_DELAY_MS = 300;
 
@@ -130,9 +168,10 @@ function bindLeafToSlot(sessionId: string, s: SessionRecord): void {
     cols: s.cols,
     rows: s.rows,
     registerOsc: (term) => {
-      const prompt = registerPromptTracker(term, s.shellState, (running) =>
-        setCommandRunning(sessionId, running),
-      );
+      const prompt = registerPromptTracker(term, s.shellState, (running, exitCode) => {
+        setCommandRunning(sessionId, running);
+        onShellIntegrationEvent(sessionId, s, term, running, exitCode);
+      });
       const cwd = registerCwdHandler(term, (next) => s.callbacks.onCwd?.(next), s.shellState);
       const query = registerTerminalQueryHandlers(term, (d) => s.bridge.writeToPty(d));
       return [prompt.dispose, cwd, query];
@@ -208,9 +247,97 @@ export function registerSession(opts: RegisterOptions): void {
     hiddenReleaseTimer: null,
     hasSlot: false,
     shellState: createShellIntegrationState(),
+    shellIntegrationSeen: false,
+    blockState: { blocks: [], current: null },
     urlDecoder: new TextDecoder("utf-8", { fatal: false }),
     lastDetectedUrl: null,
   });
+}
+
+/** Wired into every `registerOsc` call as part of the same `onCommandState`
+ *  callback `registerPromptTracker` already dispatches through — deliberately
+ *  NOT a second `registerOscHandler(133, ...)` registration. xterm dispatches
+ *  OSC handlers last-registered-first and stops at the first one returning
+ *  `true`; a second unconditional-`true` 133 handler would race with (and
+ *  could shadow) the existing prompt/cwd tracking that other features
+ *  already depend on (renderer-pool eviction gating, sudo-popup detection). */
+function onShellIntegrationEvent(
+  sessionId: string,
+  s: SessionRecord,
+  term: Terminal,
+  running: boolean,
+  exitCode?: number,
+): void {
+  s.shellIntegrationSeen = true;
+  if (running) {
+    // OSC 133 C: the shell actually started executing. Confirm the
+    // optimistic block `beginBlock` opened (composer submit) and anchor it
+    // to a live buffer row.
+    const cur = s.blockState.current;
+    if (cur && !cur.startMarker) {
+      cur.startMarker = term.registerMarker(0);
+      notifyBlocks(sessionId);
+    }
+    return;
+  }
+  if (exitCode === undefined) return; // OSC 133 A (new prompt) — nothing to finalize
+  // OSC 133 D: command finished. Only finalize a block that was actually
+  // confirmed running (has a startMarker) — an unconfirmed `current` means
+  // beginBlock fired but C never arrived, which shouldn't normally happen
+  // and would just be noise if pushed.
+  const cur = s.blockState.current;
+  if (cur?.startMarker) {
+    cur.finishedAt = Date.now();
+    cur.exitCode = exitCode;
+    s.blockState.blocks.push(cur);
+    if (s.blockState.blocks.length > MAX_BLOCKS_PER_SESSION) s.blockState.blocks.shift();
+  }
+  s.blockState.current = null;
+  notifyBlocks(sessionId);
+}
+
+/** Called by the command composer right before writing to the pty — this is
+ *  how block metadata gets the literal command text without re-parsing shell
+ *  echo (see BlockRecord doc comment). No-op if Blocks isn't in use for this
+ *  session; the record just sits unconfirmed until GC'd by disposeSession. */
+export function beginBlock(sessionId: string, command: string, cwd: string | null): void {
+  const s = sessions.get(sessionId);
+  if (!s) return;
+  s.blockState.current = {
+    id: crypto.randomUUID(),
+    command,
+    cwd,
+    startedAt: Date.now(),
+    finishedAt: null,
+    exitCode: null,
+    startMarker: null,
+  };
+  notifyBlocks(sessionId);
+}
+
+export function getBlockState(sessionId: string): BlockState | null {
+  return sessions.get(sessionId)?.blockState ?? null;
+}
+
+export function hasShellIntegration(sessionId: string): boolean {
+  return sessions.get(sessionId)?.shellIntegrationSeen ?? false;
+}
+
+/** Subscribe to block-list changes for a session (new/updated/finalized
+ *  blocks). Returns an unsubscribe function. Used by BlockOverlay, which
+ *  mounts/unmounts per pane and needs a reactive subscription rather than the
+ *  fixed callbacks registered once in `registerSession`. */
+export function subscribeBlocks(sessionId: string, cb: () => void): () => void {
+  let set = blockSubscribers.get(sessionId);
+  if (!set) {
+    set = new Set();
+    blockSubscribers.set(sessionId, set);
+  }
+  set.add(cb);
+  return () => {
+    set?.delete(cb);
+    if (set && set.size === 0) blockSubscribers.delete(sessionId);
+  };
 }
 
 export function setContainer(sessionId: string, el: HTMLDivElement | null): void {
@@ -349,6 +476,9 @@ export function resetForReconnect(sessionId: string): void {
   s.altScreenAtRelease = false;
   s.commandRunning = false;
   s.shellExited = false;
+  s.shellIntegrationSeen = false;
+  s.blockState = { blocks: [], current: null };
+  notifyBlocks(sessionId);
   cancelHiddenRelease(s);
   const slot = getSlotForLeaf(sessionId);
   if (slot) {
@@ -447,6 +577,7 @@ export function disposeSession(sessionId: string): void {
   s.hasSlot = false;
   s.snapshot = null;
   sessions.delete(sessionId);
+  blockSubscribers.delete(sessionId);
 }
 
 export function terminalDebugStats() {

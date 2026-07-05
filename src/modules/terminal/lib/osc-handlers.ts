@@ -40,11 +40,18 @@ export type PromptTracker = {
  * identically over either transport since it's parsed purely from the shell's
  * own OSC stream. OSC 133 B (end of prompt / command line begins) is parsed
  * but has no callback — the pool cares about *executing*, not *typing*.
+ *
+ * The `D` branch also carries the command's exit code as `D;<code>` (see
+ * `_labonair_precmd` in the shell-integration scripts) — passed through as
+ * the second argument so block-terminal bookkeeping (terminalSessionRegistry)
+ * can finalize a block without a second competing OSC 133 handler. `A`/`C`
+ * never carry a code, so `exitCode === undefined` doubles as "this wasn't a
+ * finished-command event" for callers that only care about `D`.
  */
 export function registerPromptTracker(
   term: Terminal,
   state?: ShellIntegrationState,
-  onCommandState?: (running: boolean) => void,
+  onCommandState?: (running: boolean, exitCode?: number) => void,
 ): PromptTracker {
   let marker: IMarker | null = null;
   const d = term.parser.registerOscHandler(133, (data) => {
@@ -58,7 +65,15 @@ export function registerPromptTracker(
       onCommandState?.(true);
     } else if (data.startsWith("D")) {
       if (state) state.inCommand = false;
-      onCommandState?.(false);
+      const code = Number.parseInt(data.split(";")[1] ?? "", 10);
+      // Only pass a second argument when we actually parsed one — callers
+      // (and tests) that assert `toHaveBeenCalledWith(false)` for a bare
+      // "D" must see exactly one argument, not `(false, undefined)`.
+      if (Number.isFinite(code)) {
+        onCommandState?.(false, code);
+      } else {
+        onCommandState?.(false);
+      }
     }
     return true;
   });
