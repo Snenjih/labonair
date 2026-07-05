@@ -115,6 +115,12 @@ async function readSshHistory(sessionId: string): Promise<string[]> {
 export async function loadHistory(sessionId: string, source: HistorySource): Promise<void> {
   const list = source.kind === "local" ? await readLocalHistory() : await readSshHistory(source.sessionId);
   sessionCache.set(sessionId, list);
+  if (list.length === 0) {
+    console.warn(
+      `[labonair] command history: 0 entries found for session ${sessionId} (${source.kind}). ` +
+        "Checked ~/.zsh_history, ~/.bash_history, and the ZDOTDIR-override path — none had readable content.",
+    );
+  }
 }
 
 /** Oldest-first, for Up/Down history navigation and the history popup
@@ -137,4 +143,12 @@ export function suggestFor(sessionId: string, prefix: string): string | null {
 
 export function disposeHistory(sessionId: string): void {
   sessionCache.delete(sessionId);
+}
+
+// Dev-only inspection hook — call __labonairHistory() in the WebView
+// devtools console to see exactly what's cached per session (mirrors the
+// __labonairTerm debug hook in terminalSessionRegistry.ts).
+if (import.meta.env?.DEV && typeof window !== "undefined") {
+  (window as unknown as { __labonairHistory?: unknown }).__labonairHistory = () =>
+    Object.fromEntries(sessionCache.entries());
 }
