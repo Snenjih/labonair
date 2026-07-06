@@ -273,6 +273,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "Switch",
   },
   {
+    id: "terminalComposerArgumentCompletion",
+    label: "Argument completion",
+    description:
+      "When ghost-text is ambiguous, show a per-argument suggestion list below the cursor. Tab fills and cycles through candidates; arrow keys scroll the list.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
     id: "terminalBlocksEnabled",
     label: "Block terminal",
     description:
