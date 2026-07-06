@@ -18,6 +18,11 @@ import { tokenize } from "./commandTokenizer";
 
 const setGhost = StateEffect.define<string | null>();
 
+// Tags doc edits made by applyArgCandidate (Tab/Arrow-driven argument
+// completion) so updateListener can recognize and skip them — see the
+// comment at the dispatch call in applyArgCandidate for why.
+const ARG_COMPLETE_USER_EVENT = "input.complete.argument";
+
 class GhostWidget extends WidgetType {
   constructor(readonly text: string) {
     super();
@@ -244,7 +249,14 @@ export function createShellComposerEditor(
   // owns rendering) but, unlike history, needs its own local state here too:
   // Tab/Arrow both read *and* advance `selected` synchronously within the
   // same keypress, without waiting for the next debounced lookup.
-  let argState: { candidates: string[]; selected: number; tokenFrom: number } | null = null;
+  // `applied` distinguishes "candidates[selected] is only being ghost-
+  // previewed so far" (fresh from the debounced lookup — the very first Tab
+  // press should commit *that* one) from "candidates[selected] is already
+  // the real, committed text" (a previous Tab/Arrow press did it — the next
+  // Tab should advance past it). Without this, the first Tab press would
+  // skip straight to the second candidate instead of confirming the one
+  // already being previewed.
+  let argState: { candidates: string[]; selected: number; tokenFrom: number; applied: boolean } | null = null;
 
   function closeArgState(): void {
     if (!argState) return;
@@ -266,8 +278,14 @@ export function createShellComposerEditor(
       changes: { from: tokenFrom, to: view.state.doc.length, insert: candidate },
       selection: { anchor: tokenFrom + candidate.length },
       effects: setGhost.of(null),
+      // Tagged so updateListener can tell this apart from genuine typing and
+      // skip re-scheduling the debounced lookup — that lookup would
+      // otherwise fire ~80ms later, re-tokenize the now-committed candidate,
+      // and reset `selected`/`applied` back to a fresh state before the next
+      // Tab press lands, making cycling past the first candidate impossible.
+      userEvent: ARG_COMPLETE_USER_EVENT,
     });
-    argState = { candidates, selected, tokenFrom };
+    argState = { candidates, selected, tokenFrom, applied: true };
     callbacks.argCompletion?.setCandidates(candidates, selected, tokenFrom);
   }
 
@@ -283,7 +301,7 @@ export function createShellComposerEditor(
     if (callbacks.argCompletion) {
       const found = computeArgumentCandidates(sessionId, text, cursorPos);
       if (found) {
-        argState = { candidates: found.candidates, selected: 0, tokenFrom: found.tokenFrom };
+        argState = { candidates: found.candidates, selected: 0, tokenFrom: found.tokenFrom, applied: false };
         callbacks.argCompletion.setCandidates(found.candidates, 0, found.tokenFrom);
         const remainder = found.candidates[0].slice(cursorPos - found.tokenFrom);
         view.dispatch({ effects: setGhost.of(remainder || null) });
@@ -329,7 +347,14 @@ export function createShellComposerEditor(
         key: "Tab",
         run: (view) => {
           if (argState) {
-            const nextSelected = (argState.selected + 1) % argState.candidates.length;
+            // First press for this popover confirms the candidate already
+            // being ghost-previewed (index `selected`, untouched); only once
+            // that's actually committed does a further press advance to the
+            // next one — otherwise the very first Tab would skip straight
+            // past the previewed candidate.
+            const nextSelected = argState.applied
+              ? (argState.selected + 1) % argState.candidates.length
+              : argState.selected;
             applyArgCandidate(view, nextSelected);
             return true;
           }
@@ -401,6 +426,12 @@ export function createShellComposerEditor(
       return;
     }
     if (!update.docChanged) return;
+    // A Tab/Arrow-driven argument completion already updated argState and
+    // notified the popover synchronously (see applyArgCandidate) — letting
+    // the debounce below re-run for it would re-tokenize the now-committed
+    // candidate and reset `selected`/`applied` before the next keypress,
+    // making it impossible to cycle past the first candidate.
+    if (update.transactions.some((tr) => tr.isUserEvent(ARG_COMPLETE_USER_EVENT))) return;
     // Genuine typing while the history popup is open means the user wants
     // to type, not browse — close it and let the keystroke through normally
     // (the popup never edits the doc itself, so any doc change here is real
