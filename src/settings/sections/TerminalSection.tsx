@@ -282,6 +282,10 @@ export function TerminalSection() {
               <SettingRow
                 title="Auto-collapse for full-screen apps"
                 description="Suppress block chrome while a full-screen terminal app (vim, htop, less, …) is running."
+                hint={{
+                  text: "Recommended to keep this on. Turning it off is for advanced use only — block chrome stays positioned for the normal buffer and will overlay on top of full-screen apps like vim or htop.",
+                  variant: "warning",
+                }}
               >
                 <Switch
                   checked={terminalBlocksAutoCollapseOnAltScreen}
