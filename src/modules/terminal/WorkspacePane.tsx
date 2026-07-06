@@ -15,7 +15,7 @@ import { FindWidget } from "@/modules/search";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { PaneNode, TerminalSessionData, WorkspaceTab } from "@/modules/tabs";
 import { BlockOverlay } from "./block";
-import { focusComposer, shouldBlockTerminalClick } from "./lib/terminalSessionRegistry";
+import { focusComposer, getBlockEngine, shouldBlockTerminalClick } from "./lib/terminalSessionRegistry";
 import { SshTerminalPane } from "./SshTerminalPane";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 
@@ -206,10 +206,21 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                 // sees it). The moment a command is actually running — vim,
                 // htop, a sudo prompt, any interactive program — this no-ops
                 // and the terminal behaves exactly as it always has.
+                //
+                // Native click-drag text selection is lost in this state (it's
+                // implemented by xterm's own mousedown handling, which capture-
+                // phase stopPropagation blocks along with the focus-steal) —
+                // selectBlockAt replaces it with click-to-select-whole-block,
+                // using xterm's own selection APIs so it still highlights/
+                // copies like a normal selection would.
                 if (shouldBlockTerminalClick(paneId)) {
                   e.stopPropagation();
                   e.preventDefault();
                   focusComposer(paneId);
+                  const screen = e.currentTarget.querySelector<HTMLElement>(".xterm-screen");
+                  if (screen) {
+                    getBlockEngine(paneId)?.selectBlockAt(e.clientY, screen.getBoundingClientRect());
+                  }
                 }
               }}
             >

@@ -221,6 +221,13 @@ function unbindLeafFromSlot(sessionId: string, s: SessionRecord): void {
     if (out.rows > 0) s.rows = out.rows;
   }
   s.hasSlot = false;
+  // The Terminal instance is about to be handed to a different session (or
+  // reset) by the renderer pool — this session's block engine listeners
+  // (onWriteParsed/onScroll/onRender) must not keep reacting to that other
+  // session's output, and its markers/decorations shouldn't linger forever
+  // while this session sits backgrounded.
+  s.blockEngine?.dispose();
+  s.blockEngine = null;
 }
 
 configureRendererPool({

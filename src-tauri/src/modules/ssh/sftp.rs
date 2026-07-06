@@ -552,12 +552,13 @@ pub async fn sftp_read_file_content(
         if buf[..sniff_len].contains(&0) {
             return Ok(ReadResult::Binary { size });
         }
-        // Lossy rather than strict UTF-8 — mirrors fs_read_file's reasoning:
-        // the null-byte sniff above already catches real binaries, so a file
-        // that passes it but still isn't strictly valid UTF-8 is more useful
-        // shown with U+FFFD replacements than rejected outright.
-        let content = String::from_utf8_lossy(&buf).into_owned();
-        Ok(ReadResult::Text { content, size })
+        // Strict UTF-8, matching fs_read_file: a lossy decode would silently
+        // substitute U+FFFD for invalid byte sequences before this content
+        // is attached/shown, misrepresenting the file's real bytes.
+        match String::from_utf8(buf) {
+            Ok(content) => Ok(ReadResult::Text { content, size }),
+            Err(_) => Ok(ReadResult::Binary { size }),
+        }
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?

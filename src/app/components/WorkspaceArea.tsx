@@ -174,7 +174,7 @@ export const WorkspaceArea = React.memo(function WorkspaceArea({
           aria-hidden={!(panelOpen || showComposerBar)}
         >
           {(aiEnabled && panelOpen && hasComposer) || showComposerBar ? (
-            <AiInputBar />
+            <AiInputBar aiEnabled={aiEnabled} hasComposer={hasComposer} />
           ) : aiEnabled && panelOpen ? (
             <AiInputBarConnect onAdd={() => void openSettingsWindow("ai")} />
           ) : null}

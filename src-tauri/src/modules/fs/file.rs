@@ -80,17 +80,15 @@ pub async fn fs_read_file(path: String) -> Result<ReadResult, String> {
             return Ok(ReadResult::Binary { size });
         }
 
-        // Lossy rather than strict UTF-8: a handful of files that are
-        // otherwise clearly text (shell history with meta-quoted special
-        // characters is a real example — zsh's history format doesn't
-        // guarantee valid UTF-8 byte-for-byte) would previously be flatly
-        // rejected as "binary" over a few bad sequences. The null-byte sniff
-        // above already catches actual binaries; anything that passes it and
-        // still fails strict UTF-8 is far more likely mostly-text-with-some-
-        // garbage than a true binary, so lossily replacing invalid sequences
-        // (U+FFFD) is strictly more useful than refusing to show it at all.
-        let content = String::from_utf8_lossy(&bytes).into_owned();
-        Ok(ReadResult::Text { content, size })
+        // Strict UTF-8: fs_write_file writes the returned content back to disk
+        // verbatim, so a lossy decode here would silently replace invalid byte
+        // sequences with U+FFFD on save, permanently corrupting any file that
+        // isn't valid UTF-8. Files that fail this check are reported as
+        // Binary — refusing to open them as text is safer than corrupting them.
+        match String::from_utf8(bytes) {
+            Ok(content) => Ok(ReadResult::Text { content, size }),
+            Err(_) => Ok(ReadResult::Binary { size }),
+        }
     })
     .await
     .map_err(|e| e.to_string())?

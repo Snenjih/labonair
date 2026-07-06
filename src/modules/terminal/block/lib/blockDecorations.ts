@@ -2,9 +2,17 @@ import type { IDecoration, IMarker, Terminal } from "@xterm/xterm";
 import { blockIndexAt, computeRange, type LineRange } from "./blockRange";
 import { readRangeText } from "./readBlock";
 
-const OK_RULER = "#5fb3b3";
-const FAIL_RULER = "#e5706b";
 const MAX_BLOCKS = 500;
+
+/** Reads a theme CSS variable at call time (not cached — cheap, and this is
+ *  only called once per finished block, not a per-render/per-chunk path)
+ *  rather than hardcoding a hex value, so the overview-ruler mark stays in
+ *  sync with the active theme instead of drifting from it. */
+function themeColor(varName: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  return v || fallback;
+}
 
 type Entry = {
   id: string;
@@ -401,7 +409,9 @@ export class BlockDecorations {
       this.term.registerDecoration({
         marker: endMarker,
         width: 1,
-        overviewRulerOptions: { color: ok ? OK_RULER : FAIL_RULER },
+        overviewRulerOptions: {
+          color: ok ? themeColor("--success", "#5fb3b3") : themeColor("--error", "#e5706b"),
+        },
       }) ?? null;
     this.entries.push({
       id: lb.id,

@@ -34,6 +34,7 @@ import { ShellComposerInput } from "@/modules/terminal/block";
 import { type FileAttachment, useComposer } from "../lib/composer";
 import type { Directive } from "../lib/directives";
 import { SLASH_COMMANDS } from "../lib/slashCommands";
+import { useChatStore } from "../store/chatStore";
 import { useDirectivesStore } from "../store/directivesStore";
 import { AgentSwitcher } from "./AgentSwitcher";
 import { DirectivePickerContent, type PickerItem } from "./DirectivePicker";
@@ -78,7 +79,16 @@ function detectFileTrigger(value: string, caret: number): FileTrigger | null {
   return null;
 }
 
-export function AiInputBar() {
+export type AiInputBarModeProps = {
+  /** Whether a usable AI provider is actually configured — the AI mode
+   *  toggle is disabled without one so users can't reach a chat box that
+   *  silently fails to send (see WorkspaceArea, which mounts this bar for
+   *  the Shell composer alone, without either of these being true). */
+  aiEnabled: boolean;
+  hasComposer: boolean;
+};
+
+export function AiInputBar({ aiEnabled, hasComposer }: AiInputBarModeProps) {
   const c = useComposer();
   const directives = useDirectivesStore((s) => s.directives);
   const explorerRoot = useLocalExplorerStore((s) => s.rootPath);
@@ -96,6 +106,7 @@ export function AiInputBar() {
   const activeWorkspaceTab = activeTab?.kind === "workspace" ? (activeTab as WorkspaceTab) : null;
   const activeSession = activeWorkspaceTab && activePaneId ? activeWorkspaceTab.sessions[activePaneId] : null;
   const canUseCommandMode = terminalComposerEnabled && !!activeSession;
+  const canUseAiMode = aiEnabled && hasComposer;
 
   const modeBySessionRef = useRef(new Map<string, "ai" | "command">());
   const [mode, setModeState] = useState<"ai" | "command">("ai");
@@ -105,26 +116,44 @@ export function AiInputBar() {
       setModeState("ai");
       return;
     }
-    setModeState(modeBySessionRef.current.get(activePaneId) ?? "command");
-  }, [activePaneId, canUseCommandMode]);
+    setModeState(modeBySessionRef.current.get(activePaneId) ?? (canUseAiMode ? "ai" : "command"));
+  }, [activePaneId, canUseCommandMode, canUseAiMode]);
 
   const setMode = (m: "ai" | "command") => {
     setModeState(m);
     if (activePaneId) modeBySessionRef.current.set(activePaneId, m);
   };
 
+  // Attaching a file/selection (explorer "Attach to Agent", breadcrumb
+  // "Reference in AI chat", terminal "Ask AI about selection") always bumps
+  // focusSignal to bring the AI chat into view — but if this session is
+  // sitting in Command mode, the AI textarea isn't mounted, so focusing it
+  // silently no-ops and the attachment looks like it went nowhere. Switch
+  // back to AI mode whenever that happens.
+  const focusSignal = useChatStore((s) => s.focusSignal);
+  const prevFocusSignalRef = useRef(focusSignal);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only react to focusSignal changing, mode/canUseAiMode are read fresh via closure
+  useEffect(() => {
+    if (focusSignal !== prevFocusSignalRef.current) {
+      prevFocusSignalRef.current = focusSignal;
+      if (mode === "command" && canUseAiMode) setMode("ai");
+    }
+  }, [focusSignal]);
+
   const modeSwitch = canUseCommandMode ? (
     <div className="flex shrink-0 items-center gap-0.5 rounded-md bg-muted/50 p-0.5">
       <button
         type="button"
-        onClick={() => setMode("ai")}
-        title="AI chat"
+        onClick={() => canUseAiMode && setMode("ai")}
+        disabled={!canUseAiMode}
+        title={canUseAiMode ? "AI chat" : "Connect an AI provider to use chat"}
         aria-label="AI chat"
         className={cn(
           "flex h-6 items-center gap-1 rounded px-2 text-[11px] font-medium transition-colors",
           mode === "ai"
             ? "bg-background shadow-sm text-foreground"
             : "text-muted-foreground hover:text-foreground",
+          !canUseAiMode && "opacity-50 cursor-not-allowed hover:text-muted-foreground",
         )}
       >
         <HugeiconsIcon icon={SparklesIcon} size={12} strokeWidth={1.75} />

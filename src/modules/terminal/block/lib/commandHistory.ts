@@ -24,6 +24,13 @@ const MAX_HISTORY = 1000;
 // "record" step.
 const sessionCache = new Map<string, string[]>();
 
+// Bumped on every loadHistory() call for a session; a call only writes its
+// result to sessionCache if it's still the most recent one issued for that
+// session. Guards against overlapping calls (e.g. two commands finishing in
+// quick succession) resolving out of order and letting a slower, older
+// fetch clobber a newer one's result.
+const latestRequest = new Map<string, number>();
+
 // zsh's EXTENDED_HISTORY option (on by default in most modern setups, e.g.
 // Oh My Zsh) prefixes each line with `: <timestamp>:<duration>;`; bash with
 // HISTTIMEFORMAT set writes a bare `#<timestamp>` comment line before each
@@ -124,7 +131,10 @@ async function readSshHistory(sessionId: string): Promise<string[]> {
 }
 
 export async function loadHistory(sessionId: string, source: HistorySource): Promise<void> {
+  const seq = (latestRequest.get(sessionId) ?? 0) + 1;
+  latestRequest.set(sessionId, seq);
   const list = source.kind === "local" ? await readLocalHistory() : await readSshHistory(source.sessionId);
+  if (latestRequest.get(sessionId) !== seq) return; // superseded by a newer call
   sessionCache.set(sessionId, list);
   if (list.length === 0) {
     console.warn(
@@ -154,6 +164,7 @@ export function suggestFor(sessionId: string, prefix: string): string | null {
 
 export function disposeHistory(sessionId: string): void {
   sessionCache.delete(sessionId);
+  latestRequest.delete(sessionId);
 }
 
 // Dev-only inspection hook — call __labonairHistory() in the WebView
