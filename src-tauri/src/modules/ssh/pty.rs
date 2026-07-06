@@ -98,6 +98,7 @@ pub fn open_shell_channel(
     rows: u32,
     keep_alive_interval: Option<u32>,
     keep_alive_tries: Option<u32>,
+    blocks: bool,
     on_event: Channel<SshPtyEvent>,
 ) -> Result<(ssh2::Channel, Arc<AtomicBool>), String> {
     let sess = session_arc.lock().map_err(|e| e.to_string())?;
@@ -112,7 +113,7 @@ pub fn open_shell_channel(
     // requested (e.g. a server that only permits a fixed "shell" request) —
     // matches the local `Shell::Other` behavior of degrading gracefully
     // rather than failing the connection.
-    let bootstrap = super::shell_integration::build_bootstrap_script();
+    let bootstrap = super::shell_integration::build_bootstrap_script(blocks);
     let cmd = format!("/bin/sh -c {}", super::shell::shell_quote(&bootstrap));
     if channel.exec(&cmd).is_err() {
         channel.shell().map_err(|e| e.to_string())?;

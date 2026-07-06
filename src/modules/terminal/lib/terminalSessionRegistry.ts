@@ -1,4 +1,7 @@
 import type { SearchAddon } from "@xterm/addon-search";
+import type { Terminal } from "@xterm/xterm";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { BlockDecorations } from "../block/lib/blockDecorations";
 import { containsSchemeSeparator, LOCAL_URL_RE, stripTrailingPunct } from "./detectLocalUrl";
 import { DormantRing } from "./dormantRing";
 import {
@@ -13,15 +16,15 @@ import {
   configureRendererPool,
   discardRetainedSlot,
   disposeLeafSlot,
-  focusSlot as poolFocusSlot,
   getLiveSlotForLeaf,
   getSlotForLeaf,
   isLeafAltScreen,
+  type LeafBridge,
   parkLeafSlot,
   playBell,
+  focusSlot as poolFocusSlot,
   refreshLeafSlot,
   releaseSlot,
-  type LeafBridge,
 } from "./rendererPool";
 
 /** What a session supplies to write/resize/kick its underlying connection.
@@ -45,6 +48,13 @@ export type RegisterOptions = {
   /** Local-only: invokes `pty_has_foreground_job`. Omitted for SSH — SSH busy
    *  detection is OSC-133-only (no local shell PID to check via tcgetpgrp). */
   checkForegroundJob?: () => Promise<boolean>;
+  /** Whether `LABONAIR_BLOCKS=1` was baked into this session's shell at spawn
+   *  time (see pty-bridge.ts's `openPty`/ssh_connect's `blocks` arg). Fixed
+   *  for the session's lifetime — there is no live channel into an
+   *  already-running shell, so block chrome must key off what THIS session
+   *  was actually spawned with, not the current (possibly since-toggled)
+   *  `terminalBlocksEnabled` preference. See `isBlocksBakedIn`. */
+  blocksBakedIn?: boolean;
 };
 
 type SessionRecord = {
@@ -65,11 +75,54 @@ type SessionRecord = {
   hiddenReleaseTimer: ReturnType<typeof setTimeout> | null;
   hasSlot: boolean;
   shellState: ShellIntegrationState;
+  /** True once this session has observed at least one OSC 133 event of any
+   *  kind — proof that shell integration is actually live for it (local
+   *  zsh/bash always graduate almost instantly; SSH sessions to an
+   *  unrecognized remote shell — see ssh/shell_integration.rs — never do,
+   *  and simply never get block/composer takeover). */
+  shellIntegrationSeen: boolean;
+  /** Only constructed when `blocksBakedIn` — see registerOsc/registerSession.
+   *  Recreated (never mutated-and-reused) on every `registerOsc` re-run,
+   *  since a cold rebind can hand this session a different (or freshly
+   *  reset) `Terminal` object whose old markers would be meaningless. */
+  blockEngine: BlockDecorations | null;
+  blocksBakedIn: boolean;
   urlDecoder: TextDecoder;
   lastDetectedUrl: string | null;
 };
 
 const sessions = new Map<string, SessionRecord>();
+const blockSubscribers = new Map<string, Set<() => void>>();
+const integrationSubscribers = new Map<string, Set<() => void>>();
+/** One imperative focus() per session, registered by `ShellComposerInput`
+ *  while it's mounted (phase "ready"). Lets `WorkspacePane`'s click
+ *  interceptor (see `shouldBlockTerminalClick`) redirect focus to the
+ *  composer instead of letting a click fall through to xterm's own
+ *  focus-on-mousedown — a plain function ref rather than a React context
+ *  since the click handler lives in a different component tree branch. */
+const composerFocusHandlers = new Map<string, () => void>();
+
+function notifyBlocks(sessionId: string): void {
+  for (const cb of blockSubscribers.get(sessionId) ?? []) cb();
+}
+
+function notifyIntegrationState(sessionId: string): void {
+  for (const cb of integrationSubscribers.get(sessionId) ?? []) cb();
+}
+
+/** Keeps the terminal cursor hidden while the composer owns input for this
+ *  session (idle prompt, composer setting on, shell integration confirmed)
+ *  and normal otherwise — see the focus/cursor routing design in
+ *  block-terminals plan §4. Called both at bind time (`registerOsc`, so a
+ *  cold-rebound slot — possibly previously showing a *different* session's
+ *  "none" cursor — starts from the right state) and on every subsequent OSC
+ *  133 event while already bound, so it never needs its own React
+ *  subscription or risks going stale across renderer-pool slot reuse. */
+function applyComposerCursor(s: SessionRecord, term: Terminal): void {
+  const composerEnabled = usePreferencesStore.getState().terminalComposerEnabled;
+  const active = composerEnabled && s.shellIntegrationSeen && !s.commandRunning;
+  term.options.cursorInactiveStyle = active ? "none" : "outline";
+}
 
 const HIDDEN_RELEASE_DELAY_MS = 300;
 
@@ -130,10 +183,27 @@ function bindLeafToSlot(sessionId: string, s: SessionRecord): void {
     cols: s.cols,
     rows: s.rows,
     registerOsc: (term) => {
-      const prompt = registerPromptTracker(term, s.shellState, (running) =>
-        setCommandRunning(sessionId, running),
+      applyComposerCursor(s, term);
+      // A cold bind either hands this session its first Terminal or reuses a
+      // pool slot's Terminal that just had `.clear()`/`.reset()` run on it
+      // (see rendererPool.ts's bindSlot) — either way, any prior engine's
+      // markers are meaningless now, so it's always replaced, never reused.
+      s.blockEngine?.dispose();
+      s.blockEngine = s.blocksBakedIn
+        ? new BlockDecorations(term, { onViewport: () => notifyBlocks(sessionId) })
+        : null;
+      const prompt = registerPromptTracker(term, s.shellState, (running, exitCode, commandText) => {
+        setCommandRunning(sessionId, running);
+        onShellIntegrationEvent(sessionId, s, term, running, exitCode, commandText);
+      });
+      const cwd = registerCwdHandler(
+        term,
+        (next) => {
+          s.callbacks.onCwd?.(next);
+          s.blockEngine?.setCwd(next);
+        },
+        s.shellState,
       );
-      const cwd = registerCwdHandler(term, (next) => s.callbacks.onCwd?.(next), s.shellState);
       const query = registerTerminalQueryHandlers(term, (d) => s.bridge.writeToPty(d));
       return [prompt.dispose, cwd, query];
     },
@@ -151,6 +221,13 @@ function unbindLeafFromSlot(sessionId: string, s: SessionRecord): void {
     if (out.rows > 0) s.rows = out.rows;
   }
   s.hasSlot = false;
+  // The Terminal instance is about to be handed to a different session (or
+  // reset) by the renderer pool — this session's block engine listeners
+  // (onWriteParsed/onScroll/onRender) must not keep reacting to that other
+  // session's output, and its markers/decorations shouldn't linger forever
+  // while this session sits backgrounded.
+  s.blockEngine?.dispose();
+  s.blockEngine = null;
 }
 
 configureRendererPool({
@@ -208,9 +285,139 @@ export function registerSession(opts: RegisterOptions): void {
     hiddenReleaseTimer: null,
     hasSlot: false,
     shellState: createShellIntegrationState(),
+    shellIntegrationSeen: false,
+    blockEngine: null,
+    blocksBakedIn: opts.blocksBakedIn ?? false,
     urlDecoder: new TextDecoder("utf-8", { fatal: false }),
     lastDetectedUrl: null,
   });
+}
+
+/** Whether this session's shell was actually spawned with block-mode PS1
+ *  reservation active — see `RegisterOptions.blocksBakedIn`. `BlockOverlay`
+ *  gates on this instead of the live `terminalBlocksEnabled` preference so a
+ *  mid-session setting flip can't desync the shell (which can't un-bake its
+ *  env var) from the overlay (which would otherwise just unmount). */
+export function isBlocksBakedIn(sessionId: string): boolean {
+  return sessions.get(sessionId)?.blocksBakedIn ?? false;
+}
+
+/** Wired into every `registerOsc` call as part of the same `onCommandState`
+ *  callback `registerPromptTracker` already dispatches through — deliberately
+ *  NOT a second `registerOscHandler(133, ...)` registration. xterm dispatches
+ *  OSC handlers last-registered-first and stops at the first one returning
+ *  `true`; a second unconditional-`true` 133 handler would race with (and
+ *  could shadow) the existing prompt/cwd tracking that other features
+ *  already depend on (renderer-pool eviction gating, sudo-popup detection). */
+function onShellIntegrationEvent(
+  sessionId: string,
+  s: SessionRecord,
+  term: Terminal,
+  running: boolean,
+  exitCode?: number,
+  commandText?: string,
+): void {
+  const firstTime = !s.shellIntegrationSeen;
+  s.shellIntegrationSeen = true;
+  s.blockEngine?.handleCommandState(running, exitCode, commandText);
+  if (running) {
+    // OSC 133 C: the shell actually started executing. Real terminal focus +
+    // normal cursor take over immediately — synchronously, in the same tick
+    // as the OSC parse — so interactive programs (vim, sudo prompts, REPLs)
+    // and a fast Ctrl+C right after submit never land in the wrong place.
+    applyComposerCursor(s, term);
+    focus(sessionId);
+    if (firstTime) notifyIntegrationState(sessionId);
+    return;
+  }
+  // OSC 133 A (new prompt, exitCode undefined) or D (finished) — either way
+  // the composer may now be able to take over (first integration event, or
+  // back to idle).
+  applyComposerCursor(s, term);
+  if (firstTime) notifyIntegrationState(sessionId);
+}
+
+/** The block engine for this session, or `null` if Blocks wasn't baked in at
+ *  spawn time (see `isBlocksBakedIn`) or shell integration hasn't graduated
+ *  yet. `BlockOverlay` calls `.visibleBlocks()`/`.blockAt()`/etc. on this
+ *  directly rather than the registry exposing a duplicate surface for each
+ *  method. */
+export function getBlockEngine(sessionId: string): BlockDecorations | null {
+  return sessions.get(sessionId)?.blockEngine ?? null;
+}
+
+export function hasShellIntegration(sessionId: string): boolean {
+  return sessions.get(sessionId)?.shellIntegrationSeen ?? false;
+}
+
+export function isCommandRunning(sessionId: string): boolean {
+  return sessions.get(sessionId)?.commandRunning ?? false;
+}
+
+/** Whether a click on this session's raw terminal surface should be
+ *  swallowed (and focus redirected to the composer) instead of being allowed
+ *  to focus xterm itself. Requires Blocks baked in, shell integration
+ *  actually confirmed live (`shellIntegrationSeen` — same gate
+ *  `ShellComposerInput` itself uses; an unsupported remote shell that never
+ *  graduates never renders a composer editor to redirect focus to either, so
+ *  blocking clicks there would leave the session permanently unclickable),
+ *  and idle at a prompt — the moment a command starts running (vim, htop, a
+ *  sudo password prompt, any interactive program), normal click/keyboard
+ *  interaction with the terminal must work exactly like today, since that's
+ *  the whole point of running something interactive. */
+export function shouldBlockTerminalClick(sessionId: string): boolean {
+  const s = sessions.get(sessionId);
+  return !!s && s.blocksBakedIn && s.shellIntegrationSeen && !s.commandRunning;
+}
+
+/** Registers the composer's imperative `focus()` for this session — called
+ *  by `WorkspacePane`'s click interceptor when `shouldBlockTerminalClick` is
+ *  true, so a click on the (now non-interactive) terminal surface lands the
+ *  user back in the composer instead of doing nothing. */
+export function registerComposerFocus(sessionId: string, fn: () => void): () => void {
+  composerFocusHandlers.set(sessionId, fn);
+  return () => {
+    if (composerFocusHandlers.get(sessionId) === fn) composerFocusHandlers.delete(sessionId);
+  };
+}
+
+export function focusComposer(sessionId: string): void {
+  composerFocusHandlers.get(sessionId)?.();
+}
+
+/** Subscribe to composer-relevant session state — `commandRunning` toggling
+ *  or shell integration graduating for the first time (see
+ *  `hasShellIntegration`). The command composer (AiInputBar's Command mode)
+ *  uses this to know when it should enable/disable itself for the active
+ *  session, independent of the block-list subscription above. */
+export function subscribeIntegrationState(sessionId: string, cb: () => void): () => void {
+  let set = integrationSubscribers.get(sessionId);
+  if (!set) {
+    set = new Set();
+    integrationSubscribers.set(sessionId, set);
+  }
+  set.add(cb);
+  return () => {
+    set?.delete(cb);
+    if (set && set.size === 0) integrationSubscribers.delete(sessionId);
+  };
+}
+
+/** Subscribe to block-list changes for a session (new/updated/finalized
+ *  blocks). Returns an unsubscribe function. Used by BlockOverlay, which
+ *  mounts/unmounts per pane and needs a reactive subscription rather than the
+ *  fixed callbacks registered once in `registerSession`. */
+export function subscribeBlocks(sessionId: string, cb: () => void): () => void {
+  let set = blockSubscribers.get(sessionId);
+  if (!set) {
+    set = new Set();
+    blockSubscribers.set(sessionId, set);
+  }
+  set.add(cb);
+  return () => {
+    set?.delete(cb);
+    if (set && set.size === 0) blockSubscribers.delete(sessionId);
+  };
 }
 
 export function setContainer(sessionId: string, el: HTMLDivElement | null): void {
@@ -250,6 +457,7 @@ export function setCommandRunning(sessionId: string, running: boolean): void {
   const s = sessions.get(sessionId);
   if (!s || s.commandRunning === running) return;
   s.commandRunning = running;
+  notifyIntegrationState(sessionId);
   if (!running) {
     scheduleHiddenRelease(sessionId, s);
     return;
@@ -349,15 +557,31 @@ export function resetForReconnect(sessionId: string): void {
   s.altScreenAtRelease = false;
   s.commandRunning = false;
   s.shellExited = false;
+  s.shellIntegrationSeen = false;
+  notifyIntegrationState(sessionId);
   cancelHiddenRelease(s);
   const slot = getSlotForLeaf(sessionId);
   if (slot) {
     slot.term.options.disableStdin = false;
     slot.term.clear();
     slot.term.reset();
+    // Unlike a cold rebind, resetting a still-bound slot in place does NOT
+    // go through `registerOsc` — so the block engine has to be explicitly
+    // torn down and recreated here, or it would keep believing whatever
+    // command was running is still running forever (no shell left to ever
+    // send its D). The Terminal object itself is untouched by the reset, so
+    // rebinding a fresh engine to it (rather than leaving it null until some
+    // future cold rebind that may never come) is safe and immediate.
+    s.blockEngine?.dispose();
+    s.blockEngine = s.blocksBakedIn
+      ? new BlockDecorations(slot.term, { onViewport: () => notifyBlocks(sessionId) })
+      : null;
   } else {
     discardRetainedSlot(sessionId);
+    s.blockEngine?.dispose();
+    s.blockEngine = null;
   }
+  notifyBlocks(sessionId);
 }
 
 export function write(sessionId: string, data: string): void {
@@ -446,7 +670,12 @@ export function disposeSession(sessionId: string): void {
   disposeLeafSlot(sessionId);
   s.hasSlot = false;
   s.snapshot = null;
+  s.blockEngine?.dispose();
+  s.blockEngine = null;
   sessions.delete(sessionId);
+  blockSubscribers.delete(sessionId);
+  integrationSubscribers.delete(sessionId);
+  composerFocusHandlers.delete(sessionId);
 }
 
 export function terminalDebugStats() {

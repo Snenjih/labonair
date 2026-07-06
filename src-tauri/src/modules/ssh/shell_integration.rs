@@ -28,9 +28,17 @@ fn heredoc(target_path: &str, content: &str) -> String {
 
 /// Builds the `/bin/sh`-compatible bootstrap script. Caller is responsible
 /// for shell-quoting the result before passing it to `channel.exec()`.
-pub(crate) fn build_bootstrap_script() -> String {
+///
+/// `blocks`: when true, prepends `export LABONAIR_BLOCKS=1` before the
+/// `case`/`exec` logic — the exported var survives the trailing `exec` into
+/// the real login shell (zsh/bash), where `zshrc.zsh`/`bashrc.bash` read it on
+/// every precmd/preexec to decide whether to reserve blank prompt rows for a
+/// block header. Baked in once per connection; there's no way to flip it for
+/// an already-open remote shell (see `ssh_pty_write` — raw bytes only).
+pub(crate) fn build_bootstrap_script(blocks: bool) -> String {
+    let blocks_env = if blocks { "export LABONAIR_BLOCKS=1\n" } else { "" };
     format!(
-        r#"case "$SHELL" in
+        r#"{blocks_env}case "$SHELL" in
   */zsh)
     zd="$HOME/.cache/labonair/shell-integration/zsh"
     mkdir -p "$zd" 2>/dev/null
@@ -61,7 +69,7 @@ mod tests {
 
     #[test]
     fn balances_heredoc_delimiters() {
-        let script = build_bootstrap_script();
+        let script = build_bootstrap_script(false);
         let opens = script.matches(&format!("<<'{HEREDOC_DELIM}'")).count();
         let closes = script
             .lines()
@@ -80,9 +88,20 @@ mod tests {
 
     #[test]
     fn ends_every_branch_with_exec() {
-        let script = build_bootstrap_script();
+        let script = build_bootstrap_script(false);
         assert!(script.contains("exec \"$SHELL\" -l"));
         assert!(script.contains("exec \"$SHELL\" --rcfile"));
         assert!(script.contains("exec \"${SHELL:-/bin/sh}\" -l"));
+    }
+
+    #[test]
+    fn blocks_flag_exports_env_var_before_the_case_statement() {
+        let script = build_bootstrap_script(true);
+        assert!(script.starts_with("export LABONAIR_BLOCKS=1\n"));
+        // Without the flag, the bootstrap itself never exports it — the
+        // scripts' own conditional references to $LABONAIR_BLOCKS (checking
+        // whether it's set) are expected and fine, just not this export line.
+        assert!(!build_bootstrap_script(false).starts_with("export LABONAIR_BLOCKS=1"));
+        assert!(build_bootstrap_script(false).starts_with("case \"$SHELL\" in"));
     }
 }

@@ -552,6 +552,9 @@ pub async fn sftp_read_file_content(
         if buf[..sniff_len].contains(&0) {
             return Ok(ReadResult::Binary { size });
         }
+        // Strict UTF-8, matching fs_read_file: a lossy decode would silently
+        // substitute U+FFFD for invalid byte sequences before this content
+        // is attached/shown, misrepresenting the file's real bytes.
         match String::from_utf8(buf) {
             Ok(content) => Ok(ReadResult::Text { content, size }),
             Err(_) => Ok(ReadResult::Binary { size }),

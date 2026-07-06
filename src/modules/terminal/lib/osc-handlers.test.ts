@@ -63,6 +63,17 @@ describe("registerPromptTracker", () => {
     expect(onCommandState).toHaveBeenCalledWith(false);
   });
 
+  it("fires onCommandState(true, undefined, text) on OSC 133 C;<command>", () => {
+    const { term, fire } = makeFakeTerminal();
+    const state = createShellIntegrationState();
+    const onCommandState = vi.fn();
+    registerPromptTracker(term, state, onCommandState);
+
+    fire("C;ls -la /tmp");
+
+    expect(onCommandState).toHaveBeenCalledWith(true, undefined, "ls -la /tmp");
+  });
+
   it("ignores OSC 133 B — no callback, no state change", () => {
     const { term, fire } = makeFakeTerminal();
     const state = createShellIntegrationState();

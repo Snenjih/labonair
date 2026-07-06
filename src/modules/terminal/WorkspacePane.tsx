@@ -1,21 +1,23 @@
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
-import { cn } from "@/lib/utils";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { FindWidget } from "@/modules/search";
-import type { PaneNode, TerminalSessionData, WorkspaceTab } from "@/modules/tabs";
+import type { SearchAddon } from "@xterm/addon-search";
 import {
   forwardRef,
+  type ReactNode,
   useCallback,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { cn } from "@/lib/utils";
+import { FindWidget } from "@/modules/search";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { PaneNode, TerminalSessionData, WorkspaceTab } from "@/modules/tabs";
+import { BlockEmptyState, BlockOverlay } from "./block";
+import { focusComposer, getBlockEngine, shouldBlockTerminalClick } from "./lib/terminalSessionRegistry";
 import { SshTerminalPane } from "./SshTerminalPane";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
-import type { SearchAddon } from "@xterm/addon-search";
 
 export type WorkspacePaneHandle = {
   getSessionHandle: (sessionId: string) => TerminalPaneHandle | null;
@@ -196,6 +198,31 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                 rect ? { left: rect.x, top: rect.y, width: rect.w, height: rect.h } : { display: "none" }
               }
               onClick={() => onSetActivePane(paneId)}
+              onMouseDownCapture={(e) => {
+                // Blocks-active + idle-at-a-prompt: the composer is the only
+                // input surface, so a click on the raw terminal must not
+                // steal keyboard focus onto it (stopping this in capture
+                // phase, before xterm's own mousedown-focus handler ever
+                // sees it). The moment a command is actually running — vim,
+                // htop, a sudo prompt, any interactive program — this no-ops
+                // and the terminal behaves exactly as it always has.
+                //
+                // Native click-drag text selection is lost in this state (it's
+                // implemented by xterm's own mousedown handling, which capture-
+                // phase stopPropagation blocks along with the focus-steal) —
+                // selectBlockAt replaces it with click-to-select-whole-block,
+                // using xterm's own selection APIs so it still highlights/
+                // copies like a normal selection would.
+                if (shouldBlockTerminalClick(paneId)) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  focusComposer(paneId);
+                  const screen = e.currentTarget.querySelector<HTMLElement>(".xterm-screen");
+                  if (screen) {
+                    getBlockEngine(paneId)?.selectBlockAt(e.clientY, screen.getBoundingClientRect());
+                  }
+                }
+              }}
             >
               {showPaneHeader && (
                 <PaneHeader
@@ -239,6 +266,8 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                     onCwd={(cwd) => onCwd(paneId, cwd)}
                   />
                 )}
+                <BlockEmptyState sessionId={paneId} />
+                <BlockOverlay sessionId={paneId} />
               </div>
             </div>
           );

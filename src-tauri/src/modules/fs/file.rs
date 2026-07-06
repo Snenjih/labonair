@@ -80,6 +80,11 @@ pub async fn fs_read_file(path: String) -> Result<ReadResult, String> {
             return Ok(ReadResult::Binary { size });
         }
 
+        // Strict UTF-8: fs_write_file writes the returned content back to disk
+        // verbatim, so a lossy decode here would silently replace invalid byte
+        // sequences with U+FFFD on save, permanently corrupting any file that
+        // isn't valid UTF-8. Files that fail this check are reported as
+        // Binary — refusing to open them as text is safer than corrupting them.
         match String::from_utf8(bytes) {
             Ok(content) => Ok(ReadResult::Text { content, size }),
             Err(_) => Ok(ReadResult::Binary { size }),

@@ -40,11 +40,22 @@ export type PromptTracker = {
  * identically over either transport since it's parsed purely from the shell's
  * own OSC stream. OSC 133 B (end of prompt / command line begins) is parsed
  * but has no callback — the pool cares about *executing*, not *typing*.
+ *
+ * The `D` branch also carries the command's exit code as `D;<code>`, and the
+ * `C` branch carries the literal command text as `C;<command>` when the
+ * shell is in block mode (see `_labonair_precmd`/`_labonair_preexec` in the
+ * shell-integration scripts — plain sessions get a bare `C` with no text, to
+ * avoid paying for a payload nothing reads) — both passed through so
+ * block-terminal bookkeeping (terminalSessionRegistry's BlockDecorations
+ * engine) can start/finish a block without a second competing OSC 133
+ * handler. `exitCode`/`commandText` are only ever defined on the event that
+ * actually carries them; `exitCode === undefined` doubles as "this wasn't a
+ * finished-command event" for callers that only care about `D`.
  */
 export function registerPromptTracker(
   term: Terminal,
   state?: ShellIntegrationState,
-  onCommandState?: (running: boolean) => void,
+  onCommandState?: (running: boolean, exitCode?: number, commandText?: string) => void,
 ): PromptTracker {
   let marker: IMarker | null = null;
   const d = term.parser.registerOscHandler(133, (data) => {
@@ -55,10 +66,26 @@ export function registerPromptTracker(
       onCommandState?.(false);
     } else if (data.startsWith("C")) {
       if (state) state.inCommand = true;
-      onCommandState?.(true);
+      // Only pass a third argument when text was actually sent — callers
+      // (and tests) that assert `toHaveBeenCalledWith(true)` for a bare "C"
+      // must see exactly one argument, not `(true, undefined, undefined)`.
+      const text = data.length > 2 && data[1] === ";" ? data.slice(2) : undefined;
+      if (text !== undefined) {
+        onCommandState?.(true, undefined, text);
+      } else {
+        onCommandState?.(true);
+      }
     } else if (data.startsWith("D")) {
       if (state) state.inCommand = false;
-      onCommandState?.(false);
+      const code = Number.parseInt(data.split(";")[1] ?? "", 10);
+      // Only pass a second argument when we actually parsed one — callers
+      // (and tests) that assert `toHaveBeenCalledWith(false)` for a bare
+      // "D" must see exactly one argument, not `(false, undefined)`.
+      if (Number.isFinite(code)) {
+        onCommandState?.(false, code);
+      } else {
+        onCommandState?.(false);
+      }
     }
     return true;
   });

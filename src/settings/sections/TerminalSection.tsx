@@ -1,31 +1,36 @@
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  setSshAutoReconnect,
+  setSshAutoReconnectDelay,
+  setSshAutoReconnectMaxAttempts,
+  setTerminalBell,
+  setTerminalBlocksAutoCollapseOnAltScreen,
+  setTerminalBlocksEnabled,
+  setTerminalComposerEnabled,
+  setTerminalComposerHistoryPopup,
+  setTerminalCopyOnSelect,
   setTerminalCursorBlink,
   setTerminalCursorBlinkInterval,
   setTerminalCursorStyle,
+  setTerminalDefaultPath,
+  setTerminalFastScrollModifier,
   setTerminalFontFamily,
   setTerminalFontSize,
   setTerminalFontWeight,
   setTerminalLetterSpacing,
   setTerminalLineHeight,
-  setTerminalScrollback,
-  setTerminalShowPaneHeader,
-  setTerminalShowPaneFooter,
-  setTerminalUseWebGL,
-  setTerminalBell,
-  setTerminalCopyOnSelect,
   setTerminalRightClickPastes,
-  setTerminalWordSeparator,
+  setTerminalScrollback,
   setTerminalScrollSensitivity,
-  setTerminalFastScrollModifier,
   setTerminalShell,
-  setTerminalDefaultPath,
-  setSshAutoReconnect,
-  setSshAutoReconnectDelay,
-  setSshAutoReconnectMaxAttempts,
+  setTerminalShowPaneFooter,
+  setTerminalShowPaneHeader,
+  setTerminalUseWebGL,
+  setTerminalWordSeparator,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -34,6 +39,12 @@ export function TerminalSection() {
   const terminalCursorBlink = usePreferencesStore((s) => s.terminalCursorBlink);
   const terminalCursorBlinkInterval = usePreferencesStore((s) => s.terminalCursorBlinkInterval);
   const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
+  const terminalComposerEnabled = usePreferencesStore((s) => s.terminalComposerEnabled);
+  const terminalComposerHistoryPopup = usePreferencesStore((s) => s.terminalComposerHistoryPopup);
+  const terminalBlocksEnabled = usePreferencesStore((s) => s.terminalBlocksEnabled);
+  const terminalBlocksAutoCollapseOnAltScreen = usePreferencesStore(
+    (s) => s.terminalBlocksAutoCollapseOnAltScreen,
+  );
   const terminalFontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const terminalFontSize = usePreferencesStore((s) => s.terminalFontSize);
   const terminalFontWeight = usePreferencesStore((s) => s.terminalFontWeight);
@@ -221,6 +232,69 @@ export function TerminalSection() {
             onCheckedChange={(v) => void setTerminalShowPaneFooter(v)}
           />
         </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Composer &amp; Blocks</Label>
+        <SettingRow
+          title="Command composer"
+          description="Show a command input for the active terminal in the bottom bar, with history-based ghost-text suggestions. Works for both local and SSH terminals, independently of AI."
+        >
+          <Switch
+            checked={terminalComposerEnabled}
+            onCheckedChange={(v) => void setTerminalComposerEnabled(v)}
+          />
+        </SettingRow>
+        {terminalComposerEnabled && (
+          <>
+            <SettingRow
+              title="History popup"
+              description="Pressing ↑ opens a scrollable history menu instead of cycling commands inline in the composer itself."
+            >
+              <Switch
+                checked={terminalComposerHistoryPopup}
+                onCheckedChange={(v) => void setTerminalComposerHistoryPopup(v)}
+              />
+            </SettingRow>
+            <SettingRow
+              title="Block terminal"
+              description="Group each executed command and its output into a block with cwd, exit code, and duration. Only available while the command composer is on."
+            >
+              <Switch
+                checked={terminalBlocksEnabled}
+                onCheckedChange={(v) => {
+                  void setTerminalBlocksEnabled(v);
+                  // The shell script that reserves header rows is baked in
+                  // once at spawn time (env var, no live side-channel into an
+                  // already-running shell) — this can't retroactively change
+                  // already-open tabs.
+                  useNotificationStore.getState().addNotification({
+                    type: "info",
+                    title: "Block terminal",
+                    message: v
+                      ? "Applies to newly opened terminals — reopen existing tabs to enable blocks there."
+                      : "Applies to newly opened terminals — existing tabs keep showing blocks until reopened.",
+                  });
+                }}
+              />
+            </SettingRow>
+            {terminalBlocksEnabled && (
+              <SettingRow
+                title="Auto-collapse for full-screen apps"
+                description="Suppress block chrome while a full-screen terminal app (vim, htop, less, …) is running."
+                hint={{
+                  text: "Recommended to keep this on. Turning it off is for advanced use only — block chrome stays positioned for the normal buffer and will overlay on top of full-screen apps like vim or htop.",
+                  variant: "warning",
+                }}
+              >
+                <Switch
+                  checked={terminalBlocksAutoCollapseOnAltScreen}
+                  onCheckedChange={(v) => void setTerminalBlocksAutoCollapseOnAltScreen(v)}
+                />
+              </SettingRow>
+            )}
+          </>
+        )}
       </div>
 
       <div className="flex flex-col gap-2">

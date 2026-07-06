@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import { handleApiError } from "@/lib/errors";
 import type { QuickConnectParams } from "@/modules/tabs";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SshPtyEvent } from "@/modules/terminal/lib/ssh-pty-bridge";
 import { invoke, type Channel } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -93,6 +94,13 @@ export function SshLoadingScreen({
     setStatus("connecting");
     if (!passphraseArg && !passwordOverride) setLogs([]);
 
+    // Read fresh on every call (including auto-reconnect re-invocations of
+    // this same doConnect) rather than caching — the shell integration flag
+    // is baked in once at spawn time (see build_bootstrap_script), so a
+    // reconnect must pick up whatever the setting currently is, not a stale
+    // value captured at first mount.
+    const blocks = usePreferencesStore.getState().terminalBlocksEnabled;
+
     const p: Promise<unknown> = isQuickConnect
       ? invoke("ssh_connect_quick", {
           sessionId: sessionId,
@@ -103,6 +111,7 @@ export function SshLoadingScreen({
           passphrase: passphraseArg ?? null,
           initialCols: initialCols ?? null,
           initialRows: initialRows ?? null,
+          blocks,
           onEvent: channel,
         })
       : connectionType === "sftp"
@@ -119,6 +128,7 @@ export function SshLoadingScreen({
             passwordOverride: passwordOverride ?? null,
             initialCols: initialCols ?? null,
             initialRows: initialRows ?? null,
+            blocks,
             onEvent: channel,
           });
 

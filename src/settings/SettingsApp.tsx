@@ -311,6 +311,18 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "gitStatusPollIntervalMs":
       void store.setGitStatusPollIntervalMs(Number(value));
       break;
+    case "terminalComposerEnabled":
+      void store.setTerminalComposerEnabled(value as boolean);
+      break;
+    case "terminalComposerHistoryPopup":
+      void store.setTerminalComposerHistoryPopup(value as boolean);
+      break;
+    case "terminalBlocksEnabled":
+      void store.setTerminalBlocksEnabled(value as boolean);
+      break;
+    case "terminalBlocksAutoCollapseOnAltScreen":
+      void store.setTerminalBlocksAutoCollapseOnAltScreen(value as boolean);
+      break;
   }
 }
 

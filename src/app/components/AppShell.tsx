@@ -10,6 +10,7 @@ import type { ExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
 import { Header } from "@/modules/header";
 import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { ShortcutsDialog } from "@/modules/shortcuts";
 import { SnippetLogDrawer } from "@/modules/snippets";
 import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
@@ -92,6 +93,13 @@ export interface AppShellProps {
 export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: AppShellProps) {
   const activeId = useTabsStore((s) => s.activeId);
   const activeTabKind = useTabsStore(selectActiveTabKind);
+  // The command composer (AiInputBar in Command mode) needs the same
+  // <AiComposerProvider> context as AI mode even when no AI key is
+  // configured — useComposer() is called unconditionally at the top of
+  // AiInputBar, so the provider must be mounted whenever the bar can be,
+  // not only when `aiEnabled && hasComposer` (see WorkspaceArea's matching
+  // bar-mount condition).
+  const terminalComposerEnabled = usePreferencesStore((s) => s.terminalComposerEnabled);
 
   const onNewGitGraph = () => {
     const { repoRoot, currentBranch } = useSourceControlStore.getState();
@@ -294,7 +302,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     </MotionConfig>
   );
 
-  if (prefs.aiEnabled && ctrl.hasComposer) {
+  if ((prefs.aiEnabled && ctrl.hasComposer) || terminalComposerEnabled) {
     return <AiComposerProvider>{shell}</AiComposerProvider>;
   }
   return shell;
