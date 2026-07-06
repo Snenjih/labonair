@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { FindWidget } from "@/modules/search";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { PaneNode, TerminalSessionData, WorkspaceTab } from "@/modules/tabs";
-import { BlockOverlay } from "./block";
+import { BlockEmptyState, BlockOverlay } from "./block";
 import { focusComposer, getBlockEngine, shouldBlockTerminalClick } from "./lib/terminalSessionRegistry";
 import { SshTerminalPane } from "./SshTerminalPane";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
@@ -266,6 +266,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                     onCwd={(cwd) => onCwd(paneId, cwd)}
                   />
                 )}
+                <BlockEmptyState sessionId={paneId} />
                 <BlockOverlay sessionId={paneId} />
               </div>
             </div>
