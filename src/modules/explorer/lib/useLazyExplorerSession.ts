@@ -160,6 +160,20 @@ function release(hostId: string) {
   evictIdleIfOverCap();
 }
 
+/** Forces a real reconnect: disconnects any stale session record first
+ *  (best-effort, ignoring errors) so `sftp_connect`'s idempotency check
+ *  (`sftp/connection.rs`) never silently no-ops against a session the
+ *  backend failed to classify/clean up itself — without this, a session
+ *  killed by an error `is_network_error` doesn't (yet) recognize would sit
+ *  in `SftpState` forever, making manual retry look like it does nothing.
+ *  Only used for explicit reconnect attempts (`reconnect` below and its
+ *  callers), never for `acquire()`'s StrictMode/concurrent-request dedup,
+ *  which intentionally relies on that idempotency. */
+async function forceReconnect(sessionId: string, hostId: string): Promise<void> {
+  await invoke("sftp_disconnect", { sessionId }).catch(() => {});
+  await connect(sessionId, hostId);
+}
+
 function reconnect(hostId: string) {
   const sessionId = sessionIdFor(hostId);
   const lifecycle = lifecycles.get(sessionId);
@@ -169,9 +183,25 @@ function reconnect(hostId: string) {
     lifecycle.reconnectTimer = null;
   }
   lifecycle.reconnectAttempts = 0;
-  lifecycle.connectPromise = connect(sessionId, hostId).catch(() => {
+  lifecycle.connectPromise = forceReconnect(sessionId, hostId).catch(() => {
     lifecycle.connectPromise = null;
   });
+}
+
+/** Retries hostId's lazy explorer session if (and only if) it's currently
+ *  sitting in `error`/`auth_required` — called when an SSH terminal tab for
+ *  the same host successfully reconnects, since the terminal's PTY session
+ *  and this lazy SFTP/browsing session are entirely independent connections
+ *  (see sftp_ssh_context.md) with no other coupling between their
+ *  lifecycles. A no-op if there's no tracked session for this host, or if
+ *  it's already connecting/connected — safe to call redundantly (e.g. from
+ *  multiple terminal tabs to the same host reconnecting around the same time). */
+export function reconnectExplorerSessionForHost(hostId: string): void {
+  const sessionId = sessionIdFor(hostId);
+  const status = useLazySessionStore.getState().sessions[sessionId]?.status;
+  if (status === "error" || status === "auth_required") {
+    reconnect(hostId);
+  }
 }
 
 /** Manually retries every lazy explorer session currently in `error` or

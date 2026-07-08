@@ -189,27 +189,28 @@ async fn download_file(
     }
 
     log::debug!("[sftp/download] looking up SFTP session for session_id={}", job.session_id);
-    let (file_size, data) = {
-        let sftp_arc = {
-            let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
-            let entry = map.get(&job.session_id)
-                .ok_or_else(|| format!("no SFTP session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
-            entry.sftp.clone()
-        };
-        log::debug!("[sftp/download] opening remote file: {}", job.src_path);
-        let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
-        let stat = sftp.0.stat(std::path::Path::new(&job.src_path))
+    // One combined lock (session + SFTP subsystem, see SftpSessionInner's doc
+    // comment) for this whole transfer — re-acquired per chunk below rather
+    // than held continuously, so browsing/git-status/other transfers on the
+    // same session aren't frozen for the transfer's full duration.
+    let inner_arc = {
+        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
+        let entry = map.get(&job.session_id)
+            .ok_or_else(|| format!("no SFTP session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
+        entry.inner.clone()
+    };
+
+    log::debug!("[sftp/download] opening remote file: {}", job.src_path);
+    let (file_size, mut remote_file) = {
+        let inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
+        let stat = inner.sftp.stat(std::path::Path::new(&job.src_path))
             .map_err(|e| format!("stat({}) failed: {e}", job.src_path))?;
         let size = stat.size.unwrap_or(0);
         log::debug!("[sftp/download] remote file size={} bytes", size);
-        let mut remote_file = sftp.0.open(std::path::Path::new(&job.src_path))
+        let remote_file = inner.sftp.open(std::path::Path::new(&job.src_path))
             .map_err(|e| format!("open({}) failed: {e}", job.src_path))?;
-        let mut buf = Vec::with_capacity(size as usize);
-        remote_file.read_to_end(&mut buf).map_err(|e| format!("read({}) failed: {e}", job.src_path))?;
-        log::debug!("[sftp/download] read {} bytes from remote", buf.len());
-        (size, buf)
+        (size, remote_file)
     };
-
     job.bytes_total = file_size;
 
     log::debug!("[sftp/download] creating local file: {}", job.dest_path);
@@ -218,13 +219,25 @@ async fn download_file(
     let mut written = 0usize;
     let mut last_emit = std::time::Instant::now();
     let mut last_bytes = 0u64;
+    let mut chunk_buf = [0u8; CHUNK_SIZE];
 
-    for chunk in data.chunks(CHUNK_SIZE) {
+    // Streams remote -> local in CHUNK_SIZE pieces (rather than reading the
+    // whole remote file into memory first) so the lock above is only held
+    // for one chunk's read at a time, and so a multi-GB download doesn't
+    // spike memory usage.
+    loop {
         if cancelled.contains(&job.id) {
             return Err("cancelled".to_string());
         }
-        local_file.write_all(chunk).map_err(|e| e.to_string())?;
-        written += chunk.len();
+        let n = {
+            let _inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
+            remote_file.read(&mut chunk_buf).map_err(|e| format!("read({}) failed: {e}", job.src_path))?
+        };
+        if n == 0 {
+            break;
+        }
+        local_file.write_all(&chunk_buf[..n]).map_err(|e| e.to_string())?;
+        written += n;
         job.bytes_transferred = written as u64;
 
         let elapsed = last_emit.elapsed().as_millis();
@@ -237,6 +250,7 @@ async fn download_file(
         }
     }
     drop(local_file);
+    log::debug!("[sftp/download] read {} bytes from remote", written);
 
     // --- Post-transfer verification ---
     log::debug!("[sftp/download] verifying transfer id={}", job.id);
@@ -249,16 +263,10 @@ async fn download_file(
         ));
     }
 
-    let session_arc = {
-        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
-        map.get(&job.session_id)
-            .ok_or_else(|| format!("no SFTP session for session_id={}", job.session_id))?
-            .session.clone()
-    };
     let local_hash = compute_local_md5(std::path::Path::new(&job.dest_path))?;
     {
-        let session = session_arc.lock().map_err(|e| format!("session lock: {e}"))?;
-        match compute_remote_md5(&session.0, &job.src_path) {
+        let inner = inner_arc.lock().map_err(|e| format!("session lock: {e}"))?;
+        match compute_remote_md5(&inner.session, &job.src_path) {
             Some(remote_hash) => {
                 if local_hash != remote_hash {
                     return Err(format!(
@@ -292,15 +300,19 @@ async fn upload_file(
     log::debug!("[sftp/upload] local file size={} bytes", data.len());
 
     log::debug!("[sftp/upload] looking up SFTP session for session_id={}", job.session_id);
+    // One combined lock (session + SFTP subsystem, see SftpSessionInner's doc
+    // comment) reused for this whole transfer — re-acquired per chunk below
+    // rather than held continuously, so browsing/git-status/other transfers
+    // on the same session aren't frozen for the transfer's full duration.
+    let inner_arc = {
+        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
+        let entry = map.get(&job.session_id)
+            .ok_or_else(|| format!("no SFTP session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
+        entry.inner.clone()
+    };
     let conflict_exists = {
-        let sftp_arc = {
-            let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
-            let entry = map.get(&job.session_id)
-                .ok_or_else(|| format!("no SFTP session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
-            entry.sftp.clone()
-        };
-        let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
-        sftp.0.stat(std::path::Path::new(&job.dest_path)).is_ok()
+        let inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
+        inner.sftp.stat(std::path::Path::new(&job.dest_path)).is_ok()
     };
 
     if conflict_exists {
@@ -323,21 +335,20 @@ async fn upload_file(
     let mut last_bytes = 0u64;
 
     log::debug!("[sftp/upload] creating remote file: {}", job.dest_path);
-    let sftp_arc = {
-        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
-        let entry = map.get(&job.session_id)
-            .ok_or_else(|| format!("no SFTP session for session_id={}", job.session_id))?;
-        entry.sftp.clone()
+    let mut remote_file = {
+        let inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
+        inner.sftp.create(std::path::Path::new(&job.dest_path))
+            .map_err(|e| format!("create remote({}) failed: {e}", job.dest_path))?
     };
-    let sftp = sftp_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
-    let mut remote_file = sftp.0.create(std::path::Path::new(&job.dest_path))
-        .map_err(|e| format!("create remote({}) failed: {e}", job.dest_path))?;
 
     for (i, chunk) in data.chunks(CHUNK_SIZE).enumerate() {
         if cancelled.contains(&job.id) {
             return Err("cancelled".to_string());
         }
-        remote_file.write_all(chunk).map_err(|e| e.to_string())?;
+        {
+            let _inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
+            remote_file.write_all(chunk).map_err(|e| e.to_string())?;
+        }
         job.bytes_transferred = ((i + 1) * CHUNK_SIZE).min(data.len()) as u64;
 
         let elapsed = last_emit.elapsed().as_millis();
@@ -354,7 +365,8 @@ async fn upload_file(
     // --- Post-transfer verification ---
     log::debug!("[sftp/upload] verifying transfer id={}", job.id);
     {
-        let remote_size = sftp.0.stat(std::path::Path::new(&job.dest_path))
+        let inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
+        let remote_size = inner.sftp.stat(std::path::Path::new(&job.dest_path))
             .map_err(|e| format!("verify stat({}) failed: {e}", job.dest_path))?
             .size.unwrap_or(0);
         if remote_size != data.len() as u64 {
@@ -364,18 +376,11 @@ async fn upload_file(
             ));
         }
     }
-    drop(sftp);
 
-    let session_arc = {
-        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
-        map.get(&job.session_id)
-            .ok_or_else(|| format!("no SFTP session for session_id={}", job.session_id))?
-            .session.clone()
-    };
     let local_hash = compute_local_md5(std::path::Path::new(&job.src_path))?;
     {
-        let session = session_arc.lock().map_err(|e| format!("session lock: {e}"))?;
-        match compute_remote_md5(&session.0, &job.dest_path) {
+        let inner = inner_arc.lock().map_err(|e| format!("session lock: {e}"))?;
+        match compute_remote_md5(&inner.session, &job.dest_path) {
             Some(remote_hash) => {
                 if local_hash != remote_hash {
                     return Err(format!(

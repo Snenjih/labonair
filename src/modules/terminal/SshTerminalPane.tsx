@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/context-menu";
 import { useChatStore } from "@/modules/ai/store/chatStore";
 import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
+import { reconnectExplorerSessionForHost } from "@/modules/explorer/lib/useLazyExplorerSession";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { TerminalSessionData } from "@/modules/tabs";
@@ -425,6 +426,11 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
           reconnectAttemptRef.current = 0;
           setReconnectAttempt(0);
           setAutoReconnectFailed(false);
+          // The sidebar Explorer's lazy session for this host (if any) is a
+          // completely separate SSH/SFTP connection from this terminal's PTY
+          // session — nothing else tells it the network is back. Quick-
+          // connect sessions have no saved host, so nothing to notify.
+          if (session.hostId) reconnectExplorerSessionForHost(session.hostId);
         }),
       ]);
       if (disposed) {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { selectEvictionCandidates, type IdleCandidate } from "./useLazyExplorerSession";
+import {
+  reconnectExplorerSessionForHost,
+  selectEvictionCandidates,
+  type IdleCandidate,
+} from "./useLazyExplorerSession";
 
 function idle(sessionId: string, releasedAt: number): IdleCandidate {
   return { sessionId, refCount: 0, releasedAt };
@@ -38,5 +42,14 @@ describe("selectEvictionCandidates", () => {
 
   it("returns an empty list for no entries", () => {
     expect(selectEvictionCandidates([], 3)).toEqual([]);
+  });
+});
+
+describe("reconnectExplorerSessionForHost", () => {
+  it("is a safe no-op for a host with no tracked lazy session", () => {
+    // No `useLazyExplorerSession(hostId)` was ever mounted for this host, so
+    // there's no lifecycle/status entry at all — this must not throw, and
+    // must not attempt a reconnect (nothing to reconnect).
+    expect(() => reconnectExplorerSessionForHost("never-acquired-host-id")).not.toThrow();
   });
 });

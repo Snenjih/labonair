@@ -13,21 +13,26 @@ const EXEC_TIMEOUT: Duration = Duration::from_secs(15);
 const RETRY_SLEEP: Duration = Duration::from_millis(5);
 
 /// The session backing the interactive PTY is deliberately non-blocking
-/// (see pty.rs's `sess.0.set_blocking(false)`, needed so the reader thread
-/// can poll without hanging) — `ssh_exec_command` shares that same session
-/// Arc, so every libssh2 call here can spuriously return
-/// LIBSSH2_ERROR_EAGAIN ("would block") even though the operation is
+/// (see pty.rs's `guard.session.set_blocking(false)`, needed so the reader
+/// thread can poll without hanging) — `ssh_exec_command` shares that same
+/// `Arc<Mutex<SshSessionInner>>`, so every libssh2 call here can spuriously
+/// return LIBSSH2_ERROR_EAGAIN ("would block") even though the operation is
 /// perfectly valid, it just isn't ready yet.
 ///
 /// Re-locks `session_arc` fresh for every attempt rather than holding one
 /// guard across the whole retry loop: the interactive PTY reader thread
-/// (pty.rs) needs the same Arc<Mutex<SessionHandle>> for its periodic
-/// keepalive_send(), and a long EAGAIN storm here must not starve it out of
-/// the lock for the entire `EXEC_TIMEOUT` window — releasing the lock during
-/// each `RETRY_SLEEP` backoff gives it a chance to interleave.
+/// (pty.rs) locks the exact same `Arc<Mutex<SshSessionInner>>` for every
+/// channel read plus its periodic keepalive_send(), and a long EAGAIN storm
+/// here must not starve it out of the lock for the entire `EXEC_TIMEOUT`
+/// window — releasing the lock during each `RETRY_SLEEP` backoff gives it a
+/// chance to interleave. This shared lock (rather than the two independent
+/// locks used before) is also what makes it safe for this exec call and the
+/// PTY reader thread to run concurrently at all — libssh2 does not allow
+/// unsynchronized concurrent access to one Session's transport, even across
+/// different Channels of it.
 fn retry_ssh2<T>(
-    session_arc: &std::sync::Mutex<super::SessionHandle>,
-    mut f: impl FnMut(&super::SessionHandle) -> Result<T, ssh2::Error>,
+    session_arc: &std::sync::Mutex<super::SshSessionInner>,
+    mut f: impl FnMut(&super::SshSessionInner) -> Result<T, ssh2::Error>,
 ) -> Result<T, String> {
     let start = Instant::now();
     loop {
@@ -57,7 +62,7 @@ fn retry_ssh2<T>(
 ///
 /// Also re-locks per attempt, for the same reason as `retry_ssh2`.
 fn retry_io<T>(
-    session_arc: &std::sync::Mutex<super::SessionHandle>,
+    session_arc: &std::sync::Mutex<super::SshSessionInner>,
     mut f: impl FnMut() -> std::io::Result<T>,
 ) -> Result<T, String> {
     let start = Instant::now();
@@ -89,7 +94,7 @@ pub fn ssh_exec_command(
 ) -> Result<ExecResult, String> {
     let session_arc = crate::get_session_arc!(state, &session_id);
 
-    let mut channel = retry_ssh2(&session_arc, |sess| sess.0.channel_session())?;
+    let mut channel = retry_ssh2(&session_arc, |sess| sess.session.channel_session())?;
     retry_ssh2(&session_arc, |_sess| channel.exec(&command))?;
 
     // read_to_end + lossy UTF-8 rather than read_to_string (which requires

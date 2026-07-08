@@ -54,9 +54,9 @@ pub fn ssh_pty_write(
     data: String,
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
-    let mut map = state.0.lock().map_err(|e| e.to_string())?;
-    let session = map.get_mut(&session_id).ok_or("no session for tab")?;
-    let channel = session.channel.as_mut().ok_or("no channel open")?;
+    let inner = crate::get_session_arc!(state, &session_id);
+    let mut guard = inner.lock().map_err(|e| e.to_string())?;
+    let channel = guard.channel.as_mut().ok_or("no channel open")?;
     channel.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
     channel.flush().map_err(|e| e.to_string())?;
     Ok(())
@@ -69,9 +69,9 @@ pub fn ssh_pty_resize(
     rows: u32,
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
-    let mut map = state.0.lock().map_err(|e| e.to_string())?;
-    let session = map.get_mut(&session_id).ok_or("no session for tab")?;
-    let channel = session.channel.as_mut().ok_or("no channel open")?;
+    let inner = crate::get_session_arc!(state, &session_id);
+    let mut guard = inner.lock().map_err(|e| e.to_string())?;
+    let channel = guard.channel.as_mut().ok_or("no channel open")?;
     channel
         .request_pty_size(cols, rows, None, None)
         .map_err(|e| e.to_string())?;
@@ -82,14 +82,16 @@ pub fn ssh_pty_resize(
 /// background reader thread that streams output directly into the caller-
 /// supplied `on_event` channel (point-to-point — see `SshPtyEvent`'s docs).
 ///
-/// Returns `(channel, shutdown_flag)`. The caller must:
-/// 1. Store both in `SshSession` and insert it into `SshState`.
+/// Stores the opened channel directly into `inner_arc` (so it lives behind
+/// the same lock as the session it was opened from — see `SshSessionInner`)
+/// and returns just the shutdown flag. The caller must:
+/// 1. Insert `inner_arc` (with `shutdown`) into `SshState` as the `SshSession`.
 /// 2. Send `()` on `ready_tx` to unblock the reader thread.
 ///
 /// `cols`/`rows` set the initial terminal size to avoid a jarring resize on connect.
 #[allow(clippy::too_many_arguments)]
 pub fn open_shell_channel(
-    session_arc: std::sync::Arc<std::sync::Mutex<super::SessionHandle>>,
+    inner_arc: std::sync::Arc<std::sync::Mutex<super::SshSessionInner>>,
     session_id: &str,
     app: &tauri::AppHandle,
     state: super::SshState,
@@ -100,9 +102,9 @@ pub fn open_shell_channel(
     keep_alive_tries: Option<u32>,
     blocks: bool,
     on_event: Channel<SshPtyEvent>,
-) -> Result<(ssh2::Channel, Arc<AtomicBool>), String> {
-    let sess = session_arc.lock().map_err(|e| e.to_string())?;
-    let mut channel = sess.0.channel_session().map_err(|e| e.to_string())?;
+) -> Result<Arc<AtomicBool>, String> {
+    let mut guard = inner_arc.lock().map_err(|e| e.to_string())?;
+    let mut channel = guard.session.channel_session().map_err(|e| e.to_string())?;
     channel
         .request_pty("xterm-256color", None, Some((cols, rows, 0, 0)))
         .map_err(|e| e.to_string())?;
@@ -120,13 +122,15 @@ pub fn open_shell_channel(
     }
 
     // Non-blocking so the reader never holds the session lock indefinitely.
-    sess.0.set_blocking(false);
-    drop(sess);
+    guard.session.set_blocking(false);
+    guard.channel = Some(channel);
+    drop(guard);
 
     let app_clone = app.clone();
     let session_id_clone = session_id.to_string();
     let shutdown = Arc::new(AtomicBool::new(false));
     let shutdown_clone = shutdown.clone();
+    let inner_arc_clone = inner_arc.clone();
 
     std::thread::spawn(move || {
         // Block until the session has been inserted into SshState so we never
@@ -166,19 +170,22 @@ pub fn open_shell_channel(
                 break; // clean shutdown via ssh_disconnect
             }
 
+            // Locks the SAME per-session mutex that guards keepalive and any
+            // concurrent exec call (ssh_exec_command, snippets, git-over-exec)
+            // for this session — this is the fix for the "transport read"
+            // race: previously this read only held the outer SshState map
+            // lock, entirely independent of the session-level lock those
+            // other callers used, so libssh2's non-thread-safe transport
+            // could be touched from two threads at once.
             let data = {
-                let mut map = match state.0.lock() {
-                    Ok(m) => m,
+                let mut guard = match inner_arc_clone.lock() {
+                    Ok(g) => g,
                     Err(_) => {
                         disconnect_reason = Some("Internal lock error".to_string());
                         break;
                     }
                 };
-                let Some(sess) = map.get_mut(&session_id_clone) else {
-                    // Session was removed by ssh_disconnect — normal exit, no event.
-                    break;
-                };
-                let Some(ch) = sess.channel.as_mut() else { break };
+                let Some(ch) = guard.channel.as_mut() else { break };
 
                 if ch.eof() {
                     disconnect_reason = Some("Connection closed by remote host".to_string());
@@ -226,32 +233,27 @@ pub fn open_shell_channel(
                     last_flush = Instant::now();
                 }
                 if last_keepalive.elapsed() >= ka_interval {
-                    let session_arc_opt = {
-                        match state.0.lock() {
-                            Ok(map) => map.get(&session_id_clone).map(|s| s.session.clone()),
-                            Err(_) => None,
-                        }
-                    };
-                    if let Some(arc) = session_arc_opt {
-                        if let Ok(sess) = arc.lock() {
-                            match sess.0.keepalive_send() {
-                                Ok(_) => {
-                                    last_keepalive = Instant::now();
-                                    ka_consecutive_fails = 0;
+                    // Same `inner_arc_clone` as the read above — no separate
+                    // lock, so this can never race the read loop or any
+                    // concurrent exec call on this session.
+                    if let Ok(guard) = inner_arc_clone.lock() {
+                        match guard.session.keepalive_send() {
+                            Ok(_) => {
+                                last_keepalive = Instant::now();
+                                ka_consecutive_fails = 0;
+                            }
+                            Err(ref e) if matches!(e.code(), ssh2::ErrorCode::Session(-37)) => {
+                                // LIBSSH2_ERROR_EAGAIN: non-blocking would block.
+                                // Don't reset last_keepalive — retry next idle iteration.
+                            }
+                            Err(e) => {
+                                ka_consecutive_fails += 1;
+                                if ka_consecutive_fails >= ka_max_fails {
+                                    disconnect_reason =
+                                        Some(humanize_disconnect_reason(&e.to_string()));
+                                    break 'reader;
                                 }
-                                Err(ref e) if matches!(e.code(), ssh2::ErrorCode::Session(-37)) => {
-                                    // LIBSSH2_ERROR_EAGAIN: non-blocking would block.
-                                    // Don't reset last_keepalive — retry next idle iteration.
-                                }
-                                Err(e) => {
-                                    ka_consecutive_fails += 1;
-                                    if ka_consecutive_fails >= ka_max_fails {
-                                        disconnect_reason =
-                                            Some(humanize_disconnect_reason(&e.to_string()));
-                                        break 'reader;
-                                    }
-                                    last_keepalive = Instant::now();
-                                }
+                                last_keepalive = Instant::now();
                             }
                         }
                     }
@@ -285,7 +287,7 @@ pub fn open_shell_channel(
         }
     });
 
-    Ok((channel, shutdown))
+    Ok(shutdown)
 }
 
 /// Decode as much valid UTF-8 from `carry` as possible, replacing definitively

@@ -1,7 +1,7 @@
 use tauri::Emitter;
 use crate::modules::errors::LabonairError;
-use crate::modules::ssh::{TrustState, SessionHandle, SftpHandle};
-use super::state::{SftpSession, SftpState};
+use crate::modules::ssh::TrustState;
+use super::state::{SftpSession, SftpSessionInner, SftpState};
 
 /// Establishes a dedicated SSH + SFTP connection for SFTP operations.
 /// Stored in `SftpState` (separate from `SshState`) so SFTP I/O never
@@ -192,15 +192,12 @@ fn sftp_connect_blocking(
         }
     };
 
-    // Step 8: Store dedicated SftpSession in SftpState.
-    let session_arc = std::sync::Arc::new(std::sync::Mutex::new(SessionHandle(session)));
-    let sftp_arc = std::sync::Arc::new(std::sync::Mutex::new(SftpHandle(sftp)));
+    // Step 8: Store dedicated SftpSession in SftpState. Session + SFTP handle
+    // share one lock (SftpSessionInner) — see its doc comment for why.
+    let inner_arc = std::sync::Arc::new(std::sync::Mutex::new(SftpSessionInner { session, sftp }));
     {
         let mut map = state.0.lock().map_err(|e| e.to_string())?;
-        map.insert(session_id.clone(), SftpSession {
-            session: session_arc,
-            sftp: sftp_arc,
-        });
+        map.insert(session_id.clone(), SftpSession { inner: inner_arc });
     }
 
     log::debug!("[SFTP-CONNECT] session_established emitting for {}", session_id);

@@ -37,22 +37,15 @@ fn handle_sftp_error(
     }
 }
 
-/// Extract the SFTP Arc under a brief outer-lock, then release it so no
-/// long-held lock blocks other operations.
-macro_rules! get_sftp_arc {
+/// Extract the combined session+SFTP Arc under a brief outer-lock, then
+/// release it so no long-held lock blocks other sessions' operations. Used
+/// by both plain SFTP file ops and exec-based ops (du, chown, find) — they
+/// share one lock per session, see `SftpSessionInner`'s doc comment.
+macro_rules! get_sftp_inner_arc {
     ($state_inner:expr, $session_id:expr) => {{
         let map = $state_inner.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get($session_id).ok_or("no SFTP session for tab")?;
-        entry.sftp.clone()
-    }};
-}
-
-/// Extract the SSH session Arc from SftpState for exec-based operations.
-macro_rules! get_sftp_session_arc {
-    ($state_inner:expr, $session_id:expr) => {{
-        let map = $state_inner.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get($session_id).ok_or("no SFTP session for tab")?;
-        entry.session.clone()
+        entry.inner.clone()
     }};
 }
 
@@ -84,10 +77,10 @@ fn mode_to_string(mode: u32) -> String {
 /// and `sftp_read_dir_page` so the symlink-resolution/sort logic only lives
 /// in one place.
 fn list_dir_entries(
-    sftp: &crate::modules::ssh::SftpHandle,
+    sftp: &ssh2::Sftp,
     path: &str,
 ) -> Result<Vec<FileNode>, String> {
-    let entries = sftp.0
+    let entries = sftp
         .readdir(std::path::Path::new(path))
         .map_err(|e| e.to_string())?;
 
@@ -101,7 +94,7 @@ fn list_dir_entries(
             let is_symlink = stat.file_type().is_symlink();
             let (symlink_target, resolved_is_dir) = if is_symlink {
                 // readlink gives the raw target (may be relative).
-                let raw_target = sftp.0.readlink(&pb).ok()
+                let raw_target = sftp.readlink(&pb).ok()
                     .map(|p| p.to_string_lossy().to_string());
                 // Resolve relative targets against the entry's parent directory
                 // so navigation works regardless of how the symlink was created.
@@ -117,7 +110,7 @@ fn list_dir_entries(
                 });
                 // stat() follows the symlink; tells us if the target is a dir.
                 let is_target_dir = abs_target.as_deref()
-                    .and_then(|t| sftp.0.stat(std::path::Path::new(t)).ok())
+                    .and_then(|t| sftp.stat(std::path::Path::new(t)).ok())
                     .map(|s| s.is_dir())
                     .unwrap_or(false);
                 (abs_target, is_target_dir)
@@ -160,12 +153,12 @@ pub async fn sftp_read_dir(
         log::debug!("[SFTP] sftp_read_dir: tab={} path={}", session_id, path);
 
         // Acquire Arc under brief lock, then release outer lock before I/O.
-        let sftp_arc: Arc<std::sync::Mutex<crate::modules::ssh::SftpHandle>> =
-            get_sftp_arc!(state_inner, &session_id);
+        let inner_arc: Arc<std::sync::Mutex<crate::modules::sftp::state::SftpSessionInner>> =
+            get_sftp_inner_arc!(state_inner, &session_id);
 
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
         log::debug!("[SFTP] readdir({})…", path);
-        let files = list_dir_entries(&sftp, &path)?;
+        let files = list_dir_entries(&inner.sftp, &path)?;
         log::debug!("[SFTP] readdir complete — {} entries.", files.len());
         Ok(files)
     })
@@ -228,10 +221,10 @@ pub async fn sftp_read_dir_page(
     let show_hidden = show_hidden.unwrap_or(false);
 
     tokio::task::spawn_blocking(move || {
-        let sftp_arc: Arc<std::sync::Mutex<crate::modules::ssh::SftpHandle>> =
-            get_sftp_arc!(state_inner, &session_id);
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-        let mut files = list_dir_entries(&sftp, &path)?;
+        let inner_arc: Arc<std::sync::Mutex<crate::modules::sftp::state::SftpSessionInner>> =
+            get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
+        let mut files = list_dir_entries(&inner.sftp, &path)?;
         if !show_hidden {
             files.retain(|f| !f.name.starts_with('.'));
         }
@@ -253,9 +246,9 @@ pub async fn sftp_rename(
     let state_inner = state.inner().clone();
     let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-        sftp.0.rename(
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
+        inner.sftp.rename(
             std::path::Path::new(&old_path),
             std::path::Path::new(&new_path),
             None,
@@ -277,16 +270,16 @@ pub async fn sftp_delete(
     let state_inner = state.inner().clone();
     let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
 
         for path in &paths {
             let p = std::path::Path::new(path);
             // Try SFTP unlink (files), then rmdir (empty dirs).
             // Non-empty dirs are not supported via SFTP alone — caller should
             // recursively delete children first.
-            if sftp.0.unlink(p).is_err() {
-                sftp.0.rmdir(p).map_err(|e| e.to_string())?;
+            if inner.sftp.unlink(p).is_err() {
+                inner.sftp.rmdir(p).map_err(|e| e.to_string())?;
             }
         }
         Ok(())
@@ -335,23 +328,23 @@ pub async fn sftp_mkdir(
     let session_id_for_err = session_id.clone();
     let recursive = recursive.unwrap_or(false);
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
         if !recursive {
-            return sftp.0.mkdir(std::path::Path::new(&path), 0o755)
+            return inner.sftp.mkdir(std::path::Path::new(&path), 0o755)
                 .map_err(|e| e.to_string());
         }
         // mkdir -p semantics: create every missing ancestor, tolerate ones
         // that already exist (including `path` itself) instead of failing.
         for ancestor in mkdir_ancestors(&path) {
             let p = std::path::Path::new(&ancestor);
-            if sftp.0.stat(p).is_ok() {
+            if inner.sftp.stat(p).is_ok() {
                 continue;
             }
-            if let Err(e) = sftp.0.mkdir(p, 0o755) {
+            if let Err(e) = inner.sftp.mkdir(p, 0o755) {
                 // A concurrent mkdir (or a race with the stat() above) can still
                 // land on "already exists" here — only surface a real failure.
-                if sftp.0.stat(p).is_err() {
+                if inner.sftp.stat(p).is_err() {
                     return Err(format!("mkdir({ancestor}) failed: {e}"));
                 }
             }
@@ -376,13 +369,13 @@ pub async fn sftp_create_file(
     let state_inner = state.inner().clone();
     let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
         let p = std::path::Path::new(&path);
-        if sftp.0.stat(p).is_ok() {
+        if inner.sftp.stat(p).is_ok() {
             return Err(format!("already exists: {path}"));
         }
-        sftp.0.create(p).map(|_| ()).map_err(|e| e.to_string())
+        inner.sftp.create(p).map(|_| ()).map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| LabonairError::Internal(e.to_string()))?
@@ -400,13 +393,13 @@ pub async fn sftp_chmod(
     let state_inner = state.inner().clone();
     let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-        let mut stat = sftp.0
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
+        let mut stat = inner.sftp
             .stat(std::path::Path::new(&path))
             .map_err(|e| e.to_string())?;
         stat.perm = Some(permissions);
-        sftp.0.setstat(std::path::Path::new(&path), stat)
+        inner.sftp.setstat(std::path::Path::new(&path), stat)
             .map_err(|e| e.to_string())
     })
     .await
@@ -425,9 +418,9 @@ pub async fn prepare_remote_edit(
     let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
         let file_data = {
-            let sftp_arc = get_sftp_arc!(state_inner, &session_id);
-            let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-            let stat = sftp.0
+            let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+            let inner = inner_arc.lock().map_err(|e| e.to_string())?;
+            let stat = inner.sftp
                 .stat(std::path::Path::new(&remote_path))
                 .map_err(|e| e.to_string())?;
             let size = stat.size.unwrap_or(0);
@@ -436,7 +429,7 @@ pub async fn prepare_remote_edit(
                     "File is too large for in-app editing ({size} bytes). Max 5 MB."
                 ));
             }
-            let mut remote_file = sftp.0
+            let mut remote_file = inner.sftp
                 .open(std::path::Path::new(&remote_path))
                 .map_err(|e| e.to_string())?;
             let mut buf = Vec::with_capacity(size as usize);
@@ -489,9 +482,9 @@ pub async fn save_remote_edit(
     tokio::task::spawn_blocking(move || {
         let canonical = validate_remote_edit_temp_path(&local_temp_path)?;
         let data = std::fs::read(&canonical).map_err(|e| e.to_string())?;
-        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-        let mut remote_file = sftp.0
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
+        let mut remote_file = inner.sftp
             .create(std::path::Path::new(&remote_path))
             .map_err(|e| e.to_string())?;
         remote_file.write_all(&data).map_err(|e| e.to_string())
@@ -532,16 +525,16 @@ pub async fn sftp_read_file_content(
     let state_inner = state.inner().clone();
     let session_id_for_err = session_id.clone();
     tokio::task::spawn_blocking(move || {
-        let sftp_arc = get_sftp_arc!(state_inner, &session_id);
-        let sftp = sftp_arc.lock().map_err(|e| e.to_string())?;
-        let stat = sftp.0
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
+        let stat = inner.sftp
             .stat(std::path::Path::new(&remote_path))
             .map_err(|e| e.to_string())?;
         let size = stat.size.unwrap_or(0);
         if size > MAX_REMOTE_READ_BYTES {
             return Ok(ReadResult::TooLarge { size, limit: MAX_REMOTE_READ_BYTES });
         }
-        let mut remote_file = sftp.0
+        let mut remote_file = inner.sftp
             .open(std::path::Path::new(&remote_path))
             .map_err(|e| e.to_string())?;
         let mut buf = Vec::with_capacity(size as usize);
@@ -578,9 +571,9 @@ pub async fn sftp_calculate_size(
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
         // Acquire Arc under brief lock, then release before I/O.
-        let session_arc = get_sftp_session_arc!(state_inner, &session_id);
-        let sess = session_arc.lock().map_err(|e| e.to_string())?;
-        let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
+        let mut ch = inner.session.channel_session().map_err(|e| e.to_string())?;
         ch.exec(&format!("du -sh {}", shell_quote(&path))).map_err(|e| e.to_string())?;
         let mut stdout = String::new();
         ch.read_to_string(&mut stdout).map_err(|e| e.to_string())?;
@@ -613,9 +606,9 @@ pub async fn sftp_chown(
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
         // Acquire Arc under brief lock, then release before I/O.
-        let session_arc = get_sftp_session_arc!(state_inner, &session_id);
-        let sess = session_arc.lock().map_err(|e| e.to_string())?;
-        let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
+        let mut ch = inner.session.channel_session().map_err(|e| e.to_string())?;
         let cmd = format!("chown {} {}", spec, shell_quote(&path));
         ch.exec(&cmd).map_err(|e| e.to_string())?;
         let mut stderr_buf = String::new();
@@ -647,9 +640,9 @@ pub async fn sftp_deep_search(
     tokio::task::spawn_blocking(move || {
         use std::io::Read;
         // Acquire Arc under brief lock, then release before I/O.
-        let session_arc = get_sftp_session_arc!(state_inner, &session_id);
-        let sess = session_arc.lock().map_err(|e| e.to_string())?;
-        let mut ch = sess.0.channel_session().map_err(|e| e.to_string())?;
+        let inner_arc = get_sftp_inner_arc!(state_inner, &session_id);
+        let inner = inner_arc.lock().map_err(|e| e.to_string())?;
+        let mut ch = inner.session.channel_session().map_err(|e| e.to_string())?;
         // Build the glob as a plain Rust string and let `shell_quote` do the
         // only escaping pass — pre-escaping `query` here too would double-
         // escape any embedded `'` once `shell_quote` escapes it again.

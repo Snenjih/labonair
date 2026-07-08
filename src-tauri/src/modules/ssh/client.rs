@@ -682,12 +682,18 @@ fn ssh_connect_blocking(
         &app,
     )?;
 
-    // Open PTY shell channel (switches session to non-blocking).
-    let session_arc = std::sync::Arc::new(std::sync::Mutex::new(super::SessionHandle(session)));
+    // Open PTY shell channel (switches session to non-blocking). The channel
+    // is stored directly into `inner_arc` by `open_shell_channel` — see
+    // `SshSessionInner`'s doc comment for why the channel and session share
+    // one lock.
+    let inner_arc = std::sync::Arc::new(std::sync::Mutex::new(super::SshSessionInner {
+        session,
+        channel: None,
+    }));
     log_step!(app, session_id, "Opening PTY shell channel…");
     let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
-    let (channel, shutdown) = super::pty::open_shell_channel(
-        session_arc.clone(),
+    let shutdown = super::pty::open_shell_channel(
+        inner_arc.clone(),
         &session_id,
         &app,
         state.clone(),
@@ -707,8 +713,7 @@ fn ssh_connect_blocking(
         map.insert(
             session_id.clone(),
             super::SshSession {
-                session: session_arc,
-                channel: Some(channel),
+                inner: inner_arc,
                 shutdown,
                 _jump_bridge: jump_bridge,
             },
@@ -1055,14 +1060,14 @@ pub fn ssh_disconnect(
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
     let mut map = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(mut sess) = map.remove(&session_id) {
+    if let Some(sess) = map.remove(&session_id) {
         // Signal the reader thread to exit before closing the channel.
         sess.shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
-        if let Some(mut ch) = sess.channel.take() {
-            let _ = ch.close();
-        }
-        if let Ok(s) = sess.session.lock() {
-            let _ = s.0.disconnect(None, "User disconnected", None);
+        if let Ok(mut inner) = sess.inner.lock() {
+            if let Some(mut ch) = inner.channel.take() {
+                let _ = ch.close();
+            }
+            let _ = inner.session.disconnect(None, "User disconnected", None);
         }
     }
     Ok(())

@@ -304,6 +304,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   async function handleReconnect() {
     setIsReconnecting(true);
     try {
+      // Force-disconnect first (best-effort) so sftp_connect's idempotency
+      // check never silently no-ops against a stale session record the
+      // backend failed to clean up itself — same reasoning as the sidebar
+      // Explorer's lazy-session reconnect (see useLazyExplorerSession.ts).
+      await invoke("sftp_disconnect", { sessionId: tabId }).catch(() => {});
       await invoke("sftp_connect", { sessionId: tabId, hostId: tab.hostId });
       clearDisconnected(tabId);
       loadLocalDir(tabId, tabState?.localPath ?? "~");

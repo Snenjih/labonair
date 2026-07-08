@@ -14,6 +14,16 @@ pub(crate) fn is_network_error(e: &str) -> bool {
         || lower.contains("no sftp session")
         || lower.contains("no ssh session")
         || lower.contains("sftp_state lock")
+        // Mirrors ssh/pty.rs's humanize_disconnect_reason patterns — a dead
+        // SFTP/browsing session surfaces the exact same libssh2 transport
+        // errors an interactive PTY session does, and previously only the
+        // PTY side recognized them here, so a browsing session killed this
+        // way was never removed/reported (see the SSH reliability fix plan).
+        || lower.contains("transport read")
+        || lower.contains("transport write")
+        || lower.contains("timed out")
+        || lower.contains("eof")
+        || lower.contains("end of file")
 }
 
 #[cfg(test)]
@@ -73,5 +83,32 @@ mod tests {
     #[test]
     fn does_not_flag_generic_internal_error() {
         assert!(!is_network_error("invalid argument"));
+    }
+
+    // --- patterns added by the SSH reliability fix (mirrors
+    // ssh/pty.rs::humanize_disconnect_reason so a browsing/SFTP session dying
+    // the same way an interactive PTY session would is classified the same). ---
+
+    #[test]
+    fn detects_transport_read_error() {
+        assert!(is_network_error(
+            "Network transport failure — the connection was dropped by the server or network [transport read]"
+        ));
+    }
+
+    #[test]
+    fn detects_transport_write_error() {
+        assert!(is_network_error("transport write error"));
+    }
+
+    #[test]
+    fn detects_timed_out() {
+        assert!(is_network_error("operation timed out"));
+    }
+
+    #[test]
+    fn detects_eof() {
+        assert!(is_network_error("unexpected eof"));
+        assert!(is_network_error("Connection closed by the remote host (EOF)"));
     }
 }

@@ -89,15 +89,34 @@ pub fn snippet_run_ssh(
 ) -> Result<(), String> {
     use std::io::Read;
 
+    // `session_arc` is the SAME lock the interactive PTY reader thread and
+    // `ssh_exec_command` use for this session (see `SshSessionInner`'s doc
+    // comment in ssh/mod.rs). A snippet can legitimately stream output for a
+    // long time, so — unlike a short one-shot exec — we deliberately do NOT
+    // hold this lock for the snippet's whole runtime: that would freeze the
+    // interactive terminal (and any other exec/git call on this host) for as
+    // long as the snippet keeps running. Instead the lock is re-acquired for
+    // each individual libssh2 call (channel creation, exec, each read poll),
+    // exactly like ssh/exec.rs's retry_ssh2/retry_io — every other operation
+    // on this session gets to interleave between reads.
     let session_arc = crate::get_session_arc!(state, &session_id);
-    let sess = session_arc.lock().map_err(|e| e.to_string())?;
 
-    let mut channel = sess.0.channel_session().map_err(|e| e.to_string())?;
-    channel.exec(&command).map_err(|e| e.to_string())?;
+    let mut channel = {
+        let sess = session_arc.lock().map_err(|e| e.to_string())?;
+        sess.session.channel_session().map_err(|e| e.to_string())?
+    };
+    {
+        let _sess = session_arc.lock().map_err(|e| e.to_string())?;
+        channel.exec(&command).map_err(|e| e.to_string())?;
+    }
 
     let mut buf = [0u8; 4096];
     loop {
-        match channel.read(&mut buf) {
+        let attempt = {
+            let _sess = session_arc.lock().map_err(|e| e.to_string())?;
+            channel.read(&mut buf)
+        };
+        match attempt {
             Ok(0) => break,
             Ok(n) => {
                 let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
@@ -114,7 +133,10 @@ pub fn snippet_run_ssh(
     }
 
     let mut stderr_buf = Vec::new();
-    let _ = channel.stderr().read_to_end(&mut stderr_buf);
+    {
+        let _sess = session_arc.lock().map_err(|e| e.to_string())?;
+        let _ = channel.stderr().read_to_end(&mut stderr_buf);
+    }
     if !stderr_buf.is_empty() {
         let chunk = String::from_utf8_lossy(&stderr_buf).to_string();
         let _ = app.emit(
@@ -123,8 +145,11 @@ pub fn snippet_run_ssh(
         );
     }
 
-    let _ = channel.wait_close();
-    let exit_code = channel.exit_status().unwrap_or(-1);
+    let exit_code = {
+        let _sess = session_arc.lock().map_err(|e| e.to_string())?;
+        let _ = channel.wait_close();
+        channel.exit_status().unwrap_or(-1)
+    };
 
     let _ = app.emit(
         "snippet_run_done",

@@ -314,7 +314,7 @@ fn run_remote_script_sync(
         );
     };
 
-    let session_arc = {
+    let inner_arc = {
         let map = sftp_state.0.lock().map_err(|e| e.to_string())?;
         let entry = map.get(session_id).ok_or_else(|| {
             // The session is already confirmed gone here — emit directly
@@ -324,12 +324,12 @@ fn run_remote_script_sync(
             emit_connection_lost(&reason);
             reason
         })?;
-        entry.session.clone()
+        entry.inner.clone()
     };
-    let sess = session_arc.lock().map_err(|e| e.to_string())?;
+    let inner = inner_arc.lock().map_err(|e| e.to_string())?;
 
     let exec_via = |shell: &str, flag: &str| -> Result<(Vec<u8>, Vec<u8>, i32), String> {
-        let mut channel = sess.0.channel_session().map_err(|e| e.to_string())?;
+        let mut channel = inner.session.channel_session().map_err(|e| e.to_string())?;
         let cmd = format!("{shell} {flag} {}", shell_quote(script));
         channel.exec(&cmd).map_err(|e| e.to_string())?;
 
