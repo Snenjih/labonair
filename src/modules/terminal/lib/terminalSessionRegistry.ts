@@ -101,6 +101,13 @@ const integrationSubscribers = new Map<string, Set<() => void>>();
  *  focus-on-mousedown — a plain function ref rather than a React context
  *  since the click handler lives in a different component tree branch. */
 const composerFocusHandlers = new Map<string, () => void>();
+/** One imperative "insert text at cursor" per session, registered by
+ *  `ShellComposerInput` alongside its focus handler above. Lets explorer
+ *  drag-drop (TerminalPane/SshTerminalPane) redirect quoted-path pasting
+ *  into the composer's draft instead of writing straight to the pty when
+ *  the composer is actually mounted and idle for this session — see
+ *  `insertIntoComposer`. */
+const composerInsertHandlers = new Map<string, (text: string) => void>();
 
 function notifyBlocks(sessionId: string): void {
   for (const cb of blockSubscribers.get(sessionId) ?? []) cb();
@@ -383,6 +390,27 @@ export function registerComposerFocus(sessionId: string, fn: () => void): () => 
 
 export function focusComposer(sessionId: string): void {
   composerFocusHandlers.get(sessionId)?.();
+}
+
+/** Registers the composer's imperative "insert text" for this session —
+ *  called by `ShellComposerInput` whenever it's mounted (phase "ready"),
+ *  same lifecycle as `registerComposerFocus`. */
+export function registerComposerInsert(sessionId: string, fn: (text: string) => void): () => void {
+  composerInsertHandlers.set(sessionId, fn);
+  return () => {
+    if (composerInsertHandlers.get(sessionId) === fn) composerInsertHandlers.delete(sessionId);
+  };
+}
+
+/** Inserts `text` into this session's composer draft if the composer is
+ *  currently mounted for it (returns `true`), or does nothing and returns
+ *  `false` otherwise — callers (explorer drag-drop) fall back to writing
+ *  straight to the pty when this returns `false`. */
+export function insertIntoComposer(sessionId: string, text: string): boolean {
+  const fn = composerInsertHandlers.get(sessionId);
+  if (!fn) return false;
+  fn(text);
+  return true;
 }
 
 /** Subscribe to composer-relevant session state — `commandRunning` toggling

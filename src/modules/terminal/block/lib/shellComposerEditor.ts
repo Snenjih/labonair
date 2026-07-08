@@ -11,11 +11,17 @@ import {
   placeholder,
   WidgetType,
 } from "@codemirror/view";
-import { historyListFor, suggestFor } from "./commandHistory";
+import { historyListFor, suggestArguments, suggestFor } from "./commandHistory";
+import { tokenize } from "./commandTokenizer";
 
 // ─── Ghost text (inline history suggestion, Tab to accept) ───────────────────
 
 const setGhost = StateEffect.define<string | null>();
+
+// Tags doc edits made by applyArgCandidate (Tab/Arrow-driven argument
+// completion) so updateListener can recognize and skip them — see the
+// comment at the dispatch call in applyArgCandidate for why.
+const ARG_COMPLETE_USER_EVENT = "input.complete.argument";
 
 class GhostWidget extends WidgetType {
   constructor(readonly text: string) {
@@ -87,16 +93,22 @@ function ghostSuggestionOf(view: EditorView): string | null {
   return view.state.field(ghostField).suggestion;
 }
 
-function scheduleGhostLookup(view: EditorView, sessionId: string): void {
-  const text = view.state.doc.toString();
-  const atEnd = view.state.selection.main.head === view.state.doc.length;
-  if (!atEnd || !text.trim()) {
-    view.dispatch({ effects: setGhost.of(null) });
-    return;
-  }
-  const found = suggestFor(sessionId, text);
-  const remainder = found ? found.slice(text.length) : null;
-  view.dispatch({ effects: setGhost.of(remainder) });
+/** Pure lookup for the per-argument candidate list at the cursor — see
+ *  commandHistory.suggestArguments. Returns null when there's no ambiguity
+ *  (fewer than 2 candidates) or the cursor sits inside an unterminated
+ *  quote, in which case the caller falls back to the plain whole-line ghost
+ *  text (suggestFor) unchanged — the two mechanisms are meant to coexist:
+ *  the argument list only takes over when there's an actual fork to resolve. */
+function computeArgumentCandidates(
+  sessionId: string,
+  text: string,
+  cursorPos: number,
+): { candidates: string[]; tokenFrom: number } | null {
+  const tok = tokenize(text, cursorPos);
+  if (tok.inUnterminatedQuote) return null;
+  const candidates = suggestArguments(sessionId, tok.precedingTokens, tok.activeTokenPrefix);
+  if (candidates.length < 2) return null;
+  return { candidates, tokenFrom: cursorPos - tok.activeTokenPrefix.length };
 }
 
 function acceptGhost(view: EditorView): boolean {
@@ -161,6 +173,10 @@ export type ShellComposerHandle = {
   view: EditorView;
   focus: () => void;
   setValue: (text: string) => void;
+  /** Inserts `text` at the current cursor position (replacing any selection)
+   *  and focuses the editor — used to redirect explorer drag-drop here
+   *  instead of writing straight to the pty. */
+  insertText: (text: string) => void;
   getValue: () => string;
   destroy: () => void;
 };
@@ -185,6 +201,16 @@ export type ShellComposerCallbacks = {
     close: () => void;
     move: (direction: -1 | 1) => void;
     runSelected: () => void;
+  };
+  /** Only set when the "argument completion" setting is on. Reports a fresh
+   *  candidate list (+ which index is selected, + the doc offset the active
+   *  token starts at) whenever the debounced lookup or a Tab/Arrow-driven
+   *  cycle changes it — this module owns tokenizing/matching/the doc edits,
+   *  same division of responsibility as `history` above: rendering (the
+   *  popover) and its open/closed state live in the React component. */
+  argCompletion?: {
+    setCandidates: (candidates: string[], selected: number, tokenFrom: number) => void;
+    close: () => void;
   };
 };
 
@@ -222,6 +248,76 @@ export function createShellComposerEditor(
 ): ShellComposerHandle {
   let ghostTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // Argument-completion popover state — mirrors the `history` callback's
+  // division of labor (this module owns matching/doc edits, the React layer
+  // owns rendering) but, unlike history, needs its own local state here too:
+  // Tab/Arrow both read *and* advance `selected` synchronously within the
+  // same keypress, without waiting for the next debounced lookup.
+  // `applied` distinguishes "candidates[selected] is only being ghost-
+  // previewed so far" (fresh from the debounced lookup — the very first Tab
+  // press should commit *that* one) from "candidates[selected] is already
+  // the real, committed text" (a previous Tab/Arrow press did it — the next
+  // Tab should advance past it). Without this, the first Tab press would
+  // skip straight to the second candidate instead of confirming the one
+  // already being previewed.
+  let argState: { candidates: string[]; selected: number; tokenFrom: number; applied: boolean } | null = null;
+
+  function closeArgState(): void {
+    if (!argState) return;
+    argState = null;
+    callbacks.argCompletion?.close();
+  }
+
+  /** Replaces the active token (argState.tokenFrom..doc end) with
+   *  `candidates[selected]` as real, committed text — used by both Tab
+   *  (advances `selected` afterward, cycling) and Arrow keys (jumps directly
+   *  to the given index, no auto-advance). Doing a full real-text replace
+   *  rather than an incremental ghost-remainder keeps behavior correct even
+   *  when candidates don't share a common prefix (e.g. "wait" -> "wall"). */
+  function applyArgCandidate(view: EditorView, selected: number): void {
+    if (!argState) return;
+    const { candidates, tokenFrom } = argState;
+    const candidate = candidates[selected];
+    view.dispatch({
+      changes: { from: tokenFrom, to: view.state.doc.length, insert: candidate },
+      selection: { anchor: tokenFrom + candidate.length },
+      effects: setGhost.of(null),
+      // Tagged so updateListener can tell this apart from genuine typing and
+      // skip re-scheduling the debounced lookup — that lookup would
+      // otherwise fire ~80ms later, re-tokenize the now-committed candidate,
+      // and reset `selected`/`applied` back to a fresh state before the next
+      // Tab press lands, making cycling past the first candidate impossible.
+      userEvent: ARG_COMPLETE_USER_EVENT,
+    });
+    argState = { candidates, selected, tokenFrom, applied: true };
+    callbacks.argCompletion?.setCandidates(candidates, selected, tokenFrom);
+  }
+
+  function applySuggestions(view: EditorView): void {
+    const text = view.state.doc.toString();
+    const cursorPos = view.state.selection.main.head;
+    const atEnd = cursorPos === text.length;
+    if (!atEnd || !text.trim()) {
+      closeArgState();
+      view.dispatch({ effects: setGhost.of(null) });
+      return;
+    }
+    if (callbacks.argCompletion) {
+      const found = computeArgumentCandidates(sessionId, text, cursorPos);
+      if (found) {
+        argState = { candidates: found.candidates, selected: 0, tokenFrom: found.tokenFrom, applied: false };
+        callbacks.argCompletion.setCandidates(found.candidates, 0, found.tokenFrom);
+        const remainder = found.candidates[0].slice(cursorPos - found.tokenFrom);
+        view.dispatch({ effects: setGhost.of(remainder || null) });
+        return;
+      }
+    }
+    closeArgState();
+    const found = suggestFor(sessionId, text);
+    const remainder = found ? found.slice(text.length) : null;
+    view.dispatch({ effects: setGhost.of(remainder) });
+  }
+
   const submitKeymap = Prec.highest(
     keymap.of([
       {
@@ -238,6 +334,7 @@ export function createShellComposerEditor(
           const text = view.state.doc.toString();
           if (!text.trim()) return false;
           resetHistoryNav(sessionId);
+          closeArgState();
           callbacks.onSubmit(text);
           view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "" } });
           return true;
@@ -250,10 +347,31 @@ export function createShellComposerEditor(
           return true;
         },
       },
-      { key: "Tab", run: acceptGhost },
+      {
+        key: "Tab",
+        run: (view) => {
+          if (argState) {
+            // First press for this popover confirms the candidate already
+            // being ghost-previewed (index `selected`, untouched); only once
+            // that's actually committed does a further press advance to the
+            // next one — otherwise the very first Tab would skip straight
+            // past the previewed candidate.
+            const nextSelected = argState.applied
+              ? (argState.selected + 1) % argState.candidates.length
+              : argState.selected;
+            applyArgCandidate(view, nextSelected);
+            return true;
+          }
+          return acceptGhost(view);
+        },
+      },
       {
         key: "Escape",
         run: () => {
+          if (argState) {
+            closeArgState();
+            return true;
+          }
           if (!callbacks.history?.isOpen()) return false;
           callbacks.history.close();
           return true;
@@ -262,6 +380,11 @@ export function createShellComposerEditor(
       {
         key: "ArrowUp",
         run: (view) => {
+          if (argState) {
+            if (argState.selected === 0) return true; // already at top — stay put
+            applyArgCandidate(view, argState.selected - 1);
+            return true;
+          }
           if (callbacks.history) {
             if (callbacks.history.isOpen()) {
               callbacks.history.move(-1);
@@ -278,6 +401,11 @@ export function createShellComposerEditor(
       {
         key: "ArrowDown",
         run: (view) => {
+          if (argState) {
+            if (argState.selected === argState.candidates.length - 1) return true; // already at bottom
+            applyArgCandidate(view, argState.selected + 1);
+            return true;
+          }
           if (callbacks.history?.isOpen()) {
             callbacks.history.move(1);
             return true;
@@ -290,14 +418,31 @@ export function createShellComposerEditor(
   );
 
   const updateListener = EditorView.updateListener.of((update) => {
+    if (update.selectionSet && !update.docChanged) {
+      // Cursor moved away from the end without editing the doc (click,
+      // ArrowLeft, …) — both suggestion mechanisms only make sense while
+      // typing at the end of the line, so close/clear rather than leave a
+      // stale popover or ghost pointing at a token that's no longer active.
+      if (update.state.selection.main.head !== update.state.doc.length) {
+        closeArgState();
+        if (ghostSuggestionOf(update.view)) update.view.dispatch({ effects: setGhost.of(null) });
+      }
+      return;
+    }
     if (!update.docChanged) return;
+    // A Tab/Arrow-driven argument completion already updated argState and
+    // notified the popover synchronously (see applyArgCandidate) — letting
+    // the debounce below re-run for it would re-tokenize the now-committed
+    // candidate and reset `selected`/`applied` before the next keypress,
+    // making it impossible to cycle past the first candidate.
+    if (update.transactions.some((tr) => tr.isUserEvent(ARG_COMPLETE_USER_EVENT))) return;
     // Genuine typing while the history popup is open means the user wants
     // to type, not browse — close it and let the keystroke through normally
     // (the popup never edits the doc itself, so any doc change here is real
     // user input, not a popup-driven update).
     if (callbacks.history?.isOpen()) callbacks.history.close();
     if (ghostTimer) clearTimeout(ghostTimer);
-    ghostTimer = setTimeout(() => scheduleGhostLookup(update.view, sessionId), 80);
+    ghostTimer = setTimeout(() => applySuggestions(update.view), 80);
   });
 
   const { fontFamily, cursorStyle, cursorBlink, cursorBlinkInterval } = options;
@@ -345,6 +490,10 @@ export function createShellComposerEditor(
     focus: () => view.focus(),
     setValue: (text: string) => {
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+    },
+    insertText: (text: string) => {
+      view.dispatch(view.state.replaceSelection(text));
+      view.focus();
     },
     getValue: () => view.state.doc.toString(),
     destroy: () => {

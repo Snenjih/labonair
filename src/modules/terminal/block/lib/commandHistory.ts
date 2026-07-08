@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { tokenizeFull } from "./commandTokenizer";
 
 // TODO: also search src/modules/snippets (user-saved reusable commands, see
 // commandSnippetsStore.ts) as a suggestion source alongside shell history —
@@ -23,6 +24,14 @@ const MAX_HISTORY = 1000;
 // finishes, which is how newly-run commands show up with no explicit
 // "record" step.
 const sessionCache = new Map<string, string[]>();
+
+// Parallel to sessionCache (same order, oldest-first) — each history line
+// pre-split into pipe/&&/||/;-separated segments of tokens, for
+// suggestArguments()'s per-position lookup. Rebuilt whenever sessionCache is
+// (loadHistory), not on every keystroke.
+const sessionSegmentsCache = new Map<string, string[][][]>();
+
+const MAX_ARGUMENT_CANDIDATES = 20;
 
 // Bumped on every loadHistory() call for a session; a call only writes its
 // result to sessionCache if it's still the most recent one issued for that
@@ -136,6 +145,10 @@ export async function loadHistory(sessionId: string, source: HistorySource): Pro
   const list = source.kind === "local" ? await readLocalHistory() : await readSshHistory(source.sessionId);
   if (latestRequest.get(sessionId) !== seq) return; // superseded by a newer call
   sessionCache.set(sessionId, list);
+  sessionSegmentsCache.set(
+    sessionId,
+    list.map((line) => tokenizeFull(line)),
+  );
   if (list.length === 0) {
     console.warn(
       `[labonair] command history: 0 entries found for session ${sessionId} (${source.kind}). ` +
@@ -162,8 +175,51 @@ export function suggestFor(sessionId: string, prefix: string): string | null {
   return null;
 }
 
+/** Argument-completion candidates for the token at the position implied by
+ *  `precedingTokens` (already-committed tokens earlier in the same
+ *  pipe/&&/||/;-segment) — every distinct next-token, across history, that
+ *  starts with `activePrefix`, most-recent-first. `precedingTokens: []`
+ *  yields command-name candidates (the history's own first tokens), which is
+ *  how Tab-completing the very first word of a line is derived — there is no
+ *  separate PATH/binary listing, only what the session's history contains.
+ *  Unlike `suggestFor`, an exact prefix match (`activePrefix` itself, already
+ *  fully typed) is kept in the results: the UI lists full candidate strings
+ *  (not just remainders), and the already-typed value is still a legitimate,
+ *  selectable entry (mirrors Warp's completion menu, which lists the exact
+ *  match too). */
+export function suggestArguments(
+  sessionId: string,
+  precedingTokens: string[],
+  activePrefix: string,
+): string[] {
+  const segmentsPerLine = sessionSegmentsCache.get(sessionId);
+  if (!segmentsPerLine) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (let i = segmentsPerLine.length - 1; i >= 0 && out.length < MAX_ARGUMENT_CANDIDATES; i--) {
+    for (const segment of segmentsPerLine[i]) {
+      if (segment.length <= precedingTokens.length) continue;
+      let matches = true;
+      for (let j = 0; j < precedingTokens.length; j++) {
+        if (segment[j] !== precedingTokens[j]) {
+          matches = false;
+          break;
+        }
+      }
+      if (!matches) continue;
+      const candidate = segment[precedingTokens.length];
+      if (!candidate.startsWith(activePrefix) || seen.has(candidate)) continue;
+      seen.add(candidate);
+      out.push(candidate);
+      if (out.length >= MAX_ARGUMENT_CANDIDATES) break;
+    }
+  }
+  return out;
+}
+
 export function disposeHistory(sessionId: string): void {
   sessionCache.delete(sessionId);
+  sessionSegmentsCache.delete(sessionId);
   latestRequest.delete(sessionId);
 }
 

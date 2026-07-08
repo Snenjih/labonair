@@ -5,9 +5,11 @@ import {
   hasShellIntegration,
   isCommandRunning,
   registerComposerFocus,
+  registerComposerInsert,
   subscribeIntegrationState,
   write,
 } from "../lib/terminalSessionRegistry";
+import { ArgumentCompletionPopover } from "./ArgumentCompletionPopover";
 import { HistoryPopover } from "./HistoryPopover";
 import { historyListFor, loadHistory } from "./lib/commandHistory";
 import { createShellComposerEditor, type ShellComposerHandle } from "./lib/shellComposerEditor";
@@ -33,6 +35,7 @@ function phaseOf(sessionId: string): SessionPhase {
 export function ShellComposerInput({ sessionId, kind }: { sessionId: string; kind: "local" | "ssh" }) {
   const fontFamily = usePreferencesStore((s) => s.terminalFontFamily);
   const historyPopupEnabled = usePreferencesStore((s) => s.terminalComposerHistoryPopup);
+  const argCompletionEnabled = usePreferencesStore((s) => s.terminalComposerArgumentCompletion);
   const cursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
   const cursorBlink = usePreferencesStore((s) => s.terminalCursorBlink);
   const cursorBlinkInterval = usePreferencesStore((s) => s.terminalCursorBlinkInterval);
@@ -76,13 +79,25 @@ export function ShellComposerInput({ sessionId, kind }: { sessionId: string; kin
     handleRef.current?.setValue("");
   };
 
+  // ── Argument completion (terminalComposerArgumentCompletion setting) ──────
+  // Same division of labor as the history popup above: shellComposerEditor
+  // owns tokenizing/matching/the doc edits, this component only renders the
+  // popover and mirrors its open/candidates/selected state. `tokenFrom` is
+  // only read by mouse clicks (onSelect below) — keyboard-driven cycling
+  // (Tab/Arrow) applies candidates from inside shellComposerEditor's own
+  // closure state without needing it here.
+  const [argOpen, setArgOpen] = useState(false);
+  const [argCandidates, setArgCandidates] = useState<string[]>([]);
+  const [argSelected, setArgSelected] = useState(0);
+  const argTokenFromRef = useRef(0);
+
   // fontFamily/cursor* intentionally excluded from deps — purely cosmetic,
   // live changes don't warrant tearing down and losing composer focus; the
   // editor picks up current values fresh next time it's (re)created for a
-  // phase/session change. historyPopupEnabled IS in deps below (unlike
-  // those) — it changes which keymap branch runs (popup vs inline nav), so
-  // toggling it should take effect immediately rather than waiting for an
-  // unrelated phase/session change.
+  // phase/session change. historyPopupEnabled/argCompletionEnabled ARE in
+  // deps below (unlike those) — they change which keymap branches run, so
+  // toggling either should take effect immediately rather than waiting for
+  // an unrelated phase/session change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: see above
   useEffect(() => {
     const el = containerRef.current;
@@ -119,6 +134,17 @@ export function ShellComposerInput({ sessionId, kind }: { sessionId: string; kin
               runSelected,
             }
           : undefined,
+        argCompletion: argCompletionEnabled
+          ? {
+              setCandidates: (candidates, selected, tokenFrom) => {
+                argTokenFromRef.current = tokenFrom;
+                setArgCandidates(candidates);
+                setArgSelected(selected);
+                setArgOpen(true);
+              },
+              close: () => setArgOpen(false),
+            }
+          : undefined,
       },
       { fontFamily, cursorStyle, cursorBlink, cursorBlinkInterval },
     );
@@ -131,17 +157,23 @@ export function ShellComposerInput({ sessionId, kind }: { sessionId: string; kin
     // shouldBlockTerminalClick) — registered only while an editor actually
     // exists to receive it.
     const unregisterFocus = registerComposerFocus(sessionId, () => handleRef.current?.focus());
+    // Lets explorer drag-drop (TerminalPane/SshTerminalPane) redirect quoted
+    // path pasting here instead of writing straight to the pty — same
+    // "only while mounted" lifecycle as the focus handler above.
+    const unregisterInsert = registerComposerInsert(sessionId, (text) => handleRef.current?.insertText(text));
 
     return () => {
       const value = handle.getValue();
       if (value.trim()) drafts.set(sessionId, value);
       else drafts.delete(sessionId);
       unregisterFocus();
+      unregisterInsert();
       handle.destroy();
       handleRef.current = null;
       setHistoryOpen(false);
+      setArgOpen(false);
     };
-  }, [sessionId, phase, kind, historyPopupEnabled]);
+  }, [sessionId, phase, kind, historyPopupEnabled, argCompletionEnabled]);
 
   const arrow = (
     <span className="shrink-0 select-none font-mono text-sm leading-none text-foreground group-focus-within:text-primary">
@@ -163,11 +195,18 @@ export function ShellComposerInput({ sessionId, kind }: { sessionId: string; kin
   return (
     <div className="group flex min-w-0 flex-1 items-center gap-2">
       {arrow}
-      <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+      <Popover
+        open={historyOpen || argOpen}
+        onOpenChange={(open) => {
+          if (open) return; // both are only ever opened imperatively, from the keymap
+          setHistoryOpen(false);
+          setArgOpen(false);
+        }}
+      >
         <PopoverAnchor asChild>
           <div ref={containerRef} className="nexum-shell-composer min-w-0 flex-1" />
         </PopoverAnchor>
-        {historyPopupEnabled && (
+        {historyPopupEnabled && historyOpen && (
           <HistoryPopover
             items={historyListFor(sessionId)}
             selectedIndex={historyIndex}
@@ -179,6 +218,24 @@ export function ShellComposerInput({ sessionId, kind }: { sessionId: string; kin
               setHistoryOpen(false);
               submitCommand(cmd);
               handleRef.current?.setValue("");
+            }}
+          />
+        )}
+        {argCompletionEnabled && argOpen && (
+          <ArgumentCompletionPopover
+            candidates={argCandidates}
+            selectedIndex={argSelected}
+            onHover={setArgSelected}
+            onSelect={(value) => {
+              const view = handleRef.current?.view;
+              if (view) {
+                view.dispatch({
+                  changes: { from: argTokenFromRef.current, to: view.state.doc.length, insert: value },
+                  selection: { anchor: argTokenFromRef.current + value.length },
+                });
+                view.focus();
+              }
+              setArgOpen(false);
             }}
           />
         )}

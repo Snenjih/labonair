@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import { useHostsStore } from "@/modules/hosts";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+// Imported from the concrete store path (not the `@/modules/tabs` barrel) —
+// that barrel re-exports `useTabManagement`, which imports `@/modules/explorer`'s
+// barrel. Going through it here would close a circular import
+// (explorer -> tabs -> explorer). `tabsStore.ts` itself doesn't import from
+// explorer, so this path is cycle-safe. Mirrors `useExplorerTarget.ts`.
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import type { Tab } from "@/modules/tabs/types";
 import type { FileEntry } from "./fsProvider";
 
 export type ChildrenState =
@@ -26,15 +33,47 @@ function isRemoteScope(scopeKey: string): boolean {
 }
 
 /** Oldest-`lastAccessedAt`-first eviction when over `maxCached` — mirrors
- *  `selectEvictionCandidates` in `useLazyExplorerSession.ts`. Exported for
- *  unit testing without touching the live store. */
+ *  `selectEvictionCandidates` in `useLazyExplorerSession.ts`. `protectedKeys`
+ *  (scopes with a currently open tab, see `openRemoteScopeKeys`) are evicted
+ *  only as a last resort, after every unprotected scope is already gone —
+ *  in practice this never triggers, since `setScope` raises `maxCached` to
+ *  fit `protectedKeys.size` before calling this. Exported for unit testing
+ *  without touching the live store. */
 export function selectScopesToEvict(
   entries: Array<{ scopeKey: string; lastAccessedAt: number }>,
   maxCached: number,
+  protectedKeys: Set<string> = new Set(),
 ): string[] {
-  const sorted = [...entries].sort((a, b) => a.lastAccessedAt - b.lastAccessedAt);
-  const overflow = Math.max(0, sorted.length - maxCached);
-  return sorted.slice(0, overflow).map((e) => e.scopeKey);
+  const byAge = (a: { lastAccessedAt: number }, b: { lastAccessedAt: number }) =>
+    a.lastAccessedAt - b.lastAccessedAt;
+  const unprotected = entries.filter((e) => !protectedKeys.has(e.scopeKey)).sort(byAge);
+  const protectedEntries = entries.filter((e) => protectedKeys.has(e.scopeKey)).sort(byAge);
+  const overflow = Math.max(0, entries.length - maxCached);
+  const fromUnprotected = unprotected.slice(0, Math.min(overflow, unprotected.length));
+  const remainingOverflow = overflow - fromUnprotected.length;
+  const fromProtected = remainingOverflow > 0 ? protectedEntries.slice(0, remainingOverflow) : [];
+  return [...fromUnprotected, ...fromProtected].map((e) => e.scopeKey);
+}
+
+/** Distinct `ssh:<hostId>` scope keys currently referenced by an open tab —
+ *  an `SftpTab`'s own host, a `WorkspaceTab`'s ssh pane sessions, or an
+ *  `EditorTab`/`PreviewTab` pinned to a remote file. Multiple tabs against
+ *  the same host collapse to one key, matching how the cache itself is keyed
+ *  by hostId rather than by tab. Exported for unit testing. */
+export function openRemoteScopeKeys(tabs: Tab[]): Set<string> {
+  const keys = new Set<string>();
+  for (const tab of tabs) {
+    if (tab.kind === "sftp") {
+      keys.add(`ssh:${tab.hostId}`);
+    } else if (tab.kind === "workspace") {
+      for (const session of Object.values(tab.sessions)) {
+        if (session.kind === "ssh" && session.hostId) keys.add(`ssh:${session.hostId}`);
+      }
+    } else if ((tab.kind === "editor" || tab.kind === "preview") && tab.remoteHostId) {
+      keys.add(`ssh:${tab.remoteHostId}`);
+    }
+  }
+  return keys;
 }
 
 /** A cached snapshot is only usable if it's for the EXACT root path being
@@ -94,7 +133,13 @@ export const useLocalExplorerStore = create<LocalExplorerStore>((set) => ({
       // instantly while a silent background fetch (see useFileTree.ts)
       // brings it up to date.
       if (isRemoteScope(s.scopeKey) && s.rootPath) {
-        const maxCached = usePreferencesStore.getState().explorerMaxCachedRemoteScopes;
+        // The configured preference is a floor, not a hard ceiling — a scope
+        // with a still-open tab against it is never evicted just to obey the
+        // number, so tabbing between hosts you actually have open can't
+        // trigger a cache-miss re-fetch (and the flash that comes with it).
+        const prefMaxCached = usePreferencesStore.getState().explorerMaxCachedRemoteScopes;
+        const protectedKeys = openRemoteScopeKeys(useTabsStore.getState().tabs);
+        const maxCached = Math.max(prefMaxCached, protectedKeys.size);
         const next = {
           ...remoteScopeCache,
           [s.scopeKey]: {
@@ -108,7 +153,7 @@ export const useLocalExplorerStore = create<LocalExplorerStore>((set) => ({
           scopeKey: k,
           lastAccessedAt: v.lastAccessedAt,
         }));
-        for (const evict of selectScopesToEvict(entries, maxCached)) delete next[evict];
+        for (const evict of selectScopesToEvict(entries, maxCached, protectedKeys)) delete next[evict];
         remoteScopeCache = next;
       }
 

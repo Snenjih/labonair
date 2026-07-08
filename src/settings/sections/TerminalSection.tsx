@@ -10,6 +10,7 @@ import {
   setTerminalBell,
   setTerminalBlocksAutoCollapseOnAltScreen,
   setTerminalBlocksEnabled,
+  setTerminalComposerArgumentCompletion,
   setTerminalComposerEnabled,
   setTerminalComposerHistoryPopup,
   setTerminalCopyOnSelect,
@@ -41,6 +42,7 @@ export function TerminalSection() {
   const terminalCursorStyle = usePreferencesStore((s) => s.terminalCursorStyle);
   const terminalComposerEnabled = usePreferencesStore((s) => s.terminalComposerEnabled);
   const terminalComposerHistoryPopup = usePreferencesStore((s) => s.terminalComposerHistoryPopup);
+  const terminalComposerArgumentCompletion = usePreferencesStore((s) => s.terminalComposerArgumentCompletion);
   const terminalBlocksEnabled = usePreferencesStore((s) => s.terminalBlocksEnabled);
   const terminalBlocksAutoCollapseOnAltScreen = usePreferencesStore(
     (s) => s.terminalBlocksAutoCollapseOnAltScreen,
@@ -254,6 +256,15 @@ export function TerminalSection() {
               <Switch
                 checked={terminalComposerHistoryPopup}
                 onCheckedChange={(v) => void setTerminalComposerHistoryPopup(v)}
+              />
+            </SettingRow>
+            <SettingRow
+              title="Argument completion"
+              description="When ghost-text is ambiguous, show a per-argument suggestion list below the cursor. Tab fills and cycles through candidates; arrow keys scroll the list."
+            >
+              <Switch
+                checked={terminalComposerArgumentCompletion}
+                onCheckedChange={(v) => void setTerminalComposerArgumentCompletion(v)}
               />
             </SettingRow>
             <SettingRow
