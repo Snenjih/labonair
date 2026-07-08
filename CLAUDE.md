@@ -24,8 +24,7 @@ Package manager: **pnpm**. Bundle id: `com.labonair.app`.
 Whenever a new conversation/session starts, you MUST:
 1. Read `handshake.md` (repo root) to understand exactly where the last session left off.
 2. Check `tasks/README.md` to identify the current `in_progress` task.
-3. Read the specific active `tasks/TASK_*.md` file before writing any code.
-4. Briefly summarize to the user what you are going to do next based on this state.
+3. Briefly summarize to the user what you are going to do next based on this state.
 
 ## Quick Context Links
 Before working on any area, read the relevant context file:
