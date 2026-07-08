@@ -19,7 +19,8 @@
     "size": "size-limit",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.71",
