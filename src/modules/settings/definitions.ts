@@ -562,7 +562,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "explorerMaxCachedRemoteScopes",
     label: "Explorer: Max cached remote folders",
     description:
-      "How many recently-viewed SSH host directory trees the sidebar keeps in memory for instant tab-switching (1–20). Higher uses more memory; lower re-fetches more often.",
+      "How many recently-viewed SSH host directory trees the sidebar keeps in memory for instant tab-switching (1–20). Higher uses more memory; lower re-fetches more often. Hosts with a currently open tab are always kept regardless of this number.",
     category: "File Manager",
     controlType: "NumberInput",
   },

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAsyncQueue } from "./asyncQueue";
 import type { FsProvider } from "./fsProvider";
 import { runFetchChildren, shouldRetryDroppedFetch } from "./useFileTree";
@@ -185,5 +185,76 @@ describe("runFetchChildren — generation-drop retry", () => {
 
     // One initial attempt + at most MAX_DROP_RETRIES (1) retry, never more.
     expect(calls).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("runFetchChildren — delayed loading indicator", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useLocalExplorerStore.setState({
+      scopeKey: "local",
+      rootPath: "/home/user",
+      nodes: {},
+      expanded: new Set(),
+      generation: 0,
+      remoteScopeCache: {},
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("does not set status to loading before the delay elapses", async () => {
+    const provider = fakeProvider();
+    const d = deferred<{ entries: []; hasMore: boolean }>();
+    provider.readDir = () => d.promise;
+
+    const deps = makeDeps(provider);
+    const call = runFetchChildren(deps, "/home/user");
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(useLocalExplorerStore.getState().nodes["/home/user"]).toBeUndefined();
+
+    d.resolve({ entries: [], hasMore: false });
+    await call;
+  });
+
+  it("sets status to loading once the fetch outlasts the delay", async () => {
+    const provider = fakeProvider();
+    const d = deferred<{ entries: []; hasMore: boolean }>();
+    provider.readDir = () => d.promise;
+
+    const deps = makeDeps(provider);
+    const call = runFetchChildren(deps, "/home/user");
+
+    await vi.advanceTimersByTimeAsync(150);
+    expect(useLocalExplorerStore.getState().nodes["/home/user"]?.status).toBe("loading");
+
+    d.resolve({ entries: [], hasMore: false });
+    await call;
+    expect(useLocalExplorerStore.getState().nodes["/home/user"]?.status).toBe("loaded");
+  });
+
+  it("never shows loading when the fetch resolves before the delay elapses", async () => {
+    const provider = fakeProvider();
+    provider.readDir = () => Promise.resolve({ entries: [], hasMore: false });
+
+    const deps = makeDeps(provider);
+    await runFetchChildren(deps, "/home/user");
+
+    expect(useLocalExplorerStore.getState().nodes["/home/user"]?.status).toBe("loaded");
+    // The loading timer must have been cleared, not left dangling.
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does not schedule a loading timer for silent or append fetches", async () => {
+    const provider = fakeProvider();
+    provider.readDir = () => Promise.resolve({ entries: [], hasMore: false });
+
+    const deps = makeDeps(provider);
+    await runFetchChildren(deps, "/home/user", { silent: true });
+
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

@@ -45,6 +45,14 @@ const READDIR_CONCURRENCY = 3;
 // steady-state instability.
 const MAX_DROP_RETRIES = 1;
 
+// A fetch that resolves faster than this never shows a "loading" placeholder
+// at all — only a fetch still pending after the delay flips the node to
+// `status: "loading"`. Without this, every cache-miss re-fetch (e.g. an
+// evicted remote scope) blanks the tree and flashes "Loading…" for a single
+// render even when the round-trip only takes tens of milliseconds, which
+// reads as flicker rather than latency.
+const LOADING_INDICATOR_DELAY_MS = 150;
+
 export function shouldRetryDroppedFetch(
   path: string,
   live: { scopeKey: string; rootPath: string | null },
@@ -111,9 +119,27 @@ export function runFetchChildren(
     // must not blank out good data just to briefly flash a spinner over
     // it. `silent` already skipped this for background polls; this
     // widens the same protection to every re-fetch, not just polls.
-    if (!append && !silent && existing?.status !== "loaded") setNode(path, { status: "loading" });
+    //
+    // The placeholder itself is deferred (not set synchronously) — see
+    // `LOADING_INDICATOR_DELAY_MS`. The timer is cleared the instant the
+    // fetch settles (success or failure), so a fetch faster than the delay
+    // never shows it at all.
+    const shouldShowLoading = !append && !silent && existing?.status !== "loaded";
+    let loadingTimer: ReturnType<typeof setTimeout> | null = shouldShowLoading
+      ? setTimeout(() => {
+          loadingTimer = null;
+          setNode(path, { status: "loading" });
+        }, LOADING_INDICATOR_DELAY_MS)
+      : null;
+    const clearLoadingTimer = () => {
+      if (loadingTimer) {
+        clearTimeout(loadingTimer);
+        loadingTimer = null;
+      }
+    };
     try {
       const page = await provider.readDir(path, { showHidden: show_hidden, offset });
+      clearLoadingTimer();
       // Discard a response that outlived a scope change (e.g. the user
       // switched away from this host/root while the request was in
       // flight) — applying it now would write into whatever scope is
@@ -133,6 +159,7 @@ export function runFetchChildren(
         hasMore: page.hasMore,
       });
     } catch (e) {
+      clearLoadingTimer();
       if (useLocalExplorerStore.getState().generation !== requestGeneration) {
         droppedForRetry = true;
         return;
