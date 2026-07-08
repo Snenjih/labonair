@@ -25,6 +25,7 @@ import {
   focus as registryFocus,
   getBuffer as registryGetBuffer,
   getSelection as registryGetSelection,
+  insertIntoComposer,
   registerSession,
   resetForReconnect,
   serialize as registrySerialize,
@@ -287,6 +288,14 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
       if (!el) return;
       const r = el.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        const { terminalComposerEnabled, terminalBlocksEnabled } = usePreferencesStore.getState();
+        if (
+          terminalComposerEnabled &&
+          terminalBlocksEnabled &&
+          insertIntoComposer(sessionId, dropPaths(drag.paths))
+        ) {
+          return;
+        }
         invoke("ssh_pty_write", { sessionId, data: dropPaths(drag.paths) }).catch(console.error);
         registryFocus(sessionId);
       }

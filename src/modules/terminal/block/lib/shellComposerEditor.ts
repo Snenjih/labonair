@@ -173,6 +173,10 @@ export type ShellComposerHandle = {
   view: EditorView;
   focus: () => void;
   setValue: (text: string) => void;
+  /** Inserts `text` at the current cursor position (replacing any selection)
+   *  and focuses the editor — used to redirect explorer drag-drop here
+   *  instead of writing straight to the pty. */
+  insertText: (text: string) => void;
   getValue: () => string;
   destroy: () => void;
 };
@@ -486,6 +490,10 @@ export function createShellComposerEditor(
     focus: () => view.focus(),
     setValue: (text: string) => {
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+    },
+    insertText: (text: string) => {
+      view.dispatch(view.state.replaceSelection(text));
+      view.focus();
     },
     getValue: () => view.state.doc.toString(),
     destroy: () => {

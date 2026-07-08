@@ -5,6 +5,7 @@ import {
   hasShellIntegration,
   isCommandRunning,
   registerComposerFocus,
+  registerComposerInsert,
   subscribeIntegrationState,
   write,
 } from "../lib/terminalSessionRegistry";
@@ -156,12 +157,17 @@ export function ShellComposerInput({ sessionId, kind }: { sessionId: string; kin
     // shouldBlockTerminalClick) — registered only while an editor actually
     // exists to receive it.
     const unregisterFocus = registerComposerFocus(sessionId, () => handleRef.current?.focus());
+    // Lets explorer drag-drop (TerminalPane/SshTerminalPane) redirect quoted
+    // path pasting here instead of writing straight to the pty — same
+    // "only while mounted" lifecycle as the focus handler above.
+    const unregisterInsert = registerComposerInsert(sessionId, (text) => handleRef.current?.insertText(text));
 
     return () => {
       const value = handle.getValue();
       if (value.trim()) drafts.set(sessionId, value);
       else drafts.delete(sessionId);
       unregisterFocus();
+      unregisterInsert();
       handle.destroy();
       handleRef.current = null;
       setHistoryOpen(false);

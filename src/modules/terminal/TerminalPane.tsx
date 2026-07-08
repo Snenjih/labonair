@@ -12,6 +12,7 @@ import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTheme } from "@/modules/theme";
 import { dropPaths } from "./lib/drop-paths";
+import { insertIntoComposer } from "./lib/terminalSessionRegistry";
 import { useTerminalSession } from "./lib/useTerminalSession";
 
 export type TerminalPaneHandle = {
@@ -71,13 +72,21 @@ export const TerminalPane = forwardRef<TerminalPaneHandle, Props>(function Termi
       if (!el) return;
       const r = el.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        const { terminalComposerEnabled, terminalBlocksEnabled } = usePreferencesStore.getState();
+        if (
+          terminalComposerEnabled &&
+          terminalBlocksEnabled &&
+          insertIntoComposer(tabId, dropPaths(drag.paths))
+        ) {
+          return;
+        }
         session.write(dropPaths(drag.paths));
         session.focus();
       }
     }
     document.addEventListener("pointerup", onUp, { capture: true });
     return () => document.removeEventListener("pointerup", onUp, { capture: true });
-  }, [session]);
+  }, [session, tabId]);
 
   useImperativeHandle(
     ref,
