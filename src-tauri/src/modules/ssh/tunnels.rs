@@ -79,7 +79,23 @@ fn handle_connection(
             match stream.read(&mut tcp_buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    if channel.write_all(&tcp_buf[..n]).is_err() {
+                    // Retry on WouldBlock instead of `write_all` bailing outright:
+                    // the SSH session is non-blocking (set_blocking(false) below),
+                    // so a write can spuriously EAGAIN under backpressure even
+                    // though the data is valid — giving up mid-write here would
+                    // desync the channel and needlessly kill the tunnel connection
+                    // (same root cause as pty.rs's ssh_pty_write fix).
+                    let mut sent = 0;
+                    while sent < n {
+                        match channel.write(&tcp_buf[sent..n]) {
+                            Ok(w) => sent += w,
+                            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                                std::thread::sleep(std::time::Duration::from_millis(1));
+                            }
+                            Err(_) => break,
+                        }
+                    }
+                    if sent < n {
                         break;
                     }
                     idle = false;

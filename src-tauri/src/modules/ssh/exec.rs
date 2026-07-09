@@ -19,28 +19,24 @@ const RETRY_SLEEP: Duration = Duration::from_millis(5);
 /// return LIBSSH2_ERROR_EAGAIN ("would block") even though the operation is
 /// perfectly valid, it just isn't ready yet.
 ///
-/// Re-locks `session_arc` fresh for every attempt rather than holding one
-/// guard across the whole retry loop: the interactive PTY reader thread
-/// (pty.rs) locks the exact same `Arc<Mutex<SshSessionInner>>` for every
-/// channel read plus its periodic keepalive_send(), and a long EAGAIN storm
-/// here must not starve it out of the lock for the entire `EXEC_TIMEOUT`
-/// window — releasing the lock during each `RETRY_SLEEP` backoff gives it a
-/// chance to interleave. This shared lock (rather than the two independent
-/// locks used before) is also what makes it safe for this exec call and the
-/// PTY reader thread to run concurrently at all — libssh2 does not allow
-/// unsynchronized concurrent access to one Session's transport, even across
-/// different Channels of it.
+/// Holds `session_arc` for the entire retry loop, including the sleep
+/// between attempts. libssh2 forbids touching a session (or any of its
+/// channels/subsystems) with a different call between an EAGAIN and its
+/// retry — releasing the lock mid-retry would let the PTY reader thread
+/// (pty.rs) interleave a channel read or keepalive_send() on the same
+/// session before this call's retry completes, which is the same class of
+/// transport-desync bug the unified `SshSessionInner` lock exists to
+/// eliminate. In practice EAGAIN clears within microseconds (kernel socket
+/// buffer backpressure), so this only pauses the reader thread in the rare
+/// case where the exec call is genuinely stalled — bounded by `EXEC_TIMEOUT`.
 fn retry_ssh2<T>(
     session_arc: &std::sync::Mutex<super::SshSessionInner>,
     mut f: impl FnMut(&super::SshSessionInner) -> Result<T, ssh2::Error>,
 ) -> Result<T, String> {
     let start = Instant::now();
+    let sess = session_arc.lock().map_err(|e| e.to_string())?;
     loop {
-        let attempt = {
-            let sess = session_arc.lock().map_err(|e| e.to_string())?;
-            f(&sess)
-        };
-        match attempt {
+        match f(&sess) {
             Ok(v) => return Ok(v),
             Err(e) if matches!(e.code(), ssh2::ErrorCode::Session(-37)) => {
                 if start.elapsed() > EXEC_TIMEOUT {

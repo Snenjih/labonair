@@ -48,6 +48,58 @@ fn step_idle_poll(current_ms: u64, idle_iterations: u32) -> u64 {
     }
 }
 
+// The interactive channel lives on a non-blocking session (see
+// open_shell_channel's `guard.session.set_blocking(false)`), so a write can
+// spuriously return LIBSSH2_ERROR_EAGAIN/WouldBlock even though the data is
+// perfectly valid — it just isn't ready to send this instant (e.g. the SSH
+// channel's flow-control window is momentarily exhausted). libssh2 requires
+// retrying the SAME operation on EAGAIN before touching the session again;
+// silently giving up mid-write (the previous behavior here, via
+// `write_all`'s default trait impl, which treats WouldBlock as a hard error
+// like any other) can abandon a partially-sent write mid-frame,
+// desynchronizing the channel's protocol framing — the remote sshd then sees
+// invalid data and drops the whole transport, which is exactly the
+// "transport read" disconnect this caused, especially for slow/deliberate
+// typing where every keystroke is its own small write with no retry safety
+// net if it hits EAGAIN.
+const PTY_IO_TIMEOUT: Duration = Duration::from_secs(5);
+const PTY_IO_RETRY_SLEEP: Duration = Duration::from_millis(2);
+
+/// Retries a channel operation, holding `inner_arc` for the entire retry
+/// loop. This is deliberate, not an oversight: libssh2 forbids touching a
+/// session (or any of its channels/subsystems) with another call between an
+/// EAGAIN and its retry, so releasing the lock here would let the reader
+/// thread or a concurrent exec call interleave a different libssh2 call
+/// mid-retry — the same class of transport-desync bug the unified
+/// `SshSessionInner` lock exists to eliminate. EAGAIN normally clears within
+/// microseconds (kernel socket buffer backpressure), so this only pauses the
+/// reader thread in the rare case where a write is genuinely stalled.
+fn with_channel_retry<T>(
+    inner_arc: &std::sync::Mutex<super::SshSessionInner>,
+    mut f: impl FnMut(&mut ssh2::Channel) -> std::io::Result<T>,
+) -> Result<T, String> {
+    let start = Instant::now();
+    let mut guard = inner_arc.lock().map_err(|e| e.to_string())?;
+    loop {
+        let attempt: std::io::Result<T> = {
+            let Some(channel) = guard.channel.as_mut() else {
+                return Err("no channel open".to_string());
+            };
+            f(channel)
+        };
+        match attempt {
+            Ok(v) => return Ok(v),
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                if start.elapsed() > PTY_IO_TIMEOUT {
+                    return Err("ssh pty io timed out (would block)".to_string());
+                }
+                std::thread::sleep(PTY_IO_RETRY_SLEEP);
+            }
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+}
+
 #[tauri::command]
 pub fn ssh_pty_write(
     session_id: String,
@@ -55,10 +107,20 @@ pub fn ssh_pty_write(
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
     let inner = crate::get_session_arc!(state, &session_id);
-    let mut guard = inner.lock().map_err(|e| e.to_string())?;
-    let channel = guard.channel.as_mut().ok_or("no channel open")?;
-    channel.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
-    channel.flush().map_err(|e| e.to_string())?;
+    let bytes = data.into_bytes();
+    let mut sent = 0usize;
+    while sent < bytes.len() {
+        let n = with_channel_retry(&inner, |channel| channel.write(&bytes[sent..]))?;
+        if n == 0 {
+            return Err("ssh pty write returned 0 bytes".to_string());
+        }
+        sent += n;
+    }
+    // No `channel.flush()` here: `Channel::flush` maps to
+    // `libssh2_channel_flush_ex`, which discards the channel's *read* buffer
+    // (unread incoming data), not a write flush — calling it after every
+    // keystroke could silently drop buffered remote output. `write()` above
+    // already sends synchronously (no local write buffering to flush).
     Ok(())
 }
 
@@ -70,12 +132,26 @@ pub fn ssh_pty_resize(
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
     let inner = crate::get_session_arc!(state, &session_id);
+    let start = Instant::now();
     let mut guard = inner.lock().map_err(|e| e.to_string())?;
-    let channel = guard.channel.as_mut().ok_or("no channel open")?;
-    channel
-        .request_pty_size(cols, rows, None, None)
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    loop {
+        let attempt = {
+            let Some(channel) = guard.channel.as_mut() else {
+                return Err("no channel open".to_string());
+            };
+            channel.request_pty_size(cols, rows, None, None)
+        };
+        match attempt {
+            Ok(()) => return Ok(()),
+            Err(ref e) if matches!(e.code(), ssh2::ErrorCode::Session(-37)) => {
+                if start.elapsed() > PTY_IO_TIMEOUT {
+                    return Err(e.to_string());
+                }
+                std::thread::sleep(PTY_IO_RETRY_SLEEP);
+            }
+            Err(e) => return Err(e.to_string()),
+        }
+    }
 }
 
 /// Opens a PTY shell channel on an authenticated session and spawns a
@@ -237,25 +313,49 @@ pub fn open_shell_channel(
                     // lock, so this can never race the read loop or any
                     // concurrent exec call on this session.
                     if let Ok(guard) = inner_arc_clone.lock() {
-                        match guard.session.keepalive_send() {
-                            Ok(_) => {
-                                last_keepalive = Instant::now();
-                                ka_consecutive_fails = 0;
+                        let start_ka = Instant::now();
+                        loop {
+                            // libssh2 can return EAGAIN on a read/keepalive because an
+                            // internal *outbound* send (e.g. a queued window-adjust ack)
+                            // hasn't flushed yet. Calling keepalive_send() before that
+                            // pending send completes is exactly the "interleave a
+                            // different libssh2 call before retrying the operation that
+                            // returned EAGAIN" pattern that desyncs the transport —
+                            // skip this cycle and retry next tick instead.
+                            let outbound_blocked = matches!(
+                                guard.session.block_directions(),
+                                ssh2::BlockDirections::Outbound | ssh2::BlockDirections::Both
+                            );
+                            if outbound_blocked {
+                                break;
                             }
-                            Err(ref e) if matches!(e.code(), ssh2::ErrorCode::Session(-37)) => {
-                                // LIBSSH2_ERROR_EAGAIN: non-blocking would block.
-                                // Don't reset last_keepalive — retry next idle iteration.
-                            }
-                            Err(e) => {
-                                ka_consecutive_fails += 1;
-                                if ka_consecutive_fails >= ka_max_fails {
-                                    disconnect_reason =
-                                        Some(humanize_disconnect_reason(&e.to_string()));
-                                    break 'reader;
+                            match guard.session.keepalive_send() {
+                                Ok(_) => {
+                                    last_keepalive = Instant::now();
+                                    ka_consecutive_fails = 0;
+                                    break;
                                 }
-                                last_keepalive = Instant::now();
+                                Err(ref e) if matches!(e.code(), ssh2::ErrorCode::Session(-37)) => {
+                                    if start_ka.elapsed() > PTY_IO_TIMEOUT {
+                                        break; // give up for now, try again next tick
+                                    }
+                                    std::thread::sleep(PTY_IO_RETRY_SLEEP);
+                                }
+                                Err(e) => {
+                                    ka_consecutive_fails += 1;
+                                    if ka_consecutive_fails >= ka_max_fails {
+                                        disconnect_reason =
+                                            Some(humanize_disconnect_reason(&e.to_string()));
+                                    } else {
+                                        last_keepalive = Instant::now();
+                                    }
+                                    break;
+                                }
                             }
                         }
+                    }
+                    if disconnect_reason.is_some() {
+                        break 'reader;
                     }
                 }
                 idle_iterations = idle_iterations.saturating_add(1);
