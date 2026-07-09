@@ -1,6 +1,7 @@
 import { Experimental_Agent as Agent, DirectChatTransport, stepCountIs, type LanguageModel } from "ai";
 import {
   DEFAULT_MODEL_ID,
+  findModel,
   getModel,
   LMSTUDIO_DEFAULT_BASE_URL,
   MLX_DEFAULT_BASE_URL,
@@ -323,7 +324,7 @@ export async function buildLanguageModelFromInstance(
   return built;
 }
 
-function buildModel(
+export function buildModel(
   modelId: ModelId | string,
   keys: ProviderKeys,
   extras: BuildModelExtras = {},
@@ -333,17 +334,24 @@ function buildModel(
   // New path: resolve via provider instances
   if (instances && instanceKeys) {
     const { modelDefId, instanceId } = parseModelRef(modelId);
-    const baseModelId = modelDefId as ModelId;
-    const m = getModel(baseModelId);
-    const instance = resolveInstance(m.provider, instanceId, instances);
+    // Dynamically-fetched models (e.g. OpenRouter's "org/model" IDs) aren't in
+    // the static MODELS list — resolve the instance directly by id instead of
+    // requiring a static model match.
+    const staticModel = findModel(modelDefId);
+    const instance = instanceId
+      ? (instances.find((i) => i.id === instanceId) ?? null)
+      : staticModel
+        ? resolveInstance(staticModel.provider, null, instances)
+        : null;
     if (instance) {
-      const key = providerNeedsKey(m.provider) ? (instanceKeys[instance.id] ?? null) : null;
-      let resolvedModelId: string = m.id;
+      const providerId = instance.providerId;
+      const key = providerNeedsKey(providerId) ? (instanceKeys[instance.id] ?? null) : null;
+      let resolvedModelId: string = staticModel?.id ?? modelDefId;
       if (
-        m.provider === "lmstudio" ||
-        m.provider === "mlx" ||
-        m.provider === "ollama" ||
-        m.provider === "openai-compatible"
+        providerId === "lmstudio" ||
+        providerId === "mlx" ||
+        providerId === "ollama" ||
+        providerId === "openai-compatible"
       ) {
         if (!instance.localModelId?.trim()) {
           throw new Error(`No model ID configured for ${instance.name}. Open Settings → AI → Providers.`);
@@ -352,8 +360,9 @@ function buildModel(
       }
       return buildLanguageModelFromInstance(instance, key, resolvedModelId);
     }
-    // Fall through to legacy path if no instance found
-    return buildModelLegacy(baseModelId, keys, extras);
+    // Fall through to legacy path only if we at least recognize the model statically
+    if (staticModel) return buildModelLegacy(staticModel.id as ModelId, keys, extras);
+    throw new Error(`No provider instance found for model: ${modelId}`);
   }
   return buildModelLegacy(modelId as ModelId, keys, extras);
 }
@@ -432,7 +441,7 @@ export async function createLabonairAgent({
   const planBlock = planMode
     ? `\n\n## PLAN MODE — ACTIVE\nMutating tools (write_file, edit, multi_edit, create_directory) will queue their changes for the user to review as a single diff. Do NOT execute bash_run or bash_background while plan mode is active — restrict yourself to reads (read_file, grep, glob, list_directory) and the queued mutations. After queueing the full set of edits, stop and return a brief summary; do not continue acting until the user has accepted/rejected.`
     : "";
-  const { modelDefId } = parseModelRef(modelId);
+  const { modelDefId, instanceId } = parseModelRef(modelId);
   const basePrompt = selectSystemPrompt(modelDefId);
   const instructions = `${basePrompt}${memoryBlock}${personaBlock}${customBlock}${planBlock}`;
   const baseModel = await buildModel(
@@ -460,9 +469,11 @@ export async function createLabonairAgent({
       : baseModel;
   const steps = maxAgentSteps ?? MAX_AGENT_STEPS;
 
-  // Apply Anthropic prompt-caching breakpoint on system message.
-  const m = getModel(modelDefId as ModelId);
-  const isAnthropic = m.provider === "anthropic";
+  // Apply Anthropic prompt-caching breakpoint on system message. Resolve the
+  // provider via the instance first — dynamically-fetched model IDs (e.g.
+  // OpenRouter) won't be found in the static MODELS list.
+  const resolvedInstance = instanceId ? instances?.find((i) => i.id === instanceId) : undefined;
+  const isAnthropic = (resolvedInstance?.providerId ?? findModel(modelDefId)?.provider) === "anthropic";
   const providerOptions = isAnthropic
     ? { anthropic: { cacheControl: { type: "ephemeral" as const } } }
     : undefined;

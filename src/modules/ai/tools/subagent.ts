@@ -3,6 +3,7 @@ import { z } from "zod";
 import { runSubagent } from "../agents/runSubagent";
 import { SUBAGENTS, type SubagentType } from "../agents/registry";
 import { useChatStore } from "../store/chatStore";
+import { useProvidersStore } from "../store/providersStore";
 import type { ToolContext } from "./context";
 
 const TYPE_KEYS = Object.keys(SUBAGENTS) as [SubagentType, ...SubagentType[]];
@@ -27,11 +28,14 @@ Auto-executes (no approval) — subagents are read-only by design.`,
       }),
       execute: async ({ type, prompt, description }) => {
         const { apiKeys, selectedModelId } = useChatStore.getState();
+        const { instances, instanceKeys } = useProvidersStore.getState();
         try {
           const r = await runSubagent({
             type,
             prompt,
             keys: apiKeys,
+            instances,
+            instanceKeys,
             modelId: selectedModelId,
             toolContext: ctx,
           });

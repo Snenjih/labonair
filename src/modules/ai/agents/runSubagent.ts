@@ -1,6 +1,6 @@
 import { Experimental_Agent as Agent, stepCountIs } from "ai";
-import { DEFAULT_MODEL_ID, getModel, type ModelId } from "../config";
-import { buildLanguageModel } from "../lib/agent";
+import { DEFAULT_MODEL_ID, type ModelId, type ProviderInstance } from "../config";
+import { buildModel } from "../lib/agent";
 import type { ProviderKeys } from "../lib/keyring";
 import type { ToolContext } from "../tools/context";
 import { buildFsTools } from "../tools/fs";
@@ -13,7 +13,12 @@ type Args = {
   type: SubagentType;
   prompt: string;
   keys: ProviderKeys;
-  modelId: ModelId;
+  /** Provider instances from the multi-instance system — resolved the same
+   *  way as the main agent's model so subagents work with dynamically
+   *  fetched models (e.g. OpenRouter) too. */
+  instances?: ProviderInstance[];
+  instanceKeys?: Record<string, string | null>;
+  modelId: ModelId | string;
   toolContext: ToolContext;
   lmstudioBaseURL?: string;
 };
@@ -28,6 +33,8 @@ export async function runSubagent({
   type,
   prompt,
   keys,
+  instances,
+  instanceKeys,
   modelId,
   toolContext,
   lmstudioBaseURL,
@@ -46,9 +53,7 @@ export async function runSubagent({
     if (t in readOnly) filtered[t] = readOnly[t];
   }
 
-  const model = await buildLanguageModel(getModel(modelId).provider, keys, getModel(modelId).id, {
-    lmstudioBaseURL,
-  });
+  const model = await buildModel(modelId, keys, { lmstudioBaseURL }, instances, instanceKeys);
 
   // The Agent constructor's tools generic infers `never` when passed a
   // dynamic record, so cast through unknown for both `tools` and

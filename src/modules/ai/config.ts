@@ -329,6 +329,12 @@ export function getModel(id: ModelId): ModelInfo {
   return m;
 }
 
+/** Non-throwing lookup — returns null for dynamically-fetched model IDs
+ *  (e.g. OpenRouter's "org/model" slugs) that aren't in the static MODELS list. */
+export function findModel(id: string): ModelInfo | null {
+  return (MODELS as readonly ModelInfo[]).find((x) => x.id === id) ?? null;
+}
+
 export const DEFAULT_MODEL_ID: ModelId = "gpt-5.4-mini";
 
 /** Approximate context window (in tokens) per model. Used for the
