@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/app/components";
 import { useAppBootstrap } from "@/app/hooks/useAppBootstrap";
 import { useMenuBridge } from "@/app/hooks/useMenuBridge";
-import { hasAnyKey, useAiLiveBridge, useChatStore } from "@/modules/ai";
+import { useAiLiveBridge, useChatStore, useHasComposer } from "@/modules/ai";
 import { usePaletteCallbacks } from "@/modules/command-palette";
 import { useExplorerTarget } from "@/modules/explorer/lib/useExplorerTarget";
 import { setScrollbackLive, useSessionLifecycle } from "@/modules/session";
@@ -34,9 +34,9 @@ export default function App() {
   } = useTabsStore.getState();
 
   // ── Bootstrap hooks ────────────────────────────────────────────────────────
-  const { keysLoaded, apiKeys, home } = useAppBootstrap();
+  const { keysLoaded, home } = useAppBootstrap();
   const { sessionRestored, prefsHydrated } = useSessionLifecycle();
-  const hasComposer = hasAnyKey(apiKeys);
+  const hasComposer = useHasComposer();
 
   // ── useWorkspaceCwd MUST come before useTabManagement ─────────────────────
   const { explorerRoot, inheritedCwdForNewTab } = useWorkspaceCwd(home);

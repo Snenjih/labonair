@@ -1,6 +1,6 @@
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-import { hasAnyKey, useChatStore } from "@/modules/ai";
+import { useChatStore, useHasComposer } from "@/modules/ai";
 import type { AiAttachFileDetail } from "@/modules/ai/lib/composer";
 import type { EditorPaneHandle } from "@/modules/editor";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
@@ -33,8 +33,7 @@ export function useAiLiveBridge({
   openPreviewTab,
 }: UseAiLiveBridgeOptions): AiLiveBridgeReturn {
   // Reactive store subscriptions
-  const apiKeys = useChatStore((s) => s.apiKeys);
-  const hasComposer = hasAnyKey(apiKeys);
+  const hasComposer = useHasComposer();
   const panelOpen = useChatStore((s) => s.panelOpen);
 
   const captureActiveSelection = useCallback((): string | null => {

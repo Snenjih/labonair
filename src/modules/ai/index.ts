@@ -19,6 +19,7 @@ export {
   sendMessage,
   stop,
   useChatStore,
+  useHasComposer,
   type AgentMeta,
   type AgentRunStatus,
 } from "./store/chatStore";

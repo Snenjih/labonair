@@ -8,7 +8,7 @@ import { BUILTIN_AGENTS } from "../lib/agents";
 import { useAgentsStore } from "./agentsStore";
 import { usePlanStore } from "./planStore";
 import { useTodosStore } from "./todoStore";
-import { EMPTY_PROVIDER_KEYS, type ProviderKeys } from "../lib/keyring";
+import { EMPTY_PROVIDER_KEYS, hasAnyKey, type ProviderKeys } from "../lib/keyring";
 import {
   deleteSessionData,
   deriveTitle,
@@ -629,6 +629,18 @@ export function hasKeyForModel(modelId: ModelId): boolean {
   // Keyless and optional-key providers are always considered "ready"
   if (!providerNeedsKey(m.provider) || m.provider === "openai-compatible") return true;
   return !!apiKeys[m.provider];
+}
+
+/** Whether at least one usable AI provider is configured — checks both the
+ *  current multi-instance store (`useProvidersStore`) and the legacy
+ *  single-key-per-provider store, since an instance only needs *a* key
+ *  somewhere on one of its providers to make the composer usable. */
+export function useHasComposer(): boolean {
+  const instances = useProvidersStore((s) => s.instances);
+  const instanceKeys = useProvidersStore((s) => s.instanceKeys);
+  const apiKeys = useChatStore((s) => s.apiKeys);
+  const hasUsableInstance = instances.some((i) => !providerNeedsKey(i.providerId) || !!instanceKeys[i.id]);
+  return hasUsableInstance || hasAnyKey(apiKeys);
 }
 
 export function getOrCreateChat(sessionId: string): Chat<UIMessage> {
