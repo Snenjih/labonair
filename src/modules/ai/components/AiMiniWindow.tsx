@@ -1,3 +1,4 @@
+import appIcon from "@/assets/app-icon.png";
 import {
   Context,
   ContextContent,
@@ -441,7 +442,7 @@ function SessionRow({
 function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 py-10 text-center">
-      <img src="/logo.png" alt="Labonair" className="size-14 opacity-90" />
+      <img src={appIcon} alt="Labonair" className="size-14 opacity-90" />
       <div className="space-y-1.5">
         <p className="text-[14px] font-semibold tracking-tight">Ask Labonair anything</p>
         <p className="max-w-[18rem] text-[11.5px] leading-relaxed text-muted-foreground">

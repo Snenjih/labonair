@@ -1,3 +1,4 @@
+import appIcon from "@/assets/app-icon.png";
 import { handleApiError } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -188,7 +189,7 @@ export function GeneralSection() {
         {/* Left: identity + updater */}
         <div className="flex flex-1 flex-col gap-3">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="" className="size-14" draggable={false} />
+            <img src={appIcon} alt="" className="size-14" draggable={false} />
             <div className="flex flex-col">
               <span className="text-[21px] font-semibold tracking-tight leading-tight">{name}</span>
               <span className="font-mono text-[10.5px] text-muted-foreground mt-0.5">{buildString}</span>
