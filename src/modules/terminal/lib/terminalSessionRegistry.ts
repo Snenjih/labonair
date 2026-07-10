@@ -55,6 +55,8 @@ export type RegisterOptions = {
    *  was actually spawned with, not the current (possibly since-toggled)
    *  `terminalBlocksEnabled` preference. See `isBlocksBakedIn`. */
   blocksBakedIn?: boolean;
+  /** True for SSH sessions — see `SessionRecord.isRemote`. */
+  isRemote?: boolean;
 };
 
 type SessionRecord = {
@@ -89,6 +91,18 @@ type SessionRecord = {
   blocksBakedIn: boolean;
   urlDecoder: TextDecoder;
   lastDetectedUrl: string | null;
+  /** True for SSH sessions. The DA1/CPR/OSC10/OSC11 terminal-query responder
+   *  (see registerOsc below) answers by round-tripping through a Tauri
+   *  `invoke()` call *and* a real network hop before the reply reaches the
+   *  remote process — on a local PTY that round trip is a same-machine
+   *  syscall and reliably beats a TUI library's own reply timeout, but over
+   *  SSH it routinely doesn't, and a reply that arrives after the caller gave
+   *  up gets consumed as literal keystrokes instead of a control reply,
+   *  corrupting whatever menu/prompt is active. Skipping these replies
+   *  entirely for SSH is the same graceful-degradation path every
+   *  well-behaved terminal program must already support for terminals with no
+   *  CPR/DA1 support at all. */
+  isRemote: boolean;
 };
 
 const sessions = new Map<string, SessionRecord>();
@@ -211,7 +225,8 @@ function bindLeafToSlot(sessionId: string, s: SessionRecord): void {
         },
         s.shellState,
       );
-      const query = registerTerminalQueryHandlers(term, (d) => s.bridge.writeToPty(d));
+      // Skipped for SSH — see SessionRecord.isRemote.
+      const query = s.isRemote ? () => {} : registerTerminalQueryHandlers(term, (d) => s.bridge.writeToPty(d));
       return [prompt.dispose, cwd, query];
     },
     onSearchReady: (addon) => s.callbacks.onSearchReady?.(addon),
@@ -297,6 +312,7 @@ export function registerSession(opts: RegisterOptions): void {
     blocksBakedIn: opts.blocksBakedIn ?? false,
     urlDecoder: new TextDecoder("utf-8", { fatal: false }),
     lastDetectedUrl: null,
+    isRemote: opts.isRemote ?? false,
   });
 }
 

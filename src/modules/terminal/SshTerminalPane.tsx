@@ -355,6 +355,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
       // (read fresh, same lifecycle moment — connect and this registration
       // happen back-to-back for the same session).
       blocksBakedIn: usePreferencesStore.getState().terminalBlocksEnabled,
+      isRemote: true,
     });
     if (containerRef.current) setContainer(sessionId, containerRef.current);
     setFocused(sessionId, isActive && tabVisible);

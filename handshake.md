@@ -1,5 +1,59 @@
 # Handshake — Session State
 
+## Last Session: 2026-07-11 (SSH Interactive-TUI Corruption, Part 2 — Query-Reply Latency)
+
+### What Was Done
+User rebuilt/restarted the app after the 2026-07-10 fixes (`c07897d`) and reported the corruption was still fully present: `NaN;1R`-style text still appeared, and `claude`'s onboarding TUI still rendered with interleaved/garbled text (e.g. "WelcomentoiClaudeeCode" instead of "Welcome to Claude Code"). Confirmed via `AskUserQuestion` that (a) the rebuild genuinely happened, so the 3 previous fixes just weren't the primary cause, and (b) **the same TUIs render perfectly fine in a local (non-SSH) terminal tab** — this is SSH-only.
+
+Ruled out via static reading before landing on the real cause: Block Terminal overlay (default `false`, user's persisted `nexum-settings.json` is empty so no override), duplicate slot-binding in `rendererPool.ts` (`acquireSlot`'s existing-slot check structurally prevents two slots ever sharing one `sessionId`), duplicate `ssh_connect` calls (`SshLoadingScreen`'s `connectingRef` guard + effect-cancellation prevent it), and the PTY resize path (`fitAddon.fit()` + `resizePty` self-corrects on every bind, not gated behind alt-screen).
+
+**Root cause**: `registerTerminalQueryHandlers` (DA1/CPR/OSC10/OSC11 responder in `osc-handlers.ts`) is wired identically for local and SSH sessions via `bindLeafToSlot`'s `registerOsc` (`terminalSessionRegistry.ts`). For local PTY, `writeToProcess` is a same-machine syscall — replies land far faster than any TUI library's own reply-timeout. For SSH, `writeToProcess` is `invoke("ssh_pty_write", ...)` — a Tauri IPC hop *plus* a real network round-trip to the remote host — on top of up to ~25ms the Rust reader thread's idle-poll backoff can already add before the *incoming* query is even seen (`pty.rs`'s `IDLE_POLL_MAX_MS`), plus the 4ms/16KB `SSH_BATCH_MS` output-batching delay. Cumulative latency routinely exceeds what interactive TUI libraries (used by `gh`, `claude`, etc.) wait for a CPR/DA1/OSC-color reply before giving up — and a reply that arrives *after* the caller gave up gets consumed as literal keystrokes/typed input instead of a control reply, corrupting whatever menu is active. This is the same failure mode as the NaN case from the previous session, just triggered by *lateness* instead of *invalid content* — explaining why the NaN guard alone didn't fix it: a well-formed but late reply is exactly as corrupting as a NaN one.
+
+**Fix** (uncommitted as of writing this entry, about to commit): added `isRemote: boolean` to `SessionRecord`/`RegisterOptions` in `terminalSessionRegistry.ts`. `SshTerminalPane.tsx`'s `registerSession(...)` call now passes `isRemote: true`. `bindLeafToSlot`'s `registerOsc` skips calling `registerTerminalQueryHandlers` entirely when `s.isRemote` — DA1/CPR/OSC10/OSC11 queries simply go unanswered for SSH sessions, same graceful-degradation path every well-behaved terminal program must already support for terminals with no CPR support at all (this is *not* a regression risk — TIOCGWINSZ/SIGWINCH-based sizing via `ssh_pty_resize`, which is what actually matters for correct wrapping, is untouched and independent of this). Local sessions are unaffected — `isRemote` defaults to `false`, so `useTerminalSession.ts`'s local PTY sessions keep answering these queries as before. `tsc --noEmit` ✅ · `vitest run` (432/432, unchanged) ✅.
+
+### Current State
+3 commits so far on `main` (not pushed): `c07897d` (part 1: CPR NaN guard, scrollback dormant-ring dedup, boundary separator) and this session's `isRemote` gate (commit hash TBD at commit time — check `git log`). `scripts/terminal-test.sh` has unrelated uncommitted local changes (bash `read -N1`→`-n 1` portability fixes, `$COLUMNS`/`$LINES` → `tput`/`stty` fixes) that were already present in the working tree before this session touched anything — deliberately left untouched/uncommitted, not part of this fix.
+
+### What's Next
+- Push once the user is ready
+- **Still needs a real rebuild + SSH-host retest** — this is the most evidence-backed hypothesis (confirmed SSH-only reproduction, ruled out every other structural candidate found via static reading) but wasn't verified live (headless sandbox, no display). If `gh auth login`/`claude` still corrupt after this fix, the next things to instrument are: (a) actual measured round-trip time for `ssh_pty_write` on the user's specific host/network, (b) whether `SSH_BATCH_MS`/`IDLE_POLL_MAX_MS` in `pty.rs` need lowering for control-sequence-carrying reads specifically, (c) packet-level capture to see whether the CLI's own reply-timeout is the limiting factor at all vs. something else entirely
+- If OSC10/11 (fg/bg color auto-detect) turning off for SSH causes a *cosmetically* wrong theme guess in some CLI, that's an accepted, expected tradeoff — flagged here so it isn't mistaken for a new bug
+
+### Blockers
+- None — but confidence is "best-supported hypothesis from static analysis," not "confirmed fix," since no live SSH+TUI verification was possible this session
+
+---
+
+## Previous Session: 2026-07-10 (SSH Interactive-TUI Corruption Fix — CPR NaN + Scrollback Duplication)
+
+### What Was Done
+User reported that interactive full-screen TUIs over SSH (`gh auth login`, `claude`, etc.) rendered broken: literal `NaN;1R` text appearing inline, and new TUI frames visually overlapping/stacked with old scrollback content instead of cleanly redrawing. Investigated via a background Explore agent, then personally verified every claimed file/line before acting (per this repo's "verify before recommending" habit) — found and fixed three compounding bugs. `tsc --noEmit` ✅ · `vitest run` (432/432) ✅.
+
+**Root causes found:**
+1. `osc-handlers.ts`'s custom CPR (Cursor Position Report, `\x1b[6n`) responder read `term.buffer.active.cursorX/cursorY` without a finiteness guard. During a renderer-pool slot rebind these can transiently be `undefined`, producing a literal `"\x1b[NaN;NaNR"` written back into the PTY — which SSH-side TUI libraries then echo as typed input instead of consuming as a control reply (matches the reported `NaN;1R^C` text).
+2. **The dominant bug**: `useSessionLifecycle.ts`'s periodic (30s) + quit-time `flushAllDormantScrollbacks()` called `DormantRing.peek()` — a *non-destructive* read — every tick, without ever draining. A long-backgrounded SSH tab therefore had its **entire accumulated dormant-ring content re-appended to the on-disk scrollback file on every single tick**, duplicating the same raw bytes exponentially (a tab dormant for 5 minutes could accumulate ~10 stacked copies). On reconnect, `SshTerminalPane.tsx` replays that whole corrupted blob verbatim — explaining the multiple stacked "generations" of old screens (gh menu + `w` output + claude welcome, all visible at once) in the user's screenshot.
+3. The raw dormant-ring tail was naively string-concatenated onto an unrelated, independently-`serialize()`d clean snapshot with no boundary marker, making any single bad splice look like corrupted live rendering rather than a legible "here's what happened while you were away" section.
+
+**Fixes (all in one commit `c07897d`):**
+- `osc-handlers.ts`: guard the CPR handler — `if (!Number.isFinite(cursorX) || !Number.isFinite(cursorY)) return false;` (leaves the query unanswered; the caller's own CPR timeout handles that gracefully, same as talking to a terminal without CPR support).
+- `dormantRing.ts`: added `peekNew()` — an incremental variant tracking a `flushedBytes` offset (adjusted correctly across overflow-drops) so repeated calls return only bytes appended since the last call, instead of the whole ring every time. `peek()`/`drain()` unchanged (still used for the correct one-shot rebind-replay path, which was never buggy).
+- `terminalSessionRegistry.ts`: `peekDormantAnsi()` now calls `peekNew()` instead of `peek()`.
+- `scrollback.ts`: `flushDormantScrollback()` inserts a dim separator (`"─── background output ───"`) between previously-saved content and each freshly-flushed chunk.
+- Added test coverage: `osc-handlers.test.ts` (CPR reply + NaN-guard), `dormantRing.test.ts` (3 new `peekNew()` cases incl. an overflow-drop consistency check).
+
+### Current State
+Committed directly to `main` as `c07897d` (not pushed yet — user only asked to commit). Working tree clean otherwise.
+
+### What's Next
+- Push `c07897d` when the user is ready
+- No manual `pnpm tauri dev` + real SSH host verification done yet (headless sandbox) — worth confirming visually that `gh auth login` / `claude` render correctly now, and that a long-backgrounded SSH tab's scrollback no longer duplicates on reconnect
+- If corruption still appears after a genuinely bad mid-escape-sequence cut (not the duplication case), the deeper architectural fix discussed but not implemented is a headless mirror `Terminal` per dormant session so periodic flushes always come from a real `serialize()` instead of raw byte splicing
+
+### Blockers
+- None
+
+---
+
 ## Last Session: 2026-07-02 (Full Remote-Parity Fix Pass — Explorer, Source Control, AI Attach)
 
 ### What Was Done
