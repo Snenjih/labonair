@@ -408,6 +408,14 @@ fn wait_for_trust(session_id: &str, trust_state: &super::TrustState) -> Result<b
 
 /// Like `establish_authenticated_session` but accepts an already-connected
 /// TcpStream (e.g. the local end of a jump-host bridge).
+///
+/// `fail_fast_untrusted_host`: when true, an unknown/mismatched host key
+/// returns an error immediately instead of blocking on `wait_for_trust`.
+/// Used by background sessions that have no trust-prompt UI of their own
+/// (the sidebar Explorer's lazy SFTP session) — without this they'd hang
+/// for up to 5 minutes on first connect to a not-yet-trusted host. The
+/// interactive terminal/SFTP-tab connect flow always passes `false` since
+/// it owns a real trust dialog (`SshLoadingScreen`).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn establish_authenticated_session_from_stream(
     session_id: &str,
@@ -423,6 +431,7 @@ pub(crate) fn establish_authenticated_session_from_stream(
     passphrase: Option<&str>,
     trust_state: &super::TrustState,
     app: &tauri::AppHandle,
+    fail_fast_untrusted_host: bool,
 ) -> Result<ssh2::Session, String> {
     let _ = keep_alive_tries;
     log_step!(app, session_id, "TCP connection established.");
@@ -472,6 +481,12 @@ pub(crate) fn establish_authenticated_session_from_stream(
         }
         ssh2::CheckResult::Mismatch => {
             log_step!(app, session_id, format!("Host key mismatch! Fingerprint: {}", fingerprint));
+            if fail_fast_untrusted_host {
+                return Err(format!(
+                    "host key mismatch for {} — open a terminal tab to this host to verify and trust its new fingerprint",
+                    host_address
+                ));
+            }
             app.emit("known_hosts_warning", serde_json::json!({
                 "session_id": session_id, "fingerprint": fingerprint,
                 "host": host_address, "is_mismatch": true
@@ -491,6 +506,12 @@ pub(crate) fn establish_authenticated_session_from_stream(
         }
         ssh2::CheckResult::NotFound | ssh2::CheckResult::Failure => {
             log_step!(app, session_id, format!("Unknown host — fingerprint: {}", fingerprint));
+            if fail_fast_untrusted_host {
+                return Err(format!(
+                    "host key not yet trusted for {} — open a terminal tab to this host to verify and trust its fingerprint",
+                    host_address
+                ));
+            }
             app.emit("known_hosts_warning", serde_json::json!({
                 "session_id": session_id, "fingerprint": fingerprint,
                 "host": host_address, "is_mismatch": false
@@ -586,6 +607,7 @@ pub(crate) fn establish_authenticated_session(
     passphrase: Option<&str>,
     trust_state: &super::TrustState,
     app: &tauri::AppHandle,
+    fail_fast_untrusted_host: bool,
 ) -> Result<ssh2::Session, String> {
     log_step!(app, session_id, format!("TCP connecting to {}:{}…", host_address, port));
     let tcp = tcp_connect(host_address, port)
@@ -593,7 +615,7 @@ pub(crate) fn establish_authenticated_session(
     establish_authenticated_session_from_stream(
         session_id, tcp, host_address, port, username, auth_method,
         private_key_path, keep_alive_interval, keep_alive_tries,
-        password, passphrase, trust_state, app,
+        password, passphrase, trust_state, app, fail_fast_untrusted_host,
     )
 }
 
@@ -680,6 +702,7 @@ fn ssh_connect_blocking(
         passphrase.as_deref(),
         &trust_state,
         &app,
+        false,
     )?;
 
     // Open PTY shell channel (switches session to non-blocking). The channel

@@ -131,6 +131,8 @@ pub async fn sftp_connect(
             LabonairError::AuthFailed(s)
         } else if lower.contains("tcp connect") || lower.contains("network") || lower.contains("broken pipe") {
             LabonairError::NetworkError(s)
+        } else if lower.contains("host key") {
+            LabonairError::HostKeyMismatch(s)
         } else {
             LabonairError::Internal(s)
         }
@@ -169,6 +171,7 @@ fn sftp_connect_blocking(
         passphrase.as_deref(),
         &trust_state,
         &app,
+        true, // fail fast — the sidebar Explorer has no trust-prompt UI of its own
     )?;
 
     // Step 7: Open SFTP subsystem. Use 60s timeout for slow hosts (RPi, etc.)
