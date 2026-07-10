@@ -1,6 +1,27 @@
 import type { Terminal } from "@xterm/xterm";
 import { describe, expect, it, vi } from "vitest";
-import { createShellIntegrationState, registerCwdHandler, registerPromptTracker } from "./osc-handlers";
+import {
+  createShellIntegrationState,
+  registerCwdHandler,
+  registerPromptTracker,
+  registerTerminalQueryHandlers,
+} from "./osc-handlers";
+
+function makeFakeQueryTerminal(cursorX: number, cursorY: number) {
+  let csiHandler: ((params: number[]) => boolean) | null = null;
+  const term = {
+    parser: {
+      registerCsiHandler: (opts: { final: string }, handler: (params: number[]) => boolean) => {
+        if (opts.final === "n") csiHandler = handler;
+        return { dispose: () => {} };
+      },
+      registerOscHandler: () => ({ dispose: () => {} }),
+    },
+    buffer: { active: { cursorX, cursorY } },
+    options: { theme: {} },
+  } as unknown as Terminal;
+  return { term, fireCpr: () => csiHandler?.([6]) };
+}
 
 function makeFakeTerminal() {
   let oscHandler: ((data: string) => boolean) | null = null;
@@ -120,5 +141,27 @@ describe("registerCwdHandler", () => {
     fire("file:///home/user/after-command");
 
     expect(onCwd).toHaveBeenCalledWith("/home/user/after-command");
+  });
+});
+
+describe("registerTerminalQueryHandlers — CPR", () => {
+  it("replies with a 1-indexed cursor position report", () => {
+    const { term, fireCpr } = makeFakeQueryTerminal(4, 9);
+    const writeToProcess = vi.fn();
+    registerTerminalQueryHandlers(term, writeToProcess);
+
+    fireCpr();
+
+    expect(writeToProcess).toHaveBeenCalledWith("\x1b[10;5R");
+  });
+
+  it("does not reply (and never writes NaN) when the cursor position is non-finite", () => {
+    const { term, fireCpr } = makeFakeQueryTerminal(Number.NaN, 9);
+    const writeToProcess = vi.fn();
+    registerTerminalQueryHandlers(term, writeToProcess);
+
+    fireCpr();
+
+    expect(writeToProcess).not.toHaveBeenCalled();
   });
 });

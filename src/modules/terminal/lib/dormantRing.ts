@@ -21,6 +21,10 @@ export class DormantRing {
   private tailLen = 0;
   private total = 0;
   private overflowed = false;
+  // Bytes from the current head already handed out by peekNew() — lets
+  // repeated peekNew() calls (periodic scrollback flush) return only the
+  // delta instead of re-emitting everything retained on every call.
+  private flushedBytes = 0;
 
   constructor(
     private readonly byteCap = DEFAULT_BYTE_CAP,
@@ -43,7 +47,9 @@ export class DormantRing {
       offset += n;
 
       while (this.total > this.byteCap && this.blocks.length - this.head > 1) {
-        this.total -= this.blocks[this.head].length;
+        const droppedLen = this.blocks[this.head].length;
+        this.total -= droppedLen;
+        this.flushedBytes = Math.max(0, this.flushedBytes - droppedLen);
         this.head++;
         this.overflowed = true;
       }
@@ -75,6 +81,25 @@ export class DormantRing {
     }
   }
 
+  /** Non-destructive read of only the bytes appended since the last
+   *  peekNew() call — used by the periodic dormant-scrollback flush so a
+   *  long-backgrounded session doesn't re-append the same already-flushed
+   *  bytes to disk on every tick (unlike peek(), which always returns
+   *  everything currently retained and is meant for a one-shot full replay). */
+  peekNew(write: (bytes: Uint8Array) => void): void {
+    const last = this.blocks.length - 1;
+    let consumed = 0;
+    for (let i = this.head; i <= last; i++) {
+      const len = i === last ? this.tailLen : this.blocks[i].length;
+      if (consumed + len > this.flushedBytes) {
+        const start = Math.max(0, this.flushedBytes - consumed);
+        if (start < len) write(this.blocks[i].subarray(start, len));
+      }
+      consumed += len;
+    }
+    this.flushedBytes = this.total;
+  }
+
   drain(write: (bytes: Uint8Array) => void): void {
     this.peek(write);
     this.blocks = [];
@@ -82,6 +107,7 @@ export class DormantRing {
     this.tailLen = 0;
     this.total = 0;
     this.overflowed = false;
+    this.flushedBytes = 0;
   }
 
   byteLength(): number {

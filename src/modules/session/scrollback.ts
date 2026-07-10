@@ -35,21 +35,30 @@ export async function saveAllScrollbacks(sessionIds: string[]): Promise<void> {
   );
 }
 
+// Marks the boundary between previously-saved content and a freshly-flushed
+// dormant-ring chunk. `buffered` is a raw, unparsed byte tail — splicing it
+// straight onto an unrelated serialize() snapshot with no marker makes a
+// single garbled cut look like corrupted live rendering. This isn't a fix
+// for that garbling itself, just makes each boundary legible.
+const DORMANT_FLUSH_SEPARATOR = `\r\n\x1b[2m\x1b[90m${"─".repeat(24)} background output ${"─".repeat(24)}\x1b[0m\r\n\r\n`;
+
 /**
  * Appends a dormant session's buffered output (accumulated in its renderer-
  * pool dormant ring while it had no bound slot — see terminalSessionRegistry.ts)
  * onto its on-disk scrollback file. `scrollback_save` overwrites the whole
  * file, so this loads the existing content first — otherwise quitting while
  * a backgrounded tab is dormant would silently drop everything it buffered.
- * No-op if nothing was buffered (the common case for a quiet background tab,
- * and always the case for a currently-bound session, whose ring is empty).
+ * `peekDormantAnsi` only returns bytes new since the last call, so repeated
+ * ticks append rather than re-duplicate the whole ring each time.
+ * No-op if nothing new was buffered (the common case for a quiet background
+ * tab, and always the case for a currently-bound session, whose ring is empty).
  */
 export async function flushDormantScrollback(sessionId: string): Promise<void> {
   const buffered = peekDormantAnsi(sessionId);
   if (!buffered) return;
   try {
     const existing = (await invoke<string | null>("scrollback_load", { sessionId })) ?? "";
-    const combined = existing + buffered;
+    const combined = existing ? existing + DORMANT_FLUSH_SEPARATOR + buffered : buffered;
     if (combined.trim().length === 0 || combined.length > MAX_SCROLLBACK_BYTES) return;
     await invoke("scrollback_save", { sessionId, ansi: combined });
   } catch (e) {

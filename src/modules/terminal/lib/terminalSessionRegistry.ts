@@ -675,16 +675,20 @@ export function getAllSessionIds(): string[] {
   return Array.from(sessions.keys());
 }
 
-/** Non-destructive read of a dormant session's buffered output — used for
- *  the periodic/quit-time scrollback flush, which must not consume the ring
- *  (a later reactivation still needs it to replay). */
+/** Non-destructive read of a dormant session's buffered output *since the
+ *  last call* — used for the periodic/quit-time scrollback flush, which must
+ *  not consume the ring (a later reactivation still needs it to replay) but
+ *  also must not re-return already-flushed bytes on every tick (that would
+ *  duplicate the same output onto disk every 30s for a long-backgrounded
+ *  session — see peekNew()). */
 export function peekDormantAnsi(sessionId: string): string | null {
   const s = sessions.get(sessionId);
-  if (!s || s.dormantRing.byteLength() === 0) return null;
+  if (!s) return null;
   const decoder = new TextDecoder("utf-8", { fatal: false });
   const parts: string[] = [];
-  s.dormantRing.peek((bytes) => parts.push(decoder.decode(bytes, { stream: true })));
-  return parts.join("");
+  s.dormantRing.peekNew((bytes) => parts.push(decoder.decode(bytes, { stream: true })));
+  const text = parts.join("");
+  return text || null;
 }
 
 /** Tab/pane close: frees a bound or merely-retained slot (no-op if neither

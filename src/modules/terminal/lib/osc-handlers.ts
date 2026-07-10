@@ -131,6 +131,11 @@ export function registerTerminalQueryHandlers(
     term.parser.registerCsiHandler({ final: "n" }, (params) => {
       if (params[0] !== 6) return false;
       const buf = term.buffer.active;
+      // During a renderer-pool slot rebind, cursorX/cursorY can transiently
+      // be non-finite. Sending "NaN;NaNR" back would land as literal typed
+      // text in the shell/TUI instead of a control reply — better to leave
+      // the query unanswered (the caller's own CPR timeout handles that).
+      if (!Number.isFinite(buf.cursorX) || !Number.isFinite(buf.cursorY)) return false;
       writeToProcess(`\x1b[${buf.cursorY + 1};${buf.cursorX + 1}R`);
       return true;
     }),
