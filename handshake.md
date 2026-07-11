@@ -1,6 +1,27 @@
 # Handshake — Session State
 
-## Last Session: 2026-07-11 (SSH Interactive-TUI Corruption, Part 2 — Query-Reply Latency)
+## Last Session: 2026-07-11 (Full-App Review + review-fix-plan.md Execution, Part 1 — Workstreams A & B)
+
+### What Was Done
+Ran a full 6-agent review of the entire app (Rust backend, frontend state/perf, terminal/PTY, AI subsystem, SFTP/explorer, editor/source-control/snippets/settings) and personally verified the most severe findings against source before reporting. User picked which findings to fix, then reduced scope again to exclude anything tied to `ssh2`-specific architecture (see `russh-migration.md` — a real, not-yet-decided consideration to swap `ssh2` for `russh`). Plan approved and written to `review-fix-plan.md` (repo root) as 15 workstreams (A–O, C and N dropped, D/E/F trimmed). Working through it sequentially; commits so far:
+
+**Workstream A** (`fb8af08`, `fix(ai)`): closed 6 AI-tool-security findings — SSH-remote `read_file`/`list_directory` now run `checkReadable` before `ssh_exec_command` (previously zero check); new `fs_realpath` Rust command + `checkReadableResolved`/`checkWritableResolved` in `security.ts` catch symlinks pointing at secrets; `grep`/`glob` now filter individual hits, not just the search root; `checkShellCommand` strips a leading `sudo`/`doas` before matching destructive patterns and additionally tokenizes the command to block secret-basename/path references (documented known limitation: command substitution `$(...)` isn't caught by string matching); generated SSH keypairs and remote-edit temp files are now created with `0600`/`0700` via `OpenOptionsExt::mode` from the start instead of `write` then `chmod` (closes a TOCTOU window). `cargo check`/`clippy`/`test --lib` (85/85) ✅ · `tsc --noEmit` ✅ · `vitest run` (441/441) ✅.
+
+**Workstream B** (`318c6a2`, `fix(terminal)`): the `isRemote` gate from the 2026-07-11-part-2 session (previous entry below) turned out to be **incomplete** — it only skipped Labonair's own `registerTerminalQueryHandlers`, but xterm.js registers its own built-in, unguarded CSI `c`(DA1)/`n`(CPR) handlers unconditionally at `Terminal` construction (verified by reading `@xterm/xterm/src/common/InputHandler.ts` + `EscapeSequenceParser.ts`'s last-registered-first CSI dispatch). For SSH sessions, with nothing registered by us, xterm's own built-in was the only responder left — still round-tripping through the slow SSH IPC+network path. New `registerTerminalQuerySwallowHandlers` (`osc-handlers.ts`) registers swallow-only CSI `c`/`n` handlers for SSH (return `true`, no reply) so they win the dispatch instead of leaving xterm's built-in exposed — this is the actual fix for the query-reply-latency corruption, not the isRemote skip alone. Also extracted `safeCursorPos()` and applied it to `SshTerminalPane.tsx`'s sudo-popup positioning and `blockDecorations.ts`'s marker placement (same unguarded-cursor-read pattern the CPR handler was already patched for). `tsc --noEmit` ✅ · `vitest run` (446/446, +5 new) ✅.
+
+### Current State
+Branch `performance-internals-optimazation`, 2 commits ahead pushed-locally-only (not pushed to remote). `review-fix-plan.md` at repo root tracks remaining workstreams (D, E, F, G, H, I, J, K, L, M, O).
+
+### What's Next
+- **Workstream B is NOT verified live** — same headless-sandbox limitation as every prior SSH-TUI session. This is the third attempt at this exact bug (see the two entries below); **do not consider it closed without a real `pnpm tauri dev` + SSH host test running `gh auth login` or `claude`**. If it's still broken after this, the query/reply layer needs live packet-level instrumentation, not another static-reading pass.
+- Continue with Workstream D (Rust: `background.rs` kill-deadlock) onward per `review-fix-plan.md`.
+
+### Blockers
+- No display in this environment — Workstream B's manual verification step is blocked until a human runs it.
+
+---
+
+## Previous Session: 2026-07-11 (SSH Interactive-TUI Corruption, Part 2 — Query-Reply Latency)
 
 ### What Was Done
 User rebuilt/restarted the app after the 2026-07-10 fixes (`c07897d`) and reported the corruption was still fully present: `NaN;1R`-style text still appeared, and `claude`'s onboarding TUI still rendered with interleaved/garbled text (e.g. "WelcomentoiClaudeeCode" instead of "Welcome to Claude Code"). Confirmed via `AskUserQuestion` that (a) the rebuild genuinely happened, so the 3 previous fixes just weren't the primary cause, and (b) **the same TUIs render perfectly fine in a local (non-SSH) terminal tab** — this is SSH-only.
