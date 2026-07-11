@@ -38,7 +38,8 @@ fn heredoc(target_path: &str, content: &str) -> String {
 pub(crate) fn build_bootstrap_script(blocks: bool) -> String {
     let blocks_env = if blocks { "export LABONAIR_BLOCKS=1\n" } else { "" };
     format!(
-        r#"{blocks_env}case "$SHELL" in
+        r#"export COLORTERM=truecolor
+{blocks_env}case "$SHELL" in
   */zsh)
     zd="$HOME/.cache/labonair/shell-integration/zsh"
     mkdir -p "$zd" 2>/dev/null
@@ -97,11 +98,17 @@ mod tests {
     #[test]
     fn blocks_flag_exports_env_var_before_the_case_statement() {
         let script = build_bootstrap_script(true);
-        assert!(script.starts_with("export LABONAIR_BLOCKS=1\n"));
+        assert!(script.starts_with("export COLORTERM=truecolor\nexport LABONAIR_BLOCKS=1\n"));
         // Without the flag, the bootstrap itself never exports it — the
         // scripts' own conditional references to $LABONAIR_BLOCKS (checking
         // whether it's set) are expected and fine, just not this export line.
-        assert!(!build_bootstrap_script(false).starts_with("export LABONAIR_BLOCKS=1"));
-        assert!(build_bootstrap_script(false).starts_with("case \"$SHELL\" in"));
+        assert!(!build_bootstrap_script(false).contains("export LABONAIR_BLOCKS=1"));
+        assert!(build_bootstrap_script(false).starts_with("export COLORTERM=truecolor\ncase \"$SHELL\" in"));
+    }
+
+    #[test]
+    fn always_exports_colorterm_truecolor_for_gradient_rendering_parity_with_local_pty() {
+        assert!(build_bootstrap_script(false).starts_with("export COLORTERM=truecolor\n"));
+        assert!(build_bootstrap_script(true).starts_with("export COLORTERM=truecolor\n"));
     }
 }
