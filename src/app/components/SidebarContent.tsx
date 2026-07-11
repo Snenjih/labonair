@@ -1,4 +1,4 @@
-import type React from "react";
+import React from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
 import { ResizablePanel } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
@@ -59,7 +59,7 @@ export interface SidebarContentProps {
   onNewGitGraph?: () => void;
 }
 
-export function SidebarContent({
+export const SidebarContent = React.memo(function SidebarContent({
   side,
   sidebarRef,
   activePanel,
@@ -146,4 +146,4 @@ export function SidebarContent({
       </div>
     </ResizablePanel>
   );
-}
+});
