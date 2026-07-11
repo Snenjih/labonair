@@ -297,18 +297,29 @@ pub async fn credential_generate_keypair(
         None => pkey.private_key_to_pem_pkcs8().map_err(|e| e.to_string())?,
     };
 
-    // Write private key to {data_dir}/keys/{cred_id} with restricted permissions
+    // Write private key to {data_dir}/keys/{cred_id} with restricted
+    // permissions set at creation time (not via a separate chmod afterward,
+    // which would leave a brief window where the key exists with default
+    // umask permissions).
     let data_dir = crate::modules::fs::paths::data_dir();
     let keys_dir = data_dir.join("keys");
     std::fs::create_dir_all(&keys_dir).map_err(|e| e.to_string())?;
     let key_path = keys_dir.join(&cred_id);
-    std::fs::write(&key_path, &pem_bytes).map_err(|e| e.to_string())?;
-
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&key_path, std::fs::Permissions::from_mode(0o600))
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&key_path)
             .map_err(|e| e.to_string())?;
+        std::io::Write::write_all(&mut f, &pem_bytes).map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(unix))]
+    {
+        std::fs::write(&key_path, &pem_bytes).map_err(|e| e.to_string())?;
     }
 
     let key_path_str = key_path.to_string_lossy().to_string();

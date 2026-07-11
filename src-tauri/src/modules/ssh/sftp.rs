@@ -439,13 +439,37 @@ pub async fn prepare_remote_edit(
 
         let temp_dir = std::env::temp_dir().join("labonair_remote_edits");
         std::fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&temp_dir, std::fs::Permissions::from_mode(0o700))
+                .map_err(|e| e.to_string())?;
+        }
         let file_name = std::path::Path::new(&remote_path)
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "file".to_string());
         let unique_id = uuid::Uuid::new_v4().to_string();
         let temp_path = temp_dir.join(format!("{}_{}", unique_id, file_name));
-        std::fs::write(&temp_path, &file_data).map_err(|e| e.to_string())?;
+        // Staged copy of a remote file's contents, potentially sensitive —
+        // create with restricted permissions from the start rather than a
+        // separate chmod afterward (same TOCTOU concern as generated keys).
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut f = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&temp_path)
+                .map_err(|e| e.to_string())?;
+            std::io::Write::write_all(&mut f, &file_data).map_err(|e| e.to_string())?;
+        }
+        #[cfg(not(unix))]
+        {
+            std::fs::write(&temp_path, &file_data).map_err(|e| e.to_string())?;
+        }
         Ok(temp_path.to_string_lossy().to_string())
     })
     .await

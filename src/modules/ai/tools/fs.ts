@@ -2,7 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { invoke } from "@tauri-apps/api/core";
 import { native } from "../lib/native";
-import { checkReadable, checkWritable } from "../lib/security";
+import { checkReadable, checkReadableResolved, checkWritableResolved } from "../lib/security";
 import { newQueuedEditId, usePlanStore } from "../store/planStore";
 import { resolvePath, type ToolContext } from "./context";
 
@@ -21,6 +21,8 @@ export function buildFsTools(ctx: ToolContext) {
 
         // Remote read via SSH: run `cat` on the server.
         if (sshTabId) {
+          const safety = checkReadable(path);
+          if (!safety.ok) return { error: safety.reason, path };
           try {
             const r = await invoke<{ stdout: string; stderr: string; exit_code: number }>(
               "ssh_exec_command",
@@ -41,7 +43,7 @@ export function buildFsTools(ctx: ToolContext) {
         }
 
         const abs = resolvePath(path, ctx.getCwd());
-        const safety = checkReadable(abs);
+        const safety = await checkReadableResolved(abs);
         if (!safety.ok) return { error: safety.reason, path: abs };
         try {
           const r = await native.readFile(abs);
@@ -79,6 +81,8 @@ export function buildFsTools(ctx: ToolContext) {
 
         // Remote listing via SSH: run `ls -la` on the server.
         if (sshTabId) {
+          const safety = checkReadable(path);
+          if (!safety.ok) return { error: safety.reason, path };
           try {
             const r = await invoke<{ stdout: string; stderr: string; exit_code: number }>(
               "ssh_exec_command",
@@ -92,7 +96,7 @@ export function buildFsTools(ctx: ToolContext) {
         }
 
         const abs = resolvePath(path, ctx.getCwd());
-        const safety = checkReadable(abs);
+        const safety = await checkReadableResolved(abs);
         if (!safety.ok) return { error: safety.reason, path: abs };
         try {
           const entries = await native.readDir(abs);
@@ -116,7 +120,7 @@ export function buildFsTools(ctx: ToolContext) {
       needsApproval: true,
       execute: async ({ path, content }) => {
         const abs = resolvePath(path, ctx.getCwd());
-        const safety = checkWritable(abs);
+        const safety = await checkWritableResolved(abs);
         if (!safety.ok) return { error: safety.reason, path: abs };
 
         if (usePlanStore.getState().active) {
@@ -161,7 +165,7 @@ export function buildFsTools(ctx: ToolContext) {
       needsApproval: true,
       execute: async ({ path }) => {
         const abs = resolvePath(path, ctx.getCwd());
-        const safety = checkWritable(abs);
+        const safety = await checkWritableResolved(abs);
         if (!safety.ok) return { error: safety.reason, path: abs };
         if (usePlanStore.getState().active) {
           usePlanStore.getState().enqueue({
