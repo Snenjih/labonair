@@ -103,7 +103,13 @@ export function GitGraphCanvas({
     getItemKey: (i) => commits[i]?.hash ?? i,
   });
 
-  const maxLaneCount = useMemo(() => Math.max(1, ...commits.map((c) => c.laneCount)), [commits]);
+  // Not `Math.max(1, ...commits.map(...))` — spreading one argument per
+  // commit into a function call risks blowing the call-stack argument limit
+  // on very large/paged repos.
+  const maxLaneCount = useMemo(
+    () => commits.reduce((max, c) => (c.laneCount > max ? c.laneCount : max), 1),
+    [commits],
+  );
 
   const railReservedPx = railWidth(Math.min(maxLaneCount, MAX_VISIBLE_LANES));
 
