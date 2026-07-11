@@ -35,6 +35,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     destroyTab,
     loadLocalDir,
     loadRemoteDir,
+    loadMoreRemoteDir,
     setSelectedLocal,
     setSelectedRemote,
     clearDisconnected,
@@ -585,6 +586,8 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                       onRenameChange={setRenameValue}
                       onRenameCommit={() => commitRename("remote")}
                       onRenameCancel={() => setRenamingPath(null)}
+                      hasMore={tabState?.remoteHasMore}
+                      onLoadMore={() => loadMoreRemoteDir(tabId)}
                     />
                   </div>
                 </SftpContextMenu>

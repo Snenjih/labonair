@@ -502,6 +502,7 @@ pub fn run() {
             pty::pty_has_foreground_job,
             fs::tree::list_subdirs,
             fs::tree::fs_read_dir,
+            fs::tree::fs_read_dir_page,
             fs::tree::fs_resolve_path,
             fs::watcher::fs_watch_dir,
             fs::watcher::fs_unwatch_dir,
