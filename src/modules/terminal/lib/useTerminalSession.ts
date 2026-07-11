@@ -4,6 +4,7 @@ import type { SearchAddon } from "@xterm/addon-search";
 import { useCallback, useEffect, useRef } from "react";
 import { openPty, type PtySession } from "./pty-bridge";
 import { applyTheme as poolApplyTheme } from "./rendererPool";
+import { PtyResizeQueue } from "./resizeQueue";
 import {
   clear as registryClear,
   deliverBytes,
@@ -69,6 +70,11 @@ export function useTerminalSession({
     if (!sessionId) return;
     let disposed = false;
 
+    const resizeQueue = new PtyResizeQueue((cols, rows) => {
+      const pty = ptyRef.current;
+      return pty ? pty.resize(cols, rows) : Promise.resolve();
+    });
+
     const bridge: SessionBridge = {
       writeToPty: (data) => {
         if (ptyRef.current) void ptyRef.current.write(data);
@@ -76,17 +82,11 @@ export function useTerminalSession({
       },
       resizePty: (cols, rows) => {
         pendingSizeRef.current = { cols, rows };
-        void ptyRef.current?.resize(cols, rows);
+        resizeQueue.resize(cols, rows);
       },
       kickPty: (cols, rows) => {
-        const pty = ptyRef.current;
-        if (!pty || cols <= 0 || rows <= 0) return;
-        // Linux only emits SIGWINCH when the winsize ioctl actually changes
-        // dims, so bump +1 row then restore to force a TUI repaint.
-        pty
-          .resize(cols, rows + 1)
-          .then(() => pty.resize(cols, rows))
-          .catch((e) => console.warn("[labonair] kickPty failed:", e));
+        if (!ptyRef.current || cols <= 0 || rows <= 0) return;
+        resizeQueue.kick(cols, rows);
       },
     };
 
@@ -148,7 +148,7 @@ export function useTerminalSession({
       // — or changed again — while the pty was still spawning.
       const pending = pendingSizeRef.current;
       if (pending && (pending.cols !== startCols || pending.rows !== startRows)) {
-        void pty.resize(pending.cols, pending.rows);
+        resizeQueue.resize(pending.cols, pending.rows);
       }
       if (initialCommand) {
         const cmd = initialCommand.endsWith("\n") ? initialCommand : `${initialCommand}\n`;
@@ -160,6 +160,7 @@ export function useTerminalSession({
 
     return () => {
       disposed = true;
+      resizeQueue.dispose();
       ptyRef.current?.close();
       ptyRef.current = null;
     };

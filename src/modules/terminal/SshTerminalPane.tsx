@@ -20,6 +20,7 @@ import type { TerminalSessionData } from "@/modules/tabs";
 import { useTheme } from "@/modules/theme";
 import { dropPaths } from "./lib/drop-paths";
 import { applyTheme as poolApplyTheme, getSlotForLeaf } from "./lib/rendererPool";
+import { PtyResizeQueue } from "./lib/resizeQueue";
 import { createSshOutputChannel, type SshPtyEvent } from "./lib/ssh-pty-bridge";
 import {
   deliverText,
@@ -329,18 +330,20 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     const cleanups: Array<() => void> = [];
     const earlyBuffer: string[] = [];
 
+    const resizeQueue = new PtyResizeQueue((cols, rows) =>
+      invoke("ssh_pty_resize", { sessionId, cols, rows }),
+    );
+
     const bridge: SessionBridge = {
       writeToPty: (data) => {
         if (sudoPopupRef.current) hideSudoPopup();
         invoke("ssh_pty_write", { sessionId, data }).catch(console.error);
       },
       resizePty: (cols, rows) => {
-        invoke("ssh_pty_resize", { sessionId, cols, rows }).catch(console.error);
+        resizeQueue.resize(cols, rows);
       },
       kickPty: (cols, rows) => {
-        invoke("ssh_pty_resize", { sessionId, cols, rows: rows + 1 })
-          .then(() => invoke("ssh_pty_resize", { sessionId, cols, rows }))
-          .catch((e) => console.warn("[labonair] kickPty failed:", e));
+        resizeQueue.kick(cols, rows);
       },
     };
 
@@ -485,6 +488,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
 
     return () => {
       disposed = true;
+      resizeQueue.dispose();
       cleanups.forEach((fn) => fn());
       if (sudoDebounceRef.current) clearTimeout(sudoDebounceRef.current);
       if (reconnectTimerRef.current) {

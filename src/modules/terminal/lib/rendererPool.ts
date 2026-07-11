@@ -14,6 +14,9 @@ import { computePoolCeiling, selectEvictionCandidate, type EvictionCandidate } f
 const FIT_DEBOUNCE_MS = 8;
 const PTY_RESIZE_DEBOUNCE_MS = 256;
 const SNAPSHOT_SCROLLBACK_CAP = 5_000;
+// Per-frame write budget for beginChunkedReplay — an empirical starting
+// point, tunable via scripts/terminal-test.sh --perf on real hardware.
+const REPLAY_BUDGET_BYTES = 48 * 1024;
 
 const FONT_WEIGHT_MAP: Record<string, string | number> = {
   normal: "normal",
@@ -77,6 +80,17 @@ export type Slot = {
   lastW: number;
   lastH: number;
   lastUsedAt: number;
+  // Chunked cold-rebind replay (see beginChunkedReplay) — true only while a
+  // snapshot/ring replay is in flight across animation frames.
+  replaying: boolean;
+  // Bumped on every new replay start and on disposeSlot so an in-flight
+  // rAF step for a stale replay aborts instead of writing into a slot that
+  // has since been reassigned, rebound again, or destroyed.
+  replayToken: number;
+  // Live output that arrived while `replaying` was true, in arrival order —
+  // flushed only after the full snapshot/ring replay completes so historical
+  // bytes are never interleaved behind newer ones.
+  replayQueue: (string | Uint8Array)[] | null;
 };
 
 const slots: Slot[] = [];
@@ -296,6 +310,9 @@ function createSlot(): Slot {
     lastW: 0,
     lastH: 0,
     lastUsedAt: 0,
+    replaying: false,
+    replayToken: 0,
+    replayQueue: null,
   };
 
   term.onBell(playBell);
@@ -439,70 +456,91 @@ function discardRetention(slot: Slot): void {
   slot.oscDisposers = [];
 }
 
-function bindSlot(slot: Slot, p: AcquireParams): void {
-  const fast = slot.retainedLeafId === p.sessionId;
-  const stale = !slot.webglAddon || slot.parked || performance.now() - slot.lastUsedAt > SLOT_STALE_MS;
-  const hadWebgl = !!slot.webglAddon;
-  slot.retainedLeafId = null;
-  slot.currentLeafId = p.sessionId;
-  slot.lastUsedAt = performance.now();
-
-  cancelPendingUnhide(slot);
-  cancelWebglReap(slot);
-  cancelSlotReap(slot);
-  unparkSlotHost(slot);
-  if (!fast) {
-    slot.host.style.visibility = "hidden";
-    if (hadWebgl) disposeSlotWebgl(slot);
+function sliceSnapshotIntoChunks(snapshot: string, maxChars: number): string[] {
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < snapshot.length) {
+    let end = Math.min(start + maxChars, snapshot.length);
+    // Nudge the boundary off a UTF-16 surrogate pair — xterm's parser already
+    // tolerates arbitrary chunk boundaries otherwise (same mechanism live
+    // streamed PTY output relies on), so no other splitting care is needed.
+    if (end < snapshot.length) {
+      const code = snapshot.charCodeAt(end - 1);
+      if (code >= 0xd800 && code <= 0xdbff) end -= 1;
+    }
+    chunks.push(snapshot.slice(start, end));
+    start = end;
   }
+  return chunks;
+}
 
-  if (slot.host.parentNode !== p.container) {
-    p.container.appendChild(slot.host);
-  }
-
-  slot.term.options.disableStdin = p.shellExited;
-
-  if (!fast) {
-    slot.term.clear();
-    slot.term.reset();
-
-    if (p.cols > 0 && p.rows > 0 && (slot.term.cols !== p.cols || slot.term.rows !== p.rows)) {
-      slot.term.resize(p.cols, p.rows);
-    }
-
-    if (p.snapshot) {
-      try {
-        slot.term.write(p.snapshot);
-      } catch (e) {
-        console.warn("[labonair] snapshot replay failed:", e);
-      }
-    }
-    if (p.altScreen) {
-      // TUI output is incremental cursor-positioned updates that can't be
-      // replayed on top of a stale snapshot; the SIGWINCH kick below makes
-      // the TUI redraw from scratch instead.
-      p.drainRing(() => {});
-    } else {
-      p.drainRing((bytes) => slot.term.write(bytes));
-    }
+function writeBudgeted(term: Terminal, queue: (string | Uint8Array)[]): boolean {
+  let budget = REPLAY_BUDGET_BYTES;
+  while (queue.length > 0 && budget > 0) {
+    const seg = queue.shift();
+    if (seg === undefined) break;
     try {
-      slot.term.write("\x1b[?25h");
-    } catch {
-      /* cursor-show escape, never throws in practice */
+      term.write(seg);
+    } catch (e) {
+      console.warn("[labonair] replay write failed:", e);
     }
+    budget -= typeof seg === "string" ? seg.length : seg.byteLength;
+  }
+  return queue.length === 0;
+}
 
-    for (const d of slot.oscDisposers) {
-      try {
-        d();
-      } catch {
-        /* disposer already torn down */
-      }
-    }
-    slot.oscDisposers = p.registerOsc(slot.term);
+// Cold-rebind snapshot+ring replay, chunked across animation frames instead
+// of one synchronous blocking write — a long-backgrounded busy tab's ring
+// can hold up to 1MB, and writing that (plus a up-to-5000-line snapshot) in
+// one tick is a direct main-thread stall. `onDone` runs everything that used
+// to follow the replay in bindSlot, in the same relative order, just delayed
+// by however many frames the replay takes; the slot's host stays hidden the
+// whole time so nothing partially-filled ever flashes into view.
+function beginChunkedReplay(slot: Slot, p: AcquireParams, onDone: () => void): void {
+  const token = ++slot.replayToken;
+  slot.replaying = true;
+  slot.replayQueue = [];
+
+  const segments: (string | Uint8Array)[] = [];
+  if (p.snapshot) segments.push(...sliceSnapshotIntoChunks(p.snapshot, REPLAY_BUDGET_BYTES));
+  if (p.altScreen) {
+    // TUI output is incremental cursor-positioned updates that can't be
+    // replayed on top of a stale snapshot; the SIGWINCH kick in
+    // bindSlot's onDone makes the TUI redraw from scratch instead.
+    p.drainRing(() => {});
   } else {
-    p.drainRing((bytes) => slot.term.write(bytes));
+    p.drainRing((bytes) => segments.push(bytes));
   }
 
+  const step = (): void => {
+    if (slot.replayToken !== token) return;
+    if (!writeBudgeted(slot.term, segments)) {
+      requestAnimationFrame(step);
+      return;
+    }
+    finishReplay();
+  };
+
+  const finishReplay = (): void => {
+    if (slot.replayToken !== token) return;
+    slot.replaying = false;
+    const queued = slot.replayQueue ?? [];
+    slot.replayQueue = null;
+    const flushStep = (): void => {
+      if (slot.replayToken !== token) return;
+      if (!writeBudgeted(slot.term, queued)) {
+        requestAnimationFrame(flushStep);
+        return;
+      }
+      onDone();
+    };
+    flushStep();
+  };
+
+  step();
+}
+
+function finishBindSlot(slot: Slot, p: AcquireParams, fast: boolean, stale: boolean, hadWebgl: boolean): void {
   setupResizeObserver(slot, p);
   slot.fitAddon.fit();
   slot.lastCols = slot.term.cols;
@@ -543,6 +581,62 @@ function bindSlot(slot: Slot, p: AcquireParams): void {
   }
 
   p.onSearchReady(slot.searchAddon);
+}
+
+function bindSlot(slot: Slot, p: AcquireParams): void {
+  const fast = slot.retainedLeafId === p.sessionId;
+  const stale = !slot.webglAddon || slot.parked || performance.now() - slot.lastUsedAt > SLOT_STALE_MS;
+  const hadWebgl = !!slot.webglAddon;
+  slot.retainedLeafId = null;
+  slot.currentLeafId = p.sessionId;
+  slot.lastUsedAt = performance.now();
+
+  cancelPendingUnhide(slot);
+  cancelWebglReap(slot);
+  cancelSlotReap(slot);
+  unparkSlotHost(slot);
+  if (!fast) {
+    slot.host.style.visibility = "hidden";
+    if (hadWebgl) disposeSlotWebgl(slot);
+  }
+
+  if (slot.host.parentNode !== p.container) {
+    p.container.appendChild(slot.host);
+  }
+
+  slot.term.options.disableStdin = p.shellExited;
+
+  if (fast) {
+    p.drainRing((bytes) => slot.term.write(bytes));
+    finishBindSlot(slot, p, fast, stale, hadWebgl);
+    return;
+  }
+
+  slot.term.clear();
+  slot.term.reset();
+
+  if (p.cols > 0 && p.rows > 0 && (slot.term.cols !== p.cols || slot.term.rows !== p.rows)) {
+    slot.term.resize(p.cols, p.rows);
+  }
+
+  beginChunkedReplay(slot, p, () => {
+    try {
+      slot.term.write("\x1b[?25h");
+    } catch {
+      /* cursor-show escape, never throws in practice */
+    }
+
+    for (const d of slot.oscDisposers) {
+      try {
+        d();
+      } catch {
+        /* disposer already torn down */
+      }
+    }
+    slot.oscDisposers = p.registerOsc(slot.term);
+
+    finishBindSlot(slot, p, fast, stale, hadWebgl);
+  });
 }
 
 function scheduleUnhide(slot: Slot, stale: boolean): void {
@@ -744,6 +838,9 @@ function reapIdleSlot(slot: Slot): void {
 }
 
 function disposeSlot(slot: Slot): void {
+  slot.replayToken++;
+  slot.replaying = false;
+  slot.replayQueue = null;
   cancelSlotReap(slot);
   cancelWebglReap(slot);
   cancelPendingUnhide(slot);
@@ -1049,4 +1146,33 @@ export function discardRetainedSlot(sessionId: string): void {
 
 export function getLiveSlotForLeaf(sessionId: string): Slot | null {
   return slots.find((s) => s.currentLeafId === sessionId || s.retainedLeafId === sessionId) ?? null;
+}
+
+// Live PTY/SSH output delivery for a bound-or-retained slot. While a cold
+// rebind's chunked replay (see beginChunkedReplay) is in flight, newly
+// arriving output is queued instead of written directly, so historical
+// snapshot/ring bytes are never overtaken by newer ones. Returns false if no
+// slot owns this session (caller falls back to the dormant ring).
+export function writeLiveBytes(sessionId: string, bytes: Uint8Array): boolean {
+  const slot = getLiveSlotForLeaf(sessionId);
+  if (!slot) return false;
+  if (slot.replaying) {
+    if (slot.replayQueue === null) slot.replayQueue = [];
+    slot.replayQueue.push(bytes);
+  } else {
+    slot.term.write(bytes);
+  }
+  return true;
+}
+
+export function writeLiveText(sessionId: string, text: string): boolean {
+  const slot = getLiveSlotForLeaf(sessionId);
+  if (!slot) return false;
+  if (slot.replaying) {
+    if (slot.replayQueue === null) slot.replayQueue = [];
+    slot.replayQueue.push(text);
+  } else {
+    slot.term.write(text);
+  }
+  return true;
 }
