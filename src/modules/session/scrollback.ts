@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { getAllSessionIds, peekDormantAnsi } from "@/modules/terminal/lib/terminalSessionRegistry";
+import {
+  commitDormantFlush,
+  getAllSessionIds,
+  peekDormantAnsi,
+} from "@/modules/terminal/lib/terminalSessionRegistry";
 import type { TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
 
 const MAX_SCROLLBACK_BYTES = 10 * 1024 * 1024;
@@ -61,6 +65,11 @@ export async function flushDormantScrollback(sessionId: string): Promise<void> {
     const combined = existing ? existing + DORMANT_FLUSH_SEPARATOR + buffered : buffered;
     if (combined.trim().length === 0 || combined.length > MAX_SCROLLBACK_BYTES) return;
     await invoke("scrollback_save", { sessionId, ansi: combined });
+    // Only mark these bytes as flushed once they're actually durably saved —
+    // an early return above (size cap) or a caught failure below leaves them
+    // unflushed so the next tick previews and retries them instead of
+    // silently dropping them.
+    commitDormantFlush(sessionId);
   } catch (e) {
     console.warn("[scrollback] dormant flush failed:", sessionId, e);
   }

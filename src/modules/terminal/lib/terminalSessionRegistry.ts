@@ -745,19 +745,30 @@ export function getAllSessionIds(): string[] {
 }
 
 /** Non-destructive read of a dormant session's buffered output *since the
- *  last call* — used for the periodic/quit-time scrollback flush, which must
- *  not consume the ring (a later reactivation still needs it to replay) but
- *  also must not re-return already-flushed bytes on every tick (that would
- *  duplicate the same output onto disk every 30s for a long-backgrounded
- *  session — see peekNew()). */
+ *  last committed flush* — used for the periodic/quit-time scrollback
+ *  flush, which must not consume the ring (a later reactivation still needs
+ *  it to replay) but also must not re-return already-flushed bytes on every
+ *  tick (that would duplicate the same output onto disk every 30s for a
+ *  long-backgrounded session — see DormantRing.previewNew()).
+ *
+ *  Does NOT mark the returned bytes as flushed — call `commitDormantFlush`
+ *  once they've actually been persisted, so a failed/size-capped
+ *  `scrollback_save` doesn't lose them. */
 export function peekDormantAnsi(sessionId: string): string | null {
   const s = sessions.get(sessionId);
   if (!s) return null;
   const decoder = new TextDecoder("utf-8", { fatal: false });
   const parts: string[] = [];
-  s.dormantRing.peekNew((bytes) => parts.push(decoder.decode(bytes, { stream: true })));
+  s.dormantRing.previewNew((bytes) => parts.push(decoder.decode(bytes, { stream: true })));
   const text = parts.join("");
   return text || null;
+}
+
+/** Marks a dormant session's most recently `peekDormantAnsi`-previewed bytes
+ *  as durably flushed — call only after the corresponding `scrollback_save`
+ *  actually succeeded. */
+export function commitDormantFlush(sessionId: string): void {
+  sessions.get(sessionId)?.dormantRing.commitFlushed();
 }
 
 /** Tab/pane close: frees a bound or merely-retained slot (no-op if neither
