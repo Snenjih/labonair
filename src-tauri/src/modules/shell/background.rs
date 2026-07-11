@@ -1,7 +1,7 @@
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::SystemTime;
@@ -19,6 +19,12 @@ pub struct BackgroundProc {
     pub cwd: Option<String>,
     pub started_at_ms: u64,
     pub child: Mutex<Option<Child>>,
+    /// The child's OS PID, captured once at spawn time and never cleared.
+    /// Deliberately independent of `child`'s mutex — see `kill()`'s doc
+    /// comment for why `Child::kill()` isn't used directly. 0 is never a
+    /// valid PID, so it's unused as a sentinel here (this field is always
+    /// populated by `spawn()` before the `Arc<BackgroundProc>` is handed out).
+    pub pid: AtomicU32,
     pub buffer: Mutex<BoundedRingBuffer>,
     pub exited: AtomicBool,
     pub exit_code: AtomicI32,
@@ -64,9 +70,19 @@ impl BackgroundProc {
         }
     }
 
+    /// Signals the process directly by PID rather than going through
+    /// `Child::kill()`, which requires locking `child` — the same lock the
+    /// reaper thread holds for the entire duration of its blocking `wait()`
+    /// call. Calling `Child::kill()` here would deadlock against a reaper
+    /// that's mid-wait: it can't acquire the lock until the process exits,
+    /// which is exactly what this call is trying to make happen. Signaling
+    /// by PID sidesteps the mutex entirely.
     pub fn kill(&self) {
-        if let Some(child) = self.child.lock().unwrap().as_mut() {
-            let _ = child.kill();
+        let pid = self.pid.load(Ordering::Acquire);
+        if pid != 0 {
+            unsafe {
+                libc::kill(pid as libc::pid_t, libc::SIGKILL);
+            }
         }
     }
 
@@ -116,6 +132,7 @@ pub fn spawn(command: String, cwd: Option<String>) -> Result<Arc<BackgroundProc>
         .stderr(Stdio::piped());
 
     let mut child = cmd.spawn().map_err(|e| e.to_string())?;
+    let pid = child.id();
 
     let stdout_pipe = child.stdout.take().ok_or("no stdout pipe")?;
     let stderr_pipe = child.stderr.take().ok_or("no stderr pipe")?;
@@ -130,6 +147,7 @@ pub fn spawn(command: String, cwd: Option<String>) -> Result<Arc<BackgroundProc>
         cwd,
         started_at_ms,
         child: Mutex::new(Some(child)),
+        pid: AtomicU32::new(pid),
         buffer: Mutex::new(BoundedRingBuffer::new(RING_CAP)),
         exited: AtomicBool::new(false),
         exit_code: AtomicI32::new(0),
