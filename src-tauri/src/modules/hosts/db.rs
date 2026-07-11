@@ -151,6 +151,61 @@ const SELECT_HOSTS: &str = "SELECT id, name, host_address, port, username, auth_
     startup_snippet_id, startup_snippet_mode, credential_id, \
     jump_host_id, notes FROM hosts";
 
+/// Duplicates a host row and replicates its stored password/sudo-password
+/// (if any) under the new host's id via the secrets store directly — the
+/// plaintext credential never has to round-trip through the frontend/IPC
+/// the way `hosts_create` normally requires one, since `Host` (the read
+/// shape) never exposes the password in the first place.
+#[tauri::command]
+pub async fn hosts_duplicate(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, HostsDb>,
+    secrets: tauri::State<'_, SecretsState>,
+    id: String,
+) -> Result<Host, LabonairError> {
+    let src = {
+        let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+        conn.query_row(&format!("{} WHERE id=?1", SELECT_HOSTS), rusqlite::params![id], row_to_host)?
+    };
+
+    let new_id = uuid::Uuid::new_v4().to_string();
+    let created_at = now_millis();
+    let name = format!("Copy of {}", src.name);
+
+    {
+        let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+        conn.execute(
+            "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
+             private_key_path, group_id, tags, created_at, default_path_ssh, default_path_sftp, \
+             pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
+             startup_snippet_id, startup_snippet_mode, credential_id, jump_host_id, notes) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23)",
+            rusqlite::params![
+                new_id, name, src.host_address, src.port, src.username, src.auth_method,
+                src.private_key_path, src.group_id, src.tags, created_at,
+                src.default_path_ssh, src.default_path_sftp, 0i64, src.sudo_password_set as i64,
+                src.keep_alive_interval, src.keep_alive_tries, 0i64, src.tunnels,
+                src.startup_snippet_id, src.startup_snippet_mode, src.credential_id,
+                src.jump_host_id, src.notes
+            ],
+        )?;
+    }
+
+    if let Some(pw) = get_password(&app, &secrets, "labonair-app", &id).map_err(LabonairError::Internal)? {
+        store_password(&app, &secrets, "labonair-app", &new_id, &pw).map_err(LabonairError::Internal)?;
+    }
+    if let Some(sp) = get_password(&app, &secrets, "labonair-sudo", &id).map_err(LabonairError::Internal)? {
+        store_password(&app, &secrets, "labonair-sudo", &new_id, &sp).map_err(LabonairError::Internal)?;
+    }
+
+    let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+    conn.query_row(
+        &format!("{} WHERE id=?1", SELECT_HOSTS),
+        rusqlite::params![new_id],
+        row_to_host,
+    ).map_err(LabonairError::from)
+}
+
 #[tauri::command]
 pub async fn hosts_get_all(db: tauri::State<'_, HostsDb>) -> Result<Vec<Host>, LabonairError> {
     let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;

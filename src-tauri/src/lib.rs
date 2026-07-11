@@ -3,7 +3,7 @@ mod modules;
 use modules::{
     fs::{self, paths},
     git, pty, secrets, shell,
-    hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete, groups_update}},
+    hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_duplicate, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete, groups_update}},
     credentials::{credentials_get_all, credentials_create, credentials_update, credentials_delete, credentials_get_hosts_using, credential_generate_keypair},
     ssh::{SshState, TrustState, client::{ssh_connect, ssh_connect_quick, ssh_trust_host, ssh_remove_known_host, ssh_disconnect}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_read_dir_page, sftp_rename, sftp_delete, sftp_mkdir, sftp_create_file, sftp_chmod, sftp_calculate_size, sftp_chown, sftp_deep_search, prepare_remote_edit, save_remote_edit, sftp_read_file_content, cleanup_remote_edit_temp}, tunnels::{TunnelState, ssh_start_tunnels, ssh_stop_tunnels}},
     sftp::{SftpState, TransferWorkerState, commands::{enqueue_transfer, cancel_transfer, resolve_conflict}, connection::{sftp_connect, sftp_disconnect}, worker::run_worker},
@@ -542,6 +542,7 @@ pub fn run() {
             hosts_create,
             hosts_update,
             hosts_delete,
+            hosts_duplicate,
             hosts_reorder,
             get_sudo_password,
             groups_get_all,
