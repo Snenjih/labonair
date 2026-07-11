@@ -5,14 +5,18 @@ import {
   registerCwdHandler,
   registerPromptTracker,
   registerTerminalQueryHandlers,
+  registerTerminalQuerySwallowHandlers,
+  safeCursorPos,
 } from "./osc-handlers";
 
 function makeFakeQueryTerminal(cursorX: number, cursorY: number) {
-  let csiHandler: ((params: number[]) => boolean) | null = null;
+  let csiNHandler: ((params: number[]) => boolean) | null = null;
+  let csiCHandler: ((params: number[]) => boolean) | null = null;
   const term = {
     parser: {
       registerCsiHandler: (opts: { final: string }, handler: (params: number[]) => boolean) => {
-        if (opts.final === "n") csiHandler = handler;
+        if (opts.final === "n") csiNHandler = handler;
+        if (opts.final === "c") csiCHandler = handler;
         return { dispose: () => {} };
       },
       registerOscHandler: () => ({ dispose: () => {} }),
@@ -20,7 +24,11 @@ function makeFakeQueryTerminal(cursorX: number, cursorY: number) {
     buffer: { active: { cursorX, cursorY } },
     options: { theme: {} },
   } as unknown as Terminal;
-  return { term, fireCpr: () => csiHandler?.([6]) };
+  return {
+    term,
+    fireCpr: () => csiNHandler?.([6]),
+    fireDa1: () => csiCHandler?.([0]),
+  };
 }
 
 function makeFakeTerminal() {
@@ -163,5 +171,70 @@ describe("registerTerminalQueryHandlers — CPR", () => {
     fireCpr();
 
     expect(writeToProcess).not.toHaveBeenCalled();
+  });
+});
+
+describe("safeCursorPos", () => {
+  it("returns the cursor position when finite", () => {
+    const { term } = makeFakeQueryTerminal(4, 9);
+    expect(safeCursorPos(term)).toEqual({ x: 4, y: 9 });
+  });
+
+  it("returns null when cursorX/cursorY is non-finite", () => {
+    const { term } = makeFakeQueryTerminal(Number.NaN, 9);
+    expect(safeCursorPos(term)).toBeNull();
+  });
+});
+
+describe("registerTerminalQuerySwallowHandlers", () => {
+  it("swallows CPR (CSI n) without writing anything back", () => {
+    const { term, fireCpr } = makeFakeQueryTerminal(4, 9);
+    registerTerminalQuerySwallowHandlers(term);
+
+    const result = fireCpr();
+
+    expect(result).toBe(true);
+  });
+
+  it("swallows DA1 (CSI c) without writing anything back", () => {
+    const { term, fireDa1 } = makeFakeQueryTerminal(0, 0);
+    registerTerminalQuerySwallowHandlers(term);
+
+    const result = fireDa1();
+
+    expect(result).toBe(true);
+  });
+
+  it("wins over a handler registered before it (xterm-builtin-shadowing simulation)", () => {
+    // Simulates xterm.js's own built-in CPR handler having been registered
+    // first (at Terminal construction time) — the parser's real dispatch is
+    // last-registered-first, so registering the swallow handler afterward
+    // (as terminalSessionRegistry.ts does for SSH sessions) must be the one
+    // that actually answers the query, not the earlier one.
+    let handlers: Array<(params: number[]) => boolean> = [];
+    const builtinReply = vi.fn(() => {
+      throw new Error("xterm's built-in handler must not run for SSH sessions");
+    });
+    const term = {
+      parser: {
+        registerCsiHandler: (_opts: { final: string }, handler: (params: number[]) => boolean) => {
+          handlers = [handler, ...handlers]; // last-registered-first, like the real parser
+          return { dispose: () => {} };
+        },
+      },
+    } as unknown as Terminal;
+    // Register the "built-in" handler first...
+    (term.parser.registerCsiHandler as (o: { final: string }, h: (p: number[]) => boolean) => unknown)(
+      { final: "n" },
+      builtinReply,
+    );
+    // ...then the swallow handler, matching bindLeafToSlot's registration order.
+    registerTerminalQuerySwallowHandlers(term);
+
+    for (const h of handlers) {
+      if (h([6])) break;
+    }
+
+    expect(builtinReply).not.toHaveBeenCalled();
   });
 });

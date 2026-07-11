@@ -19,6 +19,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { TerminalSessionData } from "@/modules/tabs";
 import { useTheme } from "@/modules/theme";
 import { dropPaths } from "./lib/drop-paths";
+import { safeCursorPos } from "./lib/osc-handlers";
 import { applyTheme as poolApplyTheme, getSlotForLeaf } from "./lib/rendererPool";
 import { PtyResizeQueue } from "./lib/resizeQueue";
 import { createSshOutputChannel, type SshPtyEvent } from "./lib/ssh-pty-bridge";
@@ -50,13 +51,17 @@ function stripAnsi(s: string): string {
 
 function getCursorPixelPos(sessionId: string, container: HTMLDivElement): { x: number; y: number } {
   const term = getSlotForLeaf(sessionId)?.term;
-  if (!term) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  // During a renderer-pool slot rebind, cursorX/cursorY can transiently be
+  // non-finite (same window the CPR handler guards against) — fall back to
+  // screen-center rather than positioning the popup at a NaN offset.
+  const pos = term ? safeCursorPos(term) : null;
+  if (!term || !pos) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   const rect = container.getBoundingClientRect();
   const cellW = rect.width / term.cols;
   const cellH = rect.height / term.rows;
   return {
-    x: rect.left + (term.buffer.active.cursorX + 0.5) * cellW,
-    y: rect.top + (term.buffer.active.cursorY + 1) * cellH,
+    x: rect.left + (pos.x + 0.5) * cellW,
+    y: rect.top + (pos.y + 1) * cellH,
   };
 }
 

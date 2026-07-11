@@ -9,6 +9,7 @@ import {
   registerCwdHandler,
   registerPromptTracker,
   registerTerminalQueryHandlers,
+  registerTerminalQuerySwallowHandlers,
   type ShellIntegrationState,
 } from "./osc-handlers";
 import {
@@ -266,8 +267,12 @@ function bindLeafToSlot(sessionId: string, s: SessionRecord): void {
         },
         s.shellState,
       );
-      // Skipped for SSH — see SessionRecord.isRemote.
-      const query = s.isRemote ? () => {} : registerTerminalQueryHandlers(term, (d) => s.bridge.writeToPty(d));
+      // SSH sessions get the swallow-only variant, not "skipped" — see
+      // registerTerminalQuerySwallowHandlers's doc comment for why leaving
+      // no handler registered here would NOT actually mean unanswered.
+      const query = s.isRemote
+        ? registerTerminalQuerySwallowHandlers(term)
+        : registerTerminalQueryHandlers(term, (d) => s.bridge.writeToPty(d));
       return [prompt.dispose, cwd, query];
     },
     onSearchReady: (addon) => s.callbacks.onSearchReady?.(addon),
