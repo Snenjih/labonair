@@ -129,54 +129,93 @@ describe("DormantRing", () => {
     expect(first.join("")).toBe(second.join(""));
   });
 
-  it("peekNew() returns only bytes appended since the last call, unlike peek()", () => {
+  it("previewNew()+commitFlushed() returns only bytes appended since the last commit, unlike peek()", () => {
     const ring = new DormantRing(64, 16);
     ring.push(enc.encode("first"));
 
     const a: string[] = [];
-    ring.peekNew((b) => a.push(dec.decode(b)));
+    ring.previewNew((b) => a.push(dec.decode(b)));
+    ring.commitFlushed();
     expect(a.join("")).toBe("first");
 
     // A second call with nothing new pushed must return nothing — this is
     // the fix for the periodic scrollback flush re-appending the same bytes
     // on every 30s tick for a long-dormant session.
     const b: string[] = [];
-    ring.peekNew((chunk) => b.push(dec.decode(chunk)));
+    ring.previewNew((chunk) => b.push(dec.decode(chunk)));
+    ring.commitFlushed();
     expect(b.join("")).toBe("");
 
     ring.push(enc.encode("second"));
     const c: string[] = [];
-    ring.peekNew((chunk) => c.push(dec.decode(chunk)));
+    ring.previewNew((chunk) => c.push(dec.decode(chunk)));
+    ring.commitFlushed();
     expect(c.join("")).toBe("second");
 
     // Nothing was consumed for a later real drain().
     expect(drainToString(ring)).toBe("firstsecond");
   });
 
-  it("peekNew() resets to empty after drain()", () => {
+  it("previewNew()/commitFlushed() resets to empty after drain()", () => {
     const ring = new DormantRing(64, 16);
     ring.push(enc.encode("x"));
-    ring.peekNew(() => {});
+    ring.previewNew(() => {});
+    ring.commitFlushed();
     drainToString(ring);
 
     ring.push(enc.encode("y"));
     const parts: string[] = [];
-    ring.peekNew((b) => parts.push(dec.decode(b)));
+    ring.previewNew((b) => parts.push(dec.decode(b)));
+    ring.commitFlushed();
     expect(parts.join("")).toBe("y");
   });
 
-  it("peekNew() stays consistent across an overflow drop", () => {
+  it("previewNew()+commitFlushed() stays consistent across an overflow drop", () => {
     const ring = new DormantRing(16, 8);
     ring.push(enc.encode("AAAAAAAA"));
-    ring.peekNew(() => {}); // mark the first block as already flushed
+    ring.previewNew(() => {}); // mark the first block as already flushed
+    ring.commitFlushed();
     ring.push(enc.encode("BBBBBBBB"));
     ring.push(enc.encode("CCCCCCCC")); // forces the AAAAAAAA block to drop
 
     const parts: string[] = [];
-    ring.peekNew((b) => parts.push(dec.decode(b)));
+    ring.previewNew((b) => parts.push(dec.decode(b)));
+    ring.commitFlushed();
     // The dropped block never re-appears, and nothing already-flushed repeats.
     expect(parts.join("")).not.toContain("A");
     expect(parts.join("")).toContain("BBBBBBBB");
     expect(parts.join("")).toContain("CCCCCCCC");
+  });
+
+  it("previewNew() without commitFlushed() re-offers the same bytes next time (failed-persist retry)", () => {
+    const ring = new DormantRing(64, 16);
+    ring.push(enc.encode("first"));
+
+    // Simulates a scrollback_save that failed or hit the size cap: preview,
+    // but never commit.
+    const a: string[] = [];
+    ring.previewNew((b) => a.push(dec.decode(b)));
+    expect(a.join("")).toBe("first");
+
+    // Without a commit in between, the same bytes must come back — the
+    // whole point of splitting preview from commit.
+    const b: string[] = [];
+    ring.previewNew((chunk) => b.push(dec.decode(chunk)));
+    expect(b.join("")).toBe("first");
+  });
+
+  it("commitFlushed() is a no-op if previewNew() hasn't been called since the last commit", () => {
+    const ring = new DormantRing(64, 16);
+    ring.push(enc.encode("first"));
+    ring.previewNew(() => {});
+    ring.commitFlushed();
+
+    // Calling commitFlushed() again with no intervening previewNew() must
+    // not advance anything further (there's nothing pending).
+    ring.commitFlushed();
+    ring.push(enc.encode("second"));
+    const parts: string[] = [];
+    ring.previewNew((b) => parts.push(dec.decode(b)));
+    expect(parts.join("")).toBe("second");
   });
 });

@@ -2,16 +2,9 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/modules/hosts";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setSftpShowHiddenFiles } from "@/modules/settings/store";
+import { toggleSftpHiddenFiles, usePreferencesStore } from "@/modules/settings/preferences";
 import { Folder01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-
-function toggleHiddenFiles() {
-  const next = !usePreferencesStore.getState().sftpShowHiddenFiles;
-  usePreferencesStore.setState({ sftpShowHiddenFiles: next });
-  setSftpShowHiddenFiles(next);
-}
 import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
 import type { SftpTab } from "@/modules/tabs";
 import { invoke } from "@tauri-apps/api/core";
@@ -42,6 +35,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     destroyTab,
     loadLocalDir,
     loadRemoteDir,
+    loadMoreRemoteDir,
     setSelectedLocal,
     setSelectedRemote,
     clearDisconnected,
@@ -408,7 +402,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
               path={localPath}
               onNavigate={(p) => loadLocalDir(tabId, p)}
               showHidden={sftpShowHiddenFiles}
-              onToggleHidden={toggleHiddenFiles}
+              onToggleHidden={toggleSftpHiddenFiles}
               bookmarkKey="local"
             />
             {creatingFolderSide === "local" && (
@@ -487,7 +481,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
               showOpenTerminal
               onOpenTerminal={() => onOpenSshTerminal?.(tab.hostId, hostLabel, remotePath)}
               showHidden={sftpShowHiddenFiles}
-              onToggleHidden={toggleHiddenFiles}
+              onToggleHidden={toggleSftpHiddenFiles}
               bookmarkKey={hostAddress || undefined}
               onDeepSearch={handleDeepSearch}
               isSearching={isDeepSearching}
@@ -592,6 +586,8 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                       onRenameChange={setRenameValue}
                       onRenameCommit={() => commitRename("remote")}
                       onRenameCancel={() => setRenamingPath(null)}
+                      hasMore={tabState?.remoteHasMore}
+                      onLoadMore={() => loadMoreRemoteDir(tabId)}
                     />
                   </div>
                 </SftpContextMenu>

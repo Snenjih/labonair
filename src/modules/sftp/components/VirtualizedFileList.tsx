@@ -48,6 +48,10 @@ interface VirtualizedFileListProps {
   onRenameChange?: (v: string) => void;
   onRenameCommit?: () => void;
   onRenameCancel?: () => void;
+  /** When set, shows a "Load more…" row below the list (remote/paginated
+   *  listings only — local directories are always loaded in full). */
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 interface MarqueeRect {
@@ -77,6 +81,8 @@ export function VirtualizedFileList({
   onRenameChange,
   onRenameCommit,
   onRenameCancel,
+  hasMore,
+  onLoadMore,
 }: VirtualizedFileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [colWidths, setColWidths] = useState<ColWidths>(DEFAULT_COL_WIDTHS);
@@ -371,6 +377,15 @@ export function VirtualizedFileList({
               );
             })}
           </div>
+        )}
+        {hasMore && !isLoading && (
+          <button
+            type="button"
+            onClick={onLoadMore}
+            className="flex h-7 w-full shrink-0 items-center px-2 text-[11px] text-primary hover:underline"
+          >
+            Load more…
+          </button>
         )}
       </div>
     </div>

@@ -21,10 +21,19 @@ export class DormantRing {
   private tailLen = 0;
   private total = 0;
   private overflowed = false;
-  // Bytes from the current head already handed out by peekNew() — lets
-  // repeated peekNew() calls (periodic scrollback flush) return only the
-  // delta instead of re-emitting everything retained on every call.
+  // Bytes from the current head already handed out by previewNew() and
+  // *committed* via commitFlushed() — lets repeated previewNew() calls
+  // (periodic scrollback flush) return only the delta instead of
+  // re-emitting everything retained on every call.
   private flushedBytes = 0;
+  // Set by previewNew() to the total reached at preview time; consumed by
+  // commitFlushed(), which only then advances flushedBytes. Kept separate
+  // from flushedBytes so a preview whose persist (scrollback_save) fails or
+  // gets size-capped never advances flushedBytes — those bytes are offered
+  // again on the next tick instead of being silently dropped. Adjusted on
+  // overflow-drop the same way flushedBytes is, so a drop landing between a
+  // preview and its (delayed, async) commit doesn't desync the offset.
+  private pendingFlushOffset: number | null = null;
 
   constructor(
     private readonly byteCap = DEFAULT_BYTE_CAP,
@@ -50,6 +59,9 @@ export class DormantRing {
         const droppedLen = this.blocks[this.head].length;
         this.total -= droppedLen;
         this.flushedBytes = Math.max(0, this.flushedBytes - droppedLen);
+        if (this.pendingFlushOffset !== null) {
+          this.pendingFlushOffset = Math.max(0, this.pendingFlushOffset - droppedLen);
+        }
         this.head++;
         this.overflowed = true;
       }
@@ -82,11 +94,18 @@ export class DormantRing {
   }
 
   /** Non-destructive read of only the bytes appended since the last
-   *  peekNew() call — used by the periodic dormant-scrollback flush so a
-   *  long-backgrounded session doesn't re-append the same already-flushed
-   *  bytes to disk on every tick (unlike peek(), which always returns
-   *  everything currently retained and is meant for a one-shot full replay). */
-  peekNew(write: (bytes: Uint8Array) => void): void {
+   *  *committed* flush (see `commitFlushed`) — used by the periodic
+   *  dormant-scrollback flush so a long-backgrounded session doesn't
+   *  re-append the same already-flushed bytes to disk on every tick (unlike
+   *  peek(), which always returns everything currently retained and is
+   *  meant for a one-shot full replay).
+   *
+   *  Does NOT itself advance the flushed offset — call `commitFlushed()`
+   *  once the previewed bytes have actually been durably persisted. This
+   *  two-step split exists so a failed or size-capped persist attempt
+   *  doesn't lose the bytes: they simply remain unflushed and get
+   *  re-previewed (and re-offered) on the next tick. */
+  previewNew(write: (bytes: Uint8Array) => void): void {
     const last = this.blocks.length - 1;
     let consumed = 0;
     for (let i = this.head; i <= last; i++) {
@@ -97,7 +116,17 @@ export class DormantRing {
       }
       consumed += len;
     }
-    this.flushedBytes = this.total;
+    this.pendingFlushOffset = this.total;
+  }
+
+  /** Advances the flushed offset to the point reached by the most recent
+   *  `previewNew()` call. No-op if `previewNew()` hasn't been called since
+   *  the last commit (or ever). */
+  commitFlushed(): void {
+    if (this.pendingFlushOffset !== null) {
+      this.flushedBytes = this.pendingFlushOffset;
+      this.pendingFlushOffset = null;
+    }
   }
 
   drain(write: (bytes: Uint8Array) => void): void {
@@ -108,6 +137,7 @@ export class DormantRing {
     this.total = 0;
     this.overflowed = false;
     this.flushedBytes = 0;
+    this.pendingFlushOffset = null;
   }
 
   byteLength(): number {

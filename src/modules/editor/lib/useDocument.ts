@@ -25,6 +25,11 @@ export function useDocument({ path, isUntitled, onDirtyChange, onSaveAs }: Optio
   const [doc, setDoc] = useState<DocumentState>({ status: "loading" });
   const [dirty, setDirty] = useState(false);
   const [reloadCounter, setReloadCounter] = useState(0);
+  // Bumped on every onChange call — unlike `doc` (only changes on file
+  // load/reload) or `dirty` (only flips once per edit session), this gives
+  // autosave a value that changes on every keystroke so its debounce timer
+  // can actually restart per-edit instead of arming once per file-open.
+  const [editVersion, setEditVersion] = useState(0);
 
   // Track the saved buffer so we can detect changes cheaply.
   const savedRef = useRef<string>("");
@@ -90,6 +95,7 @@ export function useDocument({ path, isUntitled, onDirtyChange, onSaveAs }: Optio
   const onChange = useCallback((next: string) => {
     bufferRef.current = next;
     setDirty(next !== savedRef.current);
+    setEditVersion((v) => v + 1);
   }, []);
 
   const onSaveAsRef = useRef(onSaveAs);
@@ -122,5 +128,5 @@ export function useDocument({ path, isUntitled, onDirtyChange, onSaveAs }: Optio
     setDirty(false);
   }, []);
 
-  return { doc, dirty, onChange, save, reload };
+  return { doc, dirty, editVersion, onChange, save, reload };
 }

@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { DEFAULT_PREFERENCES, loadPreferences, onPreferencesChange, type Preferences } from "./store";
+import {
+  DEFAULT_PREFERENCES,
+  loadPreferences,
+  onPreferencesChange,
+  type Preferences,
+  setSftpShowHiddenFiles,
+} from "./store";
 
 type State = Preferences & {
   hydrated: boolean;
@@ -26,3 +32,12 @@ export const usePreferencesStore = create<State>((set) => ({
     });
   },
 }));
+
+/** Shared by SftpPane's own hidden-files toggle button and the command
+ *  palette's "Toggle: Show Hidden Files" command — previously each had its
+ *  own copy (the palette's via a dead `CustomEvent` nobody listened for). */
+export function toggleSftpHiddenFiles(): void {
+  const next = !usePreferencesStore.getState().sftpShowHiddenFiles;
+  usePreferencesStore.setState({ sftpShowHiddenFiles: next });
+  void setSftpShowHiddenFiles(next);
+}

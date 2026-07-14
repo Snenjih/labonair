@@ -33,11 +33,12 @@ export function createLocalFsProvider(): FsProvider {
     joinPath,
 
     async readDir(path, opts) {
-      const raw = await invoke<RawDirEntry[]>("fs_read_dir", {
+      const raw = await invoke<{ entries: RawDirEntry[]; has_more: boolean }>("fs_read_dir_page", {
         path,
+        offset: opts?.offset ?? 0,
         showHidden: opts?.showHidden ?? false,
       });
-      const entries: FileEntry[] = raw.map((e) => ({
+      const entries: FileEntry[] = raw.entries.map((e) => ({
         name: e.name,
         path: joinPath(path, e.name),
         kind: e.kind,
@@ -45,8 +46,7 @@ export function createLocalFsProvider(): FsProvider {
         mtimeMs: e.mtime,
         isIgnored: e.is_ignored ?? false,
       }));
-      // fs_read_dir always returns the full listing in one call — no pagination locally.
-      const page: ReadDirPage = { entries, hasMore: false };
+      const page: ReadDirPage = { entries, hasMore: raw.has_more };
       return page;
     },
 

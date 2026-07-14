@@ -108,6 +108,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
   const {
     doc,
     dirty,
+    editVersion,
     onChange: _onChange,
     save,
     reload,
@@ -315,7 +316,7 @@ export const EditorPane = forwardRef<EditorPaneHandle, Props>(function EditorPan
   }, [runFormat]);
   performSaveRef.current = performSave;
 
-  useAutoSave({ performSaveRef, doc, editorAutoSave, editorAutoSaveDelay, isUntitled });
+  useAutoSave({ performSaveRef, doc, dirty, editVersion, editorAutoSave, editorAutoSaveDelay, isUntitled });
 
   // Auto-save: onFocusChange — attach blur listener to CodeMirror's DOM.
   const handleBlur = useCallback(async () => {

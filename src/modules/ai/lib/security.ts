@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+
 /**
  * Path-safety guards for AI tool calls.
  *
@@ -127,6 +129,37 @@ export function checkWritable(path: string): SafetyResult {
   return { ok: true };
 }
 
+/**
+ * Same as `checkReadable`, but also resolves symlinks (via the Rust
+ * `fs_realpath` command) and re-checks the resolved target. A file named
+ * innocuously that's actually a symlink to `~/.ssh/id_rsa` passes the plain
+ * literal-path check but must not pass this one. If the path doesn't exist
+ * yet (new file) or realpath resolution otherwise fails, only the literal
+ * check applies — there's nothing to resolve.
+ */
+export async function checkReadableResolved(path: string): Promise<SafetyResult> {
+  const literal = checkReadable(path);
+  if (!literal.ok) return literal;
+  try {
+    const real = await invoke<string>("fs_realpath", { path });
+    return checkReadable(real);
+  } catch {
+    return { ok: true };
+  }
+}
+
+/** Symlink-aware counterpart to `checkWritable` — see `checkReadableResolved`. */
+export async function checkWritableResolved(path: string): Promise<SafetyResult> {
+  const literal = checkWritable(path);
+  if (!literal.ok) return literal;
+  try {
+    const real = await invoke<string>("fs_realpath", { path });
+    return checkWritable(real);
+  } catch {
+    return { ok: true };
+  }
+}
+
 const DESTRUCTIVE_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\brm\s+(-[a-z]*r[a-z]*f[a-z]*|-[a-z]*f[a-z]*r[a-z]*)\s/i, label: "Recursive force delete (rm -rf)" },
   { re: /\bdrop\s+(table|database|schema)\b/i, label: "SQL DROP statement" },
@@ -153,9 +186,18 @@ export function checkDestructiveCommand(cmd: string): string | null {
  * even after the user has approved them. The approval UI shows the command
  * verbatim, so the user is the primary gate; this just catches a couple of
  * patterns that almost certainly indicate the model went off the rails.
+ *
+ * Known, accepted limitation: this is string-matching over the raw command,
+ * not a shell parser. Command substitution (`$(cat ~/.ssh/id_rsa)`), base64/
+ * hex round-trips, or otherwise dynamically-built strings can evade both the
+ * destructive-pattern and secret-path checks below — that's not solvable
+ * with pattern matching and is left to the approval UI as the real gate.
  */
 export function checkShellCommand(cmd: string): SafetyResult {
-  const c = cmd.trim();
+  // Strip a leading sudo/doas so the patterns below also match e.g.
+  // "sudo rm -rf /" — matched patterns don't otherwise account for the
+  // privilege-escalation prefix.
+  const c = cmd.trim().replace(/^(sudo|doas)\s+/i, "");
   // rm -rf / (and variants with quoted /, --no-preserve-root, etc.)
   if (
     /\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|--recursive\s+--force|--force\s+--recursive)\s+(['"]?\/['"]?\s*($|;|&|\|))/.test(
@@ -174,6 +216,31 @@ export function checkShellCommand(cmd: string): SafetyResult {
   // mkfs / fdisk / diskutil eraseDisk
   if (/\b(mkfs(\.[a-z0-9]+)?|fdisk|parted)\b/.test(c) || /\bdiskutil\s+erase/i.test(c)) {
     return { ok: false, reason: "Refused: disk-formatting commands are not allowed." };
+  }
+  // Same secret-file patterns read_file/list_directory refuse — tokenized
+  // over the raw command text (not a single substring scan, since the
+  // basename patterns are anchored to a whole basename) so `cat ~/.ssh/id_rsa`,
+  // `less .env`, `cp .aws/credentials /tmp` etc. are still caught regardless
+  // of where in the command line they appear. Quotes are stripped per-token
+  // so `cat ".env"` is caught the same as `cat .env`.
+  const tokens = c.split(/\s+/).map((t) => t.replace(/^['"]|['"]$/g, ""));
+  for (const token of tokens) {
+    if (!token) continue;
+    const norm = normalize(token);
+    const base = basename(norm);
+    for (const re of SECRET_BASENAME_PATTERNS) {
+      if (re.test(base)) {
+        return { ok: false, reason: `Refused: command references a sensitive-file pattern ("${base}").` };
+      }
+    }
+    for (const seg of SECRET_PATH_SEGMENTS) {
+      if (norm.includes(seg)) {
+        return {
+          ok: false,
+          reason: `Refused: command references a protected directory (${seg.replace(/\//g, "")}).`,
+        };
+      }
+    }
   }
   return { ok: true };
 }

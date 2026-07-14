@@ -5,6 +5,7 @@ import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTransferStore } from "@/modules/sftp/store/transferStore";
 import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
+import { labelFor } from "../lib/tabUtils";
 import {
   type AiDiffStatus,
   basename,
@@ -117,6 +118,41 @@ export const selectActivePaneId = (s: TabsState): string | null => {
   const tab = s.tabs.find((t) => t.id === s.activeId);
   return tab?.kind === "workspace" ? tab.activePaneId : null;
 };
+
+// `updatePaneSessionCwd` and other workspace-tab mutations replace the `Tab`
+// object on every cwd/session update even when nothing TabBar/SidebarTabList
+// actually render (kind, label, dirty dot, icon) has changed as a result —
+// so a plain `useTabsStore((s) => s.tabs)` re-renders the whole tab strip on
+// every terminal `cd`. This selector returns the *same* `Tab` reference for
+// a given id when its render-relevant fields haven't changed, so pairing it
+// with `useShallow` at the call site (which compares array elements via
+// `Object.is`) lets those components skip re-rendering on unrelated tab
+// mutations. Cache is keyed by id, not by object identity, precisely so a
+// cwd-only mutation (which produces a new `Tab` object) doesn't count as a
+// change here.
+function tabRenderFingerprint(t: Tab): string {
+  const label = labelFor(t);
+  const dirty = t.kind === "editor" ? t.dirty : false;
+  // Workspace tabs pick their icon (terminal vs SSH) off the active pane's
+  // session kind — not otherwise captured by label/dirty.
+  const iconKind = t.kind === "workspace" ? (t.sessions[t.activePaneId]?.kind ?? "") : "";
+  return `${t.kind} ${label} ${dirty} ${iconKind}`;
+}
+
+const tabIdentityCache = new Map<number, { fingerprint: string; tab: Tab }>();
+
+function toRenderStableTab(t: Tab): Tab {
+  const fingerprint = tabRenderFingerprint(t);
+  const cached = tabIdentityCache.get(t.id);
+  if (cached && cached.fingerprint === fingerprint) return cached.tab;
+  tabIdentityCache.set(t.id, { fingerprint, tab: t });
+  return t;
+}
+
+/** Tab list projected for chip-rendering components (TabBar, SidebarTabList)
+ *  — see the block comment above `tabRenderFingerprint` for why this exists
+ *  instead of a plain `s.tabs` subscription. */
+export const selectRenderStableTabs = (s: TabsState): Tab[] => s.tabs.map(toRenderStableTab);
 
 // ─── Shared remote-file staging ────────────────────────────────────────────────
 
@@ -437,6 +473,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const next = tabs.filter((t) => t.id !== id);
     const newActiveId = id === activeId ? next[Math.max(0, idx - 1)].id : activeId;
     set({ tabs: next, activeId: newActiveId });
+    tabIdentityCache.delete(id);
   },
 
   updateTab: (id, patch) => {

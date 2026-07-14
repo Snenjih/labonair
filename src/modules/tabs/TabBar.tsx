@@ -23,7 +23,8 @@ import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dn
 import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useTabsStore } from "./store/tabsStore";
+import { useShallow } from "zustand/react/shallow";
+import { selectRenderStableTabs, useTabsStore } from "./store/tabsStore";
 import { TabIconFor, labelFor, pluralLabelFor, NewTabDropdownItems } from "./lib/tabUtils";
 import type { Tab } from "./types";
 
@@ -62,7 +63,7 @@ export function TabBar({
   onNewGitGraph,
   compact,
 }: Props) {
-  const tabs = useTabsStore((s) => s.tabs);
+  const tabs = useTabsStore(useShallow(selectRenderStableTabs));
   const activeId = useTabsStore((s) => s.activeId);
   const reorderTabs = useTabsStore((s) => s.reorderTabs);
   const scrollRef = useRef<HTMLDivElement>(null);

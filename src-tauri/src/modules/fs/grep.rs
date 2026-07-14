@@ -6,7 +6,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use grep_regex::RegexMatcherBuilder;
 use grep_searcher::sinks::UTF8;
 use grep_searcher::{BinaryDetection, SearcherBuilder};
-use ignore::WalkBuilder;
+use ignore::{WalkBuilder, WalkState};
 use serde::Serialize;
 
 fn expand_home(path: &str) -> Result<PathBuf, String> {
@@ -87,66 +87,76 @@ pub fn fs_grep(
         .ignore(true)
         .parents(true)
         .follow_links(false)
-        .build();
+        .build_parallel();
 
     let hits: Arc<std::sync::Mutex<Vec<GrepHit>>> = Arc::new(std::sync::Mutex::new(Vec::new()));
     let scanned = Arc::new(AtomicUsize::new(0));
     let truncated = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-    for dent in walker.flatten() {
-        if truncated.load(Ordering::Relaxed) {
-            break;
-        }
-        if !dent.file_type().map(|t| t.is_file()).unwrap_or(false) {
-            continue;
-        }
-        let path = dent.path();
-        let rel = match path.strip_prefix(&root_path) {
-            Ok(r) => r.to_string_lossy().into_owned(),
-            Err(_) => continue,
-        };
-        if let Some(set) = globs.as_ref() {
-            if !set.is_match(&rel) {
-                continue;
+    walker.run(|| {
+        let hits = hits.clone();
+        let scanned = scanned.clone();
+        let truncated = truncated.clone();
+        let matcher = matcher.clone();
+        let globs = globs.clone();
+        let root_path = root_path.clone();
+        Box::new(move |entry| {
+            if truncated.load(Ordering::Relaxed) {
+                return WalkState::Quit;
             }
-        }
-        if let Ok(meta) = std::fs::metadata(path) {
-            if meta.len() > FILE_SIZE_CAP {
-                continue;
+            let Ok(dent) = entry else { return WalkState::Continue };
+            if !dent.file_type().map(|t| t.is_file()).unwrap_or(false) {
+                return WalkState::Continue;
             }
-        }
-
-        scanned.fetch_add(1, Ordering::Relaxed);
-
-        let abs = path.to_string_lossy().into_owned();
-        let rel_clone = rel.clone();
-        let hits_ref = hits.clone();
-        let truncated_ref = truncated.clone();
-        let mut searcher = SearcherBuilder::new()
-            .binary_detection(BinaryDetection::quit(b'\x00'))
-            .line_number(true)
-            .build();
-
-        let _ = searcher.search_path(
-            &matcher,
-            path,
-            UTF8(|line_num, text| {
-                let line_text = text.trim_end_matches('\n').to_string();
-                let mut guard = hits_ref.lock().unwrap();
-                if guard.len() >= cap {
-                    truncated_ref.store(true, Ordering::Relaxed);
-                    return Ok(false);
+            let path = dent.path();
+            let rel = match path.strip_prefix(&root_path) {
+                Ok(r) => r.to_string_lossy().into_owned(),
+                Err(_) => return WalkState::Continue,
+            };
+            if let Some(set) = globs.as_ref() {
+                if !set.is_match(&rel) {
+                    return WalkState::Continue;
                 }
-                guard.push(GrepHit {
-                    path: abs.clone(),
-                    rel: rel_clone.clone(),
-                    line: line_num,
-                    text: line_text,
-                });
-                Ok(true)
-            }),
-        );
-    }
+            }
+            if let Ok(meta) = std::fs::metadata(path) {
+                if meta.len() > FILE_SIZE_CAP {
+                    return WalkState::Continue;
+                }
+            }
+
+            scanned.fetch_add(1, Ordering::Relaxed);
+
+            let abs = path.to_string_lossy().into_owned();
+            let rel_clone = rel.clone();
+            let hits_ref = hits.clone();
+            let truncated_ref = truncated.clone();
+            let mut searcher = SearcherBuilder::new()
+                .binary_detection(BinaryDetection::quit(b'\x00'))
+                .line_number(true)
+                .build();
+
+            let _ = searcher.search_path(
+                &matcher,
+                path,
+                UTF8(|line_num, text| {
+                    let line_text = text.trim_end_matches('\n').to_string();
+                    let mut guard = hits_ref.lock().unwrap();
+                    if guard.len() >= cap {
+                        truncated_ref.store(true, Ordering::Relaxed);
+                        return Ok(false);
+                    }
+                    guard.push(GrepHit {
+                        path: abs.clone(),
+                        rel: rel_clone.clone(),
+                        line: line_num,
+                        text: line_text,
+                    });
+                    Ok(true)
+                }),
+            );
+            WalkState::Continue
+        })
+    });
 
     let final_hits = Arc::try_unwrap(hits)
         .map(|m| m.into_inner().unwrap())
@@ -199,31 +209,51 @@ pub fn fs_glob(
         .ignore(true)
         .parents(true)
         .follow_links(false)
-        .build();
+        .build_parallel();
 
-    let mut hits: Vec<GlobHit> = Vec::new();
-    let mut truncated = false;
-    for dent in walker.flatten() {
-        if hits.len() >= cap {
-            truncated = true;
-            break;
-        }
-        if !dent.file_type().map(|t| t.is_file()).unwrap_or(false) {
-            continue;
-        }
-        let path = dent.path();
-        let rel = match path.strip_prefix(&root_path) {
-            Ok(r) => r.to_string_lossy().into_owned(),
-            Err(_) => continue,
-        };
-        if !set.is_match(&rel) {
-            continue;
-        }
-        hits.push(GlobHit {
-            path: path.to_string_lossy().into_owned(),
-            rel,
-        });
-    }
+    let hits: Arc<std::sync::Mutex<Vec<GlobHit>>> = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let truncated = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
-    Ok(GlobResponse { hits, truncated })
+    walker.run(|| {
+        let hits = hits.clone();
+        let truncated = truncated.clone();
+        let set = set.clone();
+        let root_path = root_path.clone();
+        Box::new(move |entry| {
+            if truncated.load(Ordering::Relaxed) {
+                return WalkState::Quit;
+            }
+            let Ok(dent) = entry else { return WalkState::Continue };
+            if !dent.file_type().map(|t| t.is_file()).unwrap_or(false) {
+                return WalkState::Continue;
+            }
+            let path = dent.path();
+            let rel = match path.strip_prefix(&root_path) {
+                Ok(r) => r.to_string_lossy().into_owned(),
+                Err(_) => return WalkState::Continue,
+            };
+            if !set.is_match(&rel) {
+                return WalkState::Continue;
+            }
+            let mut guard = hits.lock().unwrap();
+            if guard.len() >= cap {
+                truncated.store(true, Ordering::Relaxed);
+                return WalkState::Quit;
+            }
+            guard.push(GlobHit {
+                path: path.to_string_lossy().into_owned(),
+                rel,
+            });
+            WalkState::Continue
+        })
+    });
+
+    let final_hits = Arc::try_unwrap(hits)
+        .map(|m| m.into_inner().unwrap())
+        .unwrap_or_default();
+
+    Ok(GlobResponse {
+        hits: final_hits,
+        truncated: truncated.load(Ordering::Relaxed),
+    })
 }

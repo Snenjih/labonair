@@ -1,6 +1,7 @@
 import { handleApiError } from "@/lib/errors";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import type { CreateHostPayload, Group, Host, ReorderItem, UpdateHostPayload } from "../types";
 
 type PingStatus = "online" | "offline" | "checking";
@@ -187,36 +188,43 @@ export const useHostsStore = create<HostsState>((set, get) => ({
   },
 
   deleteManyHosts: async (ids) => {
-    await Promise.all(ids.map((id) => invoke("hosts_delete", { id })));
+    const results = await Promise.allSettled(ids.map((id) => invoke("hosts_delete", { id })));
+    const deleted = new Set<string>();
+    const failed: string[] = [];
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") deleted.add(ids[i]);
+      else failed.push(ids[i]);
+    });
     set((s) => ({
-      hosts: s.hosts.filter((h) => !ids.includes(h.id)),
-      selectedHostId: ids.includes(s.selectedHostId ?? "") ? null : s.selectedHostId,
-      selectedHostIds: new Set(),
+      hosts: s.hosts.filter((h) => !deleted.has(h.id)),
+      selectedHostId: deleted.has(s.selectedHostId ?? "") ? null : s.selectedHostId,
+      // Failed deletes stay selected — a still-visible host disappearing from
+      // the selection would be confusing given it's still in the list.
+      selectedHostIds: new Set([...get().selectedHostIds].filter((id) => !deleted.has(id))),
     }));
+    if (failed.length > 0) {
+      useNotificationStore.getState().addNotification({
+        type: "error",
+        title: "Failed to delete some hosts",
+        message:
+          failed.length === 1
+            ? "1 host could not be deleted."
+            : `${failed.length} hosts could not be deleted.`,
+        source: "Hosts",
+      });
+    }
   },
 
   duplicateHost: async (id) => {
-    const src = get().hosts.find((h) => h.id === id);
-    if (!src) throw new Error("host not found");
-    const payload: CreateHostPayload = {
-      name: `Copy of ${src.name}`,
-      host_address: src.host_address,
-      port: src.port,
-      username: src.username,
-      auth_method: src.auth_method,
-      private_key_path: src.private_key_path,
-      group_id: src.group_id,
-      tags: src.tags,
-      default_path_ssh: src.default_path_ssh,
-      default_path_sftp: src.default_path_sftp,
-      pin_to_top: false,
-      keep_alive_interval: src.keep_alive_interval,
-      keep_alive_tries: src.keep_alive_tries,
-      credential_id: src.credential_id,
-      jump_host_id: src.jump_host_id,
-      notes: src.notes,
-    };
-    return get().createHost(payload);
+    // Goes through a dedicated backend command (not createHost with a
+    // client-built payload) specifically so a password-auth host's stored
+    // password gets replicated too — `Host` (the read shape returned by
+    // fetchData) never carries the plaintext password, so the frontend has
+    // no way to copy it into a createHost payload; the backend replicates
+    // it directly via the secrets store instead.
+    const host = await invoke<Host>("hosts_duplicate", { id });
+    set((s) => ({ hosts: [...s.hosts, host] }));
+    return host;
   },
 
   reorderHosts: async (items) => {

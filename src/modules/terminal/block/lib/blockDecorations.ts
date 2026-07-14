@@ -201,6 +201,9 @@ export class BlockDecorations {
     this.clearSearch();
     try {
       const buf = this.term.buffer.active;
+      // cursorY can transiently be non-finite during a renderer-pool slot
+      // rebind — bail rather than register a marker at a NaN offset.
+      if (!Number.isFinite(buf.cursorY)) return;
       this.term.scrollToLine(Math.max(0, m.line - Math.floor(this.term.rows / 2)));
       const marker = this.term.registerMarker(m.line - (buf.baseY + buf.cursorY));
       if (!marker) return;
@@ -344,7 +347,11 @@ export class BlockDecorations {
     const lb = this.live;
     if (lb && !lb.startMarker.isDisposed && lb.startMarker.line >= 0) {
       const start = lb.startMarker.line;
-      const end = Math.max(start, buf.baseY + buf.cursorY);
+      // cursorY can transiently be non-finite during a renderer-pool slot
+      // rebind — fall back to `start` (zero-height live block for this
+      // frame) rather than propagating NaN into the positioned block.
+      const cursorLine = buf.baseY + buf.cursorY;
+      const end = Number.isFinite(cursorLine) ? Math.max(start, cursorLine) : start;
       consider(
         {
           id: lb.id,

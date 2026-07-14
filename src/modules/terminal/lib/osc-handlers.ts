@@ -100,6 +100,18 @@ export function registerPromptTracker(
 }
 
 /**
+ * Reads the active buffer's cursor position, guarding against the transient
+ * non-finite values a renderer-pool slot rebind can produce (see the CPR
+ * handler below). Returns `null` when the position isn't currently sane to
+ * read — callers should treat that the same as "don't know," not "0,0."
+ */
+export function safeCursorPos(term: Terminal): { x: number; y: number } | null {
+  const buf = term.buffer.active;
+  if (!Number.isFinite(buf.cursorX) || !Number.isFinite(buf.cursorY)) return null;
+  return { x: buf.cursorX, y: buf.cursorY };
+}
+
+/**
  * Registers terminal query response handlers for DA1, CPR, OSC 10, and OSC 11.
  * Must be called after the Terminal instance is opened and the PTY/SSH write
  * function is available. Returns a cleanup function for use in the cleanups array.
@@ -130,13 +142,13 @@ export function registerTerminalQueryHandlers(
   handles.push(
     term.parser.registerCsiHandler({ final: "n" }, (params) => {
       if (params[0] !== 6) return false;
-      const buf = term.buffer.active;
       // During a renderer-pool slot rebind, cursorX/cursorY can transiently
       // be non-finite. Sending "NaN;NaNR" back would land as literal typed
       // text in the shell/TUI instead of a control reply — better to leave
       // the query unanswered (the caller's own CPR timeout handles that).
-      if (!Number.isFinite(buf.cursorX) || !Number.isFinite(buf.cursorY)) return false;
-      writeToProcess(`\x1b[${buf.cursorY + 1};${buf.cursorX + 1}R`);
+      const pos = safeCursorPos(term);
+      if (!pos) return false;
+      writeToProcess(`\x1b[${pos.y + 1};${pos.x + 1}R`);
       return true;
     }),
   );
@@ -162,6 +174,34 @@ export function registerTerminalQueryHandlers(
     }),
   );
 
+  return () => handles.forEach((h) => h.dispose());
+}
+
+/**
+ * SSH-session counterpart to `registerTerminalQueryHandlers`. DA1/CPR queries
+ * over SSH must not be answered via the normal path: `writeToProcess` for a
+ * remote session is a Tauri IPC hop plus a real network round trip, which
+ * routinely exceeds how long an interactive TUI (gh, claude, etc.) waits for
+ * a reply before giving up — a reply that arrives after the caller gave up
+ * gets consumed as literal keystrokes instead of a control reply, corrupting
+ * the TUI. The fix used for OSC 10/11 (simply never registering a handler,
+ * letting the caller's own reply-timeout degrade gracefully) does NOT work
+ * for CSI `c`/`n`: xterm.js registers its own built-in DA1/CPR handlers
+ * unconditionally at `Terminal` construction time (see
+ * `@xterm/xterm/src/common/InputHandler.ts`'s `deviceStatus`), and the parser
+ * dispatches same-key CSI handlers last-registered-first — so leaving no
+ * handler registered here doesn't mean "unanswered," it means "answered by
+ * xterm's own unguarded built-in instead," which still round-trips through
+ * the same slow path and has no NaN guard at all.
+ *
+ * Registering these swallow-handlers (after xterm's own construction-time
+ * ones) wins the dispatch and answers with nothing — the actual graceful
+ * degradation OSC 10/11 already gets "for free."
+ */
+export function registerTerminalQuerySwallowHandlers(term: Terminal): () => void {
+  const handles: IDisposable[] = [];
+  handles.push(term.parser.registerCsiHandler({ final: "c" }, () => true));
+  handles.push(term.parser.registerCsiHandler({ final: "n" }, () => true));
   return () => handles.forEach((h) => h.dispose());
 }
 
