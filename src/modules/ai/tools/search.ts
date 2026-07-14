@@ -62,12 +62,14 @@ export function buildSearchTools(ctx: ToolContext) {
           // inside a protected subpath (e.g. a `.env` or `.git/config` under
           // an otherwise-fine workspace root) — filter those out per-hit
           // rather than refusing the whole search.
-          const hits = res.hits.filter((h) => checkReadable(h.path).ok).map((h) => ({
-            path: h.path,
-            rel: h.rel,
-            line: h.line,
-            text: h.text,
-          }));
+          const hits = res.hits
+            .filter((h) => checkReadable(h.path).ok)
+            .map((h) => ({
+              path: h.path,
+              rel: h.rel,
+              line: h.line,
+              text: h.text,
+            }));
           return {
             root: r.path,
             hits,

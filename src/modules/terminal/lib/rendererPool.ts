@@ -540,7 +540,13 @@ function beginChunkedReplay(slot: Slot, p: AcquireParams, onDone: () => void): v
   step();
 }
 
-function finishBindSlot(slot: Slot, p: AcquireParams, fast: boolean, stale: boolean, hadWebgl: boolean): void {
+function finishBindSlot(
+  slot: Slot,
+  p: AcquireParams,
+  fast: boolean,
+  stale: boolean,
+  hadWebgl: boolean,
+): void {
   setupResizeObserver(slot, p);
   slot.fitAddon.fit();
   slot.lastCols = slot.term.cols;
