@@ -119,8 +119,13 @@ pub async fn snippet_run_ssh(
                 );
             }
             russh::ChannelMsg::ExtendedData { .. } => {}
+            // `ExitStatus` arrives *after* `Eof` (and before `Close`), so
+            // breaking on Eof/Close here would discard it and leave
+            // `exit_code` stuck at -1 forever — matches russh's own
+            // client_exec_simple.rs example, which explicitly warns against
+            // leaving the loop early. `channel.wait()` returns `None` on its
+            // own once the channel is fully closed, ending the loop naturally.
             russh::ChannelMsg::ExitStatus { exit_status } => exit_code = exit_status as i32,
-            russh::ChannelMsg::Eof | russh::ChannelMsg::Close => break,
             _ => {}
         }
     }

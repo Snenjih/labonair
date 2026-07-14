@@ -44,8 +44,14 @@ async fn compute_remote_md5(session: &RushSession, remote_path: &str) -> Option<
         match msg {
             russh::ChannelMsg::Data { data } => stdout_bytes.extend_from_slice(&data),
             russh::ChannelMsg::ExtendedData { .. } => {}
+            // `ExitStatus` arrives *after* `Eof` (and before `Close`), so
+            // breaking on Eof/Close here would discard it and leave
+            // `exit_code` stuck at -1 forever, making this function always
+            // return `None` — matches russh's own client_exec_simple.rs
+            // example, which explicitly warns against leaving the loop
+            // early. `channel.wait()` returns `None` on its own once the
+            // channel is fully closed, ending the loop naturally.
             russh::ChannelMsg::ExitStatus { exit_status } => exit_code = exit_status as i32,
-            russh::ChannelMsg::Eof | russh::ChannelMsg::Close => break,
             _ => {}
         }
     }

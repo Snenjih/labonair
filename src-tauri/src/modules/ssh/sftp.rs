@@ -530,7 +530,11 @@ pub async fn sftp_calculate_size(
             match msg {
                 russh::ChannelMsg::Data { data } => stdout_bytes.extend_from_slice(&data),
                 russh::ChannelMsg::ExtendedData { .. } => {}
-                russh::ChannelMsg::Eof | russh::ChannelMsg::Close => break,
+                // `channel.wait()` returns `None` on its own once the
+                // channel is fully closed — no need to break on Eof/Close
+                // explicitly (and doing so would discard any later message,
+                // e.g. ExitStatus, per russh's own client_exec_simple.rs
+                // example).
                 _ => {}
             }
         }
@@ -574,8 +578,14 @@ pub async fn sftp_chown(
                 russh::ChannelMsg::ExtendedData { data, ext: 1 } => stderr_bytes.extend_from_slice(&data),
                 russh::ChannelMsg::ExtendedData { .. } => {}
                 russh::ChannelMsg::Data { .. } => {}
+                // `ExitStatus` arrives *after* `Eof` (and before `Close`), so
+                // breaking on Eof/Close here would discard it and leave
+                // `exit_code` stuck at -1 forever, making this command always
+                // look like it failed — matches russh's own
+                // client_exec_simple.rs example. `channel.wait()` returns
+                // `None` on its own once the channel is fully closed, ending
+                // the loop naturally.
                 russh::ChannelMsg::ExitStatus { exit_status } => exit_code = exit_status as i32,
-                russh::ChannelMsg::Eof | russh::ChannelMsg::Close => break,
                 _ => {}
             }
         }
@@ -622,7 +632,10 @@ pub async fn sftp_deep_search(
             match msg {
                 russh::ChannelMsg::Data { data } => stdout_bytes.extend_from_slice(&data),
                 russh::ChannelMsg::ExtendedData { .. } => {}
-                russh::ChannelMsg::Eof | russh::ChannelMsg::Close => break,
+                // `channel.wait()` returns `None` on its own once the
+                // channel is fully closed — no need to break on Eof/Close
+                // explicitly (and doing so would discard any later message
+                // per russh's own client_exec_simple.rs example).
                 _ => {}
             }
         }

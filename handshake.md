@@ -1,6 +1,32 @@
 # Handshake — Session State
 
-## Last Session: 2026-07-14 (Full ssh2 → russh Migration)
+## Last Session: 2026-07-14 (russh Migration Follow-up: Exec Exit-Code Bug + oklch Canvas Crash)
+
+### What Was Done
+User reported two issues after the russh migration PR (#127) landed: (1) remote Source Control showed "not a repository" / `git exited with code -1` on a folder that genuinely is a git repo, and (2) `Error: Unexpected fillStyle color format "oklch(0.9452 0.0001 259.980011)" when drawing pattern glyph` in the terminal. Both investigated and fixed directly (no plan mode needed, both were concrete bug hunts). See `~/.claude/.../memory/bugs_and_fixes.md` for full write-ups of both.
+
+**Bug 1 (the real cause of the git report)**: every exec-based `channel.wait()` loop added by the russh migration (`git/executor.rs::run_remote_script`, `ssh/exec.rs::ssh_exec_command`, `sftp/worker.rs::compute_remote_md5`, `ssh/sftp.rs::sftp_chown`, `snippets/exec.rs::snippet_run_ssh` — 5 sites, plus 2 more in `ssh/sftp.rs` fixed defensively even though they don't check exit codes) broke on `ChannelMsg::Eof | ChannelMsg::Close`, but the SSH protocol sends `ExitStatus` *after* `Eof` — confirmed against russh's own bundled example (`client_exec_simple.rs`, which explicitly comments "cannot leave the loop immediately, there might still be more data to receive"). So `exit_code` was permanently stuck at its `-1` init value on every remote command, success or failure, which made `git/executor.rs`'s `exit_code == 0` success check always false — hence "not a repo" and the literal `"git exited with code -1"` string (from `normalize_git_error(-1, "")`, empty stderr on an actually-successful command). Same bug silently broke `compute_remote_md5` too (SFTP post-transfer integrity check always returned `None`, silently skipped) and made `ssh_exec_command`/`snippet_run_ssh` always report exit code -1 to the frontend — neither yet reported, both fixed anyway. Fix: removed the `Eof | Close => break` arm at all 6 sites, falling through to the existing `_ => {}` — `channel.wait()` already returns `None` on its own once the channel is fully closed, so the loop still terminates correctly, just no longer before `ExitStatus` arrives.
+
+**Bug 2 (unrelated to SSH, a WebKit/Tauri-webview canvas quirk)**: `src/styles/tokens.ts`'s theme-token resolver assumed `getComputedStyle(probe).color` always normalizes an `oklch()`-declared CSS variable (Tailwind v4's native palette format) down to `rgb()` — true on most engines, not on this user's WebKit build, which preserves the source color space verbatim. That oklch string then reaches xterm.js's `Terminal({theme})`, gets set as a canvas `fillStyle` internally, and — since this engine's canvas accepts oklch as fillStyle input and preserves it on readback rather than rejecting/normalizing it — `@xterm/addon-webgl`'s glyph-pattern cache (which only parses `#hex`/`rgba()`) throws when it reads `ctx.fillStyle` back. Fixed by adding a real numeric OKLCH→sRGB conversion (`oklchToRgb()`, Björn Ottosson's published matrices) rather than another attempt to lean on browser normalization; `resolve()` now runs it whenever the computed value starts with `oklch(`. Found and fixed an identical latent bug at a second site, `blockDecorations.ts`'s `themeColor()` (Block Terminal's overview-ruler color, feature defaults off so not yet user-visible) — same fix, reused `oklchToRgb`. Deliberately did NOT touch `FindWidget.tsx`'s superficially similar `resolveThemeColor()` — it already reads back rasterized pixels via `getImageData()` rather than the `fillStyle` string, which is a different, already-correct technique immune to this whole class of bug.
+
+New tests: `src/styles/tokens.test.ts` (7 cases — exact black/white round-trip since C=0 collapses the OKLab matrices to an exactly-verifiable closed form, alpha handling, gamut clamping, non-oklch passthrough).
+
+`cargo check`/`clippy -D warnings`/`test --lib` (87/87) ✅ · `tsc --noEmit` ✅ · `vitest run` (439/439, +7 new) ✅.
+
+### Current State
+Branch `russh-migration`, PR #127 already open. This session's fixes are on top of the migration commit, not yet pushed as of writing this entry (about to push, which will update PR #127 automatically since it already tracks this branch).
+
+### What's Next
+- Push this follow-up commit (updates PR #127)
+- The mandatory live-SSH-server manual test checklist from the previous session is still outstanding — re-verify remote git status specifically now that the exit-code bug is fixed
+- If the oklch/canvas crash resurfaces anywhere else, check any other code path that hands a theme color to a `<canvas>` 2D context — the fix pattern is `oklchToRgb()` (numeric conversion) or `getImageData()`-pixel-readback (`FindWidget.tsx`'s technique), never a raw computed-style string passed straight to `fillStyle`
+
+### Blockers
+- None
+
+---
+
+## Previous Session: 2026-07-14 (Full ssh2 → russh Migration)
 
 ### What Was Done
 User (via a pre-written planning brief, `russh-migration.md`) requested a complete replacement of the Rust SSH/SFTP backend from `ssh2` (libssh2 bindings, synchronous) to `russh` 0.62.2 (`ring` feature) + `russh-sftp` 2.3.0 (pure-Rust, native Tokio async) — no shim, no parallel operation, `ssh2` fully removed. Went through full plan-mode (3 parallel Explore agents researching current ssh2 architecture, 1 Plan agent producing the implementation plan, verified crate-API claims live against docs.rs/crates.io during planning) before implementing on branch `russh-migration`. Plan file: `~/.claude/plans/russh-migration-planungsauftrag-clever-wave.md`.

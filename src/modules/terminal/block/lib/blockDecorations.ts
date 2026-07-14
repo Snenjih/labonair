@@ -1,4 +1,5 @@
 import type { IDecoration, IMarker, Terminal } from "@xterm/xterm";
+import { oklchToRgb } from "@/styles/tokens";
 import { blockIndexAt, computeRange, type LineRange } from "./blockRange";
 import { readRangeText } from "./readBlock";
 
@@ -7,11 +8,16 @@ const MAX_BLOCKS = 500;
 /** Reads a theme CSS variable at call time (not cached — cheap, and this is
  *  only called once per finished block, not a per-render/per-chunk path)
  *  rather than hardcoding a hex value, so the overview-ruler mark stays in
- *  sync with the active theme instead of drifting from it. */
+ *  sync with the active theme instead of drifting from it. Converts oklch()
+ *  (the raw format globals.css declares tokens in) to rgb() — xterm's
+ *  overview-ruler renderer sets this value as a canvas `fillStyle`, which
+ *  some WebKit versions preserve verbatim as oklch() rather than downgrading
+ *  to rgb(), and canvas 2D fillStyle parsing doesn't accept oklch() input. */
 function themeColor(varName: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
   const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-  return v || fallback;
+  if (!v) return fallback;
+  return v.startsWith("oklch(") ? oklchToRgb(v) : v;
 }
 
 type Entry = {

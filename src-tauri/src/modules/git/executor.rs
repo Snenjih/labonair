@@ -346,8 +346,14 @@ async fn run_remote_script(
                     russh::ChannelMsg::Data { data } => stdout.extend_from_slice(&data),
                     russh::ChannelMsg::ExtendedData { data, ext: 1 } => stderr.extend_from_slice(&data),
                     russh::ChannelMsg::ExtendedData { .. } => {}
+                    // `ExitStatus` is sent by the server *after* `Eof` (and
+                    // before `Close`), so breaking on Eof/Close here would
+                    // discard it and leave `exit_code` stuck at -1 forever —
+                    // matches russh's own client_exec_simple.rs example,
+                    // which explicitly warns against leaving the loop early.
+                    // `channel.wait()` returns `None` on its own once the
+                    // channel is fully closed, ending the loop naturally.
                     russh::ChannelMsg::ExitStatus { exit_status } => exit_code = exit_status as i32,
-                    russh::ChannelMsg::Eof | russh::ChannelMsg::Close => break,
                     _ => {}
                 }
             }
