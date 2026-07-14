@@ -1,10 +1,10 @@
 import {
-  BridgeIcon,
   FlashIcon,
   FolderTreeIcon,
   GitBranchIcon,
   Globe02Icon,
   LayoutTopIcon,
+  Route01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import React from "react";
@@ -207,20 +207,20 @@ export const StatusBar = React.memo(function StatusBar({
                     onCdInNewTab={onCdInNewTab}
                   />
                 </div>
-                {jumpHostName && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="flex shrink-0 items-center text-muted-foreground">
-                        <HugeiconsIcon icon={BridgeIcon} size={12} strokeWidth={1.75} />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">Connected via jump host: {jumpHostName}</TooltipContent>
-                  </Tooltip>
-                )}
               </>
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
+            {jumpHostName && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex shrink-0 items-center text-muted-foreground">
+                    <HugeiconsIcon icon={Route01Icon} size={12} strokeWidth={1.75} />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">Connected via jump host: {jumpHostName}</TooltipContent>
+              </Tooltip>
+            )}
             {filePath && showCursorPosition && (
               <span className="tabular-nums text-muted-foreground">
                 Ln {cursorLine}, Col {cursorCol}
