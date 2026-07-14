@@ -1,10 +1,13 @@
 pub mod commands;
 pub mod connection;
 pub(crate) mod net_error;
-pub mod state;
 pub mod worker;
 
-pub use state::SftpState;
+// `state.rs` (the old dedicated `SftpState`/`SftpSession`/`SftpSessionInner`
+// types, backed by the previous synchronous SSH library) is deleted per the
+// russh migration's session-model decision: SFTP sessions are now stored
+// per-`session_id` in the unified `crate::modules::ssh::SshState` registry
+// (see `connection.rs`, `ssh/sftp.rs`, `worker.rs`, `git/executor.rs`).
 
 use std::collections::HashMap;
 use std::sync::Arc;

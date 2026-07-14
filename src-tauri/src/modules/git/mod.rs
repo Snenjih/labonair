@@ -1,6 +1,6 @@
 mod executor;
 
-use crate::modules::sftp::SftpState;
+use crate::modules::ssh::SshState;
 use crate::modules::sftp::net_error::is_network_error;
 use crate::modules::ssh::shell::shell_quote;
 use executor::{resolve_executor, GitExecutor, GIT_NOT_INSTALLED};
@@ -83,9 +83,11 @@ pub struct FileDiffStat {
 
 /// Bundles the 5-6 read-heavy queries `useGitStatus.ts` polls on an interval
 /// into a single round-trip. Locally this trades 5 process spawns for 1;
-/// remotely it's the difference between 5 serialized SSH round-trips (the
-/// underlying `ssh2::Session` is guarded by one Mutex, so "parallel" calls
-/// actually queue) and 1 — the single biggest lever for remote responsiveness.
+/// remotely it's the difference between 5 network round-trips and 1 — each
+/// one still carries a full SSH exec's latency even though `russh`'s
+/// `client::Handle` (unlike the old blocking-transport session) can serve
+/// them concurrently rather than queuing — so batching remains the single
+/// biggest lever for remote responsiveness.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceGitState {
@@ -337,7 +339,7 @@ fn safe_truncate_utf8(bytes: &[u8], max: usize) -> &[u8] {
 pub async fn git_is_repo(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<bool, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -353,7 +355,7 @@ pub async fn git_is_repo(
 pub async fn git_get_repo_root(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -365,7 +367,7 @@ pub async fn git_get_repo_root(
 pub async fn git_get_status(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<GitStatus, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -400,7 +402,7 @@ pub async fn git_get_status(
 pub async fn git_get_current_branch(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -418,7 +420,7 @@ pub async fn git_get_current_branch(
 pub async fn git_get_branches(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<Vec<Branch>, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -442,7 +444,7 @@ pub async fn git_get_diff(
     ignore_whitespace: Option<bool>,
     is_untracked: Option<bool>,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     const MAX_DIFF_BYTES: usize = 200 * 1024;
@@ -485,7 +487,7 @@ pub async fn git_stage_file(
     path: String,
     file: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -498,7 +500,7 @@ pub async fn git_unstage_file(
     path: String,
     file: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -510,7 +512,7 @@ pub async fn git_unstage_file(
 pub async fn git_stage_all(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -523,7 +525,7 @@ pub async fn git_stage_all(
 pub async fn git_unstage_all(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -539,7 +541,7 @@ pub async fn git_discard_file(
     path: String,
     file: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -553,7 +555,7 @@ pub async fn git_commit(
     message: String,
     amend: bool,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<CommitResult, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -581,7 +583,7 @@ pub async fn git_push(
     remote: Option<String>,
     branch: Option<String>,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -598,7 +600,7 @@ pub async fn git_push(
 pub async fn git_pull(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -610,7 +612,7 @@ pub async fn git_pull(
 pub async fn git_fetch(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -622,7 +624,7 @@ pub async fn git_fetch(
 pub async fn git_abort(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -649,7 +651,7 @@ pub async fn git_get_log(
     limit: Option<u32>,
     all_branches: bool,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<Vec<CommitInfo>, String> {
     // Remote page size defaults lower than local's 500 — a single exec must
@@ -743,7 +745,7 @@ pub async fn git_get_commit_detail(
     path: String,
     hash: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -756,7 +758,7 @@ pub async fn git_get_commit_numstat(
     path: String,
     hash: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -769,7 +771,7 @@ pub async fn git_get_remote_url(
     path: String,
     remote: Option<String>,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -784,7 +786,7 @@ pub async fn git_checkout_branch(
     path: String,
     branch: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -798,7 +800,7 @@ pub async fn git_create_branch(
     from_ref: Option<String>,
     checkout: bool,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -815,7 +817,7 @@ pub async fn git_delete_branch(
     name: String,
     force: bool,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -829,7 +831,7 @@ pub async fn git_rename_branch(
     old_name: String,
     new_name: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -861,7 +863,7 @@ pub async fn git_stash_push(
     message: Option<String>,
     include_untracked: Option<bool>,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -880,7 +882,7 @@ pub async fn git_stash_push(
 pub async fn git_stash_list(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<Vec<StashEntry>, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -893,7 +895,7 @@ pub async fn git_stash_pop(
     path: String,
     hash: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -906,7 +908,7 @@ pub async fn git_stash_apply(
     path: String,
     hash: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -919,7 +921,7 @@ pub async fn git_stash_drop(
     path: String,
     hash: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -934,7 +936,7 @@ pub async fn git_get_commit_diff(
     path: String,
     hash: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     const MAX_DIFF_BYTES: usize = 200 * 1024;
@@ -949,7 +951,7 @@ pub async fn git_push_force_with_lease(
     remote: Option<String>,
     branch: Option<String>,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -967,7 +969,7 @@ pub async fn git_push_set_upstream(
     remote: String,
     branch: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -981,7 +983,7 @@ pub async fn git_cherry_pick(
     path: String,
     hash: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -994,7 +996,7 @@ pub async fn git_cherry_pick(
 pub async fn git_get_tags(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<Vec<String>, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -1009,7 +1011,7 @@ pub async fn git_create_tag(
     message: Option<String>,
     hash: Option<String>,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -1036,7 +1038,7 @@ pub async fn git_delete_tag(
     path: String,
     name: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -1049,7 +1051,7 @@ pub async fn git_push_tag(
     name: String,
     remote: Option<String>,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -1063,7 +1065,7 @@ pub async fn git_push_tag(
 pub async fn git_get_diff_stats(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<Vec<FileDiffStat>, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -1080,7 +1082,7 @@ pub async fn git_get_diff_stats(
 pub async fn git_get_workspace_state(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<WorkspaceGitState, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -1171,7 +1173,7 @@ pub async fn git_add_to_gitignore(
     path: String,
     file: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let safe_file = file.replace(['\n', '\r', '\0'], "");
@@ -1218,7 +1220,7 @@ pub async fn git_add_to_exclude(
     path: String,
     file: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let safe_file = file.replace(['\n', '\r', '\0'], "");
@@ -1264,7 +1266,7 @@ pub async fn git_add_to_exclude(
 pub async fn git_init(
     path: String,
     session_id: Option<String>,
-    sftp_state: tauri::State<'_, SftpState>,
+    sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);

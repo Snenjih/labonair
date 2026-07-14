@@ -80,76 +80,50 @@ pub async fn snippet_run_local(
 /// Requires an active SSH session (opened via ssh_connect). Uses a fresh exec
 /// channel so it does not disturb the interactive PTY.
 #[tauri::command]
-pub fn snippet_run_ssh(
+pub async fn snippet_run_ssh(
     app: tauri::AppHandle,
     run_id: String,
     session_id: String,
     command: String,
     state: tauri::State<'_, crate::modules::ssh::SshState>,
 ) -> Result<(), String> {
-    use std::io::Read;
+    let session = crate::get_session_arc!(state, &session_id);
 
-    // `session_arc` is the SAME lock the interactive PTY reader thread and
-    // `ssh_exec_command` use for this session (see `SshSessionInner`'s doc
-    // comment in ssh/mod.rs). A snippet can legitimately stream output for a
-    // long time, so — unlike a short one-shot exec — we deliberately do NOT
-    // hold this lock for the snippet's whole runtime: that would freeze the
-    // interactive terminal (and any other exec/git call on this host) for as
-    // long as the snippet keeps running. Instead the lock is re-acquired for
-    // each individual libssh2 call (channel creation, exec, each read poll),
-    // exactly like ssh/exec.rs's retry_ssh2/retry_io — every other operation
-    // on this session gets to interleave between reads.
-    let session_arc = crate::get_session_arc!(state, &session_id);
+    let mut channel = session
+        .handle
+        .channel_open_session()
+        .await
+        .map_err(|e| e.to_string())?;
+    channel.exec(true, command).await.map_err(|e| e.to_string())?;
 
-    let mut channel = {
-        let sess = session_arc.lock().map_err(|e| e.to_string())?;
-        sess.session.channel_session().map_err(|e| e.to_string())?
-    };
-    {
-        let _sess = session_arc.lock().map_err(|e| e.to_string())?;
-        channel.exec(&command).map_err(|e| e.to_string())?;
-    }
-
-    let mut buf = [0u8; 4096];
-    loop {
-        let attempt = {
-            let _sess = session_arc.lock().map_err(|e| e.to_string())?;
-            channel.read(&mut buf)
-        };
-        match attempt {
-            Ok(0) => break,
-            Ok(n) => {
-                let chunk = String::from_utf8_lossy(&buf[..n]).to_string();
+    // One loop interleaves stdout/stderr as they arrive off the same message
+    // stream, streaming BOTH live via `snippet_run_output` as each message
+    // comes in — unlike the old sequential `read()`-loop-then-full-stderr-dump
+    // pattern, which only streamed stdout live and buffered stderr until the
+    // stdout side had fully closed.
+    let mut exit_code: i32 = -1;
+    while let Some(msg) = channel.wait().await {
+        match msg {
+            russh::ChannelMsg::Data { data } => {
+                let chunk = String::from_utf8_lossy(&data).into_owned();
                 let _ = app.emit(
                     "snippet_run_output",
                     serde_json::json!({ "runId": run_id, "data": chunk, "stream": "stdout" }),
                 );
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(std::time::Duration::from_millis(5));
+            russh::ChannelMsg::ExtendedData { data, ext: 1 } => {
+                let chunk = String::from_utf8_lossy(&data).into_owned();
+                let _ = app.emit(
+                    "snippet_run_output",
+                    serde_json::json!({ "runId": run_id, "data": chunk, "stream": "stderr" }),
+                );
             }
-            Err(_) => break,
+            russh::ChannelMsg::ExtendedData { .. } => {}
+            russh::ChannelMsg::ExitStatus { exit_status } => exit_code = exit_status as i32,
+            russh::ChannelMsg::Eof | russh::ChannelMsg::Close => break,
+            _ => {}
         }
     }
-
-    let mut stderr_buf = Vec::new();
-    {
-        let _sess = session_arc.lock().map_err(|e| e.to_string())?;
-        let _ = channel.stderr().read_to_end(&mut stderr_buf);
-    }
-    if !stderr_buf.is_empty() {
-        let chunk = String::from_utf8_lossy(&stderr_buf).to_string();
-        let _ = app.emit(
-            "snippet_run_output",
-            serde_json::json!({ "runId": run_id, "data": chunk, "stream": "stderr" }),
-        );
-    }
-
-    let exit_code = {
-        let _sess = session_arc.lock().map_err(|e| e.to_string())?;
-        let _ = channel.wait_close();
-        channel.exit_status().unwrap_or(-1)
-    };
 
     let _ = app.emit(
         "snippet_run_done",

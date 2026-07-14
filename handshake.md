@@ -1,6 +1,37 @@
 # Handshake — Session State
 
-## Last Session: 2026-07-11 (SSH Interactive-TUI Corruption, Part 2 — Query-Reply Latency)
+## Last Session: 2026-07-14 (Full ssh2 → russh Migration)
+
+### What Was Done
+User (via a pre-written planning brief, `russh-migration.md`) requested a complete replacement of the Rust SSH/SFTP backend from `ssh2` (libssh2 bindings, synchronous) to `russh` 0.62.2 (`ring` feature) + `russh-sftp` 2.3.0 (pure-Rust, native Tokio async) — no shim, no parallel operation, `ssh2` fully removed. Went through full plan-mode (3 parallel Explore agents researching current ssh2 architecture, 1 Plan agent producing the implementation plan, verified crate-API claims live against docs.rs/crates.io during planning) before implementing on branch `russh-migration`. Plan file: `~/.claude/plans/russh-migration-planungsauftrag-clever-wave.md`.
+
+Implemented via 9 sequential subagent workstreams on one worktree (explicitly no parallel isolated worktrees — this subsystem is too tightly coupled, `SshState`/`SftpState` merge + `lib.rs` registrations touch nearly every workstream): Cargo wiring → core transport/auth/known-hosts (`ssh/client.rs`, `ssh/mod.rs`) → PTY/terminal (`ssh/pty.rs`, `ssh/exec.rs`) → SFTP subsystem (`sftp/state.rs` deleted, `sftp/connection.rs`, `ssh/sftp.rs`) → transfer worker (`sftp/worker.rs`) → exec/git/snippets (`git/executor.rs`, `git/mod.rs`, `snippets/exec.rs` — the latter two found mid-migration, not in the original file inventory) → tunnels (`ssh/tunnels.rs`) → credentials compat test → cleanup pass. `cargo check`/`clippy -D warnings`/`test --lib` (87/87) green after every workstream; `tsc --noEmit`/`vitest run` (432/432) confirmed **zero frontend files touched** — the entire IPC contract (command names/signatures, event payloads, the `Channel<SshPtyEvent>` mechanism) is unchanged.
+
+**Session-model change**: unified `SshState`/`SftpState` into one `SshState(Arc<Mutex<HashMap<session_id, Arc<RushSession>>>>)`, `RushSession{handle: Arc<russh::client::Handle<ClientHandler>>, pty, sftp: OnceCell<SftpSession>, shutdown, disconnect_reason}` — removes the "two logins per host" problem for any code path that shares a session_id (verified none exist today, so this is risk-free). `TunnelState` deliberately stayed separate/host-keyed. True cross-tab host-level pooling explicitly scoped out as a future follow-up.
+
+**Concrete bugs fixed as part of the migration** (not just parity): SFTP upload no longer loads whole files into RAM (was `std::fs::read()`), atomic `OpenFlags::CREATE|EXCLUDE` TOCTOU fixes on both upload/download conflict detection, real mid-chunk transfer cancellation via `tokio_util::CancellationToken`+`select!` (was checked only between chunks), the sequential-stdout-then-stderr-full-drain deadlock-risk pattern fixed at all 5 sites it recurred (`git/executor.rs`, `sftp/worker.rs::compute_remote_md5`, `ssh/sftp.rs`'s du/chown, `ssh/exec.rs`, `snippets/exec.rs`) via one interleaved `channel.wait()` message loop, tunnels' auth upgraded from password/bare-pubkey-only (no agent, no passphrase, no known-hosts check) to the same shared auth helper the terminal/SFTP path uses, all busy-wait `std::thread::sleep` loops (jump-bridge 50µs, tunnel bridge/accept/shutdown polling) deleted in favor of real async I/O + `tokio::select!`.
+
+**Post-implementation review agent caught 4 real bugs**, all fixed afterward (see `~/.claude/.../memory/bugs_and_fixes.md` for full detail) — none of them broke the build or failed a test, all were behavioral/semantic mismatches only found by independently reading the vendored `russh`/`russh-sftp` source rather than trusting agent summaries:
+1. RSA pubkey/agent auth hardcoded `hash_alg: None` → requests legacy `ssh-rsa`/SHA-1, rejected by OpenSSH ≥ 8.8 by default. Fixed via `handle.best_supported_rsa_hash()`.
+2. This app's own PKCS#8-generated keys never triggered the passphrase-prompt dialog (`Error::KeyIsEncrypted` is never raised for PKCS#8, only legacy OpenSSH-format keys) — missing/wrong passphrase surfaced as a cryptic crypto error instead. Fixed via PEM-header detection routing PKCS#8 decode failures through the same prompt.
+3. PTY disconnect reason was hardcoded to `"unexpected eof"` regardless of actual cause (`ChannelReadHalf::wait()` returning `None` carries no error info by itself, unlike the old code). Fixed by adding a shared `disconnect_reason` slot written by a new `ClientHandler::disconnected()` override.
+4. `is_network_error`/`humanize_disconnect_reason` checked `"timed out"` but not `"timeout"` — added both defensively.
+
+`grep -rn "ssh2" src-tauri/src src-tauri/Cargo.toml` returns zero hits (including doc comments, which were rewritten rather than left stale).
+
+### Current State
+Branch `russh-migration`, all changes uncommitted as of writing this entry (about to commit). All automated verification green (`cargo check`/`clippy`/`test`, `tsc`, `vitest`). Diff: 19 Rust files changed (`sftp/state.rs` deleted), zero frontend files.
+
+### What's Next
+- **Mandatory before merging to `main`**: the plan's live-SSH-server manual test checklist — auth (password/pubkey-with-and-without-passphrase/agent), known-hosts TOFU + mismatch scenarios, PTY interactivity with real TUIs (`gh`/`claude` — historically the most sensitive spot in this codebase, see the two prior sessions below), SFTP transfer upload/download/cancel-mid-chunk/large-file, jump-host bridging, tunnels (specifically test agent auth + passphrase-protected key against a tunnel, which never worked pre-migration). None of this is automatable without a real reachable SSH server — do not merge on green CI alone.
+- Consider the explicitly-deferred follow-up: true cross-tab host-level connection pooling (one physical connection per host shared across terminal+SFTP+explorer tabs) — `tunnels.rs`'s `TunnelEntry{ref_count}` is the ready-made template if this is ever wanted.
+
+### Blockers
+- Live SSH server access needed for the manual test checklist above — not available in this environment.
+
+---
+
+## Previous Session: 2026-07-11 (SSH Interactive-TUI Corruption, Part 2 — Query-Reply Latency)
 
 ### What Was Done
 User rebuilt/restarted the app after the 2026-07-10 fixes (`c07897d`) and reported the corruption was still fully present: `NaN;1R`-style text still appeared, and `claude`'s onboarding TUI still rendered with interleaved/garbled text (e.g. "WelcomentoiClaudeeCode" instead of "Welcome to Claude Code"). Confirmed via `AskUserQuestion` that (a) the rebuild genuinely happened, so the 3 previous fixes just weren't the primary cause, and (b) **the same TUIs render perfectly fine in a local (non-SSH) terminal tab** — this is SSH-only.

@@ -1,5 +1,4 @@
-use std::io::{Read, Write};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use serde::Serialize;
@@ -8,19 +7,6 @@ use tauri::ipc::Channel;
 
 const SSH_BATCH_BYTES: usize = 16 * 1024;
 const SSH_BATCH_MS: Duration = Duration::from_millis(4);
-
-// Idle-poll backoff: an idle reader thread starts at IDLE_POLL_MIN_MS and steps
-// up by IDLE_POLL_STEP_MS every idle iteration once it has been idle for more
-// than IDLE_BACKOFF_THRESHOLD consecutive iterations, capping at
-// IDLE_POLL_MAX_MS. Any successful data read resets it to IDLE_POLL_MIN_MS
-// immediately, so interactive typing/echo latency never regresses — only
-// genuinely idle sessions (e.g. a background tab sitting on a shell prompt)
-// back off, which cuts their wakeup/lock-acquisition rate on the shared
-// `SshState` mutex by up to 5x (200/s -> 40/s per idle session).
-const IDLE_POLL_MIN_MS: u64 = 5;
-const IDLE_POLL_MAX_MS: u64 = 25;
-const IDLE_POLL_STEP_MS: u64 = 5;
-const IDLE_BACKOFF_THRESHOLD: u32 = 4;
 
 /// Event sent through the per-session `Channel<SshPtyEvent>` established by
 /// `ssh_connect`/`ssh_connect_quick`. Point-to-point delivery — replaces the
@@ -35,155 +21,80 @@ pub enum SshPtyEvent {
     Data { data: String },
 }
 
-/// Computes the next idle-poll interval (in ms) given the current interval and
-/// how many *consecutive* idle iterations have elapsed. Pure so it can be unit
-/// tested without spinning up threads/channels. Callers reset to
-/// `IDLE_POLL_MIN_MS` (and `idle_iterations` to 0) on the iteration after any
-/// data is read — that reset is trivial state, not part of this function.
-fn step_idle_poll(current_ms: u64, idle_iterations: u32) -> u64 {
-    if idle_iterations > IDLE_BACKOFF_THRESHOLD {
-        (current_ms + IDLE_POLL_STEP_MS).min(IDLE_POLL_MAX_MS)
-    } else {
-        current_ms
-    }
-}
-
-// The interactive channel lives on a non-blocking session (see
-// open_shell_channel's `guard.session.set_blocking(false)`), so a write can
-// spuriously return LIBSSH2_ERROR_EAGAIN/WouldBlock even though the data is
-// perfectly valid — it just isn't ready to send this instant (e.g. the SSH
-// channel's flow-control window is momentarily exhausted). libssh2 requires
-// retrying the SAME operation on EAGAIN before touching the session again;
-// silently giving up mid-write (the previous behavior here, via
-// `write_all`'s default trait impl, which treats WouldBlock as a hard error
-// like any other) can abandon a partially-sent write mid-frame,
-// desynchronizing the channel's protocol framing — the remote sshd then sees
-// invalid data and drops the whole transport, which is exactly the
-// "transport read" disconnect this caused, especially for slow/deliberate
-// typing where every keystroke is its own small write with no retry safety
-// net if it hits EAGAIN.
-const PTY_IO_TIMEOUT: Duration = Duration::from_secs(5);
-const PTY_IO_RETRY_SLEEP: Duration = Duration::from_millis(2);
-
-/// Retries a channel operation, holding `inner_arc` for the entire retry
-/// loop. This is deliberate, not an oversight: libssh2 forbids touching a
-/// session (or any of its channels/subsystems) with another call between an
-/// EAGAIN and its retry, so releasing the lock here would let the reader
-/// thread or a concurrent exec call interleave a different libssh2 call
-/// mid-retry — the same class of transport-desync bug the unified
-/// `SshSessionInner` lock exists to eliminate. EAGAIN normally clears within
-/// microseconds (kernel socket buffer backpressure), so this only pauses the
-/// reader thread in the rare case where a write is genuinely stalled.
-fn with_channel_retry<T>(
-    inner_arc: &std::sync::Mutex<super::SshSessionInner>,
-    mut f: impl FnMut(&mut ssh2::Channel) -> std::io::Result<T>,
-) -> Result<T, String> {
-    let start = Instant::now();
-    let mut guard = inner_arc.lock().map_err(|e| e.to_string())?;
-    loop {
-        let attempt: std::io::Result<T> = {
-            let Some(channel) = guard.channel.as_mut() else {
-                return Err("no channel open".to_string());
-            };
-            f(channel)
-        };
-        match attempt {
-            Ok(v) => return Ok(v),
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                if start.elapsed() > PTY_IO_TIMEOUT {
-                    return Err("ssh pty io timed out (would block)".to_string());
-                }
-                std::thread::sleep(PTY_IO_RETRY_SLEEP);
-            }
-            Err(e) => return Err(e.to_string()),
-        }
-    }
-}
-
 #[tauri::command]
-pub fn ssh_pty_write(
+pub async fn ssh_pty_write(
     session_id: String,
     data: String,
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
-    let inner = crate::get_session_arc!(state, &session_id);
-    let bytes = data.into_bytes();
-    let mut sent = 0usize;
-    while sent < bytes.len() {
-        let n = with_channel_retry(&inner, |channel| channel.write(&bytes[sent..]))?;
-        if n == 0 {
-            return Err("ssh pty write returned 0 bytes".to_string());
-        }
-        sent += n;
+    let session = crate::get_session_arc!(state, &session_id);
+    let write_half = {
+        let guard = session.pty.lock().await;
+        guard.as_ref().map(|p| p.write_half.clone())
     }
-    // No `channel.flush()` here: `Channel::flush` maps to
-    // `libssh2_channel_flush_ex`, which discards the channel's *read* buffer
-    // (unread incoming data), not a write flush — calling it after every
-    // keystroke could silently drop buffered remote output. `write()` above
-    // already sends synchronously (no local write buffering to flush).
-    Ok(())
+    .ok_or_else(|| "no pty channel open".to_string())?;
+
+    write_half.data_bytes(data).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn ssh_pty_resize(
+pub async fn ssh_pty_resize(
     session_id: String,
     cols: u32,
     rows: u32,
     state: tauri::State<'_, super::SshState>,
 ) -> Result<(), String> {
-    let inner = crate::get_session_arc!(state, &session_id);
-    let start = Instant::now();
-    let mut guard = inner.lock().map_err(|e| e.to_string())?;
-    loop {
-        let attempt = {
-            let Some(channel) = guard.channel.as_mut() else {
-                return Err("no channel open".to_string());
-            };
-            channel.request_pty_size(cols, rows, None, None)
-        };
-        match attempt {
-            Ok(()) => return Ok(()),
-            Err(ref e) if matches!(e.code(), ssh2::ErrorCode::Session(-37)) => {
-                if start.elapsed() > PTY_IO_TIMEOUT {
-                    return Err(e.to_string());
-                }
-                std::thread::sleep(PTY_IO_RETRY_SLEEP);
-            }
-            Err(e) => return Err(e.to_string()),
-        }
+    let session = crate::get_session_arc!(state, &session_id);
+    let write_half = {
+        let guard = session.pty.lock().await;
+        guard.as_ref().map(|p| p.write_half.clone())
     }
+    .ok_or_else(|| "no pty channel open".to_string())?;
+
+    write_half
+        .window_change(cols, rows, 0, 0)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Opens a PTY shell channel on an authenticated session and spawns a
-/// background reader thread that streams output directly into the caller-
+/// background reader task that streams output directly into the caller-
 /// supplied `on_event` channel (point-to-point — see `SshPtyEvent`'s docs).
 ///
-/// Stores the opened channel directly into `inner_arc` (so it lives behind
-/// the same lock as the session it was opened from — see `SshSessionInner`)
-/// and returns just the shutdown flag. The caller must:
-/// 1. Insert `inner_arc` (with `shutdown`) into `SshState` as the `SshSession`.
-/// 2. Send `()` on `ready_tx` to unblock the reader thread.
+/// `session` must already be registered in `state` under `session_id` by the
+/// caller *before* this is invoked (see `ssh_connect_async` in `client.rs`).
+/// Registering first — rather than the old model's separate
+/// `ready_rx`/`ready_tx` rendezvous — is sufficient to avoid ever missing
+/// output or racing the reader's disconnect-cleanup path: this whole function
+/// runs sequentially on one async task with no `.await` between "channel
+/// setup" and "spawn the reader", so there is no window where the reader
+/// could run before the map entry exists. That rendezvous existed only to
+/// guard against a genuine race under the old OS-thread-per-session reader
+/// model, which no longer applies here.
 ///
 /// `cols`/`rows` set the initial terminal size to avoid a jarring resize on connect.
 #[allow(clippy::too_many_arguments)]
-pub fn open_shell_channel(
-    inner_arc: std::sync::Arc<std::sync::Mutex<super::SshSessionInner>>,
-    session_id: &str,
-    app: &tauri::AppHandle,
+pub async fn open_shell_channel(
+    session: Arc<super::RushSession>,
+    session_id: String,
+    app: tauri::AppHandle,
     state: super::SshState,
-    ready_rx: std::sync::mpsc::Receiver<()>,
     cols: u32,
     rows: u32,
-    keep_alive_interval: Option<u32>,
-    keep_alive_tries: Option<u32>,
     blocks: bool,
     on_event: Channel<SshPtyEvent>,
-) -> Result<Arc<AtomicBool>, String> {
-    let mut guard = inner_arc.lock().map_err(|e| e.to_string())?;
-    let mut channel = guard.session.channel_session().map_err(|e| e.to_string())?;
-    channel
-        .request_pty("xterm-256color", None, Some((cols, rows, 0, 0)))
+) -> Result<(), String> {
+    let channel = session
+        .handle
+        .channel_open_session()
+        .await
         .map_err(|e| e.to_string())?;
+
+    channel
+        .request_pty(false, "xterm-256color", cols, rows, 0, 0, &[])
+        .await
+        .map_err(|e| e.to_string())?;
+
     // Installs the same OSC7/133 hooks the local PTY gets (see
     // shell_integration::build_bootstrap_script) so the sidebar explorer and
     // cwd breadcrumb can follow `cd` on a remote shell too. Falls back to a
@@ -193,40 +104,56 @@ pub fn open_shell_channel(
     // rather than failing the connection.
     let bootstrap = super::shell_integration::build_bootstrap_script(blocks);
     let cmd = format!("/bin/sh -c {}", super::shell::shell_quote(&bootstrap));
-    if channel.exec(&cmd).is_err() {
-        channel.shell().map_err(|e| e.to_string())?;
+    if channel.exec(true, cmd).await.is_err() {
+        channel.request_shell(true).await.map_err(|e| e.to_string())?;
     }
 
-    // Non-blocking so the reader never holds the session lock indefinitely.
-    guard.session.set_blocking(false);
-    guard.channel = Some(channel);
-    drop(guard);
+    let (read_half, write_half) = channel.split();
 
-    let app_clone = app.clone();
-    let session_id_clone = session_id.to_string();
-    let shutdown = Arc::new(AtomicBool::new(false));
-    let shutdown_clone = shutdown.clone();
-    let inner_arc_clone = inner_arc.clone();
+    {
+        let mut guard = session.pty.lock().await;
+        *guard = Some(super::PtyChannelState {
+            write_half: Arc::new(write_half),
+        });
+    }
 
-    std::thread::spawn(move || {
-        // Block until the session has been inserted into SshState so we never
-        // miss a single byte of output (replaces the old 200×10ms retry loop).
-        let _ = ready_rx.recv();
+    spawn_reader(
+        read_half,
+        app,
+        session_id,
+        state,
+        session.shutdown.clone(),
+        session.disconnect_reason.clone(),
+        on_event,
+    );
 
-        let ka_interval = Duration::from_secs(keep_alive_interval.unwrap_or(25) as u64);
-        let ka_max_fails = keep_alive_tries.unwrap_or(3);
-        let mut last_keepalive = Instant::now();
-        let mut ka_consecutive_fails: u32 = 0;
+    Ok(())
+}
 
-        // Tracks the reason for an unexpected exit so we can notify the frontend.
-        // None means the loop ended normally (ssh_disconnect set the shutdown
-        // flag, or the frontend's Channel was dropped/closed — neither is an
-        // unexpected disconnect worth surfacing via ssh_connection_lost).
-        let mut disconnect_reason: Option<String> = None;
-
+/// Background reader task: streams `ChannelMsg::Data`/`ExtendedData` off the
+/// PTY channel's read half into `on_event`, batched and UTF-8-repaired.
+///
+/// Races the channel read against a batch-flush timer (`tokio::select!`)
+/// rather than a plain `while let Some(msg) = read_half.wait().await` loop —
+/// this is the async-native equivalent of the old idle-poll loop's job of
+/// flushing buffered output after `SSH_BATCH_MS` even when no *new* data has
+/// arrived (e.g. a shell prompt sitting in `pending_output` with the session
+/// otherwise idle). The timer branch is disabled via the `if
+/// !pending_output.is_empty()` guard, so an idle session with nothing
+/// buffered just blocks on `read_half.wait()` with zero polling overhead.
+fn spawn_reader(
+    mut read_half: russh::ChannelReadHalf,
+    app: tauri::AppHandle,
+    session_id: String,
+    state: super::SshState,
+    shutdown: Arc<AtomicBool>,
+    disconnect_reason_slot: Arc<Mutex<Option<String>>>,
+    on_event: Channel<SshPtyEvent>,
+) {
+    tokio::spawn(async move {
         // Carry buffer for incomplete multi-byte UTF-8 sequences. When a read ends
         // in the middle of a multi-byte character (e.g. a 3-byte box-drawing glyph
-        // split across a 4096-byte boundary), the trailing incomplete bytes are kept
+        // split across a message boundary), the trailing incomplete bytes are kept
         // here and prepended to the next chunk. Definitively invalid sequences
         // (e.g. Latin-1 bytes, binary) are replaced with U+FFFD via flush_carry.
         let mut carry: Vec<u8> = Vec::new();
@@ -237,59 +164,65 @@ pub fn open_shell_channel(
         let mut pending_output = String::new();
         let mut last_flush = Instant::now();
 
-        // Idle-poll backoff state (see the constants' doc comment above).
-        let mut idle_iterations: u32 = 0;
-        let mut current_poll_ms: u64 = IDLE_POLL_MIN_MS;
+        // Tracks the reason for an unexpected exit so we can notify the frontend.
+        // None means the loop ended normally (ssh_disconnect set the shutdown
+        // flag, or the frontend's Channel was dropped/closed — neither is an
+        // unexpected disconnect worth surfacing via ssh_connection_lost).
+        let mut disconnect_reason: Option<String> = None;
 
         'reader: loop {
-            if shutdown_clone.load(Ordering::Relaxed) {
+            if shutdown.load(Ordering::Relaxed) {
                 break; // clean shutdown via ssh_disconnect
             }
 
-            // Locks the SAME per-session mutex that guards keepalive and any
-            // concurrent exec call (ssh_exec_command, snippets, git-over-exec)
-            // for this session — this is the fix for the "transport read"
-            // race: previously this read only held the outer SshState map
-            // lock, entirely independent of the session-level lock those
-            // other callers used, so libssh2's non-thread-safe transport
-            // could be touched from two threads at once.
-            let data = {
-                let mut guard = match inner_arc_clone.lock() {
-                    Ok(g) => g,
-                    Err(_) => {
-                        disconnect_reason = Some("Internal lock error".to_string());
-                        break;
+            let remaining = SSH_BATCH_MS.saturating_sub(last_flush.elapsed());
+            tokio::select! {
+                msg = read_half.wait() => {
+                    match msg {
+                        None => {
+                            // Channel/session closed. If ssh_disconnect didn't
+                            // request this, it's an unexpected disconnect.
+                            if !shutdown.load(Ordering::Relaxed) {
+                                disconnect_reason = Some(humanize_disconnect_reason(
+                                    &take_disconnect_reason(&disconnect_reason_slot),
+                                ));
+                            }
+                            break 'reader;
+                        }
+                        Some(russh::ChannelMsg::Data { data }) => {
+                            carry.extend_from_slice(&data);
+                            if let Some(out) = flush_carry(&mut carry) {
+                                pending_output.push_str(&out);
+                            }
+                        }
+                        // PTY channels don't normally get stderr as extended
+                        // data since the remote shell is attached to one pty
+                        // fd, but handle gracefully if it arrives rather than
+                        // silently dropping it.
+                        Some(russh::ChannelMsg::ExtendedData { data, .. }) => {
+                            carry.extend_from_slice(&data);
+                            if let Some(out) = flush_carry(&mut carry) {
+                                pending_output.push_str(&out);
+                            }
+                        }
+                        Some(russh::ChannelMsg::Eof) | Some(russh::ChannelMsg::Close) => {
+                            if !shutdown.load(Ordering::Relaxed) {
+                                disconnect_reason = Some(humanize_disconnect_reason(
+                                    &take_disconnect_reason(&disconnect_reason_slot),
+                                ));
+                            }
+                            break 'reader;
+                        }
+                        Some(_) => {}
                     }
-                };
-                let Some(ch) = guard.channel.as_mut() else { break };
-
-                if ch.eof() {
-                    disconnect_reason = Some("Connection closed by remote host".to_string());
-                    break;
                 }
-
-                let mut buf = [0u8; 32768];
-                match ch.read(&mut buf) {
-                    Ok(0) => None,
-                    Ok(n) => {
-                        ka_consecutive_fails = 0; // live data proves connection is alive
-                        // Real I/O activity — snap the poll interval back to the
-                        // minimum immediately so echo/typing latency never regresses.
-                        idle_iterations = 0;
-                        current_poll_ms = IDLE_POLL_MIN_MS;
-                        carry.extend_from_slice(&buf[..n]);
-                        flush_carry(&mut carry)
-                    }
-                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => None,
-                    Err(e) => {
-                        disconnect_reason = Some(humanize_disconnect_reason(&e.to_string()));
-                        break;
-                    }
+                _ = tokio::time::sleep(remaining), if !pending_output.is_empty() => {
+                    // Batch interval elapsed with buffered output waiting — fall
+                    // through to the flush check below.
                 }
-            };
+            }
 
-            if let Some(output) = data {
-                pending_output.push_str(&output);
+            if !pending_output.is_empty() {
                 let should_flush = pending_output.len() >= SSH_BATCH_BYTES
                     || last_flush.elapsed() >= SSH_BATCH_MS;
                 if should_flush {
@@ -299,68 +232,6 @@ pub fn open_shell_channel(
                     }
                     last_flush = Instant::now();
                 }
-            } else {
-                // WouldBlock / idle — flush pending output if the timer elapsed.
-                if !pending_output.is_empty() && last_flush.elapsed() >= SSH_BATCH_MS {
-                    let chunk = std::mem::take(&mut pending_output);
-                    if !send_ssh_output(&on_event, chunk) {
-                        break 'reader;
-                    }
-                    last_flush = Instant::now();
-                }
-                if last_keepalive.elapsed() >= ka_interval {
-                    // Same `inner_arc_clone` as the read above — no separate
-                    // lock, so this can never race the read loop or any
-                    // concurrent exec call on this session.
-                    if let Ok(guard) = inner_arc_clone.lock() {
-                        let start_ka = Instant::now();
-                        loop {
-                            // libssh2 can return EAGAIN on a read/keepalive because an
-                            // internal *outbound* send (e.g. a queued window-adjust ack)
-                            // hasn't flushed yet. Calling keepalive_send() before that
-                            // pending send completes is exactly the "interleave a
-                            // different libssh2 call before retrying the operation that
-                            // returned EAGAIN" pattern that desyncs the transport —
-                            // skip this cycle and retry next tick instead.
-                            let outbound_blocked = matches!(
-                                guard.session.block_directions(),
-                                ssh2::BlockDirections::Outbound | ssh2::BlockDirections::Both
-                            );
-                            if outbound_blocked {
-                                break;
-                            }
-                            match guard.session.keepalive_send() {
-                                Ok(_) => {
-                                    last_keepalive = Instant::now();
-                                    ka_consecutive_fails = 0;
-                                    break;
-                                }
-                                Err(ref e) if matches!(e.code(), ssh2::ErrorCode::Session(-37)) => {
-                                    if start_ka.elapsed() > PTY_IO_TIMEOUT {
-                                        break; // give up for now, try again next tick
-                                    }
-                                    std::thread::sleep(PTY_IO_RETRY_SLEEP);
-                                }
-                                Err(e) => {
-                                    ka_consecutive_fails += 1;
-                                    if ka_consecutive_fails >= ka_max_fails {
-                                        disconnect_reason =
-                                            Some(humanize_disconnect_reason(&e.to_string()));
-                                    } else {
-                                        last_keepalive = Instant::now();
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if disconnect_reason.is_some() {
-                        break 'reader;
-                    }
-                }
-                idle_iterations = idle_iterations.saturating_add(1);
-                current_poll_ms = step_idle_poll(current_poll_ms, idle_iterations);
-                std::thread::sleep(Duration::from_millis(current_poll_ms));
             }
         }
 
@@ -375,19 +246,17 @@ pub fn open_shell_channel(
         if let Some(reason) = disconnect_reason {
             // Clean up the dead session so reconnect can create a fresh one.
             if let Ok(mut map) = state.0.lock() {
-                map.remove(&session_id_clone);
+                map.remove(&session_id);
             }
-            let _ = app_clone.emit(
+            let _ = app.emit(
                 "ssh_connection_lost",
                 serde_json::json!({
-                    "session_id": session_id_clone,
+                    "session_id": session_id,
                     "reason": reason
                 }),
             );
         }
     });
-
-    Ok(shutdown)
 }
 
 /// Decode as much valid UTF-8 from `carry` as possible, replacing definitively
@@ -449,6 +318,17 @@ fn send_ssh_output(channel: &Channel<SshPtyEvent>, data: String) -> bool {
     }
 }
 
+/// Reads the disconnect reason `ClientHandler::disconnected()` captured (if
+/// any) from the session's shared slot, falling back to a generic "unexpected
+/// eof" when nothing was captured — e.g. a hard process/network kill that
+/// never let the SSH transport send or process a disconnect message at all.
+fn take_disconnect_reason(slot: &Mutex<Option<String>>) -> String {
+    slot.lock()
+        .ok()
+        .and_then(|mut guard| guard.take())
+        .unwrap_or_else(|| "unexpected eof".to_string())
+}
+
 fn humanize_disconnect_reason(raw: &str) -> String {
     let lower = raw.to_lowercase();
     if lower.contains("transport read") || lower.contains("transport write") {
@@ -457,7 +337,7 @@ fn humanize_disconnect_reason(raw: &str) -> String {
         "Connection reset by the server".to_string()
     } else if lower.contains("broken pipe") {
         "Connection interrupted — the pipe to the server was broken".to_string()
-    } else if lower.contains("timed out") {
+    } else if lower.contains("timed out") || lower.contains("timeout") {
         "Connection timed out".to_string()
     } else if lower.contains("network is unreachable") || lower.contains("no route to host") {
         "Network unreachable — no route to host".to_string()
@@ -528,35 +408,5 @@ mod tests {
     #[test]
     fn humanize_disconnect_reason_capitalizes_unknown_errors() {
         assert_eq!(humanize_disconnect_reason("something weird happened"), "Something weird happened");
-    }
-
-    #[test]
-    fn step_idle_poll_stays_at_current_below_threshold() {
-        let mut poll = IDLE_POLL_MIN_MS;
-        for iter in 1..=IDLE_BACKOFF_THRESHOLD {
-            poll = step_idle_poll(poll, iter);
-            assert_eq!(poll, IDLE_POLL_MIN_MS, "should not step up at iteration {iter}");
-        }
-    }
-
-    #[test]
-    fn step_idle_poll_steps_up_past_threshold_and_caps() {
-        let mut poll = IDLE_POLL_MIN_MS;
-        for iter in 1..=20u32 {
-            poll = step_idle_poll(poll, iter);
-        }
-        assert_eq!(poll, IDLE_POLL_MAX_MS, "should cap at the max after many idle iterations");
-    }
-
-    #[test]
-    fn step_idle_poll_ramps_gradually() {
-        // Iterations 1-4 (<= threshold) hold at min; iteration 5 takes the first step.
-        let mut poll = IDLE_POLL_MIN_MS;
-        for iter in 1..=4u32 {
-            poll = step_idle_poll(poll, iter);
-        }
-        assert_eq!(poll, IDLE_POLL_MIN_MS);
-        poll = step_idle_poll(poll, 5);
-        assert_eq!(poll, IDLE_POLL_MIN_MS + IDLE_POLL_STEP_MS);
     }
 }

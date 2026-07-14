@@ -38,7 +38,9 @@ tauri-plugin-process = "2"
 tauri-plugin-dialog = "2"
 rusqlite = { version = "0.40", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
-ssh2 = "0.9"
+russh = { version = "0.62.2", default-features = false, features = ["ring", "flate2", "rsa"] }
+russh-sftp = "2.3.0"
+tokio-util = "0.7"
 openssl = { version = "0.10", features = ["vendored"] }
 dirs = "6"
 tokio = { version = "1", features = ["full"] }

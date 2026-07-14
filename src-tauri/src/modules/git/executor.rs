@@ -1,7 +1,6 @@
-use crate::modules::sftp::SftpState;
 use crate::modules::sftp::net_error::is_network_error;
+use crate::modules::ssh::SshState;
 use crate::modules::ssh::shell::shell_quote;
-use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
@@ -23,7 +22,7 @@ pub(crate) enum GitExecutor {
     Remote {
         session_id: String,
         cwd: String,
-        sftp_state: SftpState,
+        ssh_state: SshState,
         app: tauri::AppHandle,
     },
 }
@@ -31,11 +30,11 @@ pub(crate) enum GitExecutor {
 pub(crate) fn resolve_executor(
     path: String,
     session_id: Option<String>,
-    sftp_state: SftpState,
+    ssh_state: SshState,
     app: tauri::AppHandle,
 ) -> GitExecutor {
     match session_id {
-        Some(session_id) => GitExecutor::Remote { session_id, cwd: path, sftp_state, app },
+        Some(session_id) => GitExecutor::Remote { session_id, cwd: path, ssh_state, app },
         None => GitExecutor::Local { cwd: path },
     }
 }
@@ -128,24 +127,17 @@ impl GitExecutor {
                     .await
                     .map_err(|e| e.to_string())?
             }
-            GitExecutor::Remote { session_id, cwd, sftp_state, app } => {
-                let session_id = session_id.clone();
-                let cwd = cwd.clone();
-                let sftp_state = sftp_state.clone();
-                let app = app.clone();
-                let script = format!("cd {} && {}", shell_quote(&cwd), script);
-                tokio::task::spawn_blocking(move || {
-                    run_remote_script_sync(&sftp_state, &app, &session_id, &script)
-                })
-                .await
-                .map_err(|e| e.to_string())?
-                .map(|(stdout, _stderr, exit_code)| (stdout, exit_code))
+            GitExecutor::Remote { session_id, cwd, ssh_state, app } => {
+                let script = format!("cd {} && {}", shell_quote(cwd), script);
+                run_remote_script(ssh_state, app, session_id, &script)
+                    .await
+                    .map(|(stdout, _stderr, exit_code)| (stdout, exit_code))
             }
         }
     }
 
     async fn exec_remote_args(&self, args: &[&str]) -> Result<(Vec<u8>, Vec<u8>, i32), String> {
-        let GitExecutor::Remote { session_id, cwd, sftp_state, app } = self else {
+        let GitExecutor::Remote { session_id, cwd, ssh_state, app } = self else {
             unreachable!("exec_remote_args called on Local executor");
         };
         let quoted_args: String = args.iter().map(|a| shell_quote(a)).collect::<Vec<_>>().join(" ");
@@ -153,16 +145,7 @@ impl GitExecutor {
         let build_script =
             |git_bin: &str| format!("LC_ALL=C GIT_TERMINAL_PROMPT=0 {git_bin} -C {cwd_quoted} {quoted_args}");
 
-        let run = |script: String| {
-            let session_id = session_id.clone();
-            let sftp_state = sftp_state.clone();
-            let app = app.clone();
-            async move {
-                tokio::task::spawn_blocking(move || run_remote_script_sync(&sftp_state, &app, &session_id, &script))
-                    .await
-                    .map_err(|e| e.to_string())?
-            }
-        };
+        let run = |script: String| async move { run_remote_script(ssh_state, app, session_id, &script).await };
 
         let result = run(build_script("git")).await?;
         if !looks_like_missing_git(result.2, &result.1) {
@@ -300,8 +283,8 @@ fn run_local_script(script: &str, cwd: &str) -> Result<(Vec<u8>, i32), String> {
 /// via `is_network_error` and reported by removing the dead session +
 /// emitting `ssh_connection_lost`, matching the existing SFTP browsing error
 /// path so every surface reacts the same way to a dropped connection.
-fn run_remote_script_sync(
-    sftp_state: &SftpState,
+async fn run_remote_script(
+    ssh_state: &SshState,
     app: &tauri::AppHandle,
     session_id: &str,
     script: &str,
@@ -314,36 +297,23 @@ fn run_remote_script_sync(
         );
     };
 
-    let inner_arc = {
-        let map = sftp_state.0.lock().map_err(|e| e.to_string())?;
-        let entry = map.get(session_id).ok_or_else(|| {
-            // The session is already confirmed gone here — emit directly
-            // instead of routing through `is_network_error`, which exists to
-            // *classify* an error we don't yet know the nature of.
-            let reason = "no SSH session for this host — reconnect and try again".to_string();
-            emit_connection_lost(&reason);
-            reason
-        })?;
-        entry.inner.clone()
-    };
-    let inner = inner_arc.lock().map_err(|e| e.to_string())?;
-
-    let exec_via = |shell: &str, flag: &str| -> Result<(Vec<u8>, Vec<u8>, i32), String> {
-        let mut channel = inner.session.channel_session().map_err(|e| e.to_string())?;
-        let cmd = format!("{shell} {flag} {}", shell_quote(script));
-        channel.exec(&cmd).map_err(|e| e.to_string())?;
-
-        let mut stdout = Vec::new();
-        channel.read_to_end(&mut stdout).map_err(|e| e.to_string())?;
-        let mut stderr = Vec::new();
-        channel.stderr().read_to_end(&mut stderr).map_err(|e| e.to_string())?;
-        channel.wait_close().map_err(|e| e.to_string())?;
-        Ok((stdout, stderr, channel.exit_status().unwrap_or(-1)))
+    let session = {
+        let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
+        map.get(session_id)
+            .ok_or_else(|| {
+                // The session is already confirmed gone here — emit directly
+                // instead of routing through `is_network_error`, which exists
+                // to *classify* an error we don't yet know the nature of.
+                let reason = "no SSH session for this host — reconnect and try again".to_string();
+                emit_connection_lost(&reason);
+                reason
+            })?
+            .clone()
     };
 
     let report_and_pass = |e: String| -> String {
         if is_network_error(&e) {
-            if let Ok(mut map) = sftp_state.0.lock() {
+            if let Ok(mut map) = ssh_state.0.lock() {
                 map.remove(session_id);
             }
             emit_connection_lost(&e);
@@ -351,10 +321,44 @@ fn run_remote_script_sync(
         e
     };
 
-    let attempt = exec_via("bash", "-lc").map_err(report_and_pass)?;
+    // One `.wait()` loop interleaves stdout/stderr as they arrive off the same
+    // message stream, mirroring `ssh/exec.rs::ssh_exec_command` and
+    // `sftp/worker.rs::compute_remote_md5` — replaces the old sequential
+    // `read_to_end(stdout)` then `stderr().read_to_end()` pattern, which risked
+    // stalling if the remote process filled its stderr flow-control window
+    // while stdout was still draining.
+    let exec_via = |shell: &'static str, flag: &'static str| {
+        let session = session.clone();
+        let cmd = format!("{shell} {flag} {}", shell_quote(script));
+        async move {
+            let mut channel = session
+                .handle
+                .channel_open_session()
+                .await
+                .map_err(|e| e.to_string())?;
+            channel.exec(true, cmd).await.map_err(|e| e.to_string())?;
+
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let mut exit_code: i32 = -1;
+            while let Some(msg) = channel.wait().await {
+                match msg {
+                    russh::ChannelMsg::Data { data } => stdout.extend_from_slice(&data),
+                    russh::ChannelMsg::ExtendedData { data, ext: 1 } => stderr.extend_from_slice(&data),
+                    russh::ChannelMsg::ExtendedData { .. } => {}
+                    russh::ChannelMsg::ExitStatus { exit_status } => exit_code = exit_status as i32,
+                    russh::ChannelMsg::Eof | russh::ChannelMsg::Close => break,
+                    _ => {}
+                }
+            }
+            Ok::<(Vec<u8>, Vec<u8>, i32), String>((stdout, stderr, exit_code))
+        }
+    };
+
+    let attempt = exec_via("bash", "-lc").await.map_err(report_and_pass)?;
 
     if attempt.2 == 127 && shell_missing(&attempt.1, "bash") {
-        return exec_via("sh", "-c").map_err(report_and_pass);
+        return exec_via("sh", "-c").await.map_err(report_and_pass);
     }
     Ok(attempt)
 }

@@ -13,15 +13,15 @@ pub(crate) fn is_network_error(e: &str) -> bool {
         || lower.contains("network")
         || lower.contains("no sftp session")
         || lower.contains("no ssh session")
-        || lower.contains("sftp_state lock")
         // Mirrors ssh/pty.rs's humanize_disconnect_reason patterns — a dead
-        // SFTP/browsing session surfaces the exact same libssh2 transport
+        // SFTP/browsing session surfaces the exact same transport-level
         // errors an interactive PTY session does, and previously only the
         // PTY side recognized them here, so a browsing session killed this
         // way was never removed/reported (see the SSH reliability fix plan).
         || lower.contains("transport read")
         || lower.contains("transport write")
         || lower.contains("timed out")
+        || lower.contains("timeout")
         || lower.contains("eof")
         || lower.contains("end of file")
 }
@@ -58,11 +58,6 @@ mod tests {
     #[test]
     fn detects_missing_ssh_session_for_git() {
         assert!(is_network_error("no SSH session for this host — reconnect and try again"));
-    }
-
-    #[test]
-    fn detects_lock_poisoning_message() {
-        assert!(is_network_error("sftp_state lock: poisoned"));
     }
 
     #[test]
