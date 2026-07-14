@@ -18,12 +18,20 @@ export interface TransferJob {
   conflict?: { src_path: string; dest_path: string };
 }
 
+export interface TransferStep {
+  ts: number;
+  message: string;
+}
+
 interface TransferState {
   jobs: TransferJob[];
+  /** Timestamped per-job log, kept only as long as the job itself is shown. */
+  stepsByJob: Record<string, TransferStep[]>;
   addJob: (job: TransferJob) => void;
   updateJob: (job: TransferJob) => void;
   removeJob: (id: string) => void;
   clearCompleted: () => void;
+  addStep: (jobId: string, step: TransferStep) => void;
   cancelJob: (id: string) => Promise<void>;
   resolveConflict: (
     jobId: string,
@@ -34,6 +42,7 @@ interface TransferState {
 
 export const useTransferStore = create<TransferState>((set) => ({
   jobs: [],
+  stepsByJob: {},
 
   addJob: (job) => set((s) => ({ jobs: [job, ...s.jobs] })),
 
@@ -42,11 +51,25 @@ export const useTransferStore = create<TransferState>((set) => ({
       jobs: s.jobs.map((j) => (j.id === job.id ? { ...j, ...job } : j)),
     })),
 
-  removeJob: (id) => set((s) => ({ jobs: s.jobs.filter((j) => j.id !== id) })),
+  removeJob: (id) =>
+    set((s) => {
+      const { [id]: _, ...rest } = s.stepsByJob;
+      return { jobs: s.jobs.filter((j) => j.id !== id), stepsByJob: rest };
+    }),
 
   clearCompleted: () =>
+    set((s) => {
+      const kept = s.jobs.filter((j) => j.status !== "completed" && j.status !== "cancelled");
+      const keptIds = new Set(kept.map((j) => j.id));
+      const stepsByJob = Object.fromEntries(
+        Object.entries(s.stepsByJob).filter(([jobId]) => keptIds.has(jobId)),
+      );
+      return { jobs: kept, stepsByJob };
+    }),
+
+  addStep: (jobId, step) =>
     set((s) => ({
-      jobs: s.jobs.filter((j) => j.status !== "completed" && j.status !== "cancelled"),
+      stepsByJob: { ...s.stepsByJob, [jobId]: [...(s.stepsByJob[jobId] ?? []), step] },
     })),
 
   cancelJob: async (id) => {
@@ -95,6 +118,11 @@ export async function bootstrapTransferListeners() {
         }
       }
     }
+  });
+
+  await listen<{ job_id: string; ts: number; message: string }>("transfer_step", (event) => {
+    const { job_id, ts, message } = event.payload;
+    useTransferStore.getState().addStep(job_id, { ts, message });
   });
 
   await listen<{ job_id: string; src_path: string; dest_path: string }>("file_conflict", (event) => {

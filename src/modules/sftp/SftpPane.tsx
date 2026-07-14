@@ -21,7 +21,7 @@ import { SftpToolbar } from "./components/SftpToolbar";
 import { VirtualizedFileList } from "./components/VirtualizedFileList";
 import { useSftpStore } from "./store/sftpStore";
 import type { FileNode } from "./types";
-import { parentPath } from "./utils";
+import { blurActiveInput, parentPath } from "./utils";
 
 interface SftpPaneProps {
   tab: SftpTab;
@@ -176,6 +176,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   }
 
   function startDrag(source: "local" | "remote", paths: string[]) {
+    blurActiveInput();
     dragSourceRef.current = source;
     draggedPathsRef.current = paths;
     setActiveDragSource(source);

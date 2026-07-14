@@ -44,6 +44,16 @@ pub struct TransferJob {
     pub speed_bps: f64,
 }
 
+/// A single timestamped step in a transfer's lifecycle (open, handshake,
+/// chunk-loop completion, checksum verification, ...), emitted as the
+/// `transfer_step` event so the frontend can show a per-transfer log.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TransferStepPayload {
+    pub job_id: String,
+    pub ts: i64,
+    pub message: String,
+}
+
 pub enum WorkerMessage {
     Enqueue(TransferJob),
     Cancel(String),

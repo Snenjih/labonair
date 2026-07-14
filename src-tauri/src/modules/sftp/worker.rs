@@ -189,6 +189,24 @@ fn emit_progress(app: &tauri::AppHandle, job: &TransferJob) {
     let _ = app.emit("transfer_progress", job);
 }
 
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Emits a timestamped step for a transfer's per-job log (shown in the
+/// transfer manager popup). Mirrors the existing `log::debug!` call sites at
+/// the same granularity, just also surfaced to the frontend.
+fn emit_step(app: &tauri::AppHandle, job_id: &str, message: impl Into<String>) {
+    use tauri::Emitter;
+    let _ = app.emit(
+        "transfer_step",
+        TransferStepPayload { job_id: job_id.to_string(), ts: now_ms(), message: message.into() },
+    );
+}
+
 async fn process_job(
     job: &mut TransferJob,
     ssh_state: &SshState,
@@ -200,13 +218,20 @@ async fn process_job(
         "[sftp] starting {:?} | id={} tab={} src={} dest={}",
         job.direction, job.id, job.session_id, job.src_path, job.dest_path
     );
+    emit_step(app, &job.id, format!("Transfer started: {} → {}", job.src_path, job.dest_path));
     let result = match job.direction {
         TransferDirection::Download => download_file(job, ssh_state, app, conflicts, cancel_token).await,
         TransferDirection::Upload => upload_file(job, ssh_state, app, conflicts, cancel_token).await,
     };
     match &result {
-        Ok(()) => log::info!("[sftp] completed id={}", job.id),
-        Err(e) => log::error!("[sftp] failed id={} tab={} src={} dest={} — {}", job.id, job.session_id, job.src_path, job.dest_path, e),
+        Ok(()) => {
+            log::info!("[sftp] completed id={}", job.id);
+            emit_step(app, &job.id, "Transfer completed successfully");
+        }
+        Err(e) => {
+            log::error!("[sftp] failed id={} tab={} src={} dest={} — {}", job.id, job.session_id, job.src_path, job.dest_path, e);
+            emit_step(app, &job.id, format!("Transfer failed: {e}"));
+        }
     }
     result
 }
@@ -243,6 +268,7 @@ async fn download_file(
     // where a file created concurrently in between would be silently
     // overwritten. `create_new` is atomic on macOS/Windows/Linux alike.
     log::debug!("[sftp/download] attempting atomic local create: {}", job.dest_path);
+    emit_step(app, &job.id, format!("Creating local file: {}", job.dest_path));
     let mut local_file = match tokio::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -252,7 +278,9 @@ async fn download_file(
         Ok(f) => f,
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             log::debug!("[sftp/download] conflict detected, waiting for resolution");
+            emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
             let resolution = ask_conflict(job, app, conflicts).await?;
+            emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
             match resolution.resolution.as_str() {
                 "skip" => { log::debug!("[sftp/download] skipped by user"); return Ok(()); }
                 "rename" => {
@@ -286,6 +314,7 @@ async fn download_file(
 
     log::debug!("[sftp/download] looking up SFTP session for session_id={}", job.session_id);
     let (session, sftp) = get_session_and_sftp(ssh_state, &job.session_id)?;
+    emit_step(app, &job.id, "SFTP session ready");
 
     log::debug!("[sftp/download] opening remote file: {}", job.src_path);
     let meta = sftp
@@ -294,6 +323,7 @@ async fn download_file(
         .map_err(|e| format!("stat({}) failed: {e}", job.src_path))?;
     let file_size = meta.size.unwrap_or(0);
     log::debug!("[sftp/download] remote file size={} bytes", file_size);
+    emit_step(app, &job.id, format!("Opened remote file ({} bytes)", file_size));
     let mut remote_file = sftp
         .open(job.src_path.clone())
         .await
@@ -339,9 +369,11 @@ async fn download_file(
     }
     drop(local_file);
     log::debug!("[sftp/download] read {} bytes from remote", written);
+    emit_step(app, &job.id, format!("Wrote {} bytes to local disk", written));
 
     // --- Post-transfer verification ---
     log::debug!("[sftp/download] verifying transfer id={}", job.id);
+    emit_step(app, &job.id, "Verifying transfer (size check)");
     let local_size = tokio::fs::metadata(&job.dest_path)
         .await
         .map_err(|e| format!("verify metadata({}) failed: {e}", job.dest_path))?
@@ -352,6 +384,7 @@ async fn download_file(
         ));
     }
 
+    emit_step(app, &job.id, "Computing MD5 checksum");
     let local_hash = compute_local_md5_async(std::path::PathBuf::from(&job.dest_path)).await?;
     match compute_remote_md5(&session, &job.src_path).await {
         Some(remote_hash) => {
@@ -361,9 +394,11 @@ async fn download_file(
                 ));
             }
             log::debug!("[sftp/download] md5 verified ok id={}", job.id);
+            emit_step(app, &job.id, "MD5 checksum verified — match");
         }
         None => {
             log::warn!("[sftp/download] md5sum unavailable on remote, relying on size check id={}", job.id);
+            emit_step(app, &job.id, "md5sum unavailable on remote — relying on size check only");
         }
     }
 
@@ -384,16 +419,24 @@ async fn upload_file(
     let mut local_file = tokio::fs::File::open(&job.src_path)
         .await
         .map_err(|e| format!("read local file({}) failed: {e}", job.src_path))?;
-    let file_size = local_file
+    let local_meta = local_file
         .metadata()
         .await
-        .map_err(|e| format!("metadata local file({}) failed: {e}", job.src_path))?
-        .len();
+        .map_err(|e| format!("metadata local file({}) failed: {e}", job.src_path))?;
+    if local_meta.is_dir() {
+        let name = job.src_path.rsplit('/').next().unwrap_or(&job.src_path);
+        return Err(format!(
+            "\"{name}\" is a folder. Uploading folders isn't supported yet — select individual files instead."
+        ));
+    }
+    let file_size = local_meta.len();
     job.bytes_total = file_size;
     log::debug!("[sftp/upload] local file size={} bytes", file_size);
+    emit_step(app, &job.id, format!("Opened local file ({} bytes)", file_size));
 
     log::debug!("[sftp/upload] looking up SFTP session for session_id={}", job.session_id);
     let (session, sftp) = get_session_and_sftp(ssh_state, &job.session_id)?;
+    emit_step(app, &job.id, "SFTP session ready");
 
     // Single atomic exclusive-create attempt — no prior `stat()` check —
     // closes the stat-then-create TOCTOU window the old code had. Any
@@ -401,6 +444,7 @@ async fn upload_file(
     // same ambiguity `ssh/sftp.rs`'s `sftp_create_file` already accepts for
     // this exact ATOMIC CREATE|EXCLUDE mechanism.
     log::debug!("[sftp/upload] attempting atomic remote create: {}", job.dest_path);
+    emit_step(app, &job.id, format!("Creating remote file: {}", job.dest_path));
     let mut remote_file = match sftp
         .open_with_flags(job.dest_path.clone(), OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE)
         .await
@@ -408,7 +452,9 @@ async fn upload_file(
         Ok(f) => f,
         Err(_) => {
             log::debug!("[sftp/upload] conflict at dest: {}", job.dest_path);
+            emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
             let resolution = ask_conflict(job, app, conflicts).await?;
+            emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
             match resolution.resolution.as_str() {
                 "skip" => { log::debug!("[sftp/upload] skipped by user"); return Ok(()); }
                 "rename" => {
@@ -480,9 +526,11 @@ async fn upload_file(
     // of the upload could go unnoticed.
     remote_file.shutdown().await.map_err(|e| e.to_string())?;
     log::debug!("[sftp/upload] wrote {} bytes to remote", written);
+    emit_step(app, &job.id, format!("Wrote {} bytes to remote", written));
 
     // --- Post-transfer verification ---
     log::debug!("[sftp/upload] verifying transfer id={}", job.id);
+    emit_step(app, &job.id, "Verifying transfer (size check)");
     let remote_size = sftp
         .metadata(job.dest_path.clone())
         .await
@@ -495,6 +543,7 @@ async fn upload_file(
         ));
     }
 
+    emit_step(app, &job.id, "Computing MD5 checksum");
     let local_hash = compute_local_md5_async(std::path::PathBuf::from(&job.src_path)).await?;
     match compute_remote_md5(&session, &job.dest_path).await {
         Some(remote_hash) => {
@@ -504,9 +553,11 @@ async fn upload_file(
                 ));
             }
             log::debug!("[sftp/upload] md5 verified ok id={}", job.id);
+            emit_step(app, &job.id, "MD5 checksum verified — match");
         }
         None => {
             log::warn!("[sftp/upload] md5sum unavailable on remote, relying on size check id={}", job.id);
+            emit_step(app, &job.id, "md5sum unavailable on remote — relying on size check only");
         }
     }
 

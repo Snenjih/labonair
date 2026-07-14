@@ -11,8 +11,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { FileNode } from "../types";
+import { blurActiveInput } from "../utils";
 
 const DRAG_THRESHOLD_PX = 6;
+
+type ColKey = "size" | "type" | "modified" | "permissions";
 
 interface ColWidths {
   size: number;
@@ -27,6 +30,36 @@ const DEFAULT_COL_WIDTHS: ColWidths = {
   permissions: 112,
   type: 72,
 };
+
+// Name is always pinned first; these are the reorderable columns.
+const DEFAULT_COL_ORDER: ColKey[] = ["size", "type", "modified", "permissions"];
+
+const COLUMN_DEFS: Record<ColKey, { label: string; align?: "left" | "right" }> = {
+  size: { label: "Size", align: "right" },
+  type: { label: "Type" },
+  modified: { label: "Modified" },
+  permissions: { label: "Perms" },
+};
+
+const COLUMN_CELL_CLASS: Record<ColKey, string> = {
+  size: "text-right text-xs text-muted-foreground tabular-nums pr-1 shrink-0",
+  type: "text-xs text-muted-foreground/70 tabular-nums shrink-0 truncate",
+  modified: "text-xs text-muted-foreground tabular-nums shrink-0",
+  permissions: "text-[11px] font-mono text-muted-foreground/60 shrink-0 truncate",
+};
+
+function columnCellValue(key: ColKey, file: FileNode, isUpEntry: boolean, fileExt: string): string {
+  switch (key) {
+    case "size":
+      return !isUpEntry && !file.is_dir ? formatBytes(file.size) : "";
+    case "type":
+      return fileExt;
+    case "modified":
+      return !isUpEntry ? formatRelativeTime(file.modified_at) : "";
+    case "permissions":
+      return !isUpEntry ? file.permissions || "—" : "";
+  }
+}
 
 interface VirtualizedFileListProps {
   files: FileNode[];
@@ -80,8 +113,17 @@ export function VirtualizedFileList({
 }: VirtualizedFileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [colWidths, setColWidths] = useState<ColWidths>(DEFAULT_COL_WIDTHS);
+  const [colOrder, setColOrder] = useState<ColKey[]>(DEFAULT_COL_ORDER);
   const [marquee, setMarquee] = useState<MarqueeRect | null>(null);
   const [hoveredKey, setHoveredKey] = useState<React.Key | null>(null);
+
+  const reorderColumns = useCallback((from: ColKey, to: ColKey) => {
+    setColOrder((prev) => {
+      const next = prev.filter((k) => k !== from);
+      next.splice(next.indexOf(to), 0, from);
+      return next;
+    });
+  }, []);
 
   const showSize = usePreferencesStore((s) => s.sftpColumnSize);
   const showModified = usePreferencesStore((s) => s.sftpColumnModified);
@@ -157,6 +199,8 @@ export function VirtualizedFileList({
     if (!container) return;
     const cr = container.getBoundingClientRect();
 
+    blurActiveInput();
+
     const rect: MarqueeRect = {
       startX: e.clientX,
       startY: e.clientY,
@@ -167,8 +211,6 @@ export function VirtualizedFileList({
       containerRight: cr.right,
       additive: e.shiftKey || e.metaKey || e.ctrlKey,
     };
-    setMarquee(rect);
-    setMarqueeHighlight(new Set());
 
     e.preventDefault();
     let didDrag = false;
@@ -177,13 +219,10 @@ export function VirtualizedFileList({
       const dist = Math.hypot(ev.clientX - rect.startX, ev.clientY - rect.startY);
       if (dist > DRAG_THRESHOLD_PX) didDrag = true;
       if (!didDrag) return;
-      setMarquee((prev) => {
-        if (!prev) return prev;
-        const next = { ...prev, currentX: ev.clientX, currentY: ev.clientY };
-        const hits = computeMarqueeHits(next);
-        setMarqueeHighlight(new Set(hits));
-        return next;
-      });
+      const next: MarqueeRect = { ...rect, currentX: ev.clientX, currentY: ev.clientY };
+      const hits = computeMarqueeHits(next);
+      setMarqueeHighlight(new Set(hits));
+      setMarquee(next);
     }
 
     function onUp() {
@@ -209,7 +248,12 @@ export function VirtualizedFileList({
     document.addEventListener("pointerup", onUp);
   }
 
-  const visibleCols = { showSize, showModified, showPermissions, showType };
+  const visibleCols: Record<ColKey, boolean> = {
+    size: showSize,
+    type: showType,
+    modified: showModified,
+    permissions: showPermissions,
+  };
   const showOverlay = !!dropDirection;
 
   return (
@@ -265,35 +309,19 @@ export function VirtualizedFileList({
         <span className="flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-widest truncate pl-1 min-w-0">
           Name
         </span>
-        {showSize && (
-          <ResizableHeaderCell
-            label="Size"
-            width={colWidths.size}
-            onResizeStart={(e) => startResize("size", e)}
-            align="right"
-          />
-        )}
-        {showType && (
-          <ResizableHeaderCell
-            label="Type"
-            width={colWidths.type}
-            onResizeStart={(e) => startResize("type", e)}
-          />
-        )}
-        {showModified && (
-          <ResizableHeaderCell
-            label="Modified"
-            width={colWidths.modified}
-            onResizeStart={(e) => startResize("modified", e)}
-          />
-        )}
-        {showPermissions && (
-          <ResizableHeaderCell
-            label="Perms"
-            width={colWidths.permissions}
-            onResizeStart={(e) => startResize("permissions", e)}
-          />
-        )}
+        {colOrder
+          .filter((key) => visibleCols[key])
+          .map((key) => (
+            <ResizableHeaderCell
+              key={key}
+              colKey={key}
+              label={COLUMN_DEFS[key].label}
+              width={colWidths[key]}
+              align={COLUMN_DEFS[key].align}
+              onResizeStart={(e) => startResize(key, e)}
+              onReorder={reorderColumns}
+            />
+          ))}
       </div>
 
       {/* Marquee selection overlay (fixed over the list) */}
@@ -350,6 +378,7 @@ export function VirtualizedFileList({
                   onDragStart={onDragStart ? (paths) => onDragStart(paths) : undefined}
                   selectedPaths={selectedPaths}
                   colWidths={colWidths}
+                  colOrder={colOrder}
                   visibleCols={visibleCols}
                   style={{
                     position: "absolute",
@@ -378,24 +407,64 @@ export function VirtualizedFileList({
 }
 
 interface ResizableHeaderCellProps {
+  colKey: ColKey;
   label: string;
   width: number;
   onResizeStart: (e: React.MouseEvent) => void;
+  onReorder: (from: ColKey, to: ColKey) => void;
   align?: "left" | "right";
 }
 
-function ResizableHeaderCell({ label, width, onResizeStart, align = "left" }: ResizableHeaderCellProps) {
+function ResizableHeaderCell({
+  colKey,
+  label,
+  width,
+  onResizeStart,
+  onReorder,
+  align = "left",
+}: ResizableHeaderCellProps) {
+  const [dragging, setDragging] = useState(false);
+
+  function handleLabelPointerDown(e: React.PointerEvent) {
+    if (e.button !== 0) return;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let didDrag = false;
+
+    function onMove(ev: PointerEvent) {
+      if (didDrag) return;
+      const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+      if (dist > DRAG_THRESHOLD_PX) {
+        didDrag = true;
+        setDragging(true);
+      }
+    }
+    function onUp(ev: PointerEvent) {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      setDragging(false);
+      if (!didDrag) return;
+      const targetEl = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("[data-col]") as HTMLElement | null;
+      const targetKey = targetEl?.dataset.col as ColKey | undefined;
+      if (targetKey && targetKey !== colKey) onReorder(colKey, targetKey);
+    }
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }
+
   return (
-    <div className="relative shrink-0 flex items-center" style={{ width }}>
+    <div className="relative shrink-0 flex items-center" style={{ width }} data-col={colKey}>
       <span
         className={cn(
-          "w-full text-[10px] font-semibold text-muted-foreground uppercase tracking-widest truncate",
+          "w-full text-[10px] font-semibold text-muted-foreground uppercase tracking-widest truncate cursor-grab select-none",
           align === "right" && "text-right pr-1",
+          dragging && "opacity-50",
         )}
+        onPointerDown={handleLabelPointerDown}
       >
         {label}
       </span>
-      {/* Drag handle */}
+      {/* Resize handle */}
       <div
         className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-primary/40 transition-colors"
         onMouseDown={onResizeStart}
@@ -418,7 +487,8 @@ interface FileRowProps {
   onDragStart?: (paths: string[]) => void;
   selectedPaths?: Set<string>;
   colWidths: ColWidths;
-  visibleCols: { showSize: boolean; showModified: boolean; showPermissions: boolean; showType: boolean };
+  colOrder: ColKey[];
+  visibleCols: Record<ColKey, boolean>;
   isRenaming?: boolean;
   renameValue?: string;
   onRenameChange?: (v: string) => void;
@@ -440,6 +510,7 @@ function FileRow({
   onDragStart,
   selectedPaths,
   colWidths,
+  colOrder,
   visibleCols,
   isRenaming,
   renameValue,
@@ -533,38 +604,13 @@ function FileRow({
           {file.name}
         </span>
       )}
-      {visibleCols.showSize && (
-        <span
-          className="text-right text-xs text-muted-foreground tabular-nums pr-1 shrink-0"
-          style={{ width: colWidths.size }}
-        >
-          {!isUpEntry && !file.is_dir ? formatBytes(file.size) : ""}
-        </span>
-      )}
-      {visibleCols.showType && (
-        <span
-          className="text-xs text-muted-foreground/70 tabular-nums shrink-0 truncate"
-          style={{ width: colWidths.type }}
-        >
-          {fileExt}
-        </span>
-      )}
-      {visibleCols.showModified && (
-        <span
-          className="text-xs text-muted-foreground tabular-nums shrink-0"
-          style={{ width: colWidths.modified }}
-        >
-          {!isUpEntry ? formatRelativeTime(file.modified_at) : ""}
-        </span>
-      )}
-      {visibleCols.showPermissions && (
-        <span
-          className="text-[11px] font-mono text-muted-foreground/60 shrink-0 truncate"
-          style={{ width: colWidths.permissions }}
-        >
-          {!isUpEntry ? file.permissions || "—" : ""}
-        </span>
-      )}
+      {colOrder
+        .filter((key) => visibleCols[key])
+        .map((key) => (
+          <span key={key} className={COLUMN_CELL_CLASS[key]} style={{ width: colWidths[key] }}>
+            {columnCellValue(key, file, isUpEntry, fileExt)}
+          </span>
+        ))}
     </div>
   );
 }
