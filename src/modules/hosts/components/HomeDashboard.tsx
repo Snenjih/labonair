@@ -176,7 +176,7 @@ function SortableHostCard({
     opacity: isDragging ? 0.5 : 1,
   };
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} style={style} className={layoutMode === "grid" ? "w-[260px]" : undefined}>
       {layoutMode === "list" ? (
         <HostListItem
           host={host}
@@ -713,9 +713,11 @@ export function HomeDashboard({
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="flex flex-wrap gap-4">
                     {[...Array(3)].map((_, i) => (
-                      <SkeletonCard key={i} />
+                      <div key={i} className="w-[260px]">
+                        <SkeletonCard />
+                      </div>
                     ))}
                   </div>
                 )
@@ -752,7 +754,7 @@ export function HomeDashboard({
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      <div className="flex flex-wrap gap-4">
                         {sortedHosts.map((host) => (
                           <SortableHostCard
                             key={host.id}
@@ -815,20 +817,21 @@ export function HomeDashboard({
                   No credentials match your search
                 </div>
               ) : layoutMode === "grid" ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="flex flex-wrap gap-4">
                   {sortedCredentials.map((cred) => (
-                    <CredentialCard
-                      key={cred.id}
-                      credential={cred}
-                      hostsCount={hosts.filter((h) => h.credential_id === cred.id).length}
-                      isSelected={selectedCredentialId === cred.id}
-                      onClick={() => setSelectedCredential(selectedCredentialId === cred.id ? null : cred.id)}
-                      onEdit={() => setSelectedCredential(cred.id)}
-                      onDuplicate={async () => {
-                        const dup = await duplicateCredential(cred.id);
-                        setSelectedCredential(dup.id);
-                      }}
-                    />
+                    <div key={cred.id} className="w-[260px]">
+                      <CredentialCard
+                        credential={cred}
+                        hostsCount={hosts.filter((h) => h.credential_id === cred.id).length}
+                        isSelected={selectedCredentialId === cred.id}
+                        onClick={() => setSelectedCredential(selectedCredentialId === cred.id ? null : cred.id)}
+                        onEdit={() => setSelectedCredential(cred.id)}
+                        onDuplicate={async () => {
+                          const dup = await duplicateCredential(cred.id);
+                          setSelectedCredential(dup.id);
+                        }}
+                      />
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -859,29 +862,31 @@ export function HomeDashboard({
         {showPanel && (
           <motion.div
             key={viewMode === "hosts" ? (panelHostId ?? "__new__") : (selectedCredentialId ?? "__new__cred")}
-            initial={{ x: 340, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 340, opacity: 0 }}
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 340, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="w-[340px] shrink-0 border-l border-border overflow-hidden bg-background flex flex-col"
+            className="shrink-0 border-l border-border overflow-hidden bg-background flex flex-col"
           >
-            {viewMode === "hosts" ? (
-              <HostFormPanel
-                hostId={panelHostId}
-                onClose={() => setSelectedHost(null)}
-                newSshTab={newSshTab}
-                newSftpTab={newSftpTab}
-                onNavigateToCredentials={() => {
-                  setViewMode("credentials");
-                  setSelectedCredential("__new__");
-                }}
-              />
-            ) : (
-              <CredentialFormPanel
-                credentialId={selectedCredentialId}
-                onClose={() => setSelectedCredential(null)}
-              />
-            )}
+            <div className="h-full w-[340px] flex flex-col">
+              {viewMode === "hosts" ? (
+                <HostFormPanel
+                  hostId={panelHostId}
+                  onClose={() => setSelectedHost(null)}
+                  newSshTab={newSshTab}
+                  newSftpTab={newSftpTab}
+                  onNavigateToCredentials={() => {
+                    setViewMode("credentials");
+                    setSelectedCredential("__new__");
+                  }}
+                />
+              ) : (
+                <CredentialFormPanel
+                  credentialId={selectedCredentialId}
+                  onClose={() => setSelectedCredential(null)}
+                />
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
