@@ -289,16 +289,16 @@ export function HostFormPanel({
     };
   }, []);
 
-  useEffect(() => {
-    if (!isNew && host) {
-      // Loading/switching a host looks identical to a user edit to the debounce
-      // effect below (it also calls setForm/setTunnels) — skip its next run so
-      // opening a host doesn't immediately re-save it.
-      skipNextSaveRef.current = true;
-      setForm(hostToForm(host));
-      setTunnels(parseTunnels(host.tunnels));
-    }
-  }, [hostId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // No host-sync effect here on purpose: `form`/`tunnels` are already seeded
+  // correctly from `host` by the useState initializers above. HomeDashboard
+  // keys the panel by hostId, so switching hosts fully remounts this
+  // component rather than updating `hostId` in place — resyncing state here
+  // would just re-set it to the same values, causing an extra render that
+  // consumes `skipNextSaveRef` a render early and lets the debounce effect
+  // below fire a real (no-op) save ~1s after opening. If the panel is ever
+  // changed to update in place instead of remounting, this will need a real
+  // resync effect that also re-arms `skipNextSaveRef` in the same render
+  // that changes `form`/`tunnels`.
 
   const runSave = useCallback(async () => {
     if (isNew || !host) return;
