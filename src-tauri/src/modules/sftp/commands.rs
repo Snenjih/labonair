@@ -54,3 +54,29 @@ pub async fn resolve_conflict(
     }
     Ok(())
 }
+
+/// Pushes the frontend's `sftpMaxConcurrentTransfers`/`sftpChunkSizeKb`/
+/// `sftpDefaultConflictResolution` settings into the running worker. Clamped
+/// server-side independent of whatever range the Settings UI enforces — IPC
+/// args are raw JSON, not a trusted boundary.
+#[tauri::command]
+pub async fn sftp_update_transfer_settings(
+    max_concurrent: Option<usize>,
+    chunk_size_bytes: Option<usize>,
+    default_conflict_resolution: Option<String>,
+    worker: tauri::State<'_, TransferWorkerState>,
+) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+    if let Some(v) = max_concurrent {
+        worker.settings.max_concurrent.store(v.clamp(1, 16), Ordering::Relaxed);
+    }
+    if let Some(v) = chunk_size_bytes {
+        worker.settings.chunk_size.store(v.clamp(4096, 8 * 1024 * 1024), Ordering::Relaxed);
+    }
+    if let Some(v) = default_conflict_resolution {
+        if matches!(v.as_str(), "ask" | "overwrite" | "skip") {
+            *worker.settings.default_conflict_resolution.lock().unwrap() = v;
+        }
+    }
+    Ok(())
+}

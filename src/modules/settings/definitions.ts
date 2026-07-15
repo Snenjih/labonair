@@ -7,7 +7,6 @@ export type SettingCategory =
   | "Editor"
   | "Command Palette"
   | "File Manager"
-  | "Source Control"
   | "AI"
   | "Directives"
   | "About";
@@ -69,6 +68,27 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
       { value: "1", label: "1 tab" },
       { value: "2", label: "2 tabs" },
       { value: "3", label: "3 tabs" },
+    ],
+  },
+  {
+    id: "scrollbackMaxSizeMb",
+    label: "Max scrollback size (MB)",
+    description: "Largest per-session scrollback buffer saved to disk (1–50 MB).",
+    category: "General",
+    controlType: "NumberInput",
+  },
+  {
+    id: "scrollbackRetentionDays",
+    label: "Scrollback retention",
+    description: "Automatically delete saved scrollback older than this many days.",
+    category: "General",
+    controlType: "Select",
+    options: [
+      { value: "0", label: "Never" },
+      { value: "7", label: "7 days" },
+      { value: "30", label: "30 days" },
+      { value: "90", label: "90 days" },
+      { value: "365", label: "1 year" },
     ],
   },
 
@@ -235,15 +255,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "Terminal",
     controlType: "NumberInput",
   },
-  // --- Source Control ---
-  {
-    id: "gitStatusPollIntervalMs",
-    label: "Refresh interval",
-    description:
-      "How often Source Control polls for status changes (in ms). Remote repositories over SSH automatically use a longer effective interval since each check is a network round-trip.",
-    category: "Source Control",
-    controlType: "NumberInput",
-  },
   {
     id: "terminalCursorStyle",
     label: "Cursor style",
@@ -371,6 +382,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "Terminal",
     controlType: "NumberInput",
   },
+  {
+    id: "sshConnectTimeoutSecs",
+    label: "Connect timeout (s)",
+    description: "How long to wait for the initial TCP connection before giving up (3–60 s).",
+    category: "Terminal",
+    controlType: "NumberInput",
+  },
 
   // --- Editor ---
   {
@@ -460,6 +478,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "Editor",
     controlType: "Switch",
   },
+  {
+    id: "editorMaxFileSizeMb",
+    label: "Max file size (MB)",
+    description: "Largest local file the editor (and AI file-read tools) will open (1–100 MB).",
+    category: "Editor",
+    controlType: "NumberInput",
+  },
 
   // --- File Manager ---
   {
@@ -511,6 +536,47 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
       "Display temporary download and upload operations when editing remote files in the transfers panel.",
     category: "File Manager",
     controlType: "Switch",
+  },
+  {
+    id: "sftpMaxRemoteFileSizeMb",
+    label: "Max remote file size (MB)",
+    description: "Largest remote file that can be opened for in-app editing or AI attachment (1–100 MB).",
+    category: "File Manager",
+    controlType: "NumberInput",
+  },
+  {
+    id: "sftpMaxConcurrentTransfers",
+    label: "Concurrent transfers",
+    description: "How many uploads/downloads run at the same time (1–6).",
+    category: "File Manager",
+    controlType: "NumberInput",
+  },
+  {
+    id: "sftpDefaultConflictResolution",
+    label: "On name conflict",
+    description: "What to do automatically when a transfer target already exists.",
+    category: "File Manager",
+    controlType: "Select",
+    options: [
+      { value: "ask", label: "Always ask" },
+      { value: "overwrite", label: "Always overwrite" },
+      { value: "skip", label: "Always skip" },
+    ],
+  },
+  {
+    id: "sftpChunkSizeKb",
+    label: "Transfer chunk size (KB)",
+    description: "Size of each read/write chunk during file transfers (16–1024 KB).",
+    category: "File Manager",
+    controlType: "NumberInput",
+  },
+  {
+    id: "gitStatusPollIntervalMs",
+    label: "Source Control refresh interval",
+    description:
+      "How often Source Control polls for status changes (in ms). Remote repositories over SSH automatically use a longer effective interval since each check is a network round-trip.",
+    category: "File Manager",
+    controlType: "NumberInput",
   },
   {
     id: "explorerShowHiddenByDefault",
@@ -605,6 +671,20 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "AI",
     controlType: "Switch",
   },
+  {
+    id: "aiShellMaxTimeoutSecs",
+    label: "Max command timeout (s)",
+    description: "Upper bound on how long the AI's run_command tool may wait for a command (30–1800 s).",
+    category: "AI",
+    controlType: "NumberInput",
+  },
+  {
+    id: "aiShellMaxOutputKb",
+    label: "Max command output (KB)",
+    description: "Upper bound on captured stdout/stderr from the AI's run_command tool (64–2048 KB).",
+    category: "AI",
+    controlType: "NumberInput",
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [
@@ -614,7 +694,6 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Editor",
   "Command Palette",
   "File Manager",
-  "Source Control",
   "AI",
   "Directives",
   "About",

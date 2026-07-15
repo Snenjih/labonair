@@ -477,7 +477,10 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
 
       // Restore scrollback BEFORE flushing earlyBuffer so old content appears first.
       try {
-        const ansi = await invoke<string | null>("scrollback_load", { sessionId });
+        const ansi = await invoke<string | null>("scrollback_load", {
+          sessionId,
+          maxBytes: usePreferencesStore.getState().scrollbackMaxSizeMb * 1024 * 1024,
+        });
         if (ansi && !disposed) {
           deliverText(sessionId, ansi);
           const cols = getSlotForLeaf(sessionId)?.term.cols ?? 80;

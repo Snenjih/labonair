@@ -11,6 +11,7 @@ pub mod worker;
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
 use tokio::sync::{Mutex, mpsc, oneshot};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -73,7 +74,33 @@ pub struct ConflictResolution {
     pub new_name: Option<String>,
 }
 
+/// Queue-wide transfer tuning knobs, pushed from the frontend Settings store
+/// whenever `sftpMaxConcurrentTransfers`/`sftpChunkSizeKb`/
+/// `sftpDefaultConflictResolution` change (see `sftp_update_transfer_settings`).
+/// Unlike most preferences, these affect worker behavior rather than a single
+/// command call, so they're held as shared state instead of being passed as
+/// per-call arguments.
+pub struct TransferSettings {
+    pub max_concurrent: AtomicUsize,
+    /// Chunk size in bytes for transfer read/write loops.
+    pub chunk_size: AtomicUsize,
+    /// One of "ask" | "overwrite" | "skip". "ask" preserves today's behavior
+    /// of prompting the frontend via the `file_conflict` event.
+    pub default_conflict_resolution: std::sync::Mutex<String>,
+}
+
+impl Default for TransferSettings {
+    fn default() -> Self {
+        Self {
+            max_concurrent: AtomicUsize::new(2),
+            chunk_size: AtomicUsize::new(65536),
+            default_conflict_resolution: std::sync::Mutex::new("ask".to_string()),
+        }
+    }
+}
+
 pub struct TransferWorkerState {
     pub sender: mpsc::Sender<WorkerMessage>,
     pub conflicts: ConflictMap,
+    pub settings: Arc<TransferSettings>,
 }

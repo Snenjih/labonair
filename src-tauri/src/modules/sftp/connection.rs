@@ -180,6 +180,7 @@ async fn sftp_connect_inner(
                 &app,
                 true, // fail fast — the sidebar Explorer has no trust-prompt UI of its own
                 jump,
+                None, // uses the default connect timeout — not wired to a setting on this path
             )
             .await?;
 

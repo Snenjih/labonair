@@ -52,7 +52,8 @@ pub struct FileStat {
 }
 
 #[tauri::command]
-pub async fn fs_read_file(path: String) -> Result<ReadResult, String> {
+pub async fn fs_read_file(path: String, max_bytes: Option<u64>) -> Result<ReadResult, String> {
+    let limit = max_bytes.unwrap_or(MAX_READ_BYTES);
     tokio::task::spawn_blocking(move || {
         let p = expand_home(&path)?;
         let meta = std::fs::metadata(&p).map_err(|e| {
@@ -61,11 +62,8 @@ pub async fn fs_read_file(path: String) -> Result<ReadResult, String> {
         })?;
 
         let size = meta.len();
-        if size > MAX_READ_BYTES {
-            return Ok(ReadResult::TooLarge {
-                size,
-                limit: MAX_READ_BYTES,
-            });
+        if size > limit {
+            return Ok(ReadResult::TooLarge { size, limit });
         }
 
         let bytes = std::fs::read(&p).map_err(|e| {

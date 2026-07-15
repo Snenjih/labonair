@@ -7,7 +7,7 @@ import { useCommandSnippetsStore } from "@/modules/snippets";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { onKeysChanged } from "@/modules/settings/store";
 import { useKeybindsStore } from "@/modules/shortcuts";
-import { bootstrapTransferListeners } from "@/modules/sftp/store/transferStore";
+import { bootstrapTransferListeners, bootstrapTransferSettingsSync } from "@/modules/sftp/store/transferStore";
 import { bootstrapSftpConnectionListener } from "@/modules/sftp/store/sftpStore";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { useLayoutEngine } from "@/lib/useLayoutEngine";
@@ -132,6 +132,12 @@ export function useAppBootstrap(): AppBootstrapReturn {
   // Bootstrap SFTP transfer listeners
   useEffect(() => {
     void bootstrapTransferListeners();
+  }, []);
+
+  // Push worker-wide transfer settings (concurrency, chunk size, default
+  // conflict policy) to the Rust worker once at startup and on every change.
+  useEffect(() => {
+    bootstrapTransferSettingsSync();
   }, []);
 
   // Bootstrap SFTP connection-lost listener (dead sessions → reconnect banner)

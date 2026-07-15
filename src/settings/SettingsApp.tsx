@@ -1,7 +1,7 @@
 import {
   AiScanIcon,
   File01Icon,
-  GitBranchIcon,
+  Folder01Icon,
   KeyboardIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
@@ -35,10 +35,10 @@ import { AiSection } from "./sections/AiSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { CommandPaletteSection } from "./sections/CommandPaletteSection";
 import { EditorSection } from "./sections/EditorSection";
+import { FileManagerSection } from "./sections/FileManagerSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { KeyboardShortcutsSection } from "./sections/KeyboardShortcutsSection";
 import { ModelsSection } from "./sections/ModelsSection";
-import { SourceControlSection } from "./sections/SourceControlSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemeMarketplace } from "./sections/ThemeMarketplace";
 
@@ -54,9 +54,9 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "appearance", category: "Appearance", label: "Appearance", icon: PaintBoardIcon },
   { id: "themes", category: null, label: "Themes", icon: PaintBrush01Icon },
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
+  { id: "file-manager", category: "File Manager", label: "File Manager", icon: Folder01Icon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
-  { id: "source-control", category: "Source Control", label: "Source Control", icon: GitBranchIcon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
   { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
 ];
@@ -191,9 +191,9 @@ export function SettingsApp() {
                 {active === "appearance" && <AppearanceSection />}
                 {active === "themes" && <ThemeMarketplace />}
                 {active === "terminal" && <TerminalSection />}
+                {active === "file-manager" && <FileManagerSection />}
                 {active === "editor" && <EditorSection />}
                 {active === "command-palette" && <CommandPaletteSection />}
-                {active === "source-control" && <SourceControlSection />}
                 {active === "shortcuts" && <KeyboardShortcutsSection />}
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
@@ -310,6 +310,36 @@ function applySettingChange(id: PrefKey, value: unknown): void {
       break;
     case "gitStatusPollIntervalMs":
       void store.setGitStatusPollIntervalMs(Number(value));
+      break;
+    case "sftpMaxRemoteFileSizeMb":
+      void store.setSftpMaxRemoteFileSizeMb(Number(value));
+      break;
+    case "sftpMaxConcurrentTransfers":
+      void store.setSftpMaxConcurrentTransfers(Number(value));
+      break;
+    case "sftpDefaultConflictResolution":
+      void store.setSftpDefaultConflictResolution(value as "ask" | "overwrite" | "skip");
+      break;
+    case "sftpChunkSizeKb":
+      void store.setSftpChunkSizeKb(Number(value));
+      break;
+    case "sshConnectTimeoutSecs":
+      void store.setSshConnectTimeoutSecs(Number(value));
+      break;
+    case "aiShellMaxTimeoutSecs":
+      void store.setAiShellMaxTimeoutSecs(Number(value));
+      break;
+    case "aiShellMaxOutputKb":
+      void store.setAiShellMaxOutputKb(Number(value));
+      break;
+    case "scrollbackMaxSizeMb":
+      void store.setScrollbackMaxSizeMb(Number(value));
+      break;
+    case "scrollbackRetentionDays":
+      void store.setScrollbackRetentionDays(Number(value));
+      break;
+    case "editorMaxFileSizeMb":
+      void store.setEditorMaxFileSizeMb(Number(value));
       break;
     case "terminalComposerEnabled":
       void store.setTerminalComposerEnabled(value as boolean);

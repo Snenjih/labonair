@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useSftpStore } from "./sftpStore";
 
 export type TransferStatus = "queued" | "running" | "paused" | "cancelled" | "completed" | { failed: string };
@@ -137,5 +138,40 @@ export async function bootstrapTransferListeners() {
         dest_path: event.payload.dest_path,
       },
     });
+  });
+}
+
+/** Pushes the worker-wide transfer settings (concurrency, chunk size,
+ *  default conflict policy) to the Rust worker. Unlike most preferences,
+ *  these affect the SFTP worker loop rather than a single command call, so
+ *  they're synced once at startup and again on every change instead of being
+ *  passed as a per-`enqueue_transfer` argument. */
+async function pushTransferSettings(): Promise<void> {
+  const prefs = usePreferencesStore.getState();
+  try {
+    await invoke("sftp_update_transfer_settings", {
+      maxConcurrent: prefs.sftpMaxConcurrentTransfers,
+      chunkSizeBytes: prefs.sftpChunkSizeKb * 1024,
+      defaultConflictResolution: prefs.sftpDefaultConflictResolution,
+    });
+  } catch (e) {
+    console.warn("[sftp] failed to push transfer settings:", e);
+  }
+}
+
+let _transferSettingsSyncBootstrapped = false;
+
+export function bootstrapTransferSettingsSync(): void {
+  if (_transferSettingsSyncBootstrapped) return;
+  _transferSettingsSyncBootstrapped = true;
+  void pushTransferSettings();
+  usePreferencesStore.subscribe((state, prev) => {
+    if (
+      state.sftpMaxConcurrentTransfers !== prev.sftpMaxConcurrentTransfers ||
+      state.sftpChunkSizeKb !== prev.sftpChunkSizeKb ||
+      state.sftpDefaultConflictResolution !== prev.sftpDefaultConflictResolution
+    ) {
+      void pushTransferSettings();
+    }
   });
 }

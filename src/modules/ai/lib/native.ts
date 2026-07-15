@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 export type ReadResult =
   | { kind: "text"; content: string; size: number }
@@ -37,7 +38,11 @@ export type GlobHit = { path: string; rel: string };
 export type GlobResponse = { hits: GlobHit[]; truncated: boolean };
 
 export const native = {
-  readFile: (path: string) => invoke<ReadResult>("fs_read_file", { path }),
+  readFile: (path: string) =>
+    invoke<ReadResult>("fs_read_file", {
+      path,
+      maxBytes: usePreferencesStore.getState().editorMaxFileSizeMb * 1024 * 1024,
+    }),
   writeFile: (path: string, content: string) => invoke<void>("fs_write_file", { path, content }),
   createFile: (path: string) => invoke<void>("fs_create_file", { path }),
   createDir: (path: string) => invoke<void>("fs_create_dir", { path }),
@@ -67,6 +72,8 @@ export const native = {
       command,
       cwd: cwd ?? null,
       timeoutSecs: timeoutSecs ?? null,
+      maxTimeoutSecs: usePreferencesStore.getState().aiShellMaxTimeoutSecs,
+      maxOutputBytes: usePreferencesStore.getState().aiShellMaxOutputKb * 1024,
     }),
 
   shellSessionOpen: (cwd?: string | null) => invoke<number>("shell_session_open", { cwd: cwd ?? null }),
@@ -82,6 +89,8 @@ export const native = {
       id,
       command,
       timeoutSecs: timeoutSecs ?? null,
+      maxTimeoutSecs: usePreferencesStore.getState().aiShellMaxTimeoutSecs,
+      maxOutputBytes: usePreferencesStore.getState().aiShellMaxOutputKb * 1024,
     }),
   shellSessionClose: (id: number) => invoke<void>("shell_session_close", { id }),
   shellBgSpawn: (command: string, cwd?: string | null) =>

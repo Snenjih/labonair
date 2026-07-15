@@ -67,6 +67,7 @@ async fn handle_connection(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn ssh_start_tunnels(
     host_id: String,
@@ -75,6 +76,7 @@ pub async fn ssh_start_tunnels(
     secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
     trust_state: tauri::State<'_, super::TrustState>,
     app: tauri::AppHandle,
+    connect_timeout_secs: Option<u64>,
 ) -> Result<(), String> {
     // If tunnel already running for this host, just increment the ref count.
     {
@@ -157,6 +159,7 @@ pub async fn ssh_start_tunnels(
         state_arc,
         trust_inner,
         app_clone,
+        connect_timeout_secs,
     ));
 
     Ok(())
@@ -185,6 +188,7 @@ async fn run_tunnel_loop(
     tunnel_state: TunnelMap,
     trust_state: super::TrustState,
     app: tauri::AppHandle,
+    connect_timeout_secs: Option<u64>,
 ) {
     let session_id = format!("tunnel_{host_id}");
 
@@ -203,6 +207,7 @@ async fn run_tunnel_loop(
         &app,
         true,
         jump,
+        connect_timeout_secs,
     )
     .await
     {

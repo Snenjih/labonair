@@ -7,12 +7,10 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_util::sync::CancellationToken;
 
-const CHUNK_SIZE: usize = 65536;
-
-fn compute_local_md5(path: &std::path::Path) -> Result<String, String> {
+fn compute_local_md5(path: &std::path::Path, chunk_size: usize) -> Result<String, String> {
     let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let mut ctx = md5::Context::new();
-    let mut buf = vec![0u8; CHUNK_SIZE];
+    let mut buf = vec![0u8; chunk_size];
     loop {
         let n = file.read(&mut buf).map_err(|e| e.to_string())?;
         if n == 0 { break; }
@@ -25,8 +23,8 @@ fn compute_local_md5(path: &std::path::Path) -> Result<String, String> {
 /// thread — `compute_local_md5` itself stays untouched sync code, this just
 /// gives it an async-friendly calling convention now that the rest of the
 /// worker is async (per project rule: no blocking I/O on an async task).
-async fn compute_local_md5_async(path: std::path::PathBuf) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || compute_local_md5(&path))
+async fn compute_local_md5_async(path: std::path::PathBuf, chunk_size: usize) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || compute_local_md5(&path, chunk_size))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -77,11 +75,19 @@ fn expand_home(path: &str) -> String {
     }
 }
 
+/// One finished job's outcome: id (for `cancel_tokens` bookkeeping), the job
+/// itself (mutated in place by `process_job`, carried back out since it was
+/// moved into the spawned task), its result, and the cancellation token that
+/// was raced against during the transfer (checked here to tell a real
+/// failure apart from a user-initiated cancel).
+type JoinedJob = (String, TransferJob, Result<(), String>, CancellationToken);
+
 pub async fn run_worker(
     mut rx: mpsc::Receiver<WorkerMessage>,
     ssh_state: SshState,
     app: tauri::AppHandle,
     conflicts: ConflictMap,
+    settings: Arc<TransferSettings>,
 ) {
     let mut queue: std::collections::VecDeque<TransferJob> = std::collections::VecDeque::new();
     // Per-job cancellation, replacing the old plain `HashSet<String>` that was
@@ -91,6 +97,13 @@ pub async fn run_worker(
     // chunks.
     let mut cancel_tokens: std::collections::HashMap<String, CancellationToken> =
         std::collections::HashMap::new();
+    // Jobs currently running as their own spawned tasks, up to
+    // `settings.max_concurrent` at a time. Bounding this via `JoinSet` (rather
+    // than awaiting `process_job` inline like before) is what actually enables
+    // concurrent transfers — the SFTP layer itself already supports concurrent
+    // operations on one session (russh-sftp multiplexes requests by id over a
+    // single background I/O task), so no session-level locking is needed here.
+    let mut in_flight: tokio::task::JoinSet<JoinedJob> = tokio::task::JoinSet::new();
 
     loop {
         // Drain pending messages without blocking
@@ -116,11 +129,14 @@ pub async fn run_worker(
             }
         }
 
-        if let Some(mut job) = queue.pop_front() {
-            let token = cancel_tokens
-                .entry(job.id.clone())
-                .or_default()
-                .clone();
+        // Top up in-flight jobs to the currently configured concurrency cap.
+        // Non-preemptive by design: lowering the cap mid-session doesn't
+        // cancel already-running jobs, it only throttles new ones once
+        // `in_flight` naturally drops below the new limit.
+        let cap = settings.max_concurrent.load(std::sync::atomic::Ordering::Relaxed).max(1);
+        while in_flight.len() < cap {
+            let Some(mut job) = queue.pop_front() else { break };
+            let token = cancel_tokens.entry(job.id.clone()).or_default().clone();
             if token.is_cancelled() {
                 cancel_tokens.remove(&job.id);
                 continue;
@@ -128,13 +144,86 @@ pub async fn run_worker(
             job.status = TransferStatus::Running;
             emit_progress(&app, &job);
 
-            let result = process_job(&mut job, &ssh_state, &app, &conflicts, &token).await;
-            cancel_tokens.remove(&job.id);
+            let job_id = job.id.clone();
+            let ssh_state_c = ssh_state.clone();
+            let app_c = app.clone();
+            let conflicts_c = conflicts.clone();
+            let settings_c = settings.clone();
+            let token_c = token.clone();
+            in_flight.spawn(async move {
+                let result =
+                    process_job(&mut job, &ssh_state_c, &app_c, &conflicts_c, &token_c, &settings_c).await;
+                (job_id, job, result, token_c)
+            });
+        }
 
+        if in_flight.is_empty() {
+            // Nothing running (and therefore, since we always top up above,
+            // the queue is empty too) — block until the next control message.
+            match rx.recv().await {
+                Some(WorkerMessage::Enqueue(job)) => {
+                    cancel_tokens.entry(job.id.clone()).or_default();
+                    emit_progress(&app, &job);
+                    queue.push_back(job);
+                }
+                Some(WorkerMessage::Cancel(id)) => {
+                    cancel_tokens.entry(id).or_default().cancel();
+                }
+                Some(WorkerMessage::ResolveConflict { job_id, resolution, new_name }) => {
+                    let mut map = conflicts.lock().await;
+                    if let Some(tx) = map.remove(&job_id) {
+                        let _ = tx.send(ConflictResolution { resolution, new_name });
+                    }
+                }
+                None => return,
+            }
+            continue;
+        }
+
+        tokio::select! {
+            msg = rx.recv() => match msg {
+                Some(WorkerMessage::Enqueue(job)) => {
+                    cancel_tokens.entry(job.id.clone()).or_default();
+                    emit_progress(&app, &job);
+                    queue.push_back(job);
+                }
+                Some(WorkerMessage::Cancel(id)) => {
+                    cancel_tokens.entry(id.clone()).or_default().cancel();
+                    queue.retain(|j| j.id != id);
+                }
+                Some(WorkerMessage::ResolveConflict { job_id, resolution, new_name }) => {
+                    let mut map = conflicts.lock().await;
+                    if let Some(tx) = map.remove(&job_id) {
+                        let _ = tx.send(ConflictResolution { resolution, new_name });
+                    }
+                }
+                None => {
+                    while let Some(joined) = in_flight.join_next().await {
+                        finish_job(joined, &app, &ssh_state, &mut cancel_tokens);
+                    }
+                    return;
+                }
+            },
+            Some(joined) = in_flight.join_next() => {
+                finish_job(joined, &app, &ssh_state, &mut cancel_tokens);
+            }
+        }
+    }
+}
+
+fn finish_job(
+    joined: Result<JoinedJob, tokio::task::JoinError>,
+    app: &tauri::AppHandle,
+    ssh_state: &SshState,
+    cancel_tokens: &mut std::collections::HashMap<String, CancellationToken>,
+) {
+    match joined {
+        Ok((job_id, mut job, result, token)) => {
+            cancel_tokens.remove(&job_id);
             match result {
                 Ok(()) => {
                     job.status = TransferStatus::Completed;
-                    emit_progress(&app, &job);
+                    emit_progress(app, &job);
                 }
                 Err(e) => {
                     // Detect network-level failures and notify the frontend so
@@ -158,28 +247,17 @@ pub async fn run_worker(
                     } else {
                         TransferStatus::Failed(e)
                     };
-                    emit_progress(&app, &job);
+                    emit_progress(app, &job);
                 }
             }
-        } else {
-            // Queue empty — block until next message
-            match rx.recv().await {
-                Some(WorkerMessage::Enqueue(job)) => {
-                    cancel_tokens.entry(job.id.clone()).or_default();
-                    emit_progress(&app, &job);
-                    queue.push_back(job);
-                }
-                Some(WorkerMessage::Cancel(id)) => {
-                    cancel_tokens.entry(id).or_default().cancel();
-                }
-                Some(WorkerMessage::ResolveConflict { job_id, resolution, new_name }) => {
-                    let mut map = conflicts.lock().await;
-                    if let Some(tx) = map.remove(&job_id) {
-                        let _ = tx.send(ConflictResolution { resolution, new_name });
-                    }
-                }
-                None => return,
-            }
+        }
+        Err(join_err) => {
+            // The task panicked — the `TransferJob` was moved into it and is
+            // lost along with it, so there's no per-job UI state to reconcile
+            // here. Every realistic SFTP failure mode already returns a
+            // `Result` through the path above; a panic indicates a bug worth
+            // surfacing loudly rather than a transfer outcome to handle.
+            log::error!("[sftp] worker task panicked: {join_err}");
         }
     }
 }
@@ -213,6 +291,7 @@ async fn process_job(
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
     cancel_token: &CancellationToken,
+    settings: &TransferSettings,
 ) -> Result<(), String> {
     log::info!(
         "[sftp] starting {:?} | id={} tab={} src={} dest={}",
@@ -220,8 +299,8 @@ async fn process_job(
     );
     emit_step(app, &job.id, format!("Transfer started: {} → {}", job.src_path, job.dest_path));
     let result = match job.direction {
-        TransferDirection::Download => download_file(job, ssh_state, app, conflicts, cancel_token).await,
-        TransferDirection::Upload => upload_file(job, ssh_state, app, conflicts, cancel_token).await,
+        TransferDirection::Download => download_file(job, ssh_state, app, conflicts, cancel_token, settings).await,
+        TransferDirection::Upload => upload_file(job, ssh_state, app, conflicts, cancel_token, settings).await,
     };
     match &result {
         Ok(()) => {
@@ -259,6 +338,7 @@ async fn download_file(
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
     cancel_token: &CancellationToken,
+    settings: &TransferSettings,
 ) -> Result<(), String> {
     job.src_path = expand_home(&job.src_path);
     job.dest_path = expand_home(&job.dest_path);
@@ -279,7 +359,7 @@ async fn download_file(
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             log::debug!("[sftp/download] conflict detected, waiting for resolution");
             emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
-            let resolution = ask_conflict(job, app, conflicts).await?;
+            let resolution = ask_conflict(job, app, conflicts, settings).await?;
             emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
             match resolution.resolution.as_str() {
                 "skip" => { log::debug!("[sftp/download] skipped by user"); return Ok(()); }
@@ -333,9 +413,13 @@ async fn download_file(
     let mut written = 0usize;
     let mut last_emit = std::time::Instant::now();
     let mut last_bytes = 0u64;
-    let mut chunk_buf = [0u8; CHUNK_SIZE];
+    // Read once per job (not per chunk) — avoids a redundant atomic load every
+    // iteration and a resized buffer mid-transfer if the setting changes
+    // while this job is running.
+    let chunk_size = settings.chunk_size.load(std::sync::atomic::Ordering::Relaxed).max(4096);
+    let mut chunk_buf = vec![0u8; chunk_size];
 
-    // Streams remote -> local in CHUNK_SIZE pieces so a multi-GB download
+    // Streams remote -> local in chunk_size pieces so a multi-GB download
     // doesn't spike memory usage. Each chunk's read/write is raced against
     // the cancellation token so an in-flight, stalled network read can be
     // abandoned immediately instead of only being checked between chunks.
@@ -385,7 +469,7 @@ async fn download_file(
     }
 
     emit_step(app, &job.id, "Computing MD5 checksum");
-    let local_hash = compute_local_md5_async(std::path::PathBuf::from(&job.dest_path)).await?;
+    let local_hash = compute_local_md5_async(std::path::PathBuf::from(&job.dest_path), chunk_size).await?;
     match compute_remote_md5(&session, &job.src_path).await {
         Some(remote_hash) => {
             if local_hash != remote_hash {
@@ -411,6 +495,7 @@ async fn upload_file(
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
     cancel_token: &CancellationToken,
+    settings: &TransferSettings,
 ) -> Result<(), String> {
     job.src_path = expand_home(&job.src_path);
     job.dest_path = expand_home(&job.dest_path);
@@ -453,7 +538,7 @@ async fn upload_file(
         Err(_) => {
             log::debug!("[sftp/upload] conflict at dest: {}", job.dest_path);
             emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
-            let resolution = ask_conflict(job, app, conflicts).await?;
+            let resolution = ask_conflict(job, app, conflicts, settings).await?;
             emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
             match resolution.resolution.as_str() {
                 "skip" => { log::debug!("[sftp/upload] skipped by user"); return Ok(()); }
@@ -487,9 +572,10 @@ async fn upload_file(
     let mut written = 0usize;
     let mut last_emit = std::time::Instant::now();
     let mut last_bytes = 0u64;
-    let mut chunk_buf = [0u8; CHUNK_SIZE];
+    let chunk_size = settings.chunk_size.load(std::sync::atomic::Ordering::Relaxed).max(4096);
+    let mut chunk_buf = vec![0u8; chunk_size];
 
-    // Streams local -> remote in CHUNK_SIZE pieces instead of loading the
+    // Streams local -> remote in chunk_size pieces instead of loading the
     // whole local file into a `Vec<u8>` up front — keeps memory flat for
     // multi-GB uploads. Each chunk's read/write is raced against the
     // cancellation token, same as the download side.
@@ -544,7 +630,7 @@ async fn upload_file(
     }
 
     emit_step(app, &job.id, "Computing MD5 checksum");
-    let local_hash = compute_local_md5_async(std::path::PathBuf::from(&job.src_path)).await?;
+    let local_hash = compute_local_md5_async(std::path::PathBuf::from(&job.src_path), chunk_size).await?;
     match compute_remote_md5(&session, &job.dest_path).await {
         Some(remote_hash) => {
             if local_hash != remote_hash {
@@ -568,7 +654,16 @@ async fn ask_conflict(
     job: &TransferJob,
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
+    settings: &TransferSettings,
 ) -> Result<ConflictResolution, String> {
+    // A configured default policy short-circuits the prompt entirely — no
+    // "rename" here, since that requires a new_name nothing here can
+    // synthesize; the definitions.ts Select only ever offers ask/overwrite/skip.
+    let policy = settings.default_conflict_resolution.lock().unwrap().clone();
+    if policy == "overwrite" || policy == "skip" {
+        return Ok(ConflictResolution { resolution: policy, new_name: None });
+    }
+
     use tauri::Emitter;
     let (tx, rx) = tokio::sync::oneshot::channel::<ConflictResolution>();
     {

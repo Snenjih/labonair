@@ -7,6 +7,7 @@ import {
   setSshAutoReconnect,
   setSshAutoReconnectDelay,
   setSshAutoReconnectMaxAttempts,
+  setSshConnectTimeoutSecs,
   setTerminalBell,
   setTerminalBlocksAutoCollapseOnAltScreen,
   setTerminalBlocksEnabled,
@@ -33,6 +34,7 @@ import {
   setTerminalUseWebGL,
   setTerminalWordSeparator,
 } from "@/modules/settings/store";
+import { NumInput } from "../components/NumInput";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
@@ -67,6 +69,7 @@ export function TerminalSection() {
   const sshAutoReconnect = usePreferencesStore((s) => s.sshAutoReconnect);
   const sshAutoReconnectDelay = usePreferencesStore((s) => s.sshAutoReconnectDelay);
   const sshAutoReconnectMaxAttempts = usePreferencesStore((s) => s.sshAutoReconnectMaxAttempts);
+  const sshConnectTimeoutSecs = usePreferencesStore((s) => s.sshConnectTimeoutSecs);
 
   return (
     <div className="flex flex-col gap-6">
@@ -370,6 +373,18 @@ export function TerminalSection() {
       <div className="flex flex-col gap-2">
         <Label>SSH</Label>
         <SettingRow
+          title="Connect timeout (s)"
+          description="How long to wait for the initial TCP connection before giving up (3–60 s)."
+        >
+          <NumInput
+            value={sshConnectTimeoutSecs}
+            min={3}
+            max={60}
+            step={1}
+            onChange={(v) => void setSshConnectTimeoutSecs(v)}
+          />
+        </SettingRow>
+        <SettingRow
           title="Auto-reconnect SSH sessions"
           description="Automatically retry when an SSH connection is lost unexpectedly."
         >
@@ -450,30 +465,4 @@ export function TerminalSection() {
 
 function Label({ children }: { children: React.ReactNode }) {
   return <span className="text-[11px] font-medium tracking-tight text-muted-foreground">{children}</span>;
-}
-
-function NumInput({
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <input
-      type="number"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="h-7 w-20 rounded-md border border-border/60 bg-transparent px-2 text-center text-[11.5px] focus:outline-none focus:ring-1 focus:ring-ring"
-    />
-  );
 }

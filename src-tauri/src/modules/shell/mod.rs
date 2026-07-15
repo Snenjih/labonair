@@ -19,6 +19,11 @@ use session::{SessionRunOutput, ShellSession};
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 const MAX_TIMEOUT_SECS: u64 = 300;
 const MAX_OUTPUT_BYTES: usize = 256 * 1024;
+// Absolute ceilings applied regardless of the configured `aiShellMaxTimeoutSecs`/
+// `aiShellMaxOutputKb` settings — protects against a misconfigured huge value
+// hanging the app or exhausting memory.
+const HARD_MAX_TIMEOUT_SECS: u64 = 1800;
+const HARD_MAX_OUTPUT_BYTES: usize = 10 * 1024 * 1024;
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Serialize)]
@@ -39,6 +44,8 @@ pub async fn shell_run_command(
     command: String,
     cwd: Option<String>,
     timeout_secs: Option<u64>,
+    max_timeout_secs: Option<u64>,
+    max_output_bytes: Option<usize>,
 ) -> Result<CommandOutput, String> {
     let trimmed = command.trim().to_string();
     if trimmed.is_empty() {
@@ -55,17 +62,15 @@ pub async fn shell_run_command(
         None
     };
 
-    let dur = Duration::from_secs(
-        timeout_secs
-            .unwrap_or(DEFAULT_TIMEOUT_SECS)
-            .clamp(1, MAX_TIMEOUT_SECS),
-    );
+    let ceiling = max_timeout_secs.unwrap_or(MAX_TIMEOUT_SECS).min(HARD_MAX_TIMEOUT_SECS);
+    let dur = Duration::from_secs(timeout_secs.unwrap_or(DEFAULT_TIMEOUT_SECS).clamp(1, ceiling));
+    let max_bytes = max_output_bytes.unwrap_or(MAX_OUTPUT_BYTES).min(HARD_MAX_OUTPUT_BYTES);
 
     // The blocking spawn + wait runs on a worker thread so the Tauri async
     // runtime stays unblocked.
     let (tx, rx) = mpsc::channel::<Result<CommandOutput, String>>();
     thread::spawn(move || {
-        let _ = tx.send(run_blocking(trimmed, cwd_path, dur));
+        let _ = tx.send(run_blocking(trimmed, cwd_path, dur, max_bytes));
     });
 
     rx.recv().map_err(|e| e.to_string())?
@@ -75,14 +80,16 @@ pub(crate) fn run_blocking_inner(
     command: String,
     cwd: Option<PathBuf>,
     dur: Duration,
+    max_bytes: usize,
 ) -> Result<CommandOutput, String> {
-    run_blocking(command, cwd, dur)
+    run_blocking(command, cwd, dur, max_bytes)
 }
 
 fn run_blocking(
     command: String,
     cwd: Option<PathBuf>,
     dur: Duration,
+    max_bytes: usize,
 ) -> Result<CommandOutput, String> {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
 
@@ -105,8 +112,8 @@ fn run_blocking(
 
     // Drain stdout/stderr on background threads so a full pipe buffer can't
     // deadlock the child.
-    let stdout_handle = thread::spawn(move || drain(&mut stdout_pipe));
-    let stderr_handle = thread::spawn(move || drain(&mut stderr_pipe));
+    let stdout_handle = thread::spawn(move || drain(&mut stdout_pipe, max_bytes));
+    let stderr_handle = thread::spawn(move || drain(&mut stderr_pipe, max_bytes));
 
     let started = Instant::now();
     let mut timed_out = false;
@@ -188,6 +195,8 @@ pub async fn shell_session_run(
     id: u32,
     command: String,
     timeout_secs: Option<u64>,
+    max_timeout_secs: Option<u64>,
+    max_output_bytes: Option<usize>,
 ) -> Result<SessionRunOutput, String> {
     let session = state
         .sessions
@@ -196,15 +205,13 @@ pub async fn shell_session_run(
         .get(&id)
         .cloned()
         .ok_or_else(|| "no shell session".to_string())?;
-    let dur = Duration::from_secs(
-        timeout_secs
-            .unwrap_or(DEFAULT_TIMEOUT_SECS)
-            .clamp(1, MAX_TIMEOUT_SECS),
-    );
+    let ceiling = max_timeout_secs.unwrap_or(MAX_TIMEOUT_SECS).min(HARD_MAX_TIMEOUT_SECS);
+    let dur = Duration::from_secs(timeout_secs.unwrap_or(DEFAULT_TIMEOUT_SECS).clamp(1, ceiling));
+    let max_bytes = max_output_bytes.unwrap_or(MAX_OUTPUT_BYTES).min(HARD_MAX_OUTPUT_BYTES);
     // Run on a worker so we don't block the async runtime.
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-        let _ = tx.send(session.run(command, dur));
+        let _ = tx.send(session.run(command, dur, max_bytes));
     });
     rx.recv().map_err(|e| e.to_string())?
 }
@@ -262,7 +269,7 @@ pub fn shell_bg_list(state: tauri::State<ShellState>) -> Result<Vec<BackgroundPr
     Ok(out)
 }
 
-fn drain<R: Read>(reader: &mut R) -> (Vec<u8>, bool) {
+fn drain<R: Read>(reader: &mut R, max_bytes: usize) -> (Vec<u8>, bool) {
     let mut out = Vec::new();
     let mut buf = [0u8; 8192];
     let mut truncated = false;
@@ -270,11 +277,11 @@ fn drain<R: Read>(reader: &mut R) -> (Vec<u8>, bool) {
         match reader.read(&mut buf) {
             Ok(0) => break,
             Ok(n) => {
-                if out.len() >= MAX_OUTPUT_BYTES {
+                if out.len() >= max_bytes {
                     truncated = true;
                     continue;
                 }
-                let take = (MAX_OUTPUT_BYTES - out.len()).min(n);
+                let take = (max_bytes - out.len()).min(n);
                 out.extend_from_slice(&buf[..take]);
                 if take < n {
                     truncated = true;

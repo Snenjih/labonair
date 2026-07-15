@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save as dialogSave } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 type ReadResult =
   | { kind: "text"; content: string; size: number }
@@ -49,7 +50,10 @@ export function useDocument({ path, isUntitled, onDirtyChange, onSaveAs }: Optio
     setDoc({ status: "loading" });
     setDirty(false);
 
-    invoke<ReadResult>("fs_read_file", { path })
+    invoke<ReadResult>("fs_read_file", {
+      path,
+      maxBytes: usePreferencesStore.getState().editorMaxFileSizeMb * 1024 * 1024,
+    })
       .then((res) => {
         if (cancelled) return;
         if (res.kind === "text") {

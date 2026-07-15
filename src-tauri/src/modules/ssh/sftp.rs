@@ -374,16 +374,19 @@ pub async fn sftp_chmod(
 pub async fn prepare_remote_edit(
     session_id: String,
     remote_path: String,
+    max_bytes: Option<u64>,
     state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<String, LabonairError> {
+    let limit = max_bytes.unwrap_or(MAX_REMOTE_READ_BYTES);
     let file_data = async {
         let sftp = get_sftp_session_arc(&state, &session_id)?;
         let meta = sftp.metadata(remote_path.clone()).await.map_err(|e| e.to_string())?;
         let size = meta.size.unwrap_or(0);
-        if size > MAX_REMOTE_READ_BYTES {
+        if size > limit {
             return Err(format!(
-                "File is too large for in-app editing ({size} bytes). Max 5 MB."
+                "File is too large for in-app editing ({size} bytes). Max {} MB.",
+                limit / (1024 * 1024)
             ));
         }
         let mut remote_file = sftp.open(remote_path.clone()).await.map_err(|e| e.to_string())?;
@@ -469,15 +472,17 @@ pub async fn cleanup_remote_edit_temp(local_temp_path: String) -> Result<(), Lab
 pub async fn sftp_read_file_content(
     session_id: String,
     remote_path: String,
+    max_bytes: Option<u64>,
     state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<ReadResult, LabonairError> {
+    let limit = max_bytes.unwrap_or(MAX_REMOTE_READ_BYTES);
     async {
         let sftp = get_sftp_session_arc(&state, &session_id)?;
         let meta = sftp.metadata(remote_path.clone()).await.map_err(|e| e.to_string())?;
         let size = meta.size.unwrap_or(0);
-        if size > MAX_REMOTE_READ_BYTES {
-            return Ok(ReadResult::TooLarge { size, limit: MAX_REMOTE_READ_BYTES });
+        if size > limit {
+            return Ok(ReadResult::TooLarge { size, limit });
         }
         let mut remote_file = sftp.open(remote_path.clone()).await.map_err(|e| e.to_string())?;
         let mut buf = Vec::with_capacity(size as usize);

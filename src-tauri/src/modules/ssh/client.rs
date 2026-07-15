@@ -258,6 +258,7 @@ pub async fn ssh_connect(
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
     secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
     app: tauri::AppHandle,
+    connect_timeout_secs: Option<u64>,
 ) -> Result<(), LabonairError> {
     // Step 1: Fetch host from SQLite (fast, sync — do before spawn_blocking)
     log_step!(app, session_id, "Reading host configuration…");
@@ -351,6 +352,7 @@ pub async fn ssh_connect(
         default_path_ssh, password, cols, rows,
         jump,
         blocks, state_inner, trust_inner, app.clone(), on_event,
+        connect_timeout_secs,
     )
     .await;
 
@@ -410,6 +412,7 @@ pub async fn ssh_connect_quick(
     state: tauri::State<'_, super::SshState>,
     trust_state: tauri::State<'_, super::TrustState>,
     app: tauri::AppHandle,
+    connect_timeout_secs: Option<u64>,
 ) -> Result<(), String> {
     let state_inner = state.inner().clone();
     let trust_inner = trust_state.inner().clone();
@@ -437,6 +440,7 @@ pub async fn ssh_connect_quick(
         trust_inner,
         app,
         on_event,
+        connect_timeout_secs,
     )
     .await
 }
@@ -776,6 +780,7 @@ pub(crate) fn resolve_jump_host(
 /// terminal path (`ssh_connect_async`) and the SFTP/tunnels path
 /// (`establish_authenticated_session`) so the jump-vs-direct branch and its
 /// circular-reference guard exist in exactly one place.
+#[allow(clippy::too_many_arguments)]
 async fn connect_transport_maybe_via_jump(
     session_id: &str,
     host_address: &str,
@@ -783,9 +788,10 @@ async fn connect_transport_maybe_via_jump(
     jump: Option<&JumpHostParams>,
     trust_state: &super::TrustState,
     app: &tauri::AppHandle,
+    connect_timeout_secs: u64,
 ) -> Result<Box<dyn AsyncStream>, String> {
     let Some(jh) = jump else {
-        return Ok(Box::new(tcp_connect_async(host_address, port).await?));
+        return Ok(Box::new(tcp_connect_async(host_address, port, connect_timeout_secs).await?));
     };
     // Circular reference guard
     if jh.address.as_str() == host_address && jh.port == port {
@@ -804,6 +810,7 @@ async fn connect_transport_maybe_via_jump(
         port,
         trust_state,
         app,
+        connect_timeout_secs,
     )
     .await?;
     Ok(Box::new(stream))
@@ -830,10 +837,19 @@ pub(crate) async fn establish_authenticated_session(
     app: &tauri::AppHandle,
     fail_fast_untrusted_host: bool,
     jump: Option<JumpHostParams>,
+    connect_timeout_secs: Option<u64>,
 ) -> Result<Arc<russh::client::Handle<ClientHandler>>, String> {
     log_step!(app, session_id, format!("TCP connecting to {}:{}…", host_address, port));
-    let tcp =
-        connect_transport_maybe_via_jump(session_id, host_address, port, jump.as_ref(), trust_state, app).await?;
+    let tcp = connect_transport_maybe_via_jump(
+        session_id,
+        host_address,
+        port,
+        jump.as_ref(),
+        trust_state,
+        app,
+        connect_timeout_secs.unwrap_or(10),
+    )
+    .await?;
     // Neither of this wrapper's callers (SFTP-only connect, tunnels) currently
     // consume a rich disconnect reason, so a throwaway slot is passed here —
     // only the interactive terminal path (which calls the `_from_stream`
@@ -868,12 +884,20 @@ async fn ssh_connect_async(
     trust_state: super::TrustState,
     app: tauri::AppHandle,
     on_event: Channel<super::pty::SshPtyEvent>,
+    connect_timeout_secs: Option<u64>,
 ) -> Result<(), String> {
     // Establish the transport stream — either a direct TCP connection or a
     // channel bridged through a jump host.
-    let tcp =
-        connect_transport_maybe_via_jump(&session_id, &host_address, port, jump.as_ref(), &trust_state, &app)
-            .await?;
+    let tcp = connect_transport_maybe_via_jump(
+        &session_id,
+        &host_address,
+        port,
+        jump.as_ref(),
+        &trust_state,
+        &app,
+        connect_timeout_secs.unwrap_or(10),
+    )
+    .await?;
 
     let disconnect_reason = Arc::new(std::sync::Mutex::new(None));
     let handle = establish_authenticated_session_from_stream(
@@ -968,6 +992,7 @@ async fn connect_via_jump(
     target_port: i64,
     trust_state: &super::TrustState,
     app: &tauri::AppHandle,
+    connect_timeout_secs: u64,
 ) -> Result<russh::ChannelStream<russh::client::Msg>, String> {
     log_step!(
         app,
@@ -976,7 +1001,7 @@ async fn connect_via_jump(
     );
 
     let jump_session_id = format!("{}_jump", session_id);
-    let jump_tcp = tcp_connect_async(jump_host_address, jump_port)
+    let jump_tcp = tcp_connect_async(jump_host_address, jump_port, connect_timeout_secs)
         .await
         .map_err(|e| format!("Jump host TCP connect failed: {}", e))?;
 
@@ -1032,10 +1057,11 @@ async fn connect_via_jump(
     Ok(channel.into_stream())
 }
 
-/// Opens a TCP connection to host:port with a 10-second timeout.
+/// Opens a TCP connection to host:port with a configurable timeout
+/// (`sshConnectTimeoutSecs`, default 10s — see `tcp_connect_async`).
 /// Uses socket2 for explicit OS-level socket control and IPv4-only filtering.
 /// This fixes "No route to host" errors on macOS with local network addresses.
-fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
+fn tcp_connect(host: &str, port: i64, timeout_secs: u64) -> Result<std::net::TcpStream, String> {
     use socket2::{Domain, Socket, TcpKeepalive, Type};
     use std::net::{IpAddr, ToSocketAddrs};
     use std::time::Duration;
@@ -1057,7 +1083,7 @@ fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
             Ok(socket) => {
                 let _ = socket.set_nonblocking(false);
                 let sock_addr: socket2::SockAddr = (*addr).into();
-                match socket.connect_timeout(&sock_addr, Duration::from_secs(10)) {
+                match socket.connect_timeout(&sock_addr, Duration::from_secs(timeout_secs)) {
                     Ok(_) => {
                         let ka = TcpKeepalive::new()
                             .with_time(Duration::from_secs(60))
@@ -1079,9 +1105,13 @@ fn tcp_connect(host: &str, port: i64) -> Result<std::net::TcpStream, String> {
 /// Runs the blocking `tcp_connect` helper and converts its result into a
 /// `tokio::net::TcpStream` — the stream must be switched to non-blocking mode
 /// before tokio can register it with the reactor.
-async fn tcp_connect_async(host: &str, port: i64) -> Result<tokio::net::TcpStream, String> {
+async fn tcp_connect_async(
+    host: &str,
+    port: i64,
+    timeout_secs: u64,
+) -> Result<tokio::net::TcpStream, String> {
     let host_owned = host.to_string();
-    let std_tcp = tcp_connect(&host_owned, port)
+    let std_tcp = tcp_connect(&host_owned, port, timeout_secs)
         .map_err(|e| format!("TCP connect to {}:{} failed: {}", host_owned, port, e))?;
     std_tcp.set_nonblocking(true).map_err(|e| e.to_string())?;
     tokio::net::TcpStream::from_std(std_tcp).map_err(|e| e.to_string())

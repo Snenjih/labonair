@@ -51,7 +51,7 @@ impl ShellSession {
         self.cwd.lock().unwrap().clone()
     }
 
-    pub fn run(&self, command: String, timeout: Duration) -> Result<SessionRunOutput, String> {
+    pub fn run(&self, command: String, timeout: Duration, max_bytes: usize) -> Result<SessionRunOutput, String> {
         let trimmed = command.trim().to_string();
         if trimmed.is_empty() {
             return Err("empty command".into());
@@ -67,7 +67,7 @@ impl ShellSession {
         let (tx, rx) = mpsc::channel::<Result<super::CommandOutput, String>>();
         let cwd_for_thread = cwd.clone();
         thread::spawn(move || {
-            let _ = tx.send(run_blocking_inner(wrapped, Some(cwd_for_thread), timeout));
+            let _ = tx.send(run_blocking_inner(wrapped, Some(cwd_for_thread), timeout, max_bytes));
         });
         let raw = rx.recv().map_err(|e| e.to_string())??;
 

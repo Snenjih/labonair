@@ -43,6 +43,8 @@ import {
   setAiMaxAgentSteps,
   setAiTerminalContextLines,
   setAiTemperature,
+  setAiShellMaxTimeoutSecs,
+  setAiShellMaxOutputKb,
 } from "@/modules/settings/store";
 import {
   Add01Icon,
@@ -57,6 +59,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
 import { AddProviderDropdown } from "../components/AddProviderDropdown";
+import { NumInput } from "../components/NumInput";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { ProviderInstanceCard } from "../components/ProviderInstanceCard";
 import { SectionHeader } from "../components/SectionHeader";
@@ -375,6 +378,8 @@ function BehaviourContent() {
   const aiMaxAgentSteps = usePreferencesStore((s) => s.aiMaxAgentSteps);
   const aiTerminalContextLines = usePreferencesStore((s) => s.aiTerminalContextLines);
   const aiTemperature = usePreferencesStore((s) => s.aiTemperature);
+  const aiShellMaxTimeoutSecs = usePreferencesStore((s) => s.aiShellMaxTimeoutSecs);
+  const aiShellMaxOutputKb = usePreferencesStore((s) => s.aiShellMaxOutputKb);
 
   return (
     <div className="flex flex-col gap-3">
@@ -412,6 +417,30 @@ function BehaviourContent() {
           max={1000}
           step={50}
           onChange={(v) => void setAiTerminalContextLines(v)}
+        />
+      </SettingRow>
+      <SettingRow
+        title="Max command timeout (s)"
+        description="Upper bound on how long the AI's run_command tool may wait for a command (30–1800 s)."
+      >
+        <NumInput
+          value={aiShellMaxTimeoutSecs}
+          min={30}
+          max={1800}
+          step={30}
+          onChange={(v) => void setAiShellMaxTimeoutSecs(v)}
+        />
+      </SettingRow>
+      <SettingRow
+        title="Max command output (KB)"
+        description="Upper bound on captured stdout/stderr from the AI's run_command tool (64–2048 KB)."
+      >
+        <NumInput
+          value={aiShellMaxOutputKb}
+          min={64}
+          max={2048}
+          step={64}
+          onChange={(v) => void setAiShellMaxOutputKb(v)}
         />
       </SettingRow>
     </div>
@@ -869,32 +898,6 @@ function CustomInstructionsBlock({ value }: { value: string }) {
         className="min-h-[100px] resize-y bg-card/60 font-sans text-[12px] leading-relaxed border border-border"
       />
     </div>
-  );
-}
-
-function NumInput({
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <input
-      type="number"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="h-7 w-20 rounded-md border border-border/60 bg-transparent px-2 text-center text-[11.5px] focus:outline-none focus:ring-1 focus:ring-ring"
-    />
   );
 }
 
