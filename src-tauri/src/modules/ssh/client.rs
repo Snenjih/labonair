@@ -332,81 +332,12 @@ pub async fn ssh_connect(
     };
 
     // Step 3: Resolve jump host fields (if any).
-    let (
-        jump_host_address,
-        jump_port,
-        jump_username,
-        jump_auth_method,
-        jump_private_key_path,
-        jump_password,
-        jump_keep_alive_interval,
-    ) = if let Some(ref jid) = jump_host_id {
-        log_step!(app, session_id, "Resolving jump host…");
-        let (jh_addr, jh_port, jh_user, jh_auth, jh_key, jh_kai, jh_cred_id): (
-            String, i64, String, String, Option<String>, Option<i64>, Option<String>,
-        ) = {
-            let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
-            conn.query_row(
-                "SELECT host_address, port, username, auth_method, private_key_path, \
-                 keep_alive_interval, credential_id FROM hosts WHERE id = ?1",
-                rusqlite::params![jid],
-                |row| {
-                    Ok((
-                        row.get(0)?,
-                        row.get(1)?,
-                        row.get(2)?,
-                        row.get(3)?,
-                        row.get(4)?,
-                        row.get(5)?,
-                        row.get(6)?,
-                    ))
-                },
-            )
-            .map_err(|_| LabonairError::Internal(format!("Jump host '{}' not found", jid)))?
-        };
-
-        // Resolve credential for jump host if needed
-        let (jh_auth, jh_key) = if let Some(ref jcid) = jh_cred_id {
-            let (cred_type, cred_key_path): (String, Option<String>) = {
-                let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
-                conn.query_row(
-                    "SELECT cred_type, key_path FROM credentials WHERE id=?1",
-                    rusqlite::params![jcid],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
-                )
-                .map_err(|_| LabonairError::Internal(format!("Jump host credential '{}' not found", jcid)))?
-            };
-            (cred_type, cred_key_path)
-        } else {
-            (jh_auth, jh_key)
-        };
-
-        // Fetch jump host password from keyring
-        let jh_pw: Option<String> = if jh_auth == "password" {
-            if let Some(ref jcid) = jh_cred_id {
-                crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", jcid)
-                    .ok()
-                    .flatten()
-            } else {
-                crate::modules::secrets::get_password(&app, &secrets, "labonair-app", jid)
-                    .ok()
-                    .flatten()
-            }
-        } else {
-            None
-        };
-
-        (
-            Some(jh_addr),
-            Some(jh_port),
-            Some(jh_user),
-            Some(jh_auth),
-            jh_key,
-            jh_pw,
-            jh_kai,
-        )
-    } else {
-        (None, None, None, None, None, None, None)
+    let jump = match jump_host_id.as_deref() {
+        Some(jid) => {
+            log_step!(app, session_id, "Resolving jump host…");
+            Some(resolve_jump_host(&hosts_db, &secrets, &app, jid)?)
+        }
+        None => None,
     };
 
     let state_inner = state.inner().clone();
@@ -418,8 +349,7 @@ pub async fn ssh_connect(
         host_address, port, username, auth_method,
         private_key_path, keep_alive_interval, keep_alive_tries,
         default_path_ssh, password, cols, rows,
-        jump_host_address, jump_port, jump_username, jump_auth_method,
-        jump_private_key_path, jump_password, jump_keep_alive_interval,
+        jump,
         blocks, state_inner, trust_inner, app.clone(), on_event,
     )
     .await;
@@ -500,13 +430,7 @@ pub async fn ssh_connect_quick(
         Some(password),
         cols,
         rows,
-        // No jump host for quick connect
-        None,
-        None,
-        None,
-        None,
-        None,
-        None,
+        // No jump host for quick connect — no host_id/DB record to resolve one from.
         None,
         blocks,
         state_inner,
@@ -597,8 +521,10 @@ async fn wait_for_trust(session_id: &str, trust_state: &super::TrustState) -> bo
 /// Used by background sessions that have no trust-prompt UI of their own
 /// (the sidebar Explorer's lazy SFTP session) — without this they'd hang
 /// for up to 5 minutes on first connect to a not-yet-trusted host. The
-/// interactive terminal/SFTP-tab connect flow always passes `false` since
-/// it owns a real trust dialog (`SshLoadingScreen`).
+/// interactive terminal/SFTP-tab connect flow always passes `false` for its
+/// *main* hop since it owns a real trust dialog (`SshLoadingScreen`). A jump
+/// hop (see `connect_via_jump`) always passes `true` regardless of the main
+/// hop's policy — it has no trust-prompt UI of its own either way.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn establish_authenticated_session_from_stream<R>(
     session_id: &str,
@@ -755,10 +681,139 @@ where
     Ok(Arc::new(handle))
 }
 
-/// Performs TCP connect → SSH handshake → host-key check → authentication.
-/// Returns the fully authenticated `Handle`. Thin wrapper around
-/// `establish_authenticated_session_from_stream` that first opens the TCP
-/// connection. Used by SFTP connect (Workstream 4).
+/// Fully-resolved connection parameters for a jump host — the shape
+/// `ssh_connect`'s jump-host resolution step used to build inline before
+/// being extracted into `resolve_jump_host` so the SFTP/tunnels path (via
+/// `establish_authenticated_session`) can reuse it.
+pub(crate) struct JumpHostParams {
+    pub address: String,
+    pub port: i64,
+    pub username: String,
+    pub auth_method: String,
+    pub private_key_path: Option<String>,
+    pub password: Option<String>,
+    pub keep_alive_interval: Option<i64>,
+}
+
+/// Resolves a jump host's own connection fields + credential + keyring
+/// password from the `hosts`/`credentials` tables. Single-hop only — a jump
+/// host's own `jump_host_id` (if it has one) is intentionally never queried
+/// here, so chained jump hosts remain unsupported, matching the behavior
+/// this was extracted from.
+pub(crate) fn resolve_jump_host(
+    hosts_db: &crate::modules::hosts::HostsDb,
+    secrets: &crate::modules::secrets::SecretsState,
+    app: &tauri::AppHandle,
+    jump_host_id: &str,
+) -> Result<JumpHostParams, LabonairError> {
+    let (jh_addr, jh_port, jh_user, jh_auth, jh_key, jh_kai, jh_cred_id): (
+        String, i64, String, String, Option<String>, Option<i64>, Option<String>,
+    ) = {
+        let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+        conn.query_row(
+            "SELECT host_address, port, username, auth_method, private_key_path, \
+             keep_alive_interval, credential_id FROM hosts WHERE id = ?1",
+            rusqlite::params![jump_host_id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                ))
+            },
+        )
+        .map_err(|_| LabonairError::Internal(format!("Jump host '{}' not found", jump_host_id)))?
+    };
+
+    // Resolve credential for jump host if needed
+    let (jh_auth, jh_key) = if let Some(ref jcid) = jh_cred_id {
+        let (cred_type, cred_key_path): (String, Option<String>) = {
+            let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+            conn.query_row(
+                "SELECT cred_type, key_path FROM credentials WHERE id=?1",
+                rusqlite::params![jcid],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .map_err(|_| LabonairError::Internal(format!("Jump host credential '{}' not found", jcid)))?
+        };
+        (cred_type, cred_key_path)
+    } else {
+        (jh_auth, jh_key)
+    };
+
+    // Fetch jump host password from keyring
+    let jh_pw: Option<String> = if jh_auth == "password" {
+        if let Some(ref jcid) = jh_cred_id {
+            crate::modules::secrets::get_password(app, secrets, "labonair-cred", jcid)
+                .ok()
+                .flatten()
+        } else {
+            crate::modules::secrets::get_password(app, secrets, "labonair-app", jump_host_id)
+                .ok()
+                .flatten()
+        }
+    } else {
+        None
+    };
+
+    Ok(JumpHostParams {
+        address: jh_addr,
+        port: jh_port,
+        username: jh_user,
+        auth_method: jh_auth,
+        private_key_path: jh_key,
+        password: jh_pw,
+        keep_alive_interval: jh_kai,
+    })
+}
+
+/// Opens the transport stream for a connection — either a direct TCP socket,
+/// or one bridged through a jump host via `connect_via_jump`. Shared by the
+/// terminal path (`ssh_connect_async`) and the SFTP/tunnels path
+/// (`establish_authenticated_session`) so the jump-vs-direct branch and its
+/// circular-reference guard exist in exactly one place.
+async fn connect_transport_maybe_via_jump(
+    session_id: &str,
+    host_address: &str,
+    port: i64,
+    jump: Option<&JumpHostParams>,
+    trust_state: &super::TrustState,
+    app: &tauri::AppHandle,
+) -> Result<Box<dyn AsyncStream>, String> {
+    let Some(jh) = jump else {
+        return Ok(Box::new(tcp_connect_async(host_address, port).await?));
+    };
+    // Circular reference guard
+    if jh.address.as_str() == host_address && jh.port == port {
+        return Err("Jump host cannot be the same as the target host".to_string());
+    }
+    let stream = connect_via_jump(
+        session_id,
+        &jh.address,
+        jh.port,
+        &jh.username,
+        &jh.auth_method,
+        jh.private_key_path.as_deref(),
+        jh.password.as_deref(),
+        jh.keep_alive_interval,
+        host_address,
+        port,
+        trust_state,
+        app,
+    )
+    .await?;
+    Ok(Box::new(stream))
+}
+
+/// Performs TCP connect (direct, or bridged through a jump host) → SSH
+/// handshake → host-key check → authentication. Returns the fully
+/// authenticated `Handle`. Thin wrapper around
+/// `establish_authenticated_session_from_stream` that first opens the
+/// transport. Used by SFTP connect and tunnels.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn establish_authenticated_session(
     session_id: &str,
@@ -774,9 +829,11 @@ pub(crate) async fn establish_authenticated_session(
     trust_state: &super::TrustState,
     app: &tauri::AppHandle,
     fail_fast_untrusted_host: bool,
+    jump: Option<JumpHostParams>,
 ) -> Result<Arc<russh::client::Handle<ClientHandler>>, String> {
     log_step!(app, session_id, format!("TCP connecting to {}:{}…", host_address, port));
-    let tcp = tcp_connect_async(host_address, port).await?;
+    let tcp =
+        connect_transport_maybe_via_jump(session_id, host_address, port, jump.as_ref(), trust_state, app).await?;
     // Neither of this wrapper's callers (SFTP-only connect, tunnels) currently
     // consume a rich disconnect reason, so a throwaway slot is passed here —
     // only the interactive terminal path (which calls the `_from_stream`
@@ -805,14 +862,7 @@ async fn ssh_connect_async(
     password: Option<String>,
     initial_cols: u32,
     initial_rows: u32,
-    // Jump host params (all None when no jump host is configured)
-    jump_host_address: Option<String>,
-    jump_port: Option<i64>,
-    jump_username: Option<String>,
-    jump_auth_method: Option<String>,
-    jump_private_key_path: Option<String>,
-    jump_password: Option<String>,
-    jump_keep_alive_interval: Option<i64>,
+    jump: Option<JumpHostParams>,
     blocks: bool,
     state: super::SshState,
     trust_state: super::TrustState,
@@ -821,40 +871,9 @@ async fn ssh_connect_async(
 ) -> Result<(), String> {
     // Establish the transport stream — either a direct TCP connection or a
     // channel bridged through a jump host.
-    let tcp: Box<dyn AsyncStream> = if let (
-        Some(ref jh_addr),
-        Some(jh_port_val),
-        Some(ref jh_user),
-        Some(ref jh_auth),
-    ) = (
-        &jump_host_address,
-        jump_port,
-        &jump_username,
-        &jump_auth_method,
-    ) {
-        // Circular reference guard
-        if jh_addr.as_str() == host_address.as_str() && jh_port_val == port {
-            return Err("Jump host cannot be the same as the target host".to_string());
-        }
-        let stream = connect_via_jump(
-            &session_id,
-            jh_addr,
-            jh_port_val,
-            jh_user,
-            jh_auth,
-            jump_private_key_path.as_deref(),
-            jump_password.as_deref(),
-            jump_keep_alive_interval,
-            &host_address,
-            port,
-            &trust_state,
-            &app,
-        )
-        .await?;
-        Box::new(stream)
-    } else {
-        Box::new(tcp_connect_async(&host_address, port).await?)
-    };
+    let tcp =
+        connect_transport_maybe_via_jump(&session_id, &host_address, port, jump.as_ref(), &trust_state, &app)
+            .await?;
 
     let disconnect_reason = Arc::new(std::sync::Mutex::new(None));
     let handle = establish_authenticated_session_from_stream(
@@ -931,6 +950,10 @@ async fn ssh_connect_async(
 /// (`Channel::into_stream()`) ready to hand to `connect_stream` for the
 /// target session — no local loopback socket or bridging thread needed
 /// (russh's own per-connection background task does the message pumping).
+/// Its own host-key trust check always fail-fasts (see the call site below)
+/// since no frontend trust dialog ever listens for a `"{session_id}_jump"`
+/// `known_hosts_warning` — waiting on one would hang for the full 5-minute
+/// dialog timeout with no way for the user to respond.
 #[allow(clippy::too_many_arguments)]
 async fn connect_via_jump(
     session_id: &str,
@@ -971,7 +994,14 @@ async fn connect_via_jump(
         None,
         trust_state,
         app,
-        false,
+        // Always fail-fast on an untrusted/mismatched jump-host key, regardless
+        // of the main hop's own trust-dialog policy: the frontend's trust
+        // dialog only ever listens for the *main* session_id's
+        // `known_hosts_warning`, never `"{session_id}_jump"`, so waiting here
+        // would block for the full 5-minute dialog timeout with no way for the
+        // user to ever respond. The jump hop is always a background hop with
+        // no dedicated UI, so it must resolve immediately either way.
+        true,
         // The jump hop has no PTY/consumer of its own to read this back.
         Arc::new(std::sync::Mutex::new(None)),
     )

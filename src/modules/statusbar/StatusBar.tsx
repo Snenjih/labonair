@@ -1,11 +1,4 @@
-import {
-  FlashIcon,
-  FolderTreeIcon,
-  GitBranchIcon,
-  Globe02Icon,
-  LayoutTopIcon,
-  Route01Icon,
-} from "@hugeicons/core-free-icons";
+import { FlashIcon, FolderTreeIcon, GitBranchIcon, Globe02Icon, LayoutTopIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import React from "react";
 import {
@@ -17,14 +10,12 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/modules/ai";
 import { AgentStatusPill } from "@/modules/ai/components/AgentStatusPill";
 import { AiOpenButton, AiStatusBarControls } from "@/modules/ai/components/AiStatusBarControls";
 import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
 import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
-import { useHostsStore } from "@/modules/hosts";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
@@ -132,17 +123,6 @@ export const StatusBar = React.memo(function StatusBar({
   const lazySession = useLazyExplorerSession(sshHostId);
   const remoteTarget =
     sshHostId && lazySession ? { hostId: sshHostId, sessionId: lazySession.sessionId } : null;
-  // A host's `jump_host_id` fully determines whether its connections bridge
-  // through another host — the backend always routes through the jump host
-  // when it's configured, no per-connect toggle — so this is derivable
-  // straight from the host record, no session-level event/state needed.
-  const jumpHostName = useHostsStore((s) => {
-    if (!sshHostId) return null;
-    const host = s.hosts.find((h) => h.id === sshHostId);
-    if (!host?.jump_host_id) return null;
-    const jumpHost = s.hosts.find((h) => h.id === host.jump_host_id);
-    return jumpHost?.name ?? jumpHost?.host_address ?? "unknown host";
-  });
   const filePath = useTabsStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId);
     if (tab?.kind !== "editor") return null;
@@ -211,16 +191,6 @@ export const StatusBar = React.memo(function StatusBar({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {jumpHostName && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="flex shrink-0 items-center text-muted-foreground">
-                    <HugeiconsIcon icon={Route01Icon} size={12} strokeWidth={1.75} />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top">Connected via jump host: {jumpHostName}</TooltipContent>
-              </Tooltip>
-            )}
             {filePath && showCursorPosition && (
               <span className="tabular-nums text-muted-foreground">
                 Ln {cursorLine}, Col {cursorCol}

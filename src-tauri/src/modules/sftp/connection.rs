@@ -40,11 +40,11 @@ pub async fn sftp_connect(
 
     // Fetch host from DB (fast, sync).
     let (host_address, port, username, auth_method, private_key_path, keep_alive_interval,
-         keep_alive_tries, default_path_sftp, credential_id) = {
+         keep_alive_tries, default_path_sftp, credential_id, jump_host_id) = {
         let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         let mut stmt = conn.prepare(
             "SELECT host_address, port, username, auth_method, private_key_path, \
-             keep_alive_interval, keep_alive_tries, default_path_sftp, credential_id \
+             keep_alive_interval, keep_alive_tries, default_path_sftp, credential_id, jump_host_id \
              FROM hosts WHERE id = ?1",
         )?;
         stmt.query_row(rusqlite::params![host_id], |row| {
@@ -58,6 +58,7 @@ pub async fn sftp_connect(
                 row.get::<_, Option<i64>>(6)?,
                 row.get::<_, Option<String>>(7)?,
                 row.get::<_, Option<String>>(8)?,
+                row.get::<_, Option<String>>(9)?,
             ))
         })?
     };
@@ -102,10 +103,16 @@ pub async fn sftp_connect(
         passphrase
     };
 
+    // Resolve jump host fields (if any) — same helper the terminal path uses.
+    let jump = match jump_host_id.as_deref() {
+        Some(jid) => Some(crate::modules::ssh::client::resolve_jump_host(&hosts_db, &secrets, &app, jid)?),
+        None => None,
+    };
+
     let result = sftp_connect_inner(
         session_id.clone(), passphrase, host_address, port, username, auth_method,
         private_key_path, keep_alive_interval, keep_alive_tries, default_path_sftp,
-        password, existing, state.inner().clone(), trust_state.inner().clone(), app.clone(),
+        password, jump, existing, state.inner().clone(), trust_state.inner().clone(), app.clone(),
     ).await;
 
     if result.is_ok() {
@@ -147,6 +154,7 @@ async fn sftp_connect_inner(
     keep_alive_tries: Option<i64>,
     default_path_sftp: Option<String>,
     password: Option<String>,
+    jump: Option<crate::modules::ssh::client::JumpHostParams>,
     existing: Option<Arc<RushSession>>,
     state: SshState,
     trust_state: TrustState,
@@ -171,6 +179,7 @@ async fn sftp_connect_inner(
                 &trust_state,
                 &app,
                 true, // fail fast — the sidebar Explorer has no trust-prompt UI of its own
+                jump,
             )
             .await?;
 

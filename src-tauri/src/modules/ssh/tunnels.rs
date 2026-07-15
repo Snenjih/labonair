@@ -85,10 +85,10 @@ pub async fn ssh_start_tunnels(
         }
     }
 
-    let (host_address, port, username, auth_method, private_key_path, tunnels_json) = {
+    let (host_address, port, username, auth_method, private_key_path, tunnels_json, jump_host_id) = {
         let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
         conn.query_row(
-            "SELECT host_address, port, username, auth_method, private_key_path, tunnels \
+            "SELECT host_address, port, username, auth_method, private_key_path, tunnels, jump_host_id \
              FROM hosts WHERE id = ?1",
             rusqlite::params![host_id],
             |row| {
@@ -99,6 +99,7 @@ pub async fn ssh_start_tunnels(
                     row.get::<_, String>(3)?,
                     row.get::<_, Option<String>>(4)?,
                     row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
                 ))
             },
         )
@@ -122,6 +123,14 @@ pub async fn ssh_start_tunnels(
         None
     };
 
+    // Resolve jump host fields (if any) — same helper the terminal/SFTP paths use.
+    let jump = match jump_host_id.as_deref() {
+        Some(jid) => Some(
+            super::client::resolve_jump_host(&hosts_db, &secrets, &app, jid).map_err(|e| e.to_string())?,
+        ),
+        None => None,
+    };
+
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
     {
@@ -141,6 +150,7 @@ pub async fn ssh_start_tunnels(
         auth_method,
         private_key_path,
         password,
+        jump,
         tunnels,
         shutdown_rx,
         host_id_clone,
@@ -168,6 +178,7 @@ async fn run_tunnel_loop(
     auth_method: String,
     private_key_path: Option<String>,
     password: Option<String>,
+    jump: Option<super::client::JumpHostParams>,
     tunnels: Vec<TunnelConfig>,
     shutdown_rx: tokio::sync::oneshot::Receiver<()>,
     host_id: String,
@@ -191,6 +202,7 @@ async fn run_tunnel_loop(
         &trust_state,
         &app,
         true,
+        jump,
     )
     .await
     {

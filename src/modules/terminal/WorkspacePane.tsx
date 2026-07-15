@@ -258,6 +258,7 @@ export const WorkspacePane = forwardRef<WorkspacePaneHandle, Props>(function Wor
                   <SshTerminalPane
                     key={paneId}
                     sessionId={paneId}
+                    tabId={tab.id}
                     session={session}
                     isActive={isActive}
                     tabVisible={tabVisible}
