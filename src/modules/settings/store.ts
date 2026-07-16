@@ -698,7 +698,10 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS) ?? DEFAULT_PREFERENCES.sftpRemoteEditShowTransfers,
     sftpMaxRemoteFileSizeMb: Math.min(
       100,
-      Math.max(1, get<number>(KEY_SFTP_MAX_REMOTE_FILE_SIZE_MB) ?? DEFAULT_PREFERENCES.sftpMaxRemoteFileSizeMb),
+      Math.max(
+        1,
+        get<number>(KEY_SFTP_MAX_REMOTE_FILE_SIZE_MB) ?? DEFAULT_PREFERENCES.sftpMaxRemoteFileSizeMb,
+      ),
     ),
     sftpMaxConcurrentTransfers: Math.min(
       6,

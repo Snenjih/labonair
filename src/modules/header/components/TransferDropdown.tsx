@@ -229,10 +229,14 @@ function TransferItem({ job, onCancel }: { job: TransferJob; onCancel: () => voi
             </span>
           )}
           {job.status === "running" && job.speed_bps > 0 && (
-            <span className="text-[10px] text-muted-foreground tabular-nums">{formatBytes(job.speed_bps)}/s</span>
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {formatBytes(job.speed_bps)}/s
+            </span>
           )}
           {job.status === "completed" && (
-            <span className="text-[10px] text-muted-foreground tabular-nums">{formatBytes(job.bytes_total)}</span>
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {formatBytes(job.bytes_total)}
+            </span>
           )}
         </div>
       </div>

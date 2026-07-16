@@ -1,4 +1,10 @@
-import { FlashIcon, FolderTreeIcon, GitBranchIcon, Globe02Icon, LayoutTopIcon } from "@hugeicons/core-free-icons";
+import {
+  FlashIcon,
+  FolderTreeIcon,
+  GitBranchIcon,
+  Globe02Icon,
+  LayoutTopIcon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import React from "react";
 import {

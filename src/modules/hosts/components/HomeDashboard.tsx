@@ -824,7 +824,9 @@ export function HomeDashboard({
                         credential={cred}
                         hostsCount={hosts.filter((h) => h.credential_id === cred.id).length}
                         isSelected={selectedCredentialId === cred.id}
-                        onClick={() => setSelectedCredential(selectedCredentialId === cred.id ? null : cred.id)}
+                        onClick={() =>
+                          setSelectedCredential(selectedCredentialId === cred.id ? null : cred.id)
+                        }
                         onEdit={() => setSelectedCredential(cred.id)}
                         onDuplicate={async () => {
                           const dup = await duplicateCredential(cred.id);

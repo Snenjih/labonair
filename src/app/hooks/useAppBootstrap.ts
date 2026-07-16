@@ -7,7 +7,10 @@ import { useCommandSnippetsStore } from "@/modules/snippets";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { onKeysChanged } from "@/modules/settings/store";
 import { useKeybindsStore } from "@/modules/shortcuts";
-import { bootstrapTransferListeners, bootstrapTransferSettingsSync } from "@/modules/sftp/store/transferStore";
+import {
+  bootstrapTransferListeners,
+  bootstrapTransferSettingsSync,
+} from "@/modules/sftp/store/transferStore";
 import { bootstrapSftpConnectionListener } from "@/modules/sftp/store/sftpStore";
 import { useThemeEngine } from "@/lib/useThemeEngine";
 import { useLayoutEngine } from "@/lib/useLayoutEngine";

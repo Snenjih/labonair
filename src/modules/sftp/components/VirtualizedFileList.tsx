@@ -459,7 +459,9 @@ function ResizableHeaderCell({
       document.removeEventListener("pointerup", onUp);
       setDragging(false);
       if (!didDrag) return;
-      const targetEl = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("[data-col]") as HTMLElement | null;
+      const targetEl = document
+        .elementFromPoint(ev.clientX, ev.clientY)
+        ?.closest("[data-col]") as HTMLElement | null;
       const targetKey = targetEl?.dataset.col as ColKey | undefined;
       if (targetKey && targetKey !== colKey) onReorder(colKey, targetKey);
     }

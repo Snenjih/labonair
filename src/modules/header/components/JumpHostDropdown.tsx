@@ -130,7 +130,11 @@ function HostGroupRow({
         {terminalTarget && (
           <ConnectionPill
             icon={ComputerTerminal02Icon}
-            label={group.terminalConnections.length > 1 ? `Terminal ×${group.terminalConnections.length}` : "Terminal"}
+            label={
+              group.terminalConnections.length > 1
+                ? `Terminal ×${group.terminalConnections.length}`
+                : "Terminal"
+            }
             status={terminalPillStatus(group.terminalConnections)}
             title={`Jump to ${group.hostLabel} terminal`}
             onClick={() => focusPane(terminalTarget.workspaceTabId, terminalTarget.paneId)}
@@ -150,11 +154,7 @@ function HostGroupRow({
             icon={FolderTreeIcon}
             label="Explorer"
             status={group.explorerStatus}
-            title={
-              group.explorerTabId
-                ? `Jump to ${group.hostLabel} Git tab`
-                : "Show Explorer sidebar"
-            }
+            title={group.explorerTabId ? `Jump to ${group.hostLabel} Git tab` : "Show Explorer sidebar"}
             onClick={() =>
               group.explorerTabId
                 ? useTabsStore.getState().setActiveId(group.explorerTabId)
@@ -167,11 +167,7 @@ function HostGroupRow({
   );
 }
 
-export function JumpHostDropdown({
-  onPanelToggle,
-}: {
-  onPanelToggle?: (panel: SidebarPanel) => void;
-}) {
+export function JumpHostDropdown({ onPanelToggle }: { onPanelToggle?: (panel: SidebarPanel) => void }) {
   const groups = useJumpHostGroups();
   if (groups.length === 0) return null;
 

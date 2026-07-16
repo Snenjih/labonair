@@ -344,7 +344,9 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       loadRemoteDir(tabId, tabState?.remotePath ?? host?.default_path_sftp ?? "/");
     } catch (e) {
       handleApiError(e, "Reconnect failed", "SFTP");
-      useConnectionStatusStore.getState().setStatus(tabId, "error", isLabonairError(e) ? e.message : String(e));
+      useConnectionStatusStore
+        .getState()
+        .setStatus(tabId, "error", isLabonairError(e) ? e.message : String(e));
     } finally {
       setIsReconnecting(false);
     }
