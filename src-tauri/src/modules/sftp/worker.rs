@@ -332,6 +332,77 @@ fn get_session_and_sftp(
     Ok((session, sftp))
 }
 
+/// One entry discovered while recursively walking a directory tree for a
+/// folder transfer — a relative path (forward-slash joined, relative to the
+/// tree's root) plus whether it's itself a directory, and its size (0 for
+/// directories). Parent directories always precede their children in the
+/// `Vec` returned by `walk_local_tree`/`walk_remote_tree` (a stack-based walk
+/// records an entry the moment it's discovered, before ever expanding it), so
+/// callers can create directories/files in list order without extra sorting.
+struct TreeEntry {
+    rel_path: String,
+    is_dir: bool,
+    size: u64,
+}
+
+/// Recursively walks a local directory (used for folder uploads). Iterative
+/// (stack-based) rather than a recursive async fn, since Rust async fns
+/// can't recurse into themselves without boxing every call.
+async fn walk_local_tree(root: &std::path::Path) -> Result<Vec<TreeEntry>, String> {
+    let mut out = Vec::new();
+    let mut stack: Vec<(String, std::path::PathBuf)> = vec![(String::new(), root.to_path_buf())];
+    while let Some((rel_prefix, abs_path)) = stack.pop() {
+        let mut rd = tokio::fs::read_dir(&abs_path)
+            .await
+            .map_err(|e| format!("read_dir({}) failed: {e}", abs_path.display()))?;
+        while let Some(entry) = rd.next_entry().await.map_err(|e| e.to_string())? {
+            let name = entry.file_name().to_string_lossy().to_string();
+            let rel = if rel_prefix.is_empty() { name.clone() } else { format!("{rel_prefix}/{name}") };
+            let file_type = entry.file_type().await.map_err(|e| e.to_string())?;
+            if file_type.is_dir() {
+                out.push(TreeEntry { rel_path: rel.clone(), is_dir: true, size: 0 });
+                stack.push((rel, entry.path()));
+            } else {
+                let meta = entry.metadata().await.map_err(|e| e.to_string())?;
+                out.push(TreeEntry { rel_path: rel, is_dir: false, size: meta.len() });
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// Recursively walks a remote directory over SFTP (used for folder
+/// downloads). Symlinks are recorded as their raw entry type (not followed)
+/// to keep this simple and loop-safe — unlike `list_dir_entries` in
+/// `ssh/sftp.rs`, which resolves symlink targets for the browser UI, this
+/// only needs to know what to actually copy.
+async fn walk_remote_tree(
+    sftp: &russh_sftp::client::SftpSession,
+    root: &str,
+) -> Result<Vec<TreeEntry>, String> {
+    let mut out = Vec::new();
+    let mut stack: Vec<(String, String)> = vec![(String::new(), root.trim_end_matches('/').to_string())];
+    while let Some((rel_prefix, abs_path)) = stack.pop() {
+        let entries = sftp
+            .read_dir(&abs_path)
+            .await
+            .map_err(|e| format!("readdir({abs_path}) failed: {e}"))?;
+        for entry in entries {
+            let name = entry.file_name();
+            let full_path = entry.path();
+            let metadata = entry.metadata();
+            let rel = if rel_prefix.is_empty() { name.clone() } else { format!("{rel_prefix}/{name}") };
+            if metadata.is_dir() {
+                out.push(TreeEntry { rel_path: rel.clone(), is_dir: true, size: 0 });
+                stack.push((rel, full_path));
+            } else {
+                out.push(TreeEntry { rel_path: rel, is_dir: false, size: metadata.size.unwrap_or(0) });
+            }
+        }
+    }
+    Ok(out)
+}
+
 async fn download_file(
     job: &mut TransferJob,
     ssh_state: &SshState,
@@ -342,6 +413,31 @@ async fn download_file(
 ) -> Result<(), String> {
     job.src_path = expand_home(&job.src_path);
     job.dest_path = expand_home(&job.dest_path);
+
+    log::debug!("[sftp/download] looking up SFTP session for session_id={}", job.session_id);
+    let (session, sftp) = get_session_and_sftp(ssh_state, &job.session_id)?;
+    emit_step(app, &job.id, "SFTP session ready");
+
+    log::debug!("[sftp/download] stat remote path: {}", job.src_path);
+    let meta = sftp
+        .metadata(job.src_path.clone())
+        .await
+        .map_err(|e| format!("stat({}) failed: {e}", job.src_path))?;
+
+    // A directory source needs a recursive walk + per-file copy instead of
+    // the single open/read/write loop below — dispatch early, before ever
+    // touching the local filesystem. Without this check, a directory handle
+    // would get opened below and fail on the first `read()` (SFTP servers
+    // reject reading a directory handle with SSH_FX_FAILURE), but only
+    // *after* the atomic-create step further down had already left a stray
+    // empty file behind.
+    if meta.is_dir() {
+        return download_directory(job, &sftp, app, conflicts, cancel_token, settings).await;
+    }
+
+    let file_size = meta.size.unwrap_or(0);
+    log::debug!("[sftp/download] remote file size={} bytes", file_size);
+    emit_step(app, &job.id, format!("Opened remote file ({} bytes)", file_size));
 
     // Atomic local-filesystem create — closes the TOCTOU window between the
     // old `dest.exists()` check and the later unconditional `File::create`,
@@ -392,18 +488,7 @@ async fn download_file(
         Err(e) => return Err(format!("create({}) failed: {e}", job.dest_path)),
     };
 
-    log::debug!("[sftp/download] looking up SFTP session for session_id={}", job.session_id);
-    let (session, sftp) = get_session_and_sftp(ssh_state, &job.session_id)?;
-    emit_step(app, &job.id, "SFTP session ready");
-
     log::debug!("[sftp/download] opening remote file: {}", job.src_path);
-    let meta = sftp
-        .metadata(job.src_path.clone())
-        .await
-        .map_err(|e| format!("stat({}) failed: {e}", job.src_path))?;
-    let file_size = meta.size.unwrap_or(0);
-    log::debug!("[sftp/download] remote file size={} bytes", file_size);
-    emit_step(app, &job.id, format!("Opened remote file ({} bytes)", file_size));
     let mut remote_file = sftp
         .open(job.src_path.clone())
         .await
@@ -489,6 +574,224 @@ async fn download_file(
     Ok(())
 }
 
+/// Recursive remote → local folder download. Dispatched from `download_file`
+/// once its `sftp.metadata` stat reveals the source is a directory. Unlike
+/// single-file transfers, folder transfers only verify file size (not MD5)
+/// per file — hashing every file over a fresh SSH exec channel would mean one
+/// network round trip per file, which doesn't scale for folders with
+/// hundreds/thousands of entries (e.g. a music library).
+async fn download_directory(
+    job: &mut TransferJob,
+    sftp: &Arc<russh_sftp::client::SftpSession>,
+    app: &tauri::AppHandle,
+    conflicts: &ConflictMap,
+    cancel_token: &CancellationToken,
+    settings: &TransferSettings,
+) -> Result<(), String> {
+    emit_step(app, &job.id, format!("Scanning remote folder: {}", job.src_path));
+    let entries = walk_remote_tree(sftp, &job.src_path).await?;
+    let total_bytes: u64 = entries.iter().filter(|e| !e.is_dir).map(|e| e.size).sum();
+    job.bytes_total = total_bytes;
+    emit_step(app, &job.id, format!("Found {} entries ({} bytes)", entries.len(), total_bytes));
+
+    // Ask about the destination root only once for the whole tree — nested
+    // conflicts can only happen if the root already existed (see the "fresh
+    // copy" branch below, where nested paths can't pre-exist because their
+    // parent doesn't).
+    let mut dest_root = job.dest_path.clone();
+    if tokio::fs::metadata(&dest_root).await.is_ok() {
+        emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
+        let resolution = tokio::select! {
+            _ = cancel_token.cancelled() => {
+                conflicts.lock().await.remove(&job.id);
+                return Err("cancelled".to_string());
+            }
+            r = ask_conflict(job, app, conflicts, settings) => r?,
+        };
+        emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
+        match resolution.resolution.as_str() {
+            "skip" => { log::debug!("[sftp/download] folder skipped by user"); return Ok(()); }
+            "rename" => {
+                let new_name = resolution.new_name.ok_or("rename requires new_name")?;
+                let dest = std::path::Path::new(&dest_root);
+                let new_dest = dest.parent().unwrap_or(dest).join(new_name);
+                dest_root = new_dest.to_string_lossy().to_string();
+                job.dest_path = dest_root.clone();
+                log::debug!("[sftp/download] renamed dest folder to: {}", dest_root);
+            }
+            _ => {
+                // "overwrite" (or any other resolution) — merge into the
+                // existing folder; conflicting nested files get truncated
+                // below, non-conflicting ones are created normally.
+            }
+        }
+    }
+
+    tokio::fs::create_dir_all(&dest_root)
+        .await
+        .map_err(|e| format!("mkdir({dest_root}) failed: {e}"))?;
+
+    let chunk_size = settings.chunk_size.load(std::sync::atomic::Ordering::Relaxed).max(4096);
+    let mut chunk_buf = vec![0u8; chunk_size];
+    let mut written_total = 0u64;
+    let mut file_count = 0u64;
+    let mut last_emit = std::time::Instant::now();
+    let mut last_bytes = 0u64;
+    let on_error_policy = settings.on_folder_file_error.lock().unwrap().clone();
+    // Set for the rest of *this* transfer once the user picks "skip_all" from
+    // the file_error dialog — doesn't touch the persisted setting, just
+    // avoids re-prompting for every remaining file in this one folder.
+    let mut skip_all_remaining = false;
+
+    for entry in &entries {
+        if cancel_token.is_cancelled() {
+            return Err("cancelled".to_string());
+        }
+
+        let local_path = format!("{}/{}", dest_root.trim_end_matches('/'), entry.rel_path);
+        let remote_path = format!("{}/{}", job.src_path.trim_end_matches('/'), entry.rel_path);
+
+        if entry.is_dir {
+            tokio::fs::create_dir_all(&local_path)
+                .await
+                .map_err(|e| format!("mkdir({local_path}) failed: {e}"))?;
+            continue;
+        }
+
+        emit_step(app, &job.id, format!("Downloading {}", entry.rel_path));
+        let result = download_one_file(
+            sftp,
+            &remote_path,
+            &local_path,
+            entry.size,
+            job,
+            &mut chunk_buf,
+            &mut written_total,
+            cancel_token,
+            &mut last_emit,
+            &mut last_bytes,
+            app,
+        )
+        .await;
+
+        if let Err(e) = result {
+            if skip_all_remaining || on_error_policy == "skip" {
+                log::warn!("[sftp/download] skipping failed file {}: {e}", entry.rel_path);
+                emit_step(app, &job.id, format!("Skipped (error): {} — {e}", entry.rel_path));
+                job.skipped_count += 1;
+            } else if on_error_policy == "abort" {
+                return Err(e);
+            } else {
+                emit_step(app, &job.id, format!("Error on {}: {e} — waiting for resolution", entry.rel_path));
+                let resolution = tokio::select! {
+                    _ = cancel_token.cancelled() => {
+                        conflicts.lock().await.remove(&job.id);
+                        return Err("cancelled".to_string());
+                    }
+                    r = ask_file_error(job, app, conflicts, &entry.rel_path, &e) => r?,
+                };
+                match resolution.resolution.as_str() {
+                    "abort" => return Err(e),
+                    other => {
+                        if other == "skip_all" {
+                            skip_all_remaining = true;
+                        }
+                        job.skipped_count += 1;
+                        emit_step(app, &job.id, format!("Skipped (error): {} — {e}", entry.rel_path));
+                    }
+                }
+            }
+        } else {
+            file_count += 1;
+        }
+    }
+
+    emit_step(
+        app,
+        &job.id,
+        format!(
+            "Downloaded {file_count} file{} ({written_total} bytes){}",
+            if file_count == 1 { "" } else { "s" },
+            if job.skipped_count > 0 { format!(", {} skipped", job.skipped_count) } else { String::new() },
+        ),
+    );
+    Ok(())
+}
+
+/// Streams one file remote → local, chunk by chunk, and verifies its size —
+/// shared by `download_directory`'s per-entry loop. Progress fields on `job`
+/// accumulate across the whole folder (`written_total`/`last_bytes` are
+/// carried in by the caller), not reset per file, so the transfer's overall
+/// progress bar reflects the whole tree rather than restarting per file.
+#[allow(clippy::too_many_arguments)]
+async fn download_one_file(
+    sftp: &russh_sftp::client::SftpSession,
+    remote_path: &str,
+    local_path: &str,
+    expected_size: u64,
+    job: &mut TransferJob,
+    chunk_buf: &mut [u8],
+    written_total: &mut u64,
+    cancel_token: &CancellationToken,
+    last_emit: &mut std::time::Instant,
+    last_bytes: &mut u64,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(local_path).parent() {
+        tokio::fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
+    }
+    let mut local_file = tokio::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(local_path)
+        .await
+        .map_err(|e| format!("create({local_path}) failed: {e}"))?;
+    let mut remote_file = sftp
+        .open(remote_path)
+        .await
+        .map_err(|e| format!("open({remote_path}) failed: {e}"))?;
+
+    loop {
+        let n = tokio::select! {
+            _ = cancel_token.cancelled() => return Err("cancelled".to_string()),
+            result = remote_file.read(chunk_buf) => {
+                result.map_err(|e| format!("read({remote_path}) failed: {e}"))?
+            }
+        };
+        if n == 0 {
+            break;
+        }
+        tokio::select! {
+            _ = cancel_token.cancelled() => return Err("cancelled".to_string()),
+            result = local_file.write_all(&chunk_buf[..n]) => {
+                result.map_err(|e| e.to_string())?;
+            }
+        }
+        *written_total += n as u64;
+        job.bytes_transferred = *written_total;
+
+        let elapsed = last_emit.elapsed().as_millis();
+        if elapsed >= PROGRESS_EMIT_INTERVAL_MS {
+            let bytes_delta = job.bytes_transferred - *last_bytes;
+            job.speed_bps = bytes_delta as f64 / (elapsed as f64 / 1000.0);
+            *last_bytes = job.bytes_transferred;
+            *last_emit = std::time::Instant::now();
+            emit_progress(app, job);
+        }
+    }
+    drop(local_file);
+
+    let local_size = tokio::fs::metadata(local_path)
+        .await
+        .map_err(|e| format!("verify metadata({local_path}) failed: {e}"))?
+        .len();
+    if local_size != expected_size {
+        return Err(format!("Size mismatch (remote={expected_size}, local={local_size})"));
+    }
+    Ok(())
+}
+
 async fn upload_file(
     job: &mut TransferJob,
     ssh_state: &SshState,
@@ -509,10 +812,10 @@ async fn upload_file(
         .await
         .map_err(|e| format!("metadata local file({}) failed: {e}", job.src_path))?;
     if local_meta.is_dir() {
-        let name = job.src_path.rsplit('/').next().unwrap_or(&job.src_path);
-        return Err(format!(
-            "\"{name}\" is a folder. Uploading folders isn't supported yet — select individual files instead."
-        ));
+        drop(local_file);
+        let (_session, sftp) = get_session_and_sftp(ssh_state, &job.session_id)?;
+        emit_step(app, &job.id, "SFTP session ready");
+        return upload_directory(job, &sftp, app, conflicts, cancel_token, settings).await;
     }
     let file_size = local_meta.len();
     job.bytes_total = file_size;
@@ -650,6 +953,218 @@ async fn upload_file(
     Ok(())
 }
 
+/// Recursive local → remote folder upload. Dispatched from `upload_file` once
+/// its local `metadata()` reveals the source is a directory. Mirrors
+/// `download_directory` (size-only per-file verification, one conflict
+/// prompt for the whole tree, optional skip-on-error).
+async fn upload_directory(
+    job: &mut TransferJob,
+    sftp: &Arc<russh_sftp::client::SftpSession>,
+    app: &tauri::AppHandle,
+    conflicts: &ConflictMap,
+    cancel_token: &CancellationToken,
+    settings: &TransferSettings,
+) -> Result<(), String> {
+    emit_step(app, &job.id, format!("Scanning local folder: {}", job.src_path));
+    let root_path = std::path::PathBuf::from(&job.src_path);
+    let entries = walk_local_tree(&root_path).await?;
+    let total_bytes: u64 = entries.iter().filter(|e| !e.is_dir).map(|e| e.size).sum();
+    job.bytes_total = total_bytes;
+    emit_step(app, &job.id, format!("Found {} entries ({} bytes)", entries.len(), total_bytes));
+
+    // Ask about the destination root only once for the whole tree — nested
+    // conflicts can only happen if the root already existed (see the "fresh
+    // copy" branch below, where nested paths can't pre-exist because their
+    // parent doesn't).
+    let mut dest_root = job.dest_path.clone();
+    if sftp.metadata(dest_root.clone()).await.is_ok() {
+        emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
+        let resolution = tokio::select! {
+            _ = cancel_token.cancelled() => {
+                conflicts.lock().await.remove(&job.id);
+                return Err("cancelled".to_string());
+            }
+            r = ask_conflict(job, app, conflicts, settings) => r?,
+        };
+        emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
+        match resolution.resolution.as_str() {
+            "skip" => { log::debug!("[sftp/upload] folder skipped by user"); return Ok(()); }
+            "rename" => {
+                let new_name = resolution.new_name.ok_or("rename requires new_name")?;
+                let dest = std::path::Path::new(&dest_root);
+                let new_dest = dest.parent().unwrap_or(dest).join(new_name);
+                dest_root = new_dest.to_string_lossy().to_string();
+                job.dest_path = dest_root.clone();
+                log::debug!("[sftp/upload] renamed dest folder to: {}", dest_root);
+            }
+            _ => {
+                // "overwrite" (or any other resolution) — merge into the
+                // existing folder; conflicting nested files get truncated
+                // below, non-conflicting ones are created normally.
+            }
+        }
+    }
+
+    // Tolerate the root already existing (the "overwrite" merge case above).
+    let _ = sftp.create_dir(dest_root.clone()).await;
+
+    let chunk_size = settings.chunk_size.load(std::sync::atomic::Ordering::Relaxed).max(4096);
+    let mut chunk_buf = vec![0u8; chunk_size];
+    let mut written_total = 0u64;
+    let mut file_count = 0u64;
+    let mut last_emit = std::time::Instant::now();
+    let mut last_bytes = 0u64;
+    let on_error_policy = settings.on_folder_file_error.lock().unwrap().clone();
+    // Set for the rest of *this* transfer once the user picks "skip_all" from
+    // the file_error dialog — doesn't touch the persisted setting, just
+    // avoids re-prompting for every remaining file in this one folder.
+    let mut skip_all_remaining = false;
+
+    for entry in &entries {
+        if cancel_token.is_cancelled() {
+            return Err("cancelled".to_string());
+        }
+
+        let local_path = format!("{}/{}", job.src_path.trim_end_matches('/'), entry.rel_path);
+        let remote_path = format!("{}/{}", dest_root.trim_end_matches('/'), entry.rel_path);
+
+        if entry.is_dir {
+            if let Err(e) = sftp.create_dir(remote_path.clone()).await {
+                if sftp.metadata(remote_path.clone()).await.is_err() {
+                    return Err(format!("mkdir({remote_path}) failed: {e}"));
+                }
+            }
+            continue;
+        }
+
+        emit_step(app, &job.id, format!("Uploading {}", entry.rel_path));
+        let result = upload_one_file(
+            sftp,
+            &local_path,
+            &remote_path,
+            entry.size,
+            job,
+            &mut chunk_buf,
+            &mut written_total,
+            cancel_token,
+            &mut last_emit,
+            &mut last_bytes,
+            app,
+        )
+        .await;
+
+        if let Err(e) = result {
+            if skip_all_remaining || on_error_policy == "skip" {
+                log::warn!("[sftp/upload] skipping failed file {}: {e}", entry.rel_path);
+                emit_step(app, &job.id, format!("Skipped (error): {} — {e}", entry.rel_path));
+                job.skipped_count += 1;
+            } else if on_error_policy == "abort" {
+                return Err(e);
+            } else {
+                emit_step(app, &job.id, format!("Error on {}: {e} — waiting for resolution", entry.rel_path));
+                let resolution = tokio::select! {
+                    _ = cancel_token.cancelled() => {
+                        conflicts.lock().await.remove(&job.id);
+                        return Err("cancelled".to_string());
+                    }
+                    r = ask_file_error(job, app, conflicts, &entry.rel_path, &e) => r?,
+                };
+                match resolution.resolution.as_str() {
+                    "abort" => return Err(e),
+                    other => {
+                        if other == "skip_all" {
+                            skip_all_remaining = true;
+                        }
+                        job.skipped_count += 1;
+                        emit_step(app, &job.id, format!("Skipped (error): {} — {e}", entry.rel_path));
+                    }
+                }
+            }
+        } else {
+            file_count += 1;
+        }
+    }
+
+    emit_step(
+        app,
+        &job.id,
+        format!(
+            "Uploaded {file_count} file{} ({written_total} bytes){}",
+            if file_count == 1 { "" } else { "s" },
+            if job.skipped_count > 0 { format!(", {} skipped", job.skipped_count) } else { String::new() },
+        ),
+    );
+    Ok(())
+}
+
+/// Streams one file local → remote, chunk by chunk, and verifies its size —
+/// shared by `upload_directory`'s per-entry loop. Progress fields on `job`
+/// accumulate across the whole folder, not reset per file, matching
+/// `download_one_file`'s approach.
+#[allow(clippy::too_many_arguments)]
+async fn upload_one_file(
+    sftp: &russh_sftp::client::SftpSession,
+    local_path: &str,
+    remote_path: &str,
+    expected_size: u64,
+    job: &mut TransferJob,
+    chunk_buf: &mut [u8],
+    written_total: &mut u64,
+    cancel_token: &CancellationToken,
+    last_emit: &mut std::time::Instant,
+    last_bytes: &mut u64,
+    app: &tauri::AppHandle,
+) -> Result<(), String> {
+    let mut local_file = tokio::fs::File::open(local_path)
+        .await
+        .map_err(|e| format!("read local file({local_path}) failed: {e}"))?;
+    let mut remote_file = sftp
+        .open_with_flags(remote_path, OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE)
+        .await
+        .map_err(|e| format!("create remote({remote_path}) failed: {e}"))?;
+
+    loop {
+        let n = tokio::select! {
+            _ = cancel_token.cancelled() => return Err("cancelled".to_string()),
+            result = local_file.read(chunk_buf) => {
+                result.map_err(|e| format!("read local file({local_path}) failed: {e}"))?
+            }
+        };
+        if n == 0 {
+            break;
+        }
+        tokio::select! {
+            _ = cancel_token.cancelled() => return Err("cancelled".to_string()),
+            result = remote_file.write_all(&chunk_buf[..n]) => {
+                result.map_err(|e| e.to_string())?;
+            }
+        }
+        *written_total += n as u64;
+        job.bytes_transferred = *written_total;
+
+        let elapsed = last_emit.elapsed().as_millis();
+        if elapsed >= PROGRESS_EMIT_INTERVAL_MS {
+            let bytes_delta = job.bytes_transferred - *last_bytes;
+            job.speed_bps = bytes_delta as f64 / (elapsed as f64 / 1000.0);
+            *last_bytes = job.bytes_transferred;
+            *last_emit = std::time::Instant::now();
+            emit_progress(app, job);
+        }
+    }
+    remote_file.shutdown().await.map_err(|e| e.to_string())?;
+
+    let remote_size = sftp
+        .metadata(remote_path)
+        .await
+        .map_err(|e| format!("verify stat({remote_path}) failed: {e}"))?
+        .size
+        .unwrap_or(0);
+    if remote_size != expected_size {
+        return Err(format!("Size mismatch (local={expected_size}, remote={remote_size})"));
+    }
+    Ok(())
+}
+
 async fn ask_conflict(
     job: &TransferJob,
     app: &tauri::AppHandle,
@@ -677,4 +1192,33 @@ async fn ask_conflict(
     })).map_err(|e| e.to_string())?;
 
     rx.await.map_err(|_| "conflict resolution channel closed".to_string())
+}
+
+/// Prompts the frontend about a single file that failed during a folder
+/// transfer, via the `file_error` event — parallel to `ask_conflict`'s
+/// `file_conflict` event, and resolved through the same `resolve_conflict`
+/// command/channel (the resolution vocabulary is just different: "abort" |
+/// "skip" | "skip_all" instead of "overwrite" | "skip" | "rename"). Only
+/// called when `TransferSettings::on_folder_file_error` is "ask" — "skip"/
+/// "abort" are handled inline by the caller without ever reaching here.
+async fn ask_file_error(
+    job: &TransferJob,
+    app: &tauri::AppHandle,
+    conflicts: &ConflictMap,
+    rel_path: &str,
+    error: &str,
+) -> Result<ConflictResolution, String> {
+    use tauri::Emitter;
+    let (tx, rx) = tokio::sync::oneshot::channel::<ConflictResolution>();
+    {
+        let mut map = conflicts.lock().await;
+        map.insert(job.id.clone(), tx);
+    }
+    app.emit("file_error", serde_json::json!({
+        "job_id": job.id,
+        "path": rel_path,
+        "error": error,
+    })).map_err(|e| e.to_string())?;
+
+    rx.await.map_err(|_| "file error resolution channel closed".to_string())
 }

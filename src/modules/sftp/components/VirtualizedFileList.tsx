@@ -221,6 +221,22 @@ export function VirtualizedFileList({
     e.preventDefault();
     let didDrag = false;
 
+    // `preventDefault()` above only stops the default action tied to this
+    // specific pointerdown — as the pointer keeps moving during the drag it
+    // can still trigger the browser's normal text-selection behavior on
+    // whatever it passes over elsewhere on the page. Suppress selection
+    // globally for the duration, same fix as `SftpPane.tsx`'s cross-pane
+    // drag-and-drop.
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = "none";
+
+    function endMarqueeDrag() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onCancel);
+      document.body.style.userSelect = previousUserSelect;
+    }
+
     function onMove(ev: PointerEvent) {
       const dist = Math.hypot(ev.clientX - rect.startX, ev.clientY - rect.startY);
       if (dist > DRAG_THRESHOLD_PX) didDrag = true;
@@ -232,8 +248,7 @@ export function VirtualizedFileList({
     }
 
     function onUp() {
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerup", onUp);
+      endMarqueeDrag();
       if (!didDrag) {
         // Plain click on empty space — clear selection
         if (!rect.additive) onMarqueeSelect?.([], false);
@@ -250,8 +265,15 @@ export function VirtualizedFileList({
       });
     }
 
+    function onCancel() {
+      endMarqueeDrag();
+      setMarquee(null);
+      setMarqueeHighlight(new Set());
+    }
+
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onCancel);
   }
 
   const visibleCols: Record<ColKey, boolean> = {

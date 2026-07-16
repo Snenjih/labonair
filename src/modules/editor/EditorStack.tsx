@@ -100,6 +100,7 @@ export function EditorStack({ onDirtyChange, registerHandle, onCloseTab, onSaveA
             bytes_total: 0,
             bytes_transferred: 0,
             speed_bps: 0,
+            skipped_count: 0,
           });
         }
         void invoke("save_remote_edit", {
@@ -119,6 +120,7 @@ export function EditorStack({ onDirtyChange, registerHandle, onCloseTab, onSaveA
                 bytes_total: 1,
                 bytes_transferred: 1,
                 speed_bps: 0,
+                skipped_count: 0,
               });
             }
           })
@@ -134,6 +136,7 @@ export function EditorStack({ onDirtyChange, registerHandle, onCloseTab, onSaveA
                 bytes_total: 0,
                 bytes_transferred: 0,
                 speed_bps: 0,
+                skipped_count: 0,
               });
             }
             handleApiError(e, "Failed to save to remote", "Editor");

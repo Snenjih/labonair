@@ -180,6 +180,7 @@ async function prepareRemoteFileForTab(
       bytes_total: 0,
       bytes_transferred: 0,
       speed_bps: 0,
+      skipped_count: 0,
     });
   }
 
@@ -202,6 +203,7 @@ async function prepareRemoteFileForTab(
         bytes_total: 0,
         bytes_transferred: 0,
         speed_bps: 0,
+        skipped_count: 0,
       });
     }
     throw e;
@@ -218,6 +220,7 @@ async function prepareRemoteFileForTab(
       bytes_total: 1,
       bytes_transferred: 1,
       speed_bps: 0,
+      skipped_count: 0,
     });
   }
 

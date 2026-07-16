@@ -43,6 +43,11 @@ pub struct TransferJob {
     pub bytes_total: u64,
     pub bytes_transferred: u64,
     pub speed_bps: f64,
+    /// Number of files skipped due to per-file errors during a folder
+    /// transfer (see `TransferSettings::skip_failed_files_in_folders`).
+    /// Always 0 for single-file transfers.
+    #[serde(default)]
+    pub skipped_count: u32,
 }
 
 /// A single timestamped step in a transfer's lifecycle (open, handshake,
@@ -87,6 +92,12 @@ pub struct TransferSettings {
     /// One of "ask" | "overwrite" | "skip". "ask" preserves today's behavior
     /// of prompting the frontend via the `file_conflict` event.
     pub default_conflict_resolution: std::sync::Mutex<String>,
+    /// One of "ask" | "skip" | "abort" — what to do when a folder transfer
+    /// hits a per-file error. "ask" (default) prompts the frontend via the
+    /// `file_error` event, same mechanism as `file_conflict`; "skip" silently
+    /// skips the offending file and continues; "abort" fails the whole job
+    /// immediately, matching a single-file transfer's behavior.
+    pub on_folder_file_error: std::sync::Mutex<String>,
 }
 
 impl Default for TransferSettings {
@@ -95,6 +106,7 @@ impl Default for TransferSettings {
             max_concurrent: AtomicUsize::new(2),
             chunk_size: AtomicUsize::new(65536),
             default_conflict_resolution: std::sync::Mutex::new("ask".to_string()),
+            on_folder_file_error: std::sync::Mutex::new("ask".to_string()),
         }
     }
 }

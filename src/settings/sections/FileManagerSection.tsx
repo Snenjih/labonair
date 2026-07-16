@@ -19,6 +19,7 @@ import {
   setSftpMaxConcurrentTransfers,
   setSftpDefaultConflictResolution,
   setSftpChunkSizeKb,
+  setSftpOnFolderFileError,
   setGitStatusPollIntervalMs,
 } from "@/modules/settings/store";
 import { NumInput } from "../components/NumInput";
@@ -47,6 +48,7 @@ export function FileManagerSection() {
   const sftpMaxConcurrentTransfers = usePreferencesStore((s) => s.sftpMaxConcurrentTransfers);
   const sftpDefaultConflictResolution = usePreferencesStore((s) => s.sftpDefaultConflictResolution);
   const sftpChunkSizeKb = usePreferencesStore((s) => s.sftpChunkSizeKb);
+  const sftpOnFolderFileError = usePreferencesStore((s) => s.sftpOnFolderFileError);
 
   const gitStatusPollIntervalMs = usePreferencesStore((s) => s.gitStatusPollIntervalMs);
 
@@ -272,6 +274,30 @@ export function FileManagerSection() {
               step={16}
               onChange={(v) => void setSftpChunkSizeKb(v)}
             />
+          </SettingRow>
+          <SettingRow
+            title="On file error in folder transfers"
+            description="What to do when an individual file fails during a folder transfer."
+          >
+            <Select
+              value={sftpOnFolderFileError}
+              onValueChange={(v) => void setSftpOnFolderFileError(v as "ask" | "skip" | "abort")}
+            >
+              <SelectTrigger className="h-7 w-36 text-[11.5px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ask" className="text-[11.5px]">
+                  Always ask
+                </SelectItem>
+                <SelectItem value="skip" className="text-[11.5px]">
+                  Always skip
+                </SelectItem>
+                <SelectItem value="abort" className="text-[11.5px]">
+                  Always abort
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </SettingRow>
         </div>
       </div>

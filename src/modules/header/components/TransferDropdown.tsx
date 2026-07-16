@@ -12,9 +12,12 @@ export function TransferDropdown() {
   const { jobs, clearCompleted, cancelJob, resolveConflict } = useTransferStore();
 
   const activeCount = jobs.filter((j) => j.status === "queued" || j.status === "running").length;
-  const hasConflicts = jobs.some((j) => !isFailed(j.status) && j.status === "paused" && j.conflict);
+  const hasConflicts = jobs.some(
+    (j) => !isFailed(j.status) && j.status === "paused" && (j.conflict || j.file_error),
+  );
 
   const conflictJob = jobs.find((j) => !isFailed(j.status) && j.status === "paused" && j.conflict);
+  const fileErrorJob = jobs.find((j) => !isFailed(j.status) && j.status === "paused" && j.file_error);
 
   return (
     <>
@@ -70,6 +73,13 @@ export function TransferDropdown() {
         <ConflictModal
           job={conflictJob}
           onResolve={(resolution, newName) => resolveConflict(conflictJob.id, resolution, newName)}
+        />
+      )}
+
+      {!conflictJob && fileErrorJob && (
+        <FileErrorModal
+          job={fileErrorJob}
+          onResolve={(resolution) => resolveConflict(fileErrorJob.id, resolution)}
         />
       )}
     </>
@@ -198,6 +208,9 @@ function TransferItem({ job, onCancel }: { job: TransferJob; onCancel: () => voi
             )}
           >
             {statusLabel(job.status)}
+            {job.status === "completed" && job.skipped_count > 0
+              ? ` · ${job.skipped_count} skipped`
+              : ""}
           </span>
         )}
         {isActive && (
@@ -265,7 +278,7 @@ function ConflictModal({
   onResolve: (resolution: "overwrite" | "skip" | "rename", newName?: string) => void;
 }) {
   const [renaming, setRenaming] = useState(false);
-  const [newName, setNewName] = useState(job.dest_path.split("/").pop() ?? "file");
+  const [newName, setNewName] = useState(job.dest_path.split("/").pop() ?? "item");
 
   const fileName = job.dest_path.split("/").pop() ?? job.dest_path;
 
@@ -273,11 +286,10 @@ function ConflictModal({
     <Dialog open>
       <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle>File Already Exists</DialogTitle>
+          <DialogTitle>Item Already Exists</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            The file{" "}
             <span className="font-mono text-foreground text-xs bg-muted px-1 py-0.5 rounded">{fileName}</span>{" "}
             already exists at{" "}
             <span className="font-mono text-xs text-muted-foreground">{job.conflict?.dest_path}</span>. What
@@ -291,7 +303,7 @@ function ConflictModal({
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 className="flex-1 h-8 text-sm bg-background border border-border rounded px-2 outline-none focus:ring-1 focus:ring-primary"
-                placeholder="New file name"
+                placeholder="New name"
               />
               <Button size="sm" onClick={() => onResolve("rename", newName)} disabled={!newName.trim()}>
                 Rename
@@ -313,6 +325,48 @@ function ConflictModal({
               </Button>
             </div>
           )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FileErrorModal({
+  job,
+  onResolve,
+}: {
+  job: TransferJob;
+  onResolve: (resolution: "abort" | "skip" | "skip_all") => void;
+}) {
+  return (
+    <Dialog open>
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle>File Failed to Transfer</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Couldn't transfer{" "}
+            <span className="font-mono text-foreground text-xs bg-muted px-1 py-0.5 rounded break-all">
+              {job.file_error?.path}
+            </span>
+            :
+          </p>
+          <p className="text-xs font-mono text-destructive break-all bg-destructive/10 rounded px-2 py-1.5">
+            {job.file_error?.error}
+          </p>
+          <p className="text-sm text-muted-foreground">What would you like to do?</p>
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="outline" onClick={() => onResolve("abort")}>
+              Abort transfer
+            </Button>
+            <Button size="sm" onClick={() => onResolve("skip")}>
+              Skip this file
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => onResolve("skip_all")}>
+              Skip all remaining errors
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

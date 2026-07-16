@@ -24,6 +24,7 @@ pub async fn enqueue_transfer(
         bytes_total: 0,
         bytes_transferred: 0,
         speed_bps: 0.0,
+        skipped_count: 0,
     };
     worker.sender.send(WorkerMessage::Enqueue(job))
         .await
@@ -64,6 +65,7 @@ pub async fn sftp_update_transfer_settings(
     max_concurrent: Option<usize>,
     chunk_size_bytes: Option<usize>,
     default_conflict_resolution: Option<String>,
+    on_folder_file_error: Option<String>,
     worker: tauri::State<'_, TransferWorkerState>,
 ) -> Result<(), String> {
     use std::sync::atomic::Ordering;
@@ -76,6 +78,11 @@ pub async fn sftp_update_transfer_settings(
     if let Some(v) = default_conflict_resolution {
         if matches!(v.as_str(), "ask" | "overwrite" | "skip") {
             *worker.settings.default_conflict_resolution.lock().unwrap() = v;
+        }
+    }
+    if let Some(v) = on_folder_file_error {
+        if matches!(v.as_str(), "ask" | "skip" | "abort") {
+            *worker.settings.on_folder_file_error.lock().unwrap() = v;
         }
     }
     Ok(())

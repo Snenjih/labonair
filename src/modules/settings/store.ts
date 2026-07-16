@@ -140,6 +140,7 @@ export type Preferences = {
   sftpMaxConcurrentTransfers: number;
   sftpDefaultConflictResolution: "ask" | "overwrite" | "skip";
   sftpChunkSizeKb: number;
+  sftpOnFolderFileError: "ask" | "skip" | "abort";
 
   // --- Command Palette ---
   commandPaletteBlur: number;
@@ -318,6 +319,7 @@ const KEY_SFTP_MAX_REMOTE_FILE_SIZE_MB = "sftpMaxRemoteFileSizeMb";
 const KEY_SFTP_MAX_CONCURRENT_TRANSFERS = "sftpMaxConcurrentTransfers";
 const KEY_SFTP_DEFAULT_CONFLICT_RESOLUTION = "sftpDefaultConflictResolution";
 const KEY_SFTP_CHUNK_SIZE_KB = "sftpChunkSizeKb";
+const KEY_SFTP_ON_FOLDER_FILE_ERROR = "sftpOnFolderFileError";
 const KEY_COMMAND_PALETTE_BLUR = "commandPaletteBlur";
 const KEY_COMMAND_PALETTE_OPACITY = "commandPaletteOpacity";
 const KEY_COMMAND_PALETTE_POSITION = "commandPalettePosition";
@@ -468,6 +470,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpMaxConcurrentTransfers: 2,
   sftpDefaultConflictResolution: "ask",
   sftpChunkSizeKb: 64,
+  sftpOnFolderFileError: "ask",
 
   commandPaletteBlur: 4,
   commandPaletteOpacity: 95,
@@ -718,6 +721,10 @@ export async function loadPreferences(): Promise<Preferences> {
       1024,
       Math.max(16, get<number>(KEY_SFTP_CHUNK_SIZE_KB) ?? DEFAULT_PREFERENCES.sftpChunkSizeKb),
     ),
+    sftpOnFolderFileError: ((): "ask" | "skip" | "abort" => {
+      const v = get<string>(KEY_SFTP_ON_FOLDER_FILE_ERROR);
+      return v === "skip" || v === "abort" ? v : "ask";
+    })(),
 
     commandPaletteBlur: get<number>(KEY_COMMAND_PALETTE_BLUR) ?? DEFAULT_PREFERENCES.commandPaletteBlur,
     commandPaletteOpacity:
@@ -1308,6 +1315,11 @@ export async function setSftpChunkSizeKb(value: number): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setSftpOnFolderFileError(value: "ask" | "skip" | "abort"): Promise<void> {
+  await (await getStore()).set(KEY_SFTP_ON_FOLDER_FILE_ERROR, value);
+  await (await getStore()).save();
+}
+
 export async function setCommandPaletteBlur(value: number): Promise<void> {
   await (await getStore()).set(KEY_COMMAND_PALETTE_BLUR, value);
   await (await getStore()).save();
@@ -1680,6 +1692,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SFTP_MAX_CONCURRENT_TRANSFERS]: "sftpMaxConcurrentTransfers",
     [KEY_SFTP_DEFAULT_CONFLICT_RESOLUTION]: "sftpDefaultConflictResolution",
     [KEY_SFTP_CHUNK_SIZE_KB]: "sftpChunkSizeKb",
+    [KEY_SFTP_ON_FOLDER_FILE_ERROR]: "sftpOnFolderFileError",
     [KEY_COMMAND_PALETTE_BLUR]: "commandPaletteBlur",
     [KEY_COMMAND_PALETTE_OPACITY]: "commandPaletteOpacity",
     [KEY_COMMAND_PALETTE_POSITION]: "commandPalettePosition",

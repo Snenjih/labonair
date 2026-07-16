@@ -17,6 +17,7 @@ function makeJob(id: string, status: TransferJob["status"] = "queued"): Transfer
     bytes_total: 1000,
     bytes_transferred: 0,
     speed_bps: 0,
+    skipped_count: 0,
   };
 }
 

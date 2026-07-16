@@ -16,7 +16,9 @@ export interface TransferJob {
   bytes_total: number;
   bytes_transferred: number;
   speed_bps: number;
+  skipped_count: number;
   conflict?: { src_path: string; dest_path: string };
+  file_error?: { path: string; error: string };
 }
 
 export interface TransferStep {
@@ -36,7 +38,7 @@ interface TransferState {
   cancelJob: (id: string) => Promise<void>;
   resolveConflict: (
     jobId: string,
-    resolution: "overwrite" | "skip" | "rename",
+    resolution: "overwrite" | "skip" | "rename" | "abort" | "skip_all",
     newName?: string,
   ) => Promise<void>;
 }
@@ -80,7 +82,9 @@ export const useTransferStore = create<TransferState>((set) => ({
   resolveConflict: async (jobId, resolution, newName) => {
     set((s) => ({
       jobs: s.jobs.map((j) =>
-        j.id === jobId ? { ...j, conflict: undefined, status: "running" as TransferStatus } : j,
+        j.id === jobId
+          ? { ...j, conflict: undefined, file_error: undefined, status: "running" as TransferStatus }
+          : j,
       ),
     }));
     await invoke("resolve_conflict", {
@@ -139,6 +143,20 @@ export async function bootstrapTransferListeners() {
       },
     });
   });
+
+  await listen<{ job_id: string; path: string; error: string }>("file_error", (event) => {
+    const store = useTransferStore.getState();
+    const job = store.jobs.find((j) => j.id === event.payload.job_id);
+    if (!job) return;
+    store.updateJob({
+      ...job,
+      status: "paused",
+      file_error: {
+        path: event.payload.path,
+        error: event.payload.error,
+      },
+    });
+  });
 }
 
 /** Pushes the worker-wide transfer settings (concurrency, chunk size,
@@ -153,6 +171,7 @@ async function pushTransferSettings(): Promise<void> {
       maxConcurrent: prefs.sftpMaxConcurrentTransfers,
       chunkSizeBytes: prefs.sftpChunkSizeKb * 1024,
       defaultConflictResolution: prefs.sftpDefaultConflictResolution,
+      onFolderFileError: prefs.sftpOnFolderFileError,
     });
   } catch (e) {
     console.warn("[sftp] failed to push transfer settings:", e);
@@ -169,7 +188,8 @@ export function bootstrapTransferSettingsSync(): void {
     if (
       state.sftpMaxConcurrentTransfers !== prev.sftpMaxConcurrentTransfers ||
       state.sftpChunkSizeKb !== prev.sftpChunkSizeKb ||
-      state.sftpDefaultConflictResolution !== prev.sftpDefaultConflictResolution
+      state.sftpDefaultConflictResolution !== prev.sftpDefaultConflictResolution ||
+      state.sftpOnFolderFileError !== prev.sftpOnFolderFileError
     ) {
       void pushTransferSettings();
     }

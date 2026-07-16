@@ -7,7 +7,7 @@ import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useConnectionStatusStore, useHostsStore } from "@/modules/hosts";
 import { toggleSftpHiddenFiles, usePreferencesStore } from "@/modules/settings/preferences";
-import type { SftpTab } from "@/modules/tabs";
+import { useTabsStore, type SftpTab } from "@/modules/tabs";
 import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
 import { isLabonairError } from "@/types";
 import { SftpContextMenu } from "./components/SftpContextMenu";
@@ -44,6 +44,10 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   } = useSftpStore();
   const tabState = tabs[tabId];
   const [isReconnecting, setIsReconnecting] = useState(false);
+  // SFTP tabs stay mounted (just visually hidden) when switched away from —
+  // guards the pane-container Ctrl/Cmd+A handler below against firing on a
+  // stale focus left behind in a now-hidden tab.
+  const isTabActive = useTabsStore((s) => s.activeId === tab.id);
 
   const hosts = useHostsStore((s) => s.hosts);
   const host = hosts.find((h) => h.id === tab.hostId);
@@ -149,6 +153,34 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     }
   }
 
+  /** Selects every file/folder currently shown in one pane (excluding the
+   *  synthetic ".." up-navigation row) — only the currently loaded page for
+   *  the remote pane, matching what's actually visible/counted in the UI. */
+  function handleSelectAll(side: "local" | "remote") {
+    if (side === "remote" && deepSearchResults !== null) return; // no bulk selection over search results
+    const files = side === "local" ? displayedLocalFiles : displayedRemoteFiles;
+    const paths = new Set(files.filter((f) => f.name !== "..").map((f) => f.path));
+    if (side === "local") {
+      setSelectedLocal(tabId, paths);
+    } else {
+      setSelectedRemote(tabId, paths);
+    }
+  }
+
+  /** Ctrl/Cmd+A inside a pane selects all its files instead of the browser's
+   *  default select-all-text. Only acts while this tab is the active one
+   *  (see `isTabActive`) and never intercepts typing in the rename/new-folder
+   *  inputs, which should keep normal text-selection behavior. */
+  function handlePaneKeyDown(side: "local" | "remote") {
+    return (e: React.KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return;
+      if (!isTabActive) return;
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "a") return;
+      e.preventDefault();
+      handleSelectAll(side);
+    };
+  }
+
   function handleLocalDoubleClick(file: FileNode) {
     if (file.name === "..") {
       loadLocalDir(tabId, parentPath(tabState?.localPath ?? "~"));
@@ -208,6 +240,15 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     setActiveDragSource(source);
     setDropHoveredPane(null);
 
+    // This is a manual pointer-based drag (not HTML5 DnD, which doesn't work
+    // reliably in WKWebView/Tauri — see the comment above `dragSourceRef`),
+    // so nothing stops the browser's normal text-selection behavior while the
+    // pointer moves across the rest of the app during the drag. Suppress it
+    // for the duration, restoring it once the drag ends however it ends
+    // (pointerup, or a cancel from e.g. an OS-level interruption).
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = "none";
+
     function getHoveredPane(x: number, y: number): "local" | "remote" | null {
       const lr = localPaneRef.current?.getBoundingClientRect();
       const rr = remotePaneRef.current?.getBoundingClientRect();
@@ -221,14 +262,19 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       setDropHoveredPane(hovered !== source ? hovered : null);
     }
 
-    function onUp(e: PointerEvent) {
+    function endDrag() {
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onCancel);
+      document.body.style.userSelect = previousUserSelect;
+    }
 
+    function onUp(e: PointerEvent) {
       const landed = getHoveredPane(e.clientX, e.clientY);
       const src = dragSourceRef.current;
       const paths = draggedPathsRef.current;
 
+      endDrag();
       dragSourceRef.current = null;
       draggedPathsRef.current = [];
       setActiveDragSource(null);
@@ -243,8 +289,17 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       }
     }
 
+    function onCancel() {
+      endDrag();
+      dragSourceRef.current = null;
+      draggedPathsRef.current = [];
+      setActiveDragSource(null);
+      setDropHoveredPane(null);
+    }
+
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp);
+    document.addEventListener("pointercancel", onCancel);
   }
 
   async function enqueueDownloads(remotePaths: string[]) {
@@ -436,7 +491,13 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
         {/* LOCAL */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <div ref={localPaneRef} className="flex flex-col h-full">
+          <div
+            ref={localPaneRef}
+            className="flex flex-col h-full outline-none"
+            tabIndex={-1}
+            onMouseDown={() => localPaneRef.current?.focus()}
+            onKeyDown={handlePaneKeyDown("local")}
+          >
             <PaneLabel
               label="LOCAL"
               count={displayedLocalFiles.length}
@@ -509,7 +570,13 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
 
         {/* REMOTE */}
         <ResizablePanel defaultSize={50} minSize={20}>
-          <div ref={remotePaneRef} className="flex flex-col h-full relative">
+          <div
+            ref={remotePaneRef}
+            className="flex flex-col h-full relative outline-none"
+            tabIndex={-1}
+            onMouseDown={() => remotePaneRef.current?.focus()}
+            onKeyDown={handlePaneKeyDown("remote")}
+          >
             <PaneLabel
               label={deepSearchResults !== null ? `SEARCH RESULTS (${deepSearchResults.length})` : "REMOTE"}
               count={deepSearchResults !== null ? deepSearchResults.length : displayedRemoteFiles.length}

@@ -571,6 +571,19 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "NumberInput",
   },
   {
+    id: "sftpOnFolderFileError",
+    label: "On file error in folder transfers",
+    description:
+      "What to do when an individual file fails during a folder transfer. \"Always ask\" shows the failing file and lets you abort, skip it, or skip all remaining errors in that transfer.",
+    category: "File Manager",
+    controlType: "Select",
+    options: [
+      { value: "ask", label: "Always ask" },
+      { value: "skip", label: "Always skip" },
+      { value: "abort", label: "Always abort" },
+    ],
+  },
+  {
     id: "gitStatusPollIntervalMs",
     label: "Source Control refresh interval",
     description:
