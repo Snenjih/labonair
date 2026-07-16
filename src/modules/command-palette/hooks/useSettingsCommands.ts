@@ -8,7 +8,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { createElement, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { usePreferencesStore } from "@/modules/settings/preferences";
+import { toggleSftpHiddenFiles, usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setTheme as persistTheme,
   setAppTheme,
@@ -215,9 +215,7 @@ export function useSettingsCommands(): {
       section: "Settings",
       contexts: ["sftp"],
       icon: createElement(HugeiconsIcon, { icon: EyeIcon, strokeWidth: 2, className: "size-4" }),
-      perform: () => {
-        window.dispatchEvent(new CustomEvent("labonair:sftp-toggle-hidden"));
-      },
+      perform: toggleSftpHiddenFiles,
     },
     {
       id: "settings.autocomplete",

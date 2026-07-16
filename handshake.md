@@ -57,6 +57,39 @@ Branch `russh-migration`, all changes uncommitted as of writing this entry (abou
 
 ---
 
+## Previous Session: 2026-07-11 (Full-App Review + review-fix-plan.md Execution — Workstreams A, B, D–O)
+
+### What Was Done
+Ran a full 6-agent review of the entire app (Rust backend, frontend state/perf, terminal/PTY, AI subsystem, SFTP/explorer, editor/source-control/snippets/settings) and personally verified the most severe findings against source before reporting. User picked which findings to fix, then reduced scope again to exclude anything tied to `ssh2`-specific architecture (see `russh-migration.md` — a real, not-yet-decided consideration to swap `ssh2` for `russh`). Plan approved and written to `review-fix-plan.md` (repo root) as 15 workstreams (A–O, C and N dropped, D/E/F trimmed). All workstreams except B are code-complete and committed:
+
+- **A** (`fb8af08`, `fix(ai)`): 6 AI-tool-security findings — SSH-remote `read_file`/`list_directory` now run `checkReadable` before `ssh_exec_command`; new `fs_realpath` Rust command + `checkReadableResolved`/`checkWritableResolved` catch symlinks; `grep`/`glob` filter individual hits, not just the search root; `checkShellCommand` strips `sudo`/`doas` and blocks secret-basename/path references (command substitution stays a documented limitation); generated SSH keypairs and remote-edit temp files created with `0600`/`0700` from the start (`OpenOptionsExt::mode`), closing a TOCTOU window.
+- **B** (`318c6a2`, `fix(terminal)`): the `isRemote` gate from the previous session was **incomplete** — xterm.js's own built-in, unguarded CSI `c`(DA1)/`n`(CPR) handlers were still answering for SSH sessions (verified by reading `@xterm/xterm` source, its last-registered-first CSI dispatch). New `registerTerminalQuerySwallowHandlers` wins that dispatch instead. **Not live-verified — see below, this is the actual blocker for the whole session.**
+- **D** (`2c02e67` co-commit, `fix(rust)`): `background.rs`'s kill-deadlock — reaper thread held the `child` mutex for its whole blocking `wait()`; `kill()` now signals by PID (`libc::kill`) instead of needing that lock.
+- **E** (same commit): `fs/mutate.rs`'s six local-FS commands wrapped in `spawn_blocking` (were plain sync fns doing blocking I/O on the async runtime).
+- **F** (same commit): `fs_grep`/`fs_glob` switched from `WalkBuilder::build()` to `build_parallel()`.
+- **G** (`a349e86`, `perf(tabs)`): `TabBar`/`SidebarTabList` no longer re-render on every unrelated tab-store mutation (new `selectRenderStableTabs`, value-memoized per tab id); `AppShell`'s `sidebarPassthrough`/Header props memoized so `React.memo` on `Header`/`WorkspaceArea` isn't defeated; `SidebarContent` now wrapped in `React.memo` too (wasn't before).
+- **H** (`3c7a497`, `fix(editor)`): autosave timer now re-arms on every keystroke (new `editVersion` counter in `useDocument`), not just once per file-open.
+- **I** (`993a0b6`, `fix(sftp,command-palette)`): the dead "Toggle Hidden Files" command now calls the real toggle (`toggleSftpHiddenFiles`, moved to `preferences.ts`) instead of a `CustomEvent` nobody listened for.
+- **J** (`6d470fb`, `fix(snippets)`): silent SSH snippet runs no longer leak listeners when no SSH session is active for the host.
+- **K** (`15a59b9`, `fix(terminal)`): dormant-scrollback flush no longer loses bytes on a failed/size-capped `scrollback_save` — `DormantRing.peekNew()` split into `previewNew()`/`commitFlushed()`.
+- **L** (`4fa32c2`, `perf(sftp,explorer)`): dual-pane SFTP tab and local sidebar explorer are now both paginated (`sftp_read_dir_page` reused; new `fs_read_dir_page` Rust command for local), matching the pagination the remote sidebar tree already had.
+- **M** (`406d4c1`, `fix(hosts)`): `deleteManyHosts` uses `Promise.allSettled` + notifies on partial failure instead of one failure blocking the whole batch's UI update; new `hosts_duplicate` Rust command replicates a duplicated host's stored password server-side (the frontend's `Host` read-shape never carries it).
+- **O** (`6ebd2f0`, `fix(git-graph)`): `Math.max(1, ...spread)` → `reduce` for lane-count (call-stack-size hazard on huge repos).
+
+Every commit passed `cargo check` + `cargo clippy --all-targets` + `cargo test --lib` (91/91 by the end, started at 85/85) and `tsc --noEmit` + `vitest run` (448/448 by the end, started at 432/432) before being made.
+
+### Current State
+Branch `performance-internals-optimazation`, all of A/D–O committed and locally ahead of `main` (not pushed). `review-fix-plan.md` at repo root has the full spec for every workstream if any needs re-deriving.
+
+### What's Next
+- **Workstream B is the one open item and is NOT verified live** — same headless-sandbox limitation as every prior SSH-TUI session on this exact bug (this is the third fix attempt total; see the two entries below for the first two, both of which were also marked done without live verification and turned out incomplete). **Do not consider this closed without a real `pnpm tauri dev` + SSH host test running `gh auth login` or `claude`.** If it's still broken after this fix, the query/reply layer needs live packet-level instrumentation (actual measured SSH round-trip time, whether `SSH_BATCH_MS`/`IDLE_POLL_MAX_MS` need lowering), not another static-reading pass — the static-analysis well has likely been fully drawn from at this point.
+- Once B is confirmed (or fixed further), this branch is ready for a PR against `main`.
+
+### Blockers
+- No display in this environment — Workstream B's manual verification step is blocked until a human runs it.
+
+---
+
 ## Previous Session: 2026-07-11 (SSH Interactive-TUI Corruption, Part 2 — Query-Reply Latency)
 
 ### What Was Done

@@ -1,22 +1,15 @@
+import { Folder01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useConnectionStatusStore, useHostsStore } from "@/modules/hosts";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setSftpShowHiddenFiles } from "@/modules/settings/store";
-import { Folder01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-
-function toggleHiddenFiles() {
-  const next = !usePreferencesStore.getState().sftpShowHiddenFiles;
-  usePreferencesStore.setState({ sftpShowHiddenFiles: next });
-  setSftpShowHiddenFiles(next);
-}
-import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
+import { toggleSftpHiddenFiles, usePreferencesStore } from "@/modules/settings/preferences";
 import type { SftpTab } from "@/modules/tabs";
+import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
 import { isLabonairError } from "@/types";
-import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
 import { SftpContextMenu } from "./components/SftpContextMenu";
 import { SftpToolbar } from "./components/SftpToolbar";
 import { VirtualizedFileList } from "./components/VirtualizedFileList";
@@ -43,6 +36,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     destroyTab,
     loadLocalDir,
     loadRemoteDir,
+    loadMoreRemoteDir,
     setSelectedLocal,
     setSelectedRemote,
     clearDisconnected,
@@ -450,7 +444,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
               path={localPath}
               onNavigate={(p) => loadLocalDir(tabId, p)}
               showHidden={sftpShowHiddenFiles}
-              onToggleHidden={toggleHiddenFiles}
+              onToggleHidden={toggleSftpHiddenFiles}
               bookmarkKey="local"
             />
             {creatingFolderSide === "local" && (
@@ -529,7 +523,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
               showOpenTerminal
               onOpenTerminal={() => onOpenSshTerminal?.(tab.hostId, hostLabel, remotePath)}
               showHidden={sftpShowHiddenFiles}
-              onToggleHidden={toggleHiddenFiles}
+              onToggleHidden={toggleSftpHiddenFiles}
               bookmarkKey={hostAddress || undefined}
               onDeepSearch={handleDeepSearch}
               isSearching={isDeepSearching}
@@ -634,6 +628,8 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                       onRenameChange={setRenameValue}
                       onRenameCommit={() => commitRename("remote")}
                       onRenameCancel={() => setRenamingPath(null)}
+                      hasMore={tabState?.remoteHasMore}
+                      onLoadMore={() => loadMoreRemoteDir(tabId)}
                     />
                   </div>
                 </SftpContextMenu>

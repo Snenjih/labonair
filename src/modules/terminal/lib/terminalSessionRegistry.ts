@@ -9,6 +9,7 @@ import {
   registerCwdHandler,
   registerPromptTracker,
   registerTerminalQueryHandlers,
+  registerTerminalQuerySwallowHandlers,
   type ShellIntegrationState,
 } from "./osc-handlers";
 import {
@@ -25,6 +26,8 @@ import {
   focusSlot as poolFocusSlot,
   refreshLeafSlot,
   releaseSlot,
+  writeLiveBytes,
+  writeLiveText,
 } from "./rendererPool";
 
 /** What a session supplies to write/resize/kick its underlying connection.
@@ -103,6 +106,16 @@ type SessionRecord = {
    *  well-behaved terminal program must already support for terminals with no
    *  CPR/DA1 support at all. */
   isRemote: boolean;
+  /** Date.now() of the last output chunk delivered for this session, 0 until
+   *  the first ever arrives. Drives the isRemote busy fallback below — SSH
+   *  sessions have no local shell PID to tcgetpgrp (unlike
+   *  checkForegroundJob), and OSC 133 only graduates for remote zsh/bash
+   *  (see ssh/shell_integration.rs's shell case statement), so any other
+   *  remote shell never sets commandRunning and would otherwise get its
+   *  hidden slot released — and its scrollback silently dropped into the
+   *  byte-capped DormantRing — while genuinely producing output. */
+  lastOutputAt: number;
+  outputQuietTimer: ReturnType<typeof setTimeout> | null;
 };
 
 const sessions = new Map<string, SessionRecord>();
@@ -146,9 +159,15 @@ function applyComposerCursor(s: SessionRecord, term: Terminal): void {
 }
 
 const HIDDEN_RELEASE_DELAY_MS = 300;
+// isRemote-only fallback busy signal — see SessionRecord.lastOutputAt. Long
+// enough to bridge typical pauses in chatty build/log output, short enough
+// that a genuinely finished session still frees its slot promptly. Tunable.
+const SSH_IDLE_OUTPUT_MS = 5000;
 
 function leafBusy(s: SessionRecord): boolean {
-  return s.commandRunning;
+  if (s.commandRunning) return true;
+  if (s.isRemote && Date.now() - s.lastOutputAt < SSH_IDLE_OUTPUT_MS) return true;
+  return false;
 }
 
 function cancelHiddenRelease(s: SessionRecord): void {
@@ -158,6 +177,19 @@ function cancelHiddenRelease(s: SessionRecord): void {
   }
 }
 
+function cancelOutputQuietTimer(s: SessionRecord): void {
+  if (s.outputQuietTimer !== null) {
+    clearTimeout(s.outputQuietTimer);
+    s.outputQuietTimer = null;
+  }
+}
+
+function attemptHiddenRelease(sessionId: string, s: SessionRecord): void {
+  if (s.disposed || s.visible || !s.hasSlot) return;
+  if (isLeafAltScreen(sessionId) || leafBusy(s)) return;
+  unbindLeafFromSlot(sessionId, s);
+}
+
 // A hidden session went idle (command finished): give the post-command
 // prompt a moment to render into the live buffer, then hand the slot back.
 function scheduleHiddenRelease(sessionId: string, s: SessionRecord): void {
@@ -165,10 +197,21 @@ function scheduleHiddenRelease(sessionId: string, s: SessionRecord): void {
   cancelHiddenRelease(s);
   s.hiddenReleaseTimer = setTimeout(() => {
     s.hiddenReleaseTimer = null;
-    if (s.disposed || s.visible || !s.hasSlot) return;
-    if (isLeafAltScreen(sessionId) || leafBusy(s)) return;
-    unbindLeafFromSlot(sessionId, s);
+    attemptHiddenRelease(sessionId, s);
   }, HIDDEN_RELEASE_DELAY_MS);
+}
+
+// isRemote-only: re-armed on every output chunk delivered while hidden (see
+// deliverBytes/deliverText) so a session that's continuously producing
+// output but never graduates OSC 133 (see SessionRecord.lastOutputAt) keeps
+// getting re-checked instead of being released mid-stream after the one-shot
+// scheduleHiddenRelease/releaseIfIdle triggers it never otherwise gets.
+function scheduleOutputQuietRelease(sessionId: string, s: SessionRecord): void {
+  cancelOutputQuietTimer(s);
+  s.outputQuietTimer = setTimeout(() => {
+    s.outputQuietTimer = null;
+    attemptHiddenRelease(sessionId, s);
+  }, SSH_IDLE_OUTPUT_MS);
 }
 
 async function checkForegroundBusy(s: SessionRecord): Promise<boolean> {
@@ -182,9 +225,8 @@ async function checkForegroundBusy(s: SessionRecord): Promise<boolean> {
 
 async function releaseIfIdle(sessionId: string, s: SessionRecord): Promise<void> {
   const busy = await checkForegroundBusy(s);
-  if (busy || s.disposed || s.visible || !s.hasSlot) return;
-  if (isLeafAltScreen(sessionId) || leafBusy(s)) return;
-  unbindLeafFromSlot(sessionId, s);
+  if (busy) return;
+  attemptHiddenRelease(sessionId, s);
 }
 
 function bindLeafToSlot(sessionId: string, s: SessionRecord): void {
@@ -225,8 +267,12 @@ function bindLeafToSlot(sessionId: string, s: SessionRecord): void {
         },
         s.shellState,
       );
-      // Skipped for SSH — see SessionRecord.isRemote.
-      const query = s.isRemote ? () => {} : registerTerminalQueryHandlers(term, (d) => s.bridge.writeToPty(d));
+      // SSH sessions get the swallow-only variant, not "skipped" — see
+      // registerTerminalQuerySwallowHandlers's doc comment for why leaving
+      // no handler registered here would NOT actually mean unanswered.
+      const query = s.isRemote
+        ? registerTerminalQuerySwallowHandlers(term)
+        : registerTerminalQueryHandlers(term, (d) => s.bridge.writeToPty(d));
       return [prompt.dispose, cwd, query];
     },
     onSearchReady: (addon) => s.callbacks.onSearchReady?.(addon),
@@ -313,6 +359,8 @@ export function registerSession(opts: RegisterOptions): void {
     urlDecoder: new TextDecoder("utf-8", { fatal: false }),
     lastDetectedUrl: null,
     isRemote: opts.isRemote ?? false,
+    lastOutputAt: 0,
+    outputQuietTimer: null,
   });
 }
 
@@ -477,6 +525,7 @@ export function setVisible(sessionId: string, visible: boolean): void {
   s.visible = visible;
   if (visible) {
     cancelHiddenRelease(s);
+    cancelOutputQuietTimer(s);
     if (s.container && !s.hasSlot) bindLeafToSlot(sessionId, s);
     else if (s.hasSlot) refreshLeafSlot(sessionId);
     if (s.focused) poolFocusSlot(sessionId);
@@ -532,6 +581,9 @@ export function deliverBytes(sessionId: string, bytes: Uint8Array): void {
   const s = sessions.get(sessionId);
   if (!s) return;
 
+  s.lastOutputAt = Date.now();
+  if (s.isRemote && !s.visible && s.hasSlot) scheduleOutputQuietRelease(sessionId, s);
+
   // Sniff for dev-server URLs regardless of slot binding — cheap byte-level
   // prefilter, runs the same whether output is live-rendered or dormant.
   if (s.callbacks.onDetectedLocalUrl && containsSchemeSeparator(bytes)) {
@@ -548,10 +600,9 @@ export function deliverBytes(sessionId: string, bytes: Uint8Array): void {
 
   // A retained-but-parked slot still parses live (rendering is merely
   // paused) — only a truly unbound session falls back to the byte ring.
-  const slot = getLiveSlotForLeaf(sessionId);
-  if (slot) {
-    slot.term.write(bytes);
-  } else {
+  // writeLiveBytes queues instead of writing if a chunked cold-rebind replay
+  // is in flight for this slot, so historical bytes are never overtaken.
+  if (!writeLiveBytes(sessionId, bytes)) {
     s.dormantRing.push(bytes);
     // A bound slot gets BEL via xterm's own onBell (wired once per pool slot);
     // a dormant session has no live parser, so scan the raw bytes instead.
@@ -568,6 +619,9 @@ export function deliverText(sessionId: string, text: string): void {
   const s = sessions.get(sessionId);
   if (!s) return;
 
+  s.lastOutputAt = Date.now();
+  if (s.isRemote && !s.visible && s.hasSlot) scheduleOutputQuietRelease(sessionId, s);
+
   if (s.callbacks.onDetectedLocalUrl && text.includes("://")) {
     const matches = text.match(LOCAL_URL_RE);
     if (matches && matches.length > 0) {
@@ -579,10 +633,7 @@ export function deliverText(sessionId: string, text: string): void {
     }
   }
 
-  const slot = getLiveSlotForLeaf(sessionId);
-  if (slot) {
-    slot.term.write(text);
-  } else {
+  if (!writeLiveText(sessionId, text)) {
     s.dormantRing.push(new TextEncoder().encode(text));
     if (text.includes("\x07")) playBell();
   }
@@ -602,8 +653,10 @@ export function resetForReconnect(sessionId: string): void {
   s.commandRunning = false;
   s.shellExited = false;
   s.shellIntegrationSeen = false;
+  s.lastOutputAt = 0;
   notifyIntegrationState(sessionId);
   cancelHiddenRelease(s);
+  cancelOutputQuietTimer(s);
   const slot = getSlotForLeaf(sessionId);
   if (slot) {
     slot.term.options.disableStdin = false;
@@ -692,19 +745,30 @@ export function getAllSessionIds(): string[] {
 }
 
 /** Non-destructive read of a dormant session's buffered output *since the
- *  last call* — used for the periodic/quit-time scrollback flush, which must
- *  not consume the ring (a later reactivation still needs it to replay) but
- *  also must not re-return already-flushed bytes on every tick (that would
- *  duplicate the same output onto disk every 30s for a long-backgrounded
- *  session — see peekNew()). */
+ *  last committed flush* — used for the periodic/quit-time scrollback
+ *  flush, which must not consume the ring (a later reactivation still needs
+ *  it to replay) but also must not re-return already-flushed bytes on every
+ *  tick (that would duplicate the same output onto disk every 30s for a
+ *  long-backgrounded session — see DormantRing.previewNew()).
+ *
+ *  Does NOT mark the returned bytes as flushed — call `commitDormantFlush`
+ *  once they've actually been persisted, so a failed/size-capped
+ *  `scrollback_save` doesn't lose them. */
 export function peekDormantAnsi(sessionId: string): string | null {
   const s = sessions.get(sessionId);
   if (!s) return null;
   const decoder = new TextDecoder("utf-8", { fatal: false });
   const parts: string[] = [];
-  s.dormantRing.peekNew((bytes) => parts.push(decoder.decode(bytes, { stream: true })));
+  s.dormantRing.previewNew((bytes) => parts.push(decoder.decode(bytes, { stream: true })));
   const text = parts.join("");
   return text || null;
+}
+
+/** Marks a dormant session's most recently `peekDormantAnsi`-previewed bytes
+ *  as durably flushed — call only after the corresponding `scrollback_save`
+ *  actually succeeded. */
+export function commitDormantFlush(sessionId: string): void {
+  sessions.get(sessionId)?.dormantRing.commitFlushed();
 }
 
 /** Tab/pane close: frees a bound or merely-retained slot (no-op if neither
@@ -715,6 +779,7 @@ export function disposeSession(sessionId: string): void {
   if (!s) return;
   s.disposed = true;
   cancelHiddenRelease(s);
+  cancelOutputQuietTimer(s);
   disposeLeafSlot(sessionId);
   s.hasSlot = false;
   s.snapshot = null;

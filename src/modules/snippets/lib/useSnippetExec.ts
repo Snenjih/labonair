@@ -101,8 +101,12 @@ export function useSnippetExec({
         lines: [],
       });
       onOpenLogDrawer();
-      registerRunListeners(runId);
 
+      // registerRunListeners is deferred until just before the invoke() call
+      // that will actually trigger `snippet_run_done` — the SSH branch below
+      // can bail out (no active session) before ever invoking, and
+      // registering listeners for a runId that never gets a matching "done"
+      // event leaks them until this hook unmounts.
       if (snippet.target === "ssh") {
         // Find an active SSH session for this host
         const sshSession = findSshSessionForHost(tabs, snippet.hostId);
@@ -118,6 +122,7 @@ export function useSnippetExec({
           });
           return;
         }
+        registerRunListeners(runId);
         try {
           await invoke("snippet_run_ssh", {
             runId,
@@ -129,6 +134,7 @@ export function useSnippetExec({
           appendRunLine(runId, String(err) + "\n", "stderr");
         }
       } else {
+        registerRunListeners(runId);
         try {
           await invoke("snippet_run_local", {
             runId,

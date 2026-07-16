@@ -51,6 +51,22 @@ pub struct FileStat {
     pub kind: StatKind,
 }
 
+/// Resolves symlinks and returns the canonical absolute path. Used by the AI
+/// tool layer (`src/modules/ai/lib/security.ts`'s `checkReadableResolved`/
+/// `checkWritableResolved`) to re-check the deny-list against a symlink's
+/// actual target, not just the literal path the model asked for.
+#[tauri::command]
+pub async fn fs_realpath(path: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        let p = expand_home(&path)?;
+        std::fs::canonicalize(&p)
+            .map(|c| c.to_string_lossy().to_string())
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn fs_read_file(path: String, max_bytes: Option<u64>) -> Result<ReadResult, String> {
     let limit = max_bytes.unwrap_or(MAX_READ_BYTES);

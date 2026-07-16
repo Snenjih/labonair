@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { native } from "../lib/native";
-import { checkWritable } from "../lib/security";
+import { checkWritableResolved } from "../lib/security";
 import { newQueuedEditId, usePlanStore } from "../store/planStore";
 import { resolvePath, type ToolContext } from "./context";
 
@@ -116,7 +116,7 @@ export function buildEditTools(ctx: ToolContext) {
       needsApproval: true,
       execute: async ({ path, old_string, new_string, replace_all }) => {
         const abs = resolvePath(path, ctx.getCwd());
-        const safety = checkWritable(abs);
+        const safety = await checkWritableResolved(abs);
         if (!safety.ok) return { error: safety.reason, path: abs };
         if (!ctx.readCache.has(abs)) {
           return {
@@ -146,7 +146,7 @@ export function buildEditTools(ctx: ToolContext) {
       needsApproval: true,
       execute: async ({ path, edits }) => {
         const abs = resolvePath(path, ctx.getCwd());
-        const safety = checkWritable(abs);
+        const safety = await checkWritableResolved(abs);
         if (!safety.ok) return { error: safety.reason, path: abs };
         if (!ctx.readCache.has(abs)) {
           return {

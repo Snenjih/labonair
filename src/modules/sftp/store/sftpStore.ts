@@ -12,11 +12,21 @@ interface DirEntry {
   mtime: number; // milliseconds
 }
 
+interface SftpReadDirPage {
+  entries: FileNode[];
+  has_more: boolean;
+  next_offset: number | null;
+}
+
 interface SftpTabState {
   localPath: string;
   remotePath: string;
   localFiles: FileNode[];
   remoteFiles: FileNode[];
+  /** Whether the remote directory has more entries beyond `remoteFiles` —
+   *  drives the "Load more…" row. Local listing is never paginated
+   *  server-side (fs_read_dir always returns everything in one shot). */
+  remoteHasMore: boolean;
   isLoadingLocal: boolean;
   isLoadingRemote: boolean;
   selectedLocalPaths: Set<string>;
@@ -39,6 +49,9 @@ interface SftpStore {
 
   loadLocalDir: (tabId: string, path: string) => Promise<void>;
   loadRemoteDir: (tabId: string, path: string) => Promise<void>;
+  /** Appends the next page of the current remote directory (offset =
+   *  `remoteFiles.length`). No-op if already loading or there's nothing more. */
+  loadMoreRemoteDir: (tabId: string) => Promise<void>;
 
   setSelectedLocal: (tabId: string, paths: Set<string>) => void;
   setSelectedRemote: (tabId: string, paths: Set<string>) => void;
@@ -52,6 +65,7 @@ const DEFAULT_TAB_STATE = (): SftpTabState => ({
   remotePath: "/",
   localFiles: [],
   remoteFiles: [],
+  remoteHasMore: false,
   isLoadingLocal: false,
   isLoadingRemote: false,
   selectedLocalPaths: new Set(),
@@ -74,7 +88,7 @@ function mapDirEntry(parentPath: string, entry: DirEntry): FileNode {
   };
 }
 
-export const useSftpStore = create<SftpStore>((set) => ({
+export const useSftpStore = create<SftpStore>((set, get) => ({
   tabs: {},
 
   initTab: (tabId, initialRemotePath = "/") => {
@@ -151,13 +165,25 @@ export const useSftpStore = create<SftpStore>((set) => ({
       },
     }));
     try {
-      const files = await invoke<FileNode[]>("sftp_read_dir", { sessionId: tabId, path });
+      // Paginated (sftp_read_dir_page) instead of the one-shot sftp_read_dir
+      // — a directory with tens of thousands of entries no longer fetches
+      // (and per-symlink readlinks) everything in a single IPC round trip.
+      // show_hidden:true mirrors loadLocalDir's fs_read_dir call — hidden-file
+      // filtering stays entirely client-side (SftpPane's buildFileList), so
+      // that logic doesn't need to change.
+      const page = await invoke<SftpReadDirPage>("sftp_read_dir_page", {
+        sessionId: tabId,
+        path,
+        offset: 0,
+        showHidden: true,
+      });
       set((s) => ({
         tabs: {
           ...s.tabs,
           [tabId]: {
             ...s.tabs[tabId],
-            remoteFiles: files,
+            remoteFiles: page.entries,
+            remoteHasMore: page.has_more,
             remotePath: path,
             isLoadingRemote: false,
           },
@@ -165,6 +191,45 @@ export const useSftpStore = create<SftpStore>((set) => ({
       }));
     } catch (e) {
       handleApiError(e, "Failed to load remote directory", "SFTP");
+      set((s) => ({
+        tabs: {
+          ...s.tabs,
+          [tabId]: {
+            ...s.tabs[tabId],
+            isLoadingRemote: false,
+            error: isLabonairError(e) ? e.message : String(e),
+          },
+        },
+      }));
+    }
+  },
+
+  loadMoreRemoteDir: async (tabId) => {
+    const tab = get().tabs[tabId];
+    if (!tab || tab.isLoadingRemote || !tab.remoteHasMore) return;
+    set((s) => ({
+      tabs: { ...s.tabs, [tabId]: { ...s.tabs[tabId], isLoadingRemote: true } },
+    }));
+    try {
+      const page = await invoke<SftpReadDirPage>("sftp_read_dir_page", {
+        sessionId: tabId,
+        path: tab.remotePath,
+        offset: tab.remoteFiles.length,
+        showHidden: true,
+      });
+      set((s) => ({
+        tabs: {
+          ...s.tabs,
+          [tabId]: {
+            ...s.tabs[tabId],
+            remoteFiles: [...s.tabs[tabId].remoteFiles, ...page.entries],
+            remoteHasMore: page.has_more,
+            isLoadingRemote: false,
+          },
+        },
+      }));
+    } catch (e) {
+      handleApiError(e, "Failed to load more remote entries", "SFTP");
       set((s) => ({
         tabs: {
           ...s.tabs,

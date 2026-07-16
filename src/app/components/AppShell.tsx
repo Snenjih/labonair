@@ -1,4 +1,5 @@
 import { MotionConfig } from "motion/react";
+import { useCallback, useMemo } from "react";
 import { AiOverlays, CloseDialogs, SidebarContent, WorkspaceArea } from "@/app/components";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -101,7 +102,16 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
   // bar-mount condition).
   const terminalComposerEnabled = usePreferencesStore((s) => s.terminalComposerEnabled);
 
-  const onNewGitGraph = () => {
+  // Shared between `sidebarPassthrough` and the direct <Header> props below
+  // — memoized once rather than as separate inline closures in each spot.
+  const onNewPreview = useCallback(() => tabs.openPreviewTab(""), [tabs.openPreviewTab]);
+  const onNewEditor = useCallback(() => void actions.openUntitledTab(), [actions.openUntitledTab]);
+  const onOpenShortcuts = useCallback(() => ctrl.setShortcutsOpen(true), [ctrl.setShortcutsOpen]);
+  const onOpenSettings = useCallback(() => void openSettingsWindow(), []);
+  const onOpenKeybindings = useCallback(() => void openSettingsWindow("shortcuts"), []);
+  const onOpenThemes = useCallback(() => useCommandStore.getState().openToPage("themes"), []);
+
+  const onNewGitGraph = useCallback(() => {
     const { repoRoot, currentBranch } = useSourceControlStore.getState();
     // hostId/sessionId come from the always-live explorerTarget (derived
     // from the active tab) rather than the Source Control store, which only
@@ -113,56 +123,92 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     const hostId = target.type === "remote" ? target.hostId : undefined;
     const sessionId = target.type === "remote" ? target.sessionId : undefined;
     tabs.openGitGraphTab(path, currentBranch, hostId, sessionId);
-  };
+  }, [ctrl.explorerTarget, ctrl.explorerRoot, tabs.openGitGraphTab]);
 
-  const sidebarPassthrough = {
-    sidebarRef: sidebar.sidebarRef,
-    activePanel: sidebar.activePanel,
-    setActivePanel: sidebar.setActivePanel,
-    onSidebarResize: sidebar.onSidebarResize,
-    explorerTarget: ctrl.explorerTarget,
-    onSelect: actions.setActiveId,
-    onNew: tabs.openNewTab,
-    onNewPreview: () => tabs.openPreviewTab(""),
-    onNewEditor: () => void actions.openUntitledTab(),
-    onNewSsh: actions.newSshTab,
-    onNewSftp: actions.newSftpTab,
-    onOpenHostManager: tabs.onOpenHostManager,
-    onClose: tabs.handleClose,
-    onCloseOthers: tabs.handleCloseOthers,
-    onCloseAll: tabs.handleCloseAll,
-    onCloseByKind: tabs.handleCloseByKind,
-    onDuplicate: tabs.handleDuplicateTab,
-    onRename: tabs.handleRenameTab,
-    onOpenFile: tabs.handleOpenFile,
-    onOpenPreview: tabs.openPreviewTab,
-    onPathRenamed: tabs.handlePathRenamed,
-    onPathDeleted: tabs.handlePathDeleted,
-    onRevealInTerminal: tabs.cdInNewTab,
-    onAttachToAgent: ai.handleAttachFileToAgent,
-    onOpenRemoteFile: (
-      sessionId: string,
-      path: string,
-      hostId: string,
-      source: "sftp-tab" | "lazy-session",
-    ) => {
-      void actions.openRemoteEditorTab(sessionId, path, hostId, source);
-    },
-    onOpenRemotePreview: (
-      sessionId: string,
-      path: string,
-      hostId: string,
-      source: "sftp-tab" | "lazy-session",
-    ) => {
-      void actions.openRemotePreviewTab(sessionId, path, hostId, source);
-    },
-    onOpenSftpTab: (hostId: string, title: string) => {
-      actions.newSftpTab(hostId, title);
-    },
-    onSnippetRun: tabs.handleSnippetRun,
-    onOpenGitGraph: tabs.openGitGraphTab,
-    onNewGitGraph,
-  };
+  // Memoized so SidebarContent (React.memo) and Header (React.memo) don't
+  // re-render on every AppShell render (e.g. every tab switch, which changes
+  // `activeId`/`activeTabKind` above) purely because this object/its inline
+  // closures got new identities — see review-fix-plan.md Workstream G.
+  const sidebarPassthrough = useMemo(
+    () => ({
+      sidebarRef: sidebar.sidebarRef,
+      activePanel: sidebar.activePanel,
+      setActivePanel: sidebar.setActivePanel,
+      onSidebarResize: sidebar.onSidebarResize,
+      explorerTarget: ctrl.explorerTarget,
+      onSelect: actions.setActiveId,
+      onNew: tabs.openNewTab,
+      onNewPreview,
+      onNewEditor,
+      onNewSsh: actions.newSshTab,
+      onNewSftp: actions.newSftpTab,
+      onOpenHostManager: tabs.onOpenHostManager,
+      onClose: tabs.handleClose,
+      onCloseOthers: tabs.handleCloseOthers,
+      onCloseAll: tabs.handleCloseAll,
+      onCloseByKind: tabs.handleCloseByKind,
+      onDuplicate: tabs.handleDuplicateTab,
+      onRename: tabs.handleRenameTab,
+      onOpenFile: tabs.handleOpenFile,
+      onOpenPreview: tabs.openPreviewTab,
+      onPathRenamed: tabs.handlePathRenamed,
+      onPathDeleted: tabs.handlePathDeleted,
+      onRevealInTerminal: tabs.cdInNewTab,
+      onAttachToAgent: ai.handleAttachFileToAgent,
+      onOpenRemoteFile: (
+        sessionId: string,
+        path: string,
+        hostId: string,
+        source: "sftp-tab" | "lazy-session",
+      ) => {
+        void actions.openRemoteEditorTab(sessionId, path, hostId, source);
+      },
+      onOpenRemotePreview: (
+        sessionId: string,
+        path: string,
+        hostId: string,
+        source: "sftp-tab" | "lazy-session",
+      ) => {
+        void actions.openRemotePreviewTab(sessionId, path, hostId, source);
+      },
+      onOpenSftpTab: (hostId: string, title: string) => {
+        actions.newSftpTab(hostId, title);
+      },
+      onSnippetRun: tabs.handleSnippetRun,
+      onOpenGitGraph: tabs.openGitGraphTab,
+      onNewGitGraph,
+    }),
+    [
+      sidebar.sidebarRef,
+      sidebar.activePanel,
+      sidebar.setActivePanel,
+      sidebar.onSidebarResize,
+      ctrl.explorerTarget,
+      actions.setActiveId,
+      tabs.openNewTab,
+      onNewPreview,
+      onNewEditor,
+      tabs.openPreviewTab,
+      actions.newSshTab,
+      actions.newSftpTab,
+      tabs.onOpenHostManager,
+      tabs.handleClose,
+      tabs.handleCloseOthers,
+      tabs.handleCloseAll,
+      tabs.handleCloseByKind,
+      tabs.handleDuplicateTab,
+      tabs.handleRenameTab,
+      tabs.handleOpenFile,
+      tabs.handlePathRenamed,
+      tabs.handlePathDeleted,
+      tabs.cdInNewTab,
+      ai.handleAttachFileToAgent,
+      actions.openRemoteEditorTab,
+      actions.openRemotePreviewTab,
+      tabs.handleSnippetRun,
+      onNewGitGraph,
+    ],
+  );
 
   // Shared by both Header (JumpHostDropdown's Explorer pill fallback) and
   // StatusBar (panel switcher buttons) so the "hosts" special-case only
@@ -186,8 +232,8 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
               <Header
                 onSelect={actions.setActiveId}
                 onNew={tabs.openNewTab}
-                onNewPreview={() => tabs.openPreviewTab("")}
-                onNewEditor={() => void actions.openUntitledTab()}
+                onNewPreview={onNewPreview}
+                onNewEditor={onNewEditor}
                 onNewSsh={actions.newSshTab}
                 onNewSftp={actions.newSftpTab}
                 onClose={tabs.handleClose}
@@ -196,11 +242,11 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onCloseByKind={tabs.handleCloseByKind}
                 onDuplicate={tabs.handleDuplicateTab}
                 onRename={tabs.handleRenameTab}
-                onOpenShortcuts={() => ctrl.setShortcutsOpen(true)}
-                onOpenSettings={() => void openSettingsWindow()}
-                onOpenKeybindings={() => void openSettingsWindow("shortcuts")}
+                onOpenShortcuts={onOpenShortcuts}
+                onOpenSettings={onOpenSettings}
+                onOpenKeybindings={onOpenKeybindings}
                 onOpenHostManager={tabs.onOpenHostManager}
-                onOpenThemes={() => useCommandStore.getState().openToPage("themes")}
+                onOpenThemes={onOpenThemes}
                 onNewGitGraph={onNewGitGraph}
                 onPanelToggle={handlePanelToggle}
               />

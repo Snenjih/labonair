@@ -58,14 +58,21 @@ export function buildSearchTools(ctx: ToolContext) {
             caseInsensitive: case_insensitive,
             maxResults: max_results,
           });
-          return {
-            root: r.path,
-            hits: res.hits.map((h) => ({
+          // The root passed the deny-list, but individual hits can still fall
+          // inside a protected subpath (e.g. a `.env` or `.git/config` under
+          // an otherwise-fine workspace root) — filter those out per-hit
+          // rather than refusing the whole search.
+          const hits = res.hits
+            .filter((h) => checkReadable(h.path).ok)
+            .map((h) => ({
               path: h.path,
               rel: h.rel,
               line: h.line,
               text: h.text,
-            })),
+            }));
+          return {
+            root: r.path,
+            hits,
             truncated: res.truncated,
             files_scanned: res.files_scanned,
           };
@@ -94,9 +101,11 @@ export function buildSearchTools(ctx: ToolContext) {
             root: r.path,
             maxResults: max_results,
           });
+          // Same per-hit filtering rationale as `grep` above.
+          const hits = res.hits.filter((h) => checkReadable(h.path).ok);
           return {
             root: r.path,
-            hits: res.hits,
+            hits,
             truncated: res.truncated,
           };
         } catch (e) {
