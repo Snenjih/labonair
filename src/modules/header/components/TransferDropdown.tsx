@@ -42,7 +42,7 @@ export function TransferDropdown() {
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-[360px] p-0 max-h-[480px] flex flex-col">
+        <PopoverContent align="end" className="w-[405px] p-0 max-h-[540px] flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
             <span className="text-sm font-semibold">Transfers</span>
             <button

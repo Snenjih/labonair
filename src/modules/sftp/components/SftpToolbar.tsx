@@ -91,8 +91,13 @@ export function SftpToolbar({
         <HugeiconsIcon icon={ArrowUp01Icon} size={13} />
       </Button>
 
-      {/* Path input */}
+      {/* Path input — tabIndex={-1} like every other control in this toolbar,
+          so it can only ever gain focus via a deliberate click (never via
+          Tab-order or a stray default-focus assignment), which is what lets
+          Ctrl/Cmd+A safely fall through to normal select-all-text here only
+          while genuinely being edited. */}
       <input
+        tabIndex={-1}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         onKeyDown={(e) => {

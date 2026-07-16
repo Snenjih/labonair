@@ -45,9 +45,15 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   const tabState = tabs[tabId];
   const [isReconnecting, setIsReconnecting] = useState(false);
   // SFTP tabs stay mounted (just visually hidden) when switched away from —
-  // guards the pane-container Ctrl/Cmd+A handler below against firing on a
-  // stale focus left behind in a now-hidden tab.
+  // guards the Ctrl/Cmd+A handling below against firing on a tab the user
+  // can't currently see.
   const isTabActive = useTabsStore((s) => s.activeId === tab.id);
+  // Which pane the user last interacted with (click on a row, empty space,
+  // or the toolbar) — tracked as plain state rather than relying on real DOM
+  // focus, since forcing focus onto the pane container on every click would
+  // fight with clicking directly into an actual input (path field, rename,
+  // new-folder) for genuine text editing.
+  const [activePane, setActivePane] = useState<"local" | "remote" | null>(null);
 
   const hosts = useHostsStore((s) => s.hosts);
   const host = hosts.find((h) => h.id === tab.hostId);
@@ -167,19 +173,33 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     }
   }
 
-  /** Ctrl/Cmd+A inside a pane selects all its files instead of the browser's
-   *  default select-all-text. Only acts while this tab is the active one
-   *  (see `isTabActive`) and never intercepts typing in the rename/new-folder
-   *  inputs, which should keep normal text-selection behavior. */
-  function handlePaneKeyDown(side: "local" | "remote") {
-    return (e: React.KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
-      if (!isTabActive) return;
+  // Keeps a window-level keydown listener (registered once below) calling
+  // the latest `handleSelectAll` without needing to re-subscribe it on every
+  // render just because the displayed file lists changed.
+  const handleSelectAllRef = useRef(handleSelectAll);
+  handleSelectAllRef.current = handleSelectAll;
+
+  // Ctrl/Cmd+A selects all files in whichever pane was last clicked, instead
+  // of the browser's default select-all-text — a window-level listener
+  // (rather than a per-pane onKeyDown) because it must also fire for clicks
+  // on plain, non-focusable row/empty-space elements that never receive real
+  // DOM focus. Bails out whenever the currently focused element is an actual
+  // `<input>` (rename, new-folder-name, deep search, or the path field once
+  // the user has deliberately clicked into it) so normal text editing keeps
+  // its native select-all behavior; the path field itself additionally gets
+  // `tabIndex={-1}` (see `SftpToolbar.tsx`) so it can only ever gain focus
+  // through such a deliberate click, never by accident.
+  useEffect(() => {
+    function onWindowKeyDown(e: KeyboardEvent) {
+      if (!isTabActive || !activePane) return;
+      if (document.activeElement instanceof HTMLInputElement) return;
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "a") return;
       e.preventDefault();
-      handleSelectAll(side);
-    };
-  }
+      handleSelectAllRef.current(activePane);
+    }
+    window.addEventListener("keydown", onWindowKeyDown);
+    return () => window.removeEventListener("keydown", onWindowKeyDown);
+  }, [isTabActive, activePane]);
 
   function handleLocalDoubleClick(file: FileNode) {
     if (file.name === "..") {
@@ -493,10 +513,14 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
         <ResizablePanel defaultSize={50} minSize={20}>
           <div
             ref={localPaneRef}
-            className="flex flex-col h-full outline-none"
-            tabIndex={-1}
-            onMouseDown={() => localPaneRef.current?.focus()}
-            onKeyDown={handlePaneKeyDown("local")}
+            className="flex flex-col h-full"
+            // `onPointerDown` (not `onMouseDown`/`onClick`) so this still
+            // fires even when an inner handler (e.g. the marquee-select
+            // empty-space handler in VirtualizedFileList) calls
+            // `preventDefault()` on its own pointerdown — that only
+            // suppresses the browser's compatibility mouse events, not
+            // pointerdown itself or its bubbling.
+            onPointerDown={() => setActivePane("local")}
           >
             <PaneLabel
               label="LOCAL"
@@ -572,10 +596,8 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
         <ResizablePanel defaultSize={50} minSize={20}>
           <div
             ref={remotePaneRef}
-            className="flex flex-col h-full relative outline-none"
-            tabIndex={-1}
-            onMouseDown={() => remotePaneRef.current?.focus()}
-            onKeyDown={handlePaneKeyDown("remote")}
+            className="flex flex-col h-full relative"
+            onPointerDown={() => setActivePane("remote")}
           >
             <PaneLabel
               label={deepSearchResults !== null ? `SEARCH RESULTS (${deepSearchResults.length})` : "REMOTE"}
