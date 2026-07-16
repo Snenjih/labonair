@@ -1,14 +1,16 @@
 use super::*;
 use super::net_error::is_network_error;
-use std::io::{Read, Write};
+use crate::modules::ssh::{RushSession, SshState};
+use russh_sftp::protocol::OpenFlags;
+use std::io::Read;
 use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_util::sync::CancellationToken;
 
-const CHUNK_SIZE: usize = 65536;
-
-fn compute_local_md5(path: &std::path::Path) -> Result<String, String> {
+fn compute_local_md5(path: &std::path::Path, chunk_size: usize) -> Result<String, String> {
     let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
     let mut ctx = md5::Context::new();
-    let mut buf = vec![0u8; CHUNK_SIZE];
+    let mut buf = vec![0u8; chunk_size];
     loop {
         let n = file.read(&mut buf).map_err(|e| e.to_string())?;
         if n == 0 { break; }
@@ -17,14 +19,44 @@ fn compute_local_md5(path: &std::path::Path) -> Result<String, String> {
     Ok(format!("{:x}", ctx.compute()))
 }
 
-fn compute_remote_md5(session: &ssh2::Session, remote_path: &str) -> Option<String> {
-    let mut ch = session.channel_session().ok()?;
+/// Runs the (blocking, local-disk-only) MD5 hash on a dedicated blocking
+/// thread — `compute_local_md5` itself stays untouched sync code, this just
+/// gives it an async-friendly calling convention now that the rest of the
+/// worker is async (per project rule: no blocking I/O on an async task).
+async fn compute_local_md5_async(path: std::path::PathBuf, chunk_size: usize) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || compute_local_md5(&path, chunk_size))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Same `.wait()`-loop concurrent-drain fix `ssh/exec.rs` established —
+/// replaces the old single blocking `read_to_string` on stdout only.
+async fn compute_remote_md5(session: &RushSession, remote_path: &str) -> Option<String> {
+    let mut channel = session.handle.channel_open_session().await.ok()?;
     let escaped = remote_path.replace('\'', "'\\''");
-    ch.exec(&format!("md5sum '{}'", escaped)).ok()?;
-    let mut out = String::new();
-    ch.read_to_string(&mut out).ok()?;
-    ch.wait_close().ok()?;
-    if ch.exit_status().ok()? != 0 { return None; }
+    channel.exec(true, format!("md5sum '{}'", escaped)).await.ok()?;
+
+    let mut stdout_bytes: Vec<u8> = Vec::new();
+    let mut exit_code: i32 = -1;
+    while let Some(msg) = channel.wait().await {
+        match msg {
+            russh::ChannelMsg::Data { data } => stdout_bytes.extend_from_slice(&data),
+            russh::ChannelMsg::ExtendedData { .. } => {}
+            // `ExitStatus` arrives *after* `Eof` (and before `Close`), so
+            // breaking on Eof/Close here would discard it and leave
+            // `exit_code` stuck at -1 forever, making this function always
+            // return `None` — matches russh's own client_exec_simple.rs
+            // example, which explicitly warns against leaving the loop
+            // early. `channel.wait()` returns `None` on its own once the
+            // channel is fully closed, ending the loop naturally.
+            russh::ChannelMsg::ExitStatus { exit_status } => exit_code = exit_status as i32,
+            _ => {}
+        }
+    }
+    if exit_code != 0 {
+        return None;
+    }
+    let out = String::from_utf8_lossy(&stdout_bytes);
     out.split_whitespace().next().map(|s| s.to_string())
 }
 const PROGRESS_EMIT_INTERVAL_MS: u128 = 100;
@@ -43,25 +75,47 @@ fn expand_home(path: &str) -> String {
     }
 }
 
+/// One finished job's outcome: id (for `cancel_tokens` bookkeeping), the job
+/// itself (mutated in place by `process_job`, carried back out since it was
+/// moved into the spawned task), its result, and the cancellation token that
+/// was raced against during the transfer (checked here to tell a real
+/// failure apart from a user-initiated cancel).
+type JoinedJob = (String, TransferJob, Result<(), String>, CancellationToken);
+
 pub async fn run_worker(
     mut rx: mpsc::Receiver<WorkerMessage>,
-    sftp_state: Arc<crate::modules::sftp::SftpState>,
+    ssh_state: SshState,
     app: tauri::AppHandle,
     conflicts: ConflictMap,
+    settings: Arc<TransferSettings>,
 ) {
     let mut queue: std::collections::VecDeque<TransferJob> = std::collections::VecDeque::new();
-    let mut cancelled: std::collections::HashSet<String> = std::collections::HashSet::new();
+    // Per-job cancellation, replacing the old plain `HashSet<String>` that was
+    // only checked once per CHUNK_SIZE iteration. A `CancellationToken` lets an
+    // in-flight, genuinely-stalled chunk read/write be abandoned immediately
+    // via `tokio::select!` instead of only being noticed in the gap between
+    // chunks.
+    let mut cancel_tokens: std::collections::HashMap<String, CancellationToken> =
+        std::collections::HashMap::new();
+    // Jobs currently running as their own spawned tasks, up to
+    // `settings.max_concurrent` at a time. Bounding this via `JoinSet` (rather
+    // than awaiting `process_job` inline like before) is what actually enables
+    // concurrent transfers — the SFTP layer itself already supports concurrent
+    // operations on one session (russh-sftp multiplexes requests by id over a
+    // single background I/O task), so no session-level locking is needed here.
+    let mut in_flight: tokio::task::JoinSet<JoinedJob> = tokio::task::JoinSet::new();
 
     loop {
         // Drain pending messages without blocking
         loop {
             match rx.try_recv() {
                 Ok(WorkerMessage::Enqueue(job)) => {
+                    cancel_tokens.entry(job.id.clone()).or_default();
                     emit_progress(&app, &job);
                     queue.push_back(job);
                 }
                 Ok(WorkerMessage::Cancel(id)) => {
-                    cancelled.insert(id.clone());
+                    cancel_tokens.entry(id.clone()).or_default().cancel();
                     queue.retain(|j| j.id != id);
                 }
                 Ok(WorkerMessage::ResolveConflict { job_id, resolution, new_name }) => {
@@ -75,25 +129,108 @@ pub async fn run_worker(
             }
         }
 
-        if let Some(mut job) = queue.pop_front() {
-            if cancelled.contains(&job.id) {
+        // Top up in-flight jobs to the currently configured concurrency cap.
+        // Non-preemptive by design: lowering the cap mid-session doesn't
+        // cancel already-running jobs, it only throttles new ones once
+        // `in_flight` naturally drops below the new limit.
+        let cap = settings.max_concurrent.load(std::sync::atomic::Ordering::Relaxed).max(1);
+        while in_flight.len() < cap {
+            let Some(mut job) = queue.pop_front() else { break };
+            let token = cancel_tokens.entry(job.id.clone()).or_default().clone();
+            if token.is_cancelled() {
+                cancel_tokens.remove(&job.id);
                 continue;
             }
             job.status = TransferStatus::Running;
             emit_progress(&app, &job);
 
-            let result = process_job(&mut job, &sftp_state, &app, &conflicts, &cancelled).await;
+            let job_id = job.id.clone();
+            let ssh_state_c = ssh_state.clone();
+            let app_c = app.clone();
+            let conflicts_c = conflicts.clone();
+            let settings_c = settings.clone();
+            let token_c = token.clone();
+            in_flight.spawn(async move {
+                let result =
+                    process_job(&mut job, &ssh_state_c, &app_c, &conflicts_c, &token_c, &settings_c).await;
+                (job_id, job, result, token_c)
+            });
+        }
 
+        if in_flight.is_empty() {
+            // Nothing running (and therefore, since we always top up above,
+            // the queue is empty too) — block until the next control message.
+            match rx.recv().await {
+                Some(WorkerMessage::Enqueue(job)) => {
+                    cancel_tokens.entry(job.id.clone()).or_default();
+                    emit_progress(&app, &job);
+                    queue.push_back(job);
+                }
+                Some(WorkerMessage::Cancel(id)) => {
+                    cancel_tokens.entry(id).or_default().cancel();
+                }
+                Some(WorkerMessage::ResolveConflict { job_id, resolution, new_name }) => {
+                    let mut map = conflicts.lock().await;
+                    if let Some(tx) = map.remove(&job_id) {
+                        let _ = tx.send(ConflictResolution { resolution, new_name });
+                    }
+                }
+                None => return,
+            }
+            continue;
+        }
+
+        tokio::select! {
+            msg = rx.recv() => match msg {
+                Some(WorkerMessage::Enqueue(job)) => {
+                    cancel_tokens.entry(job.id.clone()).or_default();
+                    emit_progress(&app, &job);
+                    queue.push_back(job);
+                }
+                Some(WorkerMessage::Cancel(id)) => {
+                    cancel_tokens.entry(id.clone()).or_default().cancel();
+                    queue.retain(|j| j.id != id);
+                }
+                Some(WorkerMessage::ResolveConflict { job_id, resolution, new_name }) => {
+                    let mut map = conflicts.lock().await;
+                    if let Some(tx) = map.remove(&job_id) {
+                        let _ = tx.send(ConflictResolution { resolution, new_name });
+                    }
+                }
+                None => {
+                    while let Some(joined) = in_flight.join_next().await {
+                        finish_job(joined, &app, &ssh_state, &mut cancel_tokens);
+                    }
+                    return;
+                }
+            },
+            Some(joined) = in_flight.join_next() => {
+                finish_job(joined, &app, &ssh_state, &mut cancel_tokens);
+            }
+        }
+    }
+}
+
+fn finish_job(
+    joined: Result<JoinedJob, tokio::task::JoinError>,
+    app: &tauri::AppHandle,
+    ssh_state: &SshState,
+    cancel_tokens: &mut std::collections::HashMap<String, CancellationToken>,
+) {
+    match joined {
+        Ok((job_id, mut job, result, token)) => {
+            cancel_tokens.remove(&job_id);
             match result {
                 Ok(()) => {
                     job.status = TransferStatus::Completed;
-                    emit_progress(&app, &job);
+                    emit_progress(app, &job);
                 }
                 Err(e) => {
                     // Detect network-level failures and notify the frontend so
                     // it can show the reconnect overlay (same event as pty.rs).
-                    if !cancelled.contains(&job.id) && is_network_error(&e) {
-                        if let Ok(mut map) = sftp_state.0.lock() {
+                    let was_cancelled = token.is_cancelled();
+                    if !was_cancelled && is_network_error(&e) {
+                        if let Ok(mut map) = ssh_state.0.lock() {
                             map.remove(&job.session_id);
                         }
                         use tauri::Emitter;
@@ -105,32 +242,22 @@ pub async fn run_worker(
                             }),
                         );
                     }
-                    job.status = if cancelled.contains(&job.id) {
+                    job.status = if was_cancelled {
                         TransferStatus::Cancelled
                     } else {
                         TransferStatus::Failed(e)
                     };
-                    emit_progress(&app, &job);
+                    emit_progress(app, &job);
                 }
             }
-        } else {
-            // Queue empty — block until next message
-            match rx.recv().await {
-                Some(WorkerMessage::Enqueue(job)) => {
-                    emit_progress(&app, &job);
-                    queue.push_back(job);
-                }
-                Some(WorkerMessage::Cancel(id)) => {
-                    cancelled.insert(id);
-                }
-                Some(WorkerMessage::ResolveConflict { job_id, resolution, new_name }) => {
-                    let mut map = conflicts.lock().await;
-                    if let Some(tx) = map.remove(&job_id) {
-                        let _ = tx.send(ConflictResolution { resolution, new_name });
-                    }
-                }
-                None => return,
-            }
+        }
+        Err(join_err) => {
+            // The task panicked — the `TransferJob` was moved into it and is
+            // lost along with it, so there's no per-job UI state to reconcile
+            // here. Every realistic SFTP failure mode already returns a
+            // `Result` through the path above; a panic indicates a bug worth
+            // surfacing loudly rather than a transfer outcome to handle.
+            log::error!("[sftp] worker task panicked: {join_err}");
         }
     }
 }
@@ -140,103 +267,178 @@ fn emit_progress(app: &tauri::AppHandle, job: &TransferJob) {
     let _ = app.emit("transfer_progress", job);
 }
 
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Emits a timestamped step for a transfer's per-job log (shown in the
+/// transfer manager popup). Mirrors the existing `log::debug!` call sites at
+/// the same granularity, just also surfaced to the frontend.
+fn emit_step(app: &tauri::AppHandle, job_id: &str, message: impl Into<String>) {
+    use tauri::Emitter;
+    let _ = app.emit(
+        "transfer_step",
+        TransferStepPayload { job_id: job_id.to_string(), ts: now_ms(), message: message.into() },
+    );
+}
+
 async fn process_job(
     job: &mut TransferJob,
-    sftp_state: &Arc<crate::modules::sftp::SftpState>,
+    ssh_state: &SshState,
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
-    cancelled: &std::collections::HashSet<String>,
+    cancel_token: &CancellationToken,
+    settings: &TransferSettings,
 ) -> Result<(), String> {
     log::info!(
         "[sftp] starting {:?} | id={} tab={} src={} dest={}",
         job.direction, job.id, job.session_id, job.src_path, job.dest_path
     );
+    emit_step(app, &job.id, format!("Transfer started: {} → {}", job.src_path, job.dest_path));
     let result = match job.direction {
-        TransferDirection::Download => download_file(job, sftp_state, app, conflicts, cancelled).await,
-        TransferDirection::Upload => upload_file(job, sftp_state, app, conflicts, cancelled).await,
+        TransferDirection::Download => download_file(job, ssh_state, app, conflicts, cancel_token, settings).await,
+        TransferDirection::Upload => upload_file(job, ssh_state, app, conflicts, cancel_token, settings).await,
     };
     match &result {
-        Ok(()) => log::info!("[sftp] completed id={}", job.id),
-        Err(e) => log::error!("[sftp] failed id={} tab={} src={} dest={} — {}", job.id, job.session_id, job.src_path, job.dest_path, e),
+        Ok(()) => {
+            log::info!("[sftp] completed id={}", job.id);
+            emit_step(app, &job.id, "Transfer completed successfully");
+        }
+        Err(e) => {
+            log::error!("[sftp] failed id={} tab={} src={} dest={} — {}", job.id, job.session_id, job.src_path, job.dest_path, e);
+            emit_step(app, &job.id, format!("Transfer failed: {e}"));
+        }
     }
     result
 }
 
+/// Looks up the unified session and its lazily-opened SFTP subsystem for a
+/// transfer job. Mirrors `ssh/sftp.rs`'s `get_sftp_session_arc`, but also
+/// hands back the session itself (needed for `compute_remote_md5`'s exec
+/// channel) rather than just the SFTP handle.
+fn get_session_and_sftp(
+    ssh_state: &SshState,
+    session_id: &str,
+) -> Result<(Arc<RushSession>, Arc<russh_sftp::client::SftpSession>), String> {
+    let session = crate::get_session_arc!(ssh_state, session_id);
+    let sftp = session
+        .sftp
+        .get()
+        .cloned()
+        .ok_or_else(|| "no SFTP session for tab".to_string())?;
+    Ok((session, sftp))
+}
+
 async fn download_file(
     job: &mut TransferJob,
-    sftp_state: &Arc<crate::modules::sftp::SftpState>,
+    ssh_state: &SshState,
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
-    cancelled: &std::collections::HashSet<String>,
+    cancel_token: &CancellationToken,
+    settings: &TransferSettings,
 ) -> Result<(), String> {
     job.src_path = expand_home(&job.src_path);
     job.dest_path = expand_home(&job.dest_path);
-    log::debug!("[sftp/download] checking dest exists: {}", job.dest_path);
-    let dest = std::path::Path::new(&job.dest_path);
-    if dest.exists() {
-        log::debug!("[sftp/download] conflict detected, waiting for resolution");
-        let resolution = ask_conflict(job, app, conflicts).await?;
-        match resolution.resolution.as_str() {
-            "skip" => { log::debug!("[sftp/download] skipped by user"); return Ok(()); }
-            "rename" => {
-                let new_name = resolution.new_name.ok_or("rename requires new_name")?;
-                let new_dest = dest.parent().unwrap_or(dest).join(new_name);
-                job.dest_path = new_dest.to_string_lossy().to_string();
-                log::debug!("[sftp/download] renamed dest to: {}", job.dest_path);
+
+    // Atomic local-filesystem create — closes the TOCTOU window between the
+    // old `dest.exists()` check and the later unconditional `File::create`,
+    // where a file created concurrently in between would be silently
+    // overwritten. `create_new` is atomic on macOS/Windows/Linux alike.
+    log::debug!("[sftp/download] attempting atomic local create: {}", job.dest_path);
+    emit_step(app, &job.id, format!("Creating local file: {}", job.dest_path));
+    let mut local_file = match tokio::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&job.dest_path)
+        .await
+    {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            log::debug!("[sftp/download] conflict detected, waiting for resolution");
+            emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
+            let resolution = ask_conflict(job, app, conflicts, settings).await?;
+            emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
+            match resolution.resolution.as_str() {
+                "skip" => { log::debug!("[sftp/download] skipped by user"); return Ok(()); }
+                "rename" => {
+                    let new_name = resolution.new_name.ok_or("rename requires new_name")?;
+                    let dest = std::path::Path::new(&job.dest_path);
+                    let new_dest = dest.parent().unwrap_or(dest).join(new_name);
+                    job.dest_path = new_dest.to_string_lossy().to_string();
+                    log::debug!("[sftp/download] renamed dest to: {}", job.dest_path);
+                    tokio::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&job.dest_path)
+                        .await
+                        .map_err(|e| format!("create({}) failed: {e}", job.dest_path))?
+                }
+                _ => {
+                    // "overwrite" (or any other resolution) — matches the old
+                    // code's unconditional overwrite-create fallthrough.
+                    tokio::fs::OpenOptions::new()
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .open(&job.dest_path)
+                        .await
+                        .map_err(|e| format!("create({}) failed: {e}", job.dest_path))?
+                }
             }
-            _ => {}
         }
-    }
+        Err(e) => return Err(format!("create({}) failed: {e}", job.dest_path)),
+    };
 
     log::debug!("[sftp/download] looking up SFTP session for session_id={}", job.session_id);
-    // One combined lock (session + SFTP subsystem, see SftpSessionInner's doc
-    // comment) for this whole transfer — re-acquired per chunk below rather
-    // than held continuously, so browsing/git-status/other transfers on the
-    // same session aren't frozen for the transfer's full duration.
-    let inner_arc = {
-        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
-        let entry = map.get(&job.session_id)
-            .ok_or_else(|| format!("no SFTP session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
-        entry.inner.clone()
-    };
+    let (session, sftp) = get_session_and_sftp(ssh_state, &job.session_id)?;
+    emit_step(app, &job.id, "SFTP session ready");
 
     log::debug!("[sftp/download] opening remote file: {}", job.src_path);
-    let (file_size, mut remote_file) = {
-        let inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
-        let stat = inner.sftp.stat(std::path::Path::new(&job.src_path))
-            .map_err(|e| format!("stat({}) failed: {e}", job.src_path))?;
-        let size = stat.size.unwrap_or(0);
-        log::debug!("[sftp/download] remote file size={} bytes", size);
-        let remote_file = inner.sftp.open(std::path::Path::new(&job.src_path))
-            .map_err(|e| format!("open({}) failed: {e}", job.src_path))?;
-        (size, remote_file)
-    };
+    let meta = sftp
+        .metadata(job.src_path.clone())
+        .await
+        .map_err(|e| format!("stat({}) failed: {e}", job.src_path))?;
+    let file_size = meta.size.unwrap_or(0);
+    log::debug!("[sftp/download] remote file size={} bytes", file_size);
+    emit_step(app, &job.id, format!("Opened remote file ({} bytes)", file_size));
+    let mut remote_file = sftp
+        .open(job.src_path.clone())
+        .await
+        .map_err(|e| format!("open({}) failed: {e}", job.src_path))?;
     job.bytes_total = file_size;
 
-    log::debug!("[sftp/download] creating local file: {}", job.dest_path);
-    let mut local_file = std::fs::File::create(&job.dest_path)
-        .map_err(|e| format!("create({}) failed: {e}", job.dest_path))?;
     let mut written = 0usize;
     let mut last_emit = std::time::Instant::now();
     let mut last_bytes = 0u64;
-    let mut chunk_buf = [0u8; CHUNK_SIZE];
+    // Read once per job (not per chunk) — avoids a redundant atomic load every
+    // iteration and a resized buffer mid-transfer if the setting changes
+    // while this job is running.
+    let chunk_size = settings.chunk_size.load(std::sync::atomic::Ordering::Relaxed).max(4096);
+    let mut chunk_buf = vec![0u8; chunk_size];
 
-    // Streams remote -> local in CHUNK_SIZE pieces (rather than reading the
-    // whole remote file into memory first) so the lock above is only held
-    // for one chunk's read at a time, and so a multi-GB download doesn't
-    // spike memory usage.
+    // Streams remote -> local in chunk_size pieces so a multi-GB download
+    // doesn't spike memory usage. Each chunk's read/write is raced against
+    // the cancellation token so an in-flight, stalled network read can be
+    // abandoned immediately instead of only being checked between chunks.
     loop {
-        if cancelled.contains(&job.id) {
-            return Err("cancelled".to_string());
-        }
-        let n = {
-            let _inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
-            remote_file.read(&mut chunk_buf).map_err(|e| format!("read({}) failed: {e}", job.src_path))?
+        let n = tokio::select! {
+            _ = cancel_token.cancelled() => return Err("cancelled".to_string()),
+            result = remote_file.read(&mut chunk_buf) => {
+                result.map_err(|e| format!("read({}) failed: {e}", job.src_path))?
+            }
         };
         if n == 0 {
             break;
         }
-        local_file.write_all(&chunk_buf[..n]).map_err(|e| e.to_string())?;
+        tokio::select! {
+            _ = cancel_token.cancelled() => return Err("cancelled".to_string()),
+            result = local_file.write_all(&chunk_buf[..n]) => {
+                result.map_err(|e| e.to_string())?;
+            }
+        }
         written += n;
         job.bytes_transferred = written as u64;
 
@@ -251,10 +453,13 @@ async fn download_file(
     }
     drop(local_file);
     log::debug!("[sftp/download] read {} bytes from remote", written);
+    emit_step(app, &job.id, format!("Wrote {} bytes to local disk", written));
 
     // --- Post-transfer verification ---
     log::debug!("[sftp/download] verifying transfer id={}", job.id);
-    let local_size = std::fs::metadata(&job.dest_path)
+    emit_step(app, &job.id, "Verifying transfer (size check)");
+    let local_size = tokio::fs::metadata(&job.dest_path)
+        .await
         .map_err(|e| format!("verify metadata({}) failed: {e}", job.dest_path))?
         .len();
     if local_size != file_size {
@@ -263,21 +468,21 @@ async fn download_file(
         ));
     }
 
-    let local_hash = compute_local_md5(std::path::Path::new(&job.dest_path))?;
-    {
-        let inner = inner_arc.lock().map_err(|e| format!("session lock: {e}"))?;
-        match compute_remote_md5(&inner.session, &job.src_path) {
-            Some(remote_hash) => {
-                if local_hash != remote_hash {
-                    return Err(format!(
-                        "Transfer failed: MD5 checksum mismatch (remote={remote_hash}, local={local_hash}). File is corrupted."
-                    ));
-                }
-                log::debug!("[sftp/download] md5 verified ok id={}", job.id);
+    emit_step(app, &job.id, "Computing MD5 checksum");
+    let local_hash = compute_local_md5_async(std::path::PathBuf::from(&job.dest_path), chunk_size).await?;
+    match compute_remote_md5(&session, &job.src_path).await {
+        Some(remote_hash) => {
+            if local_hash != remote_hash {
+                return Err(format!(
+                    "Transfer failed: MD5 checksum mismatch (remote={remote_hash}, local={local_hash}). File is corrupted."
+                ));
             }
-            None => {
-                log::warn!("[sftp/download] md5sum unavailable on remote, relying on size check id={}", job.id);
-            }
+            log::debug!("[sftp/download] md5 verified ok id={}", job.id);
+            emit_step(app, &job.id, "MD5 checksum verified — match");
+        }
+        None => {
+            log::warn!("[sftp/download] md5sum unavailable on remote, relying on size check id={}", job.id);
+            emit_step(app, &job.id, "md5sum unavailable on remote — relying on size check only");
         }
     }
 
@@ -286,70 +491,112 @@ async fn download_file(
 
 async fn upload_file(
     job: &mut TransferJob,
-    sftp_state: &Arc<crate::modules::sftp::SftpState>,
+    ssh_state: &SshState,
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
-    cancelled: &std::collections::HashSet<String>,
+    cancel_token: &CancellationToken,
+    settings: &TransferSettings,
 ) -> Result<(), String> {
     job.src_path = expand_home(&job.src_path);
     job.dest_path = expand_home(&job.dest_path);
-    log::debug!("[sftp/upload] reading local file: {}", job.src_path);
-    let data = std::fs::read(&job.src_path)
+
+    log::debug!("[sftp/upload] opening local file: {}", job.src_path);
+    let mut local_file = tokio::fs::File::open(&job.src_path)
+        .await
         .map_err(|e| format!("read local file({}) failed: {e}", job.src_path))?;
-    job.bytes_total = data.len() as u64;
-    log::debug!("[sftp/upload] local file size={} bytes", data.len());
+    let local_meta = local_file
+        .metadata()
+        .await
+        .map_err(|e| format!("metadata local file({}) failed: {e}", job.src_path))?;
+    if local_meta.is_dir() {
+        let name = job.src_path.rsplit('/').next().unwrap_or(&job.src_path);
+        return Err(format!(
+            "\"{name}\" is a folder. Uploading folders isn't supported yet — select individual files instead."
+        ));
+    }
+    let file_size = local_meta.len();
+    job.bytes_total = file_size;
+    log::debug!("[sftp/upload] local file size={} bytes", file_size);
+    emit_step(app, &job.id, format!("Opened local file ({} bytes)", file_size));
 
     log::debug!("[sftp/upload] looking up SFTP session for session_id={}", job.session_id);
-    // One combined lock (session + SFTP subsystem, see SftpSessionInner's doc
-    // comment) reused for this whole transfer — re-acquired per chunk below
-    // rather than held continuously, so browsing/git-status/other transfers
-    // on the same session aren't frozen for the transfer's full duration.
-    let inner_arc = {
-        let map = sftp_state.0.lock().map_err(|e| format!("sftp_state lock: {e}"))?;
-        let entry = map.get(&job.session_id)
-            .ok_or_else(|| format!("no SFTP session for session_id={} (active tabs: {:?})", job.session_id, map.keys().collect::<Vec<_>>()))?;
-        entry.inner.clone()
-    };
-    let conflict_exists = {
-        let inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
-        inner.sftp.stat(std::path::Path::new(&job.dest_path)).is_ok()
-    };
+    let (session, sftp) = get_session_and_sftp(ssh_state, &job.session_id)?;
+    emit_step(app, &job.id, "SFTP session ready");
 
-    if conflict_exists {
-        log::debug!("[sftp/upload] conflict at dest: {}", job.dest_path);
-        let resolution = ask_conflict(job, app, conflicts).await?;
-        match resolution.resolution.as_str() {
-            "skip" => { log::debug!("[sftp/upload] skipped by user"); return Ok(()); }
-            "rename" => {
-                let new_name = resolution.new_name.ok_or("rename requires new_name")?;
-                let dest = std::path::Path::new(&job.dest_path);
-                let new_dest = dest.parent().unwrap_or(dest).join(new_name);
-                job.dest_path = new_dest.to_string_lossy().to_string();
-                log::debug!("[sftp/upload] renamed dest to: {}", job.dest_path);
+    // Single atomic exclusive-create attempt — no prior `stat()` check —
+    // closes the stat-then-create TOCTOU window the old code had. Any
+    // failure here is treated as "destination already exists", matching the
+    // same ambiguity `ssh/sftp.rs`'s `sftp_create_file` already accepts for
+    // this exact ATOMIC CREATE|EXCLUDE mechanism.
+    log::debug!("[sftp/upload] attempting atomic remote create: {}", job.dest_path);
+    emit_step(app, &job.id, format!("Creating remote file: {}", job.dest_path));
+    let mut remote_file = match sftp
+        .open_with_flags(job.dest_path.clone(), OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE)
+        .await
+    {
+        Ok(f) => f,
+        Err(_) => {
+            log::debug!("[sftp/upload] conflict at dest: {}", job.dest_path);
+            emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
+            let resolution = ask_conflict(job, app, conflicts, settings).await?;
+            emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
+            match resolution.resolution.as_str() {
+                "skip" => { log::debug!("[sftp/upload] skipped by user"); return Ok(()); }
+                "rename" => {
+                    let new_name = resolution.new_name.ok_or("rename requires new_name")?;
+                    let dest = std::path::Path::new(&job.dest_path);
+                    let new_dest = dest.parent().unwrap_or(dest).join(new_name);
+                    job.dest_path = new_dest.to_string_lossy().to_string();
+                    log::debug!("[sftp/upload] renamed dest to: {}", job.dest_path);
+                    sftp.open_with_flags(
+                        job.dest_path.clone(),
+                        OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE,
+                    )
+                    .await
+                    .map_err(|e| format!("create remote({}) failed: {e}", job.dest_path))?
+                }
+                _ => {
+                    // "overwrite" (or any other resolution) — intentional
+                    // overwrite, so EXCLUDE is dropped in favor of TRUNCATE.
+                    sftp.open_with_flags(
+                        job.dest_path.clone(),
+                        OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE,
+                    )
+                    .await
+                    .map_err(|e| format!("create remote({}) failed: {e}", job.dest_path))?
+                }
             }
-            _ => {}
         }
-    }
+    };
 
+    let mut written = 0usize;
     let mut last_emit = std::time::Instant::now();
     let mut last_bytes = 0u64;
+    let chunk_size = settings.chunk_size.load(std::sync::atomic::Ordering::Relaxed).max(4096);
+    let mut chunk_buf = vec![0u8; chunk_size];
 
-    log::debug!("[sftp/upload] creating remote file: {}", job.dest_path);
-    let mut remote_file = {
-        let inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
-        inner.sftp.create(std::path::Path::new(&job.dest_path))
-            .map_err(|e| format!("create remote({}) failed: {e}", job.dest_path))?
-    };
-
-    for (i, chunk) in data.chunks(CHUNK_SIZE).enumerate() {
-        if cancelled.contains(&job.id) {
-            return Err("cancelled".to_string());
+    // Streams local -> remote in chunk_size pieces instead of loading the
+    // whole local file into a `Vec<u8>` up front — keeps memory flat for
+    // multi-GB uploads. Each chunk's read/write is raced against the
+    // cancellation token, same as the download side.
+    loop {
+        let n = tokio::select! {
+            _ = cancel_token.cancelled() => return Err("cancelled".to_string()),
+            result = local_file.read(&mut chunk_buf) => {
+                result.map_err(|e| format!("read local file({}) failed: {e}", job.src_path))?
+            }
+        };
+        if n == 0 {
+            break;
         }
-        {
-            let _inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
-            remote_file.write_all(chunk).map_err(|e| e.to_string())?;
+        tokio::select! {
+            _ = cancel_token.cancelled() => return Err("cancelled".to_string()),
+            result = remote_file.write_all(&chunk_buf[..n]) => {
+                result.map_err(|e| e.to_string())?;
+            }
         }
-        job.bytes_transferred = ((i + 1) * CHUNK_SIZE).min(data.len()) as u64;
+        written += n;
+        job.bytes_transferred = written as u64;
 
         let elapsed = last_emit.elapsed().as_millis();
         if elapsed >= PROGRESS_EMIT_INTERVAL_MS {
@@ -360,38 +607,43 @@ async fn upload_file(
             emit_progress(app, job);
         }
     }
-    drop(remote_file);
+    // Drains pending write acks and closes the handle — without this, a
+    // mid-write server error (disk full, permission denied) on the tail end
+    // of the upload could go unnoticed.
+    remote_file.shutdown().await.map_err(|e| e.to_string())?;
+    log::debug!("[sftp/upload] wrote {} bytes to remote", written);
+    emit_step(app, &job.id, format!("Wrote {} bytes to remote", written));
 
     // --- Post-transfer verification ---
     log::debug!("[sftp/upload] verifying transfer id={}", job.id);
-    {
-        let inner = inner_arc.lock().map_err(|e| format!("sftp lock: {e}"))?;
-        let remote_size = inner.sftp.stat(std::path::Path::new(&job.dest_path))
-            .map_err(|e| format!("verify stat({}) failed: {e}", job.dest_path))?
-            .size.unwrap_or(0);
-        if remote_size != data.len() as u64 {
-            return Err(format!(
-                "Transfer failed: Size mismatch (local={}, remote={}).",
-                data.len(), remote_size
-            ));
-        }
+    emit_step(app, &job.id, "Verifying transfer (size check)");
+    let remote_size = sftp
+        .metadata(job.dest_path.clone())
+        .await
+        .map_err(|e| format!("verify stat({}) failed: {e}", job.dest_path))?
+        .size
+        .unwrap_or(0);
+    if remote_size != file_size {
+        return Err(format!(
+            "Transfer failed: Size mismatch (local={file_size}, remote={remote_size})."
+        ));
     }
 
-    let local_hash = compute_local_md5(std::path::Path::new(&job.src_path))?;
-    {
-        let inner = inner_arc.lock().map_err(|e| format!("session lock: {e}"))?;
-        match compute_remote_md5(&inner.session, &job.dest_path) {
-            Some(remote_hash) => {
-                if local_hash != remote_hash {
-                    return Err(format!(
-                        "Transfer failed: MD5 checksum mismatch (local={local_hash}, remote={remote_hash}). File is corrupted."
-                    ));
-                }
-                log::debug!("[sftp/upload] md5 verified ok id={}", job.id);
+    emit_step(app, &job.id, "Computing MD5 checksum");
+    let local_hash = compute_local_md5_async(std::path::PathBuf::from(&job.src_path), chunk_size).await?;
+    match compute_remote_md5(&session, &job.dest_path).await {
+        Some(remote_hash) => {
+            if local_hash != remote_hash {
+                return Err(format!(
+                    "Transfer failed: MD5 checksum mismatch (local={local_hash}, remote={remote_hash}). File is corrupted."
+                ));
             }
-            None => {
-                log::warn!("[sftp/upload] md5sum unavailable on remote, relying on size check id={}", job.id);
-            }
+            log::debug!("[sftp/upload] md5 verified ok id={}", job.id);
+            emit_step(app, &job.id, "MD5 checksum verified — match");
+        }
+        None => {
+            log::warn!("[sftp/upload] md5sum unavailable on remote, relying on size check id={}", job.id);
+            emit_step(app, &job.id, "md5sum unavailable on remote — relying on size check only");
         }
     }
 
@@ -402,7 +654,16 @@ async fn ask_conflict(
     job: &TransferJob,
     app: &tauri::AppHandle,
     conflicts: &ConflictMap,
+    settings: &TransferSettings,
 ) -> Result<ConflictResolution, String> {
+    // A configured default policy short-circuits the prompt entirely — no
+    // "rename" here, since that requires a new_name nothing here can
+    // synthesize; the definitions.ts Select only ever offers ask/overwrite/skip.
+    let policy = settings.default_conflict_resolution.lock().unwrap().clone();
+    if policy == "overwrite" || policy == "skip" {
+        return Ok(ConflictResolution { resolution: policy, new_name: None });
+    }
+
     use tauri::Emitter;
     let (tx, rx) = tokio::sync::oneshot::channel::<ConflictResolution>();
     {

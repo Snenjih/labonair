@@ -1,8 +1,13 @@
 use std::io::{Read, Write};
+use std::time::Duration;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use crate::modules::fs::paths::data_dir;
 
 const MAX_UNCOMPRESSED_BYTES: usize = 10 * 1024 * 1024; // 10 MB
+// Absolute ceiling applied regardless of the configured `scrollbackMaxSizeMb`
+// setting — protects against a misconfigured huge value writing unbounded
+// scrollback files to disk.
+const HARD_MAX_UNCOMPRESSED_BYTES: usize = 100 * 1024 * 1024;
 
 fn scrollback_path(session_id: &str) -> Result<std::path::PathBuf, String> {
     if session_id.len() != 36
@@ -16,8 +21,17 @@ fn scrollback_path(session_id: &str) -> Result<std::path::PathBuf, String> {
 }
 
 #[tauri::command]
-pub async fn scrollback_save(session_id: String, ansi: String) -> Result<(), String> {
-    if ansi.trim().is_empty() || ansi.len() > MAX_UNCOMPRESSED_BYTES {
+pub async fn scrollback_save(
+    session_id: String,
+    ansi: String,
+    max_bytes: Option<usize>,
+) -> Result<(), String> {
+    let max_bytes = max_bytes.unwrap_or(MAX_UNCOMPRESSED_BYTES).min(HARD_MAX_UNCOMPRESSED_BYTES);
+    // Oversized content is silently dropped (not truncated) — matches the
+    // pre-existing behavior. If a user lowers `scrollbackMaxSizeMb` below
+    // what a session's buffer already holds, future saves for that session
+    // no-op until the buffer shrinks or the session restarts.
+    if ansi.trim().is_empty() || ansi.len() > max_bytes {
         return Ok(());
     }
     let path = match scrollback_path(&session_id) {
@@ -41,7 +55,11 @@ pub async fn scrollback_save(session_id: String, ansi: String) -> Result<(), Str
 }
 
 #[tauri::command]
-pub async fn scrollback_load(session_id: String) -> Result<Option<String>, String> {
+pub async fn scrollback_load(
+    session_id: String,
+    max_bytes: Option<usize>,
+) -> Result<Option<String>, String> {
+    let max_bytes = max_bytes.unwrap_or(MAX_UNCOMPRESSED_BYTES).min(HARD_MAX_UNCOMPRESSED_BYTES);
     let path = match scrollback_path(&session_id) {
         Ok(p) => p,
         Err(_) => return Ok(None), // invalid id — graceful
@@ -58,7 +76,7 @@ pub async fn scrollback_load(session_id: String) -> Result<Option<String>, Strin
         let mut ansi = String::new();
         match decoder.read_to_string(&mut ansi) {
             Ok(_) => {
-                if ansi.len() > MAX_UNCOMPRESSED_BYTES {
+                if ansi.len() > max_bytes {
                     let _ = std::fs::remove_file(&path);
                     return Ok(None);
                 }
@@ -76,7 +94,10 @@ pub async fn scrollback_load(session_id: String) -> Result<Option<String>, Strin
 }
 
 #[tauri::command]
-pub async fn scrollback_cleanup(known_session_ids: Vec<String>) -> Result<(), String> {
+pub async fn scrollback_cleanup(
+    known_session_ids: Vec<String>,
+    max_age_secs: Option<u64>,
+) -> Result<(), String> {
     let dir = data_dir().join("scrollback");
     tokio::task::spawn_blocking(move || {
         let entries = match std::fs::read_dir(&dir) {
@@ -85,6 +106,8 @@ pub async fn scrollback_cleanup(known_session_ids: Vec<String>) -> Result<(), St
         };
         let known: std::collections::HashSet<&str> =
             known_session_ids.iter().map(|s| s.as_str()).collect();
+        let max_age = max_age_secs.filter(|&s| s > 0).map(Duration::from_secs);
+        let now = std::time::SystemTime::now();
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
@@ -93,8 +116,20 @@ pub async fn scrollback_cleanup(known_session_ids: Vec<String>) -> Result<(), St
                 let _ = std::fs::remove_file(entry.path());
                 continue;
             }
-            if let Some(stem) = name_str.strip_suffix(".ansi.gz") {
-                if !known.contains(stem) {
+            let Some(stem) = name_str.strip_suffix(".ansi.gz") else { continue };
+            if !known.contains(stem) {
+                let _ = std::fs::remove_file(entry.path());
+                continue;
+            }
+            // Known (active) session, but old enough to fall outside the
+            // configured retention window — delete it too.
+            if let Some(max_age) = max_age {
+                let age = entry
+                    .metadata()
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|m| now.duration_since(m).ok());
+                if age.is_some_and(|age| age > max_age) {
                     let _ = std::fs::remove_file(entry.path());
                 }
             }

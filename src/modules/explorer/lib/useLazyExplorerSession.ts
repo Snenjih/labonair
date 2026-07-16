@@ -24,7 +24,7 @@ interface LazySessionStore {
   clear: (sessionId: string) => void;
 }
 
-const useLazySessionStore = create<LazySessionStore>((set) => ({
+export const useLazySessionStore = create<LazySessionStore>((set) => ({
   sessions: {},
   setStatus: (sessionId, status, error = null) =>
     set((s) => ({ sessions: { ...s.sessions, [sessionId]: { status, error } } })),
@@ -34,6 +34,17 @@ const useLazySessionStore = create<LazySessionStore>((set) => ({
       return { sessions: rest };
     }),
 }));
+
+const EXPLORER_SESSION_PREFIX = "explorer:";
+
+/** Extracts the hostId a lazy explorer session id encodes, or `null` if
+ *  `sessionId` isn't one of ours — the `explorer:${hostId}` convention is
+ *  otherwise private to this module (see `sessionIdFor` below). */
+export function getLazySessionHostId(sessionId: string): string | null {
+  return sessionId.startsWith(EXPLORER_SESSION_PREFIX)
+    ? sessionId.slice(EXPLORER_SESSION_PREFIX.length)
+    : null;
+}
 
 // --- module-level lifecycle bookkeeping (ref-counting, idle timers — not
 // reactive state, deliberately kept outside the store so re-renders only

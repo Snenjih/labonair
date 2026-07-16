@@ -1,11 +1,15 @@
 use tauri::Emitter;
 use crate::modules::errors::LabonairError;
-use crate::modules::ssh::TrustState;
-use super::state::{SftpSession, SftpSessionInner, SftpState};
+use crate::modules::ssh::{RushSession, SshState, TrustState};
+use std::sync::Arc;
 
-/// Establishes a dedicated SSH + SFTP connection for SFTP operations.
-/// Stored in `SftpState` (separate from `SshState`) so SFTP I/O never
-/// blocks the PTY terminal mutex.
+/// Establishes (or reuses) the unified per-`session_id` SSH session and
+/// lazily opens its SFTP subsystem. Session storage moved from the old
+/// dedicated `SftpState` into `SshState` (the same registry the terminal path
+/// uses) per the russh migration's session-model decision — no code path
+/// today looks up the same `session_id` from both a terminal tab and a
+/// dedicated SFTP tab, so this is a pure simplification with no behavior
+/// change for any existing tab.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn sftp_connect(
@@ -13,30 +17,34 @@ pub async fn sftp_connect(
     host_id: String,
     passphrase: Option<String>,
     password_override: Option<String>,
-    state: tauri::State<'_, SftpState>,
+    state: tauri::State<'_, SshState>,
     trust_state: tauri::State<'_, TrustState>,
     hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
     secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
     app: tauri::AppHandle,
 ) -> Result<(), LabonairError> {
-    // Idempotent: a session already live under this session_id is left alone
-    // instead of opening a second TCP/SSH connection. Needed for React
+    // Idempotent: a session already live under this session_id whose SFTP
+    // subsystem is already open is left alone instead of dialing a second
+    // TCP/SSH connection or reopening the subsystem. Needed for React
     // StrictMode's double-invoke of effects and for lazy sidebar-tree
     // sessions that may be requested more than once in quick succession.
-    {
+    let existing = {
         let map = state.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
-        if map.contains_key(&session_id) {
+        map.get(&session_id).cloned()
+    };
+    if let Some(ref session) = existing {
+        if session.sftp.get().is_some() {
             return Ok(());
         }
     }
 
     // Fetch host from DB (fast, sync).
     let (host_address, port, username, auth_method, private_key_path, keep_alive_interval,
-         keep_alive_tries, default_path_sftp, credential_id) = {
+         keep_alive_tries, default_path_sftp, credential_id, jump_host_id) = {
         let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         let mut stmt = conn.prepare(
             "SELECT host_address, port, username, auth_method, private_key_path, \
-             keep_alive_interval, keep_alive_tries, default_path_sftp, credential_id \
+             keep_alive_interval, keep_alive_tries, default_path_sftp, credential_id, jump_host_id \
              FROM hosts WHERE id = ?1",
         )?;
         stmt.query_row(rusqlite::params![host_id], |row| {
@@ -50,6 +58,7 @@ pub async fn sftp_connect(
                 row.get::<_, Option<i64>>(6)?,
                 row.get::<_, Option<String>>(7)?,
                 row.get::<_, Option<String>>(8)?,
+                row.get::<_, Option<String>>(9)?,
             ))
         })?
     };
@@ -74,12 +83,10 @@ pub async fn sftp_connect(
     let password: Option<String> = if auth_method == "password" {
         if password_override.is_some() {
             password_override.clone()
+        } else if let Some(ref cid) = credential_id {
+            crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", cid).ok().flatten()
         } else {
-            if let Some(ref cid) = credential_id {
-                crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", cid).ok().flatten()
-            } else {
-                crate::modules::secrets::get_password(&app, &secrets, "labonair-app", &host_id).ok().flatten()
-            }
+            crate::modules::secrets::get_password(&app, &secrets, "labonair-app", &host_id).ok().flatten()
         }
     } else {
         None
@@ -96,22 +103,17 @@ pub async fn sftp_connect(
         passphrase
     };
 
-    let state_inner = state.inner().clone();
-    let trust_inner = trust_state.inner().clone();
-    let app_clone = app.clone();
-    let session_id_clone = session_id.clone();
-    let host_id_clone = host_id.clone();
+    // Resolve jump host fields (if any) — same helper the terminal path uses.
+    let jump = match jump_host_id.as_deref() {
+        Some(jid) => Some(crate::modules::ssh::client::resolve_jump_host(&hosts_db, &secrets, &app, jid)?),
+        None => None,
+    };
 
-    let result = tokio::task::spawn_blocking(move || {
-        sftp_connect_blocking(
-            session_id_clone, host_id_clone, passphrase,
-            host_address, port, username, auth_method,
-            private_key_path, keep_alive_interval, keep_alive_tries,
-            default_path_sftp, password, state_inner, trust_inner, app_clone,
-        )
-    })
-    .await
-    .map_err(|e| LabonairError::Internal(e.to_string()))?;
+    let result = sftp_connect_inner(
+        session_id.clone(), passphrase, host_address, port, username, auth_method,
+        private_key_path, keep_alive_interval, keep_alive_tries, default_path_sftp,
+        password, jump, existing, state.inner().clone(), trust_state.inner().clone(), app.clone(),
+    ).await;
 
     if result.is_ok() {
         let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
@@ -140,9 +142,8 @@ pub async fn sftp_connect(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn sftp_connect_blocking(
+async fn sftp_connect_inner(
     session_id: String,
-    _host_id: String,
     passphrase: Option<String>,
     host_address: String,
     port: i64,
@@ -153,57 +154,83 @@ fn sftp_connect_blocking(
     keep_alive_tries: Option<i64>,
     default_path_sftp: Option<String>,
     password: Option<String>,
-    state: SftpState,
+    jump: Option<crate::modules::ssh::client::JumpHostParams>,
+    existing: Option<Arc<RushSession>>,
+    state: SshState,
     trust_state: TrustState,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
-    // Step 1-6: shared TCP + SSH + auth flow.
-    let session = crate::modules::ssh::client::establish_authenticated_session(
-        &session_id,
-        &host_address,
-        port,
-        &username,
-        &auth_method,
-        private_key_path.as_deref(),
-        keep_alive_interval,
-        keep_alive_tries,
-        password.as_deref(),
-        passphrase.as_deref(),
-        &trust_state,
-        &app,
-        true, // fail fast — the sidebar Explorer has no trust-prompt UI of its own
-    )?;
+    let session = match existing {
+        Some(session) => session,
+        None => {
+            // Steps 1-6: shared TCP + SSH + auth flow — the exact same helper
+            // the terminal path (`ssh_connect_async`) uses.
+            let handle = crate::modules::ssh::client::establish_authenticated_session(
+                &session_id,
+                &host_address,
+                port,
+                &username,
+                &auth_method,
+                private_key_path.as_deref(),
+                keep_alive_interval,
+                keep_alive_tries,
+                password.as_deref(),
+                passphrase.as_deref(),
+                &trust_state,
+                &app,
+                true, // fail fast — the sidebar Explorer has no trust-prompt UI of its own
+                jump,
+                None, // uses the default connect timeout — not wired to a setting on this path
+            )
+            .await?;
 
-    // Step 7: Open SFTP subsystem. Use 60s timeout for slow hosts (RPi, etc.)
+            let session = Arc::new(RushSession {
+                handle,
+                pty: tokio::sync::Mutex::new(None),
+                sftp: tokio::sync::OnceCell::new(),
+                shutdown: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                disconnect_reason: Arc::new(std::sync::Mutex::new(None)),
+            });
+            {
+                let mut map = state.0.lock().map_err(|e| e.to_string())?;
+                map.insert(session_id.clone(), session.clone());
+            }
+            session
+        }
+    };
+
+    // Step 7: lazily open the SFTP subsystem on this session's `OnceCell`.
+    // Idempotent even if called again concurrently (a racing caller just sees
+    // the already-populated cell). If opening the subsystem fails, the cell
+    // is left uninitialized so a later `sftp_connect` retries just this step
+    // against the already-authenticated handle instead of reconnecting from
+    // scratch.
     let app_handle = app.clone();
     let _ = app_handle.emit("ssh_connect_log", serde_json::json!({
         "session_id": session_id, "message": "Initialising SFTP subsystem…"
     }));
-    session.set_timeout(60_000);
-    log::debug!("[SFTP-CONNECT] calling session.sftp() in blocking mode…");
-    let sftp = match session.sftp() {
-        Ok(s) => {
-            log::debug!("[SFTP-CONNECT] SFTP subsystem open ✓");
-            let _ = app_handle.emit("ssh_connect_log", serde_json::json!({
-                "session_id": session_id, "message": "SFTP ready ✓"
-            }));
-            s
-        }
-        Err(e) => {
-            log::warn!("[SFTP-CONNECT] SFTP subsystem failed: {}", e);
-            return Err(format!("SFTP subsystem unavailable: {}", e));
-        }
-    };
+    session
+        .sftp
+        .get_or_try_init(|| async {
+            let channel = session
+                .handle
+                .channel_open_session()
+                .await
+                .map_err(|e| e.to_string())?;
+            channel
+                .request_subsystem(true, "sftp")
+                .await
+                .map_err(|e| e.to_string())?;
+            let sftp = russh_sftp::client::SftpSession::new(channel.into_stream())
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok::<_, String>(Arc::new(sftp))
+        })
+        .await?;
+    let _ = app_handle.emit("ssh_connect_log", serde_json::json!({
+        "session_id": session_id, "message": "SFTP ready ✓"
+    }));
 
-    // Step 8: Store dedicated SftpSession in SftpState. Session + SFTP handle
-    // share one lock (SftpSessionInner) — see its doc comment for why.
-    let inner_arc = std::sync::Arc::new(std::sync::Mutex::new(SftpSessionInner { session, sftp }));
-    {
-        let mut map = state.0.lock().map_err(|e| e.to_string())?;
-        map.insert(session_id.clone(), SftpSession { inner: inner_arc });
-    }
-
-    log::debug!("[SFTP-CONNECT] session_established emitting for {}", session_id);
     app.emit(
         "session_established",
         serde_json::json!({ "session_id": session_id, "default_path_sftp": default_path_sftp }),
@@ -213,11 +240,15 @@ fn sftp_connect_blocking(
     Ok(())
 }
 
-/// Removes the SFTP session from `SftpState` and closes the connection.
+/// Removes the unified session from `SshState` and closes the connection. A
+/// dedicated SFTP tab's `session_id` is never shared with a terminal or
+/// lazy-explorer session today (see the russh migration's session-model
+/// decision), so removing the whole entry here is exactly equivalent to the
+/// old `SftpState`-only removal from the frontend's perspective.
 #[tauri::command]
 pub fn sftp_disconnect(
     session_id: String,
-    state: tauri::State<'_, SftpState>,
+    state: tauri::State<'_, SshState>,
 ) -> Result<(), LabonairError> {
     let mut map = state.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
     map.remove(&session_id);

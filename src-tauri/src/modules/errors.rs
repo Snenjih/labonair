@@ -16,8 +16,14 @@ pub enum LabonairError {
     Internal(String),
 }
 
-impl From<ssh2::Error> for LabonairError {
-    fn from(e: ssh2::Error) -> Self {
+impl From<russh::Error> for LabonairError {
+    fn from(e: russh::Error) -> Self {
+        LabonairError::Internal(e.to_string())
+    }
+}
+
+impl From<russh_sftp::client::error::Error> for LabonairError {
+    fn from(e: russh_sftp::client::error::Error) -> Self {
         LabonairError::Internal(e.to_string())
     }
 }

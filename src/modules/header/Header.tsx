@@ -31,6 +31,8 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useRef } from "react";
 import { NotificationDropdown } from "@/modules/notifications/components/NotificationDropdown";
+import type { SidebarPanel } from "@/modules/statusbar";
+import { JumpHostDropdown } from "./components/JumpHostDropdown";
 import { TransferDropdown } from "./components/TransferDropdown";
 import { UpdaterButton } from "./components/UpdaterButton";
 
@@ -53,6 +55,7 @@ type Props = {
   onOpenHostManager: () => void;
   onOpenThemes: () => void;
   onNewGitGraph?: () => void;
+  onPanelToggle?: (panel: SidebarPanel) => void;
 };
 
 export const Header = React.memo(function Header({
@@ -74,6 +77,7 @@ export const Header = React.memo(function Header({
   onOpenHostManager,
   onOpenThemes,
   onNewGitGraph,
+  onPanelToggle,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
@@ -85,6 +89,7 @@ export const Header = React.memo(function Header({
     <>
       <UpdaterButton />
       <NotificationDropdown />
+      <JumpHostDropdown onPanelToggle={onPanelToggle} />
       <TransferDropdown />
     </>
   );

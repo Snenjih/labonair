@@ -172,12 +172,13 @@ export function SftpContextMenu({
             <ContextMenuItem onClick={handleUploadHere}>Upload files here…</ContextMenuItem>
           )}
 
-          {side === "remote" && count >= 0 && <ContextMenuSeparator />}
+          {side === "remote" && <ContextMenuSeparator />}
 
           {/* Bookmark current path or selected item */}
           <ContextMenuItem onClick={handleBookmark}>Bookmark this path</ContextMenuItem>
+          <ContextMenuItem onClick={onRefresh}>Refresh</ContextMenuItem>
 
-          <ContextMenuSeparator />
+          {(count > 0 || (side === "remote" && count === 1)) && <ContextMenuSeparator />}
 
           {count > 0 && (
             <ContextMenuItem

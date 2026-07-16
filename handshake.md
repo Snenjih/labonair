@@ -1,6 +1,63 @@
 # Handshake — Session State
 
-## Last Session: 2026-07-11 (Full-App Review + review-fix-plan.md Execution — Workstreams A, B, D–O)
+## Last Session: 2026-07-14 (russh Migration Follow-up: Exec Exit-Code Bug + oklch Canvas Crash)
+
+### What Was Done
+User reported two issues after the russh migration PR (#127) landed: (1) remote Source Control showed "not a repository" / `git exited with code -1` on a folder that genuinely is a git repo, and (2) `Error: Unexpected fillStyle color format "oklch(0.9452 0.0001 259.980011)" when drawing pattern glyph` in the terminal. Both investigated and fixed directly (no plan mode needed, both were concrete bug hunts). See `~/.claude/.../memory/bugs_and_fixes.md` for full write-ups of both.
+
+**Bug 1 (the real cause of the git report)**: every exec-based `channel.wait()` loop added by the russh migration (`git/executor.rs::run_remote_script`, `ssh/exec.rs::ssh_exec_command`, `sftp/worker.rs::compute_remote_md5`, `ssh/sftp.rs::sftp_chown`, `snippets/exec.rs::snippet_run_ssh` — 5 sites, plus 2 more in `ssh/sftp.rs` fixed defensively even though they don't check exit codes) broke on `ChannelMsg::Eof | ChannelMsg::Close`, but the SSH protocol sends `ExitStatus` *after* `Eof` — confirmed against russh's own bundled example (`client_exec_simple.rs`, which explicitly comments "cannot leave the loop immediately, there might still be more data to receive"). So `exit_code` was permanently stuck at its `-1` init value on every remote command, success or failure, which made `git/executor.rs`'s `exit_code == 0` success check always false — hence "not a repo" and the literal `"git exited with code -1"` string (from `normalize_git_error(-1, "")`, empty stderr on an actually-successful command). Same bug silently broke `compute_remote_md5` too (SFTP post-transfer integrity check always returned `None`, silently skipped) and made `ssh_exec_command`/`snippet_run_ssh` always report exit code -1 to the frontend — neither yet reported, both fixed anyway. Fix: removed the `Eof | Close => break` arm at all 6 sites, falling through to the existing `_ => {}` — `channel.wait()` already returns `None` on its own once the channel is fully closed, so the loop still terminates correctly, just no longer before `ExitStatus` arrives.
+
+**Bug 2 (unrelated to SSH, a WebKit/Tauri-webview canvas quirk)**: `src/styles/tokens.ts`'s theme-token resolver assumed `getComputedStyle(probe).color` always normalizes an `oklch()`-declared CSS variable (Tailwind v4's native palette format) down to `rgb()` — true on most engines, not on this user's WebKit build, which preserves the source color space verbatim. That oklch string then reaches xterm.js's `Terminal({theme})`, gets set as a canvas `fillStyle` internally, and — since this engine's canvas accepts oklch as fillStyle input and preserves it on readback rather than rejecting/normalizing it — `@xterm/addon-webgl`'s glyph-pattern cache (which only parses `#hex`/`rgba()`) throws when it reads `ctx.fillStyle` back. Fixed by adding a real numeric OKLCH→sRGB conversion (`oklchToRgb()`, Björn Ottosson's published matrices) rather than another attempt to lean on browser normalization; `resolve()` now runs it whenever the computed value starts with `oklch(`. Found and fixed an identical latent bug at a second site, `blockDecorations.ts`'s `themeColor()` (Block Terminal's overview-ruler color, feature defaults off so not yet user-visible) — same fix, reused `oklchToRgb`. Deliberately did NOT touch `FindWidget.tsx`'s superficially similar `resolveThemeColor()` — it already reads back rasterized pixels via `getImageData()` rather than the `fillStyle` string, which is a different, already-correct technique immune to this whole class of bug.
+
+New tests: `src/styles/tokens.test.ts` (7 cases — exact black/white round-trip since C=0 collapses the OKLab matrices to an exactly-verifiable closed form, alpha handling, gamut clamping, non-oklch passthrough).
+
+`cargo check`/`clippy -D warnings`/`test --lib` (87/87) ✅ · `tsc --noEmit` ✅ · `vitest run` (439/439, +7 new) ✅.
+
+### Current State
+Branch `russh-migration`, PR #127 already open. This session's fixes are on top of the migration commit, not yet pushed as of writing this entry (about to push, which will update PR #127 automatically since it already tracks this branch).
+
+### What's Next
+- Push this follow-up commit (updates PR #127)
+- The mandatory live-SSH-server manual test checklist from the previous session is still outstanding — re-verify remote git status specifically now that the exit-code bug is fixed
+- If the oklch/canvas crash resurfaces anywhere else, check any other code path that hands a theme color to a `<canvas>` 2D context — the fix pattern is `oklchToRgb()` (numeric conversion) or `getImageData()`-pixel-readback (`FindWidget.tsx`'s technique), never a raw computed-style string passed straight to `fillStyle`
+
+### Blockers
+- None
+
+---
+
+## Previous Session: 2026-07-14 (Full ssh2 → russh Migration)
+
+### What Was Done
+User (via a pre-written planning brief, `russh-migration.md`) requested a complete replacement of the Rust SSH/SFTP backend from `ssh2` (libssh2 bindings, synchronous) to `russh` 0.62.2 (`ring` feature) + `russh-sftp` 2.3.0 (pure-Rust, native Tokio async) — no shim, no parallel operation, `ssh2` fully removed. Went through full plan-mode (3 parallel Explore agents researching current ssh2 architecture, 1 Plan agent producing the implementation plan, verified crate-API claims live against docs.rs/crates.io during planning) before implementing on branch `russh-migration`. Plan file: `~/.claude/plans/russh-migration-planungsauftrag-clever-wave.md`.
+
+Implemented via 9 sequential subagent workstreams on one worktree (explicitly no parallel isolated worktrees — this subsystem is too tightly coupled, `SshState`/`SftpState` merge + `lib.rs` registrations touch nearly every workstream): Cargo wiring → core transport/auth/known-hosts (`ssh/client.rs`, `ssh/mod.rs`) → PTY/terminal (`ssh/pty.rs`, `ssh/exec.rs`) → SFTP subsystem (`sftp/state.rs` deleted, `sftp/connection.rs`, `ssh/sftp.rs`) → transfer worker (`sftp/worker.rs`) → exec/git/snippets (`git/executor.rs`, `git/mod.rs`, `snippets/exec.rs` — the latter two found mid-migration, not in the original file inventory) → tunnels (`ssh/tunnels.rs`) → credentials compat test → cleanup pass. `cargo check`/`clippy -D warnings`/`test --lib` (87/87) green after every workstream; `tsc --noEmit`/`vitest run` (432/432) confirmed **zero frontend files touched** — the entire IPC contract (command names/signatures, event payloads, the `Channel<SshPtyEvent>` mechanism) is unchanged.
+
+**Session-model change**: unified `SshState`/`SftpState` into one `SshState(Arc<Mutex<HashMap<session_id, Arc<RushSession>>>>)`, `RushSession{handle: Arc<russh::client::Handle<ClientHandler>>, pty, sftp: OnceCell<SftpSession>, shutdown, disconnect_reason}` — removes the "two logins per host" problem for any code path that shares a session_id (verified none exist today, so this is risk-free). `TunnelState` deliberately stayed separate/host-keyed. True cross-tab host-level pooling explicitly scoped out as a future follow-up.
+
+**Concrete bugs fixed as part of the migration** (not just parity): SFTP upload no longer loads whole files into RAM (was `std::fs::read()`), atomic `OpenFlags::CREATE|EXCLUDE` TOCTOU fixes on both upload/download conflict detection, real mid-chunk transfer cancellation via `tokio_util::CancellationToken`+`select!` (was checked only between chunks), the sequential-stdout-then-stderr-full-drain deadlock-risk pattern fixed at all 5 sites it recurred (`git/executor.rs`, `sftp/worker.rs::compute_remote_md5`, `ssh/sftp.rs`'s du/chown, `ssh/exec.rs`, `snippets/exec.rs`) via one interleaved `channel.wait()` message loop, tunnels' auth upgraded from password/bare-pubkey-only (no agent, no passphrase, no known-hosts check) to the same shared auth helper the terminal/SFTP path uses, all busy-wait `std::thread::sleep` loops (jump-bridge 50µs, tunnel bridge/accept/shutdown polling) deleted in favor of real async I/O + `tokio::select!`.
+
+**Post-implementation review agent caught 4 real bugs**, all fixed afterward (see `~/.claude/.../memory/bugs_and_fixes.md` for full detail) — none of them broke the build or failed a test, all were behavioral/semantic mismatches only found by independently reading the vendored `russh`/`russh-sftp` source rather than trusting agent summaries:
+1. RSA pubkey/agent auth hardcoded `hash_alg: None` → requests legacy `ssh-rsa`/SHA-1, rejected by OpenSSH ≥ 8.8 by default. Fixed via `handle.best_supported_rsa_hash()`.
+2. This app's own PKCS#8-generated keys never triggered the passphrase-prompt dialog (`Error::KeyIsEncrypted` is never raised for PKCS#8, only legacy OpenSSH-format keys) — missing/wrong passphrase surfaced as a cryptic crypto error instead. Fixed via PEM-header detection routing PKCS#8 decode failures through the same prompt.
+3. PTY disconnect reason was hardcoded to `"unexpected eof"` regardless of actual cause (`ChannelReadHalf::wait()` returning `None` carries no error info by itself, unlike the old code). Fixed by adding a shared `disconnect_reason` slot written by a new `ClientHandler::disconnected()` override.
+4. `is_network_error`/`humanize_disconnect_reason` checked `"timed out"` but not `"timeout"` — added both defensively.
+
+`grep -rn "ssh2" src-tauri/src src-tauri/Cargo.toml` returns zero hits (including doc comments, which were rewritten rather than left stale).
+
+### Current State
+Branch `russh-migration`, all changes uncommitted as of writing this entry (about to commit). All automated verification green (`cargo check`/`clippy`/`test`, `tsc`, `vitest`). Diff: 19 Rust files changed (`sftp/state.rs` deleted), zero frontend files.
+
+### What's Next
+- **Mandatory before merging to `main`**: the plan's live-SSH-server manual test checklist — auth (password/pubkey-with-and-without-passphrase/agent), known-hosts TOFU + mismatch scenarios, PTY interactivity with real TUIs (`gh`/`claude` — historically the most sensitive spot in this codebase, see the two prior sessions below), SFTP transfer upload/download/cancel-mid-chunk/large-file, jump-host bridging, tunnels (specifically test agent auth + passphrase-protected key against a tunnel, which never worked pre-migration). None of this is automatable without a real reachable SSH server — do not merge on green CI alone.
+- Consider the explicitly-deferred follow-up: true cross-tab host-level connection pooling (one physical connection per host shared across terminal+SFTP+explorer tabs) — `tunnels.rs`'s `TunnelEntry{ref_count}` is the ready-made template if this is ever wanted.
+
+### Blockers
+- Live SSH server access needed for the manual test checklist above — not available in this environment.
+
+---
+
+## Previous Session: 2026-07-11 (Full-App Review + review-fix-plan.md Execution — Workstreams A, B, D–O)
 
 ### What Was Done
 Ran a full 6-agent review of the entire app (Rust backend, frontend state/perf, terminal/PTY, AI subsystem, SFTP/explorer, editor/source-control/snippets/settings) and personally verified the most severe findings against source before reporting. User picked which findings to fix, then reduced scope again to exclude anything tied to `ssh2`-specific architecture (see `russh-migration.md` — a real, not-yet-decided consideration to swap `ssh2` for `russh`). Plan approved and written to `review-fix-plan.md` (repo root) as 15 workstreams (A–O, C and N dropped, D/E/F trimmed). All workstreams except B are code-complete and committed:

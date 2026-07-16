@@ -346,3 +346,75 @@ pub async fn credential_generate_keypair(
 
     Ok(GenerateKeypairResult { key_path: key_path_str, public_key: public_key_str })
 }
+
+#[cfg(test)]
+mod russh_key_compat_tests {
+    //! Workstream 8 of the SSH-library migration (to russh): confirms that PKCS8 PEM
+    //! keys produced by `credential_generate_keypair`'s openssl-based
+    //! generation (unchanged by the migration) still load via
+    //! `russh::keys::decode_secret_key`, so existing users' already-generated
+    //! keys on disk keep working after upgrading. Exercises the exact same
+    //! openssl calls as the real command rather than invoking the full Tauri
+    //! command (which needs an AppHandle/DB/SecretsState) — the PEM encoding
+    //! is the only part whose cross-library compatibility is in question.
+
+    fn pem_for(key_type: &str, passphrase: Option<&str>) -> String {
+        let pkey: openssl::pkey::PKey<openssl::pkey::Private> = match key_type {
+            "ed25519" => openssl::pkey::PKey::generate_ed25519().unwrap(),
+            "rsa-4096" => {
+                let rsa = openssl::rsa::Rsa::generate(4096).unwrap();
+                openssl::pkey::PKey::from_rsa(rsa).unwrap()
+            }
+            _ => panic!("unknown key_type: {key_type}"),
+        };
+        let pem_bytes = match passphrase {
+            Some(pw) => pkey
+                .private_key_to_pem_pkcs8_passphrase(openssl::symm::Cipher::aes_256_cbc(), pw.as_bytes())
+                .unwrap(),
+            None => pkey.private_key_to_pem_pkcs8().unwrap(),
+        };
+        String::from_utf8(pem_bytes).unwrap()
+    }
+
+    #[test]
+    fn ed25519_no_passphrase_round_trips_through_decode_secret_key() {
+        let pem = pem_for("ed25519", None);
+        russh::keys::decode_secret_key(&pem, None)
+            .expect("ed25519 PKCS8 PEM (no passphrase) must decode via russh::keys");
+    }
+
+    #[test]
+    fn rsa4096_no_passphrase_round_trips_through_decode_secret_key() {
+        let pem = pem_for("rsa-4096", None);
+        russh::keys::decode_secret_key(&pem, None)
+            .expect("RSA-4096 PKCS8 PEM (no passphrase) must decode via russh::keys");
+    }
+
+    #[test]
+    fn ed25519_with_passphrase_round_trips_through_decode_secret_key() {
+        let pem = pem_for("ed25519", Some("correct horse battery staple"));
+        russh::keys::decode_secret_key(&pem, Some("correct horse battery staple"))
+            .expect("ed25519 encrypted PKCS8 PEM must decode with the correct passphrase");
+    }
+
+    #[test]
+    fn rsa4096_with_passphrase_round_trips_through_decode_secret_key() {
+        let pem = pem_for("rsa-4096", Some("correct horse battery staple"));
+        russh::keys::decode_secret_key(&pem, Some("correct horse battery staple"))
+            .expect("RSA-4096 encrypted PKCS8 PEM must decode with the correct passphrase");
+    }
+
+    #[test]
+    fn wrong_passphrase_fails_distinctly_rather_than_silently_succeeding() {
+        let pem = pem_for("ed25519", Some("correct horse battery staple"));
+        let result = russh::keys::decode_secret_key(&pem, Some("wrong password"));
+        assert!(result.is_err(), "decoding with a wrong passphrase must fail");
+    }
+
+    #[test]
+    fn missing_passphrase_on_encrypted_key_fails_rather_than_silently_succeeding() {
+        let pem = pem_for("rsa-4096", Some("correct horse battery staple"));
+        let result = russh::keys::decode_secret_key(&pem, None);
+        assert!(result.is_err(), "decoding an encrypted key with no passphrase must fail");
+    }
+}

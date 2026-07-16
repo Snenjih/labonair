@@ -8,63 +8,67 @@ pub(crate) mod shell_integration;
 pub mod tunnels;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Condvar, Mutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex};
 
-/// A separately-locked session handle used by `tunnels.rs`'s local-forward
-/// tunnels for their own independent session — not the interactive PTY or
-/// browsing sessions, which use the merged `SshSessionInner`/
-/// `SftpSessionInner` below instead. ssh2::Session contains raw pointers but
-/// access is serialised by the Mutex.
-pub struct SessionHandle(pub ssh2::Session);
-unsafe impl Send for SessionHandle {}
-unsafe impl Sync for SessionHandle {}
-
-/// Colocates the interactive PTY channel with its owning `ssh2::Session`
-/// behind a single lock, so every operation that touches this session's
-/// libssh2 transport — PTY reads/writes/resizes, keepalive, and one-shot
-/// exec (history reload, snippets) — serializes through the same mutex.
-/// libssh2 is not safe for concurrent multi-threaded access to one Session,
-/// even across different Channels/subsystems of it; splitting the channel
-/// and the session behind two independent locks (as this used to do) allows
-/// a PTY read and a concurrent exec call to race on the same socket, which
-/// surfaces as random "transport read/write" errors that kill the session.
-pub struct SshSessionInner {
-    pub session: ssh2::Session,
-    pub channel: Option<ssh2::Channel>,
+/// Holds the interactive PTY channel's write half once `ssh/pty.rs`
+/// (Workstream 3) opens the shell channel on a `RushSession`. The read half
+/// is not stored here — it is moved into the dedicated reader task that owns
+/// it exclusively, matching `russh::ChannelReadHalf`'s single-consumer model.
+/// `ChannelWriteHalf`'s methods all take `&self`, so wrapping it in a plain
+/// `Arc` (no lock) is sufficient for concurrent writes/resizes.
+///
+/// Placeholder shape: Workstream 3 may extend this (e.g. with the channel id
+/// for logging) once `open_shell_channel` is rewritten against this model.
+pub struct PtyChannelState {
+    pub write_half: Arc<russh::ChannelWriteHalf<russh::client::Msg>>,
 }
-unsafe impl Send for SshSessionInner {}
-unsafe impl Sync for SshSessionInner {}
 
-pub struct SshSession {
-    /// The ONE lock for everything above — see `SshSessionInner`'s doc comment.
-    pub inner: Arc<Mutex<SshSessionInner>>,
-    /// Set to true by ssh_disconnect so the reader thread exits cleanly.
+/// Unified per-`session_id` (tab) SSH session, replacing the old
+/// synchronous-library-based `SshSessionInner`/`SftpSessionInner` split.
+/// `russh`'s `client::Handle` is natively `Send + Sync` with every post-auth
+/// method taking `&self` (verified against the vendored 0.62.2 source), so
+/// unlike the old blocking-transport session, no external `Mutex` is needed
+/// to serialize access — the PTY reader, one-shot exec calls, and the SFTP
+/// subsystem can all use this session concurrently without racing on a
+/// shared transport.
+pub struct RushSession {
+    pub handle: Arc<russh::client::Handle<client::ClientHandler>>,
+    /// Slot for the interactive PTY channel's split write half — populated by
+    /// `ssh/pty.rs` (Workstream 3). `None` until a shell channel is opened.
+    pub pty: tokio::sync::Mutex<Option<PtyChannelState>>,
+    /// Lazily-opened SFTP subsystem, wired up in Workstream 4.
+    pub sftp: tokio::sync::OnceCell<Arc<russh_sftp::client::SftpSession>>,
+    /// Set to true by ssh_disconnect so the reader task exits cleanly.
     pub shutdown: Arc<AtomicBool>,
-    /// Holds the bridge thread for jump-host tunnels. Dropped when the session is removed.
-    pub _jump_bridge: Option<std::thread::JoinHandle<()>>,
+    /// Written by `ClientHandler::disconnected()` with the real reason the
+    /// transport went down (a server-sent disconnect message, or the
+    /// underlying I/O error) — `russh::ChannelReadHalf::wait()` returning
+    /// `None`/`Eof`/`Close` carries no error info by itself, so without this
+    /// slot the PTY reader loop could only ever report a generic fallback
+    /// string instead of the actual cause.
+    pub disconnect_reason: Arc<Mutex<Option<String>>>,
 }
 
-/// Clones the `Arc<Mutex<SshSessionInner>>` from the SshState map and
-/// releases the outer lock before returning — analogous to get_sftp_arc!.
+/// Clones the `Arc<RushSession>` out of the `SshState` map and releases the
+/// outer lock before returning, so callers never hold the map's
+/// `std::sync::Mutex` across an `.await`.
 #[macro_export]
 macro_rules! get_session_arc {
     ($state_inner:expr, $session_id:expr) => {{
         let map = $state_inner.0.lock().map_err(|e| e.to_string())?;
         map.get($session_id)
             .ok_or_else(|| format!("no SSH session for tab {}", $session_id))?
-            .inner
             .clone()
     }};
 }
 
-// ssh2::Session contains raw pointers but is guarded by the Mutex.
-unsafe impl Send for SshSession {}
-unsafe impl Sync for SshSession {}
-
-/// Global map of session_id → SshSession, cloneable so the reader thread can hold a reference.
+/// Global map of session_id → SshSession. `RushSession` is stored behind an
+/// `Arc` (rather than each of its fields being independently `Arc`'d) so
+/// `get_session_arc!` hands back a single `Arc<RushSession>` with no double
+/// indirection.
 #[derive(Clone)]
-pub struct SshState(pub Arc<Mutex<HashMap<String, SshSession>>>);
+pub struct SshState(pub Arc<Mutex<HashMap<String, Arc<RushSession>>>>);
 
 impl Default for SshState {
     fn default() -> Self {
@@ -72,10 +76,9 @@ impl Default for SshState {
     }
 }
 
-/// Pending trust confirmation for a specific tab.
-/// The condvar is signalled by `ssh_trust_host` once the user acts.
-pub type TrustPair = Arc<(Mutex<Option<bool>>, Condvar)>;
-
-/// Global map of session_id → pending trust confirmation pair.
+/// Global map of session_id → pending trust confirmation. `ssh_trust_host`
+/// sends on the oneshot once the user accepts/rejects a host key; at most one
+/// trust dialog is ever pending per session_id, so a oneshot (rather than the
+/// old `Condvar`-guarded pair) is the natural fit for the now-async wait.
 #[derive(Clone, Default)]
-pub struct TrustState(pub Arc<Mutex<HashMap<String, TrustPair>>>);
+pub struct TrustState(pub Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>>);

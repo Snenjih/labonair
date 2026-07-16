@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { tokenizeFull } from "./commandTokenizer";
 
 // TODO: also search src/modules/snippets (user-saved reusable commands, see
@@ -88,7 +89,10 @@ const ZDOTDIR_OVERRIDE_ZSH_HISTORY = "~/.cache/labonair/shell-integration/zsh/.z
 
 async function readTextFile(path: string): Promise<string | null> {
   try {
-    const r = await invoke<ReadResult>("fs_read_file", { path });
+    const r = await invoke<ReadResult>("fs_read_file", {
+      path,
+      maxBytes: usePreferencesStore.getState().editorMaxFileSizeMb * 1024 * 1024,
+    });
     return r.kind === "text" ? r.content : null;
   } catch {
     return null; // doesn't exist / unreadable — not fatal, just skip it

@@ -21,10 +21,12 @@ import {
   setEditorTrimTrailingWhitespace,
   setEditorInsertFinalNewline,
   setEditorAutocompleteDebounceMs,
+  setEditorMaxFileSizeMb,
   EDITOR_THEMES,
   EDITOR_THEME_LABELS,
   type EditorThemeId,
 } from "@/modules/settings/store";
+import { NumInput } from "../components/NumInput";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
@@ -47,6 +49,7 @@ export function EditorSection() {
   const editorTrimTrailingWhitespace = usePreferencesStore((s) => s.editorTrimTrailingWhitespace);
   const editorInsertFinalNewline = usePreferencesStore((s) => s.editorInsertFinalNewline);
   const editorAutocompleteDebounceMs = usePreferencesStore((s) => s.editorAutocompleteDebounceMs);
+  const editorMaxFileSizeMb = usePreferencesStore((s) => s.editorMaxFileSizeMb);
 
   return (
     <div className="flex flex-col gap-6">
@@ -179,6 +182,22 @@ export function EditorSection() {
       </div>
 
       <div className="flex flex-col gap-2">
+        <Label>Files</Label>
+        <SettingRow
+          title="Max file size (MB)"
+          description="Largest local file the editor (and AI file-read tools) will open (1–100 MB)."
+        >
+          <NumInput
+            value={editorMaxFileSizeMb}
+            min={1}
+            max={100}
+            step={1}
+            onChange={(v) => void setEditorMaxFileSizeMb(v)}
+          />
+        </SettingRow>
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Label>Display</Label>
         <div className="flex flex-col gap-2">
           <SettingRow title="Line numbers" description="Show line numbers in the gutter of the code editor.">
@@ -274,30 +293,4 @@ export function EditorSection() {
 
 function Label({ children }: { children: React.ReactNode }) {
   return <span className="text-[11px] font-medium tracking-tight text-muted-foreground">{children}</span>;
-}
-
-function NumInput({
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <input
-      type="number"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      className="h-7 w-20 rounded-md border border-border/60 bg-transparent px-2 text-center text-[11.5px] focus:outline-none focus:ring-1 focus:ring-ring"
-    />
-  );
 }

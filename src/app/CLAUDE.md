@@ -6,7 +6,7 @@ This directory is the top-level wiring layer of the Labonair app. It owns no fea
 
 ```
 src/app/
-├── App.tsx              (181 lines) — pure hook wiring + single <AppShell> return
+├── App.tsx              (189 lines) — pure hook wiring + single <AppShell> return
 ├── hooks/
 │   ├── index.ts
 │   ├── useAppBootstrap.ts   — all startup effects (prefs, keybinds, API keys, hydration, errors)
@@ -22,22 +22,23 @@ src/app/
 
 ## App.tsx Structure
 
-App.tsx is intentionally thin — 181 lines of hook calls and prop wiring:
+App.tsx is intentionally thin — ~189 lines of hook calls and prop wiring:
 
 1. **Stable store actions** — destructured once from `useTabsStore.getState()` (never cause rerenders)
-2. **Bootstrap hooks** — `useAppBootstrap()` → `{keysLoaded, apiKeys, home}`
+2. **Bootstrap hooks** — `useAppBootstrap()` → `{keysLoaded, apiKeys, home}` (only `keysLoaded`/`home` currently destructured); `useHasComposer()` for `hasComposer`
 3. **Session hook** — `useSessionLifecycle()` → `{sessionRestored, prefsHydrated}`
-4. **`useWorkspaceCwd(home)`** — MUST run before `useTabManagement` (provides `inheritedCwdForNewTab`)
+4. **`useWorkspaceCwd(home)`** — MUST run before `useTabManagement` (provides `inheritedCwdForNewTab`); followed by `useExplorerTarget(explorerRoot)`
 5. **`useSidebar()`** — sidebar panel state
 6. **`useTabManagement({ home, inheritedCwdForNewTab })`** — all tab/pane ops + refs
 7. **`usePreviewDetection(tabs.activeDetectedUrl)`** — detects local dev server URLs from terminal output
-8. **Reactive store subscriptions** — only render-relevant values (panelOpen, prefs)
-9. **`useAiLiveBridge({...})`** — AI context callbacks + selection popup
-10. **`usePaletteCallbacks({...})`** — command palette RegistryCallbacks + activeContext
-11. **`useMenuBridge({...})`** — wires Tauri menu events to app actions
-12. **`useShortcutHandlers({...})`** — registers global keyboard shortcuts
-13. **`show_main_window` effect** — waits for `prefsHydrated && keysLoaded && sessionRestored`
-14. **Single `<AppShell>` return** — passes actions/prefs/ctrl/tabs/sidebar/ai/palette as prop groups
+8. **Reactive store subscriptions** — only render-relevant values: `useChatStore` (`openMini`, `panelOpen`, `respondToApproval`) and `usePreferencesStore` (`sidebarPosition`, `zenModeShowHeader`, `zenModeShowStatusbar`, `aiEnabled`, `checkForUpdates`, `reduceMotion`)
+9. **`useUpdater({ autoCheck: checkForUpdates })`** — background update check
+10. **`useAiLiveBridge({...})`** — AI context callbacks + selection popup
+11. **`usePaletteCallbacks({...})`** — command palette RegistryCallbacks + activeContext
+12. **`useMenuBridge({...})`** — wires Tauri menu events to app actions
+13. **`useShortcutHandlers({...})`** — registers global keyboard shortcuts
+14. **`show_main_window` effects** — one waits for `prefsHydrated && sessionRestored`, plus an 8s idempotent safety-net timeout in case a bootstrap condition never resolves
+15. **Single `<AppShell>` return** — passes `actions`/`prefs`/`ctrl` (constructed prop groups) plus `tabs`/`sidebar`/`ai`/`palette` (hook results passed through directly)
 
 ## Hook Location Convention
 
@@ -63,7 +64,7 @@ Only truly app-level hooks without a module home live in `src/app/hooks/`:
 `menuHandlersRef.current = { ... }` runs every render intentionally — no `useMemo`. This keeps handlers always current without re-registering the Tauri `listen()` calls (which are registered once with `[]` deps).
 
 ### show_main_window
-The window is hidden on startup and shown only once `prefsHydrated && keysLoaded && sessionRestored` are all true. This prevents flash-of-unstyled-content and ensures session restore completes before the user sees anything.
+The window is hidden on startup and shown once `prefsHydrated && sessionRestored` are both true, plus an 8s safety-net timeout that calls it unconditionally in case a bootstrap condition never resolves (`show_main_window` is idempotent, so a double call is harmless). This prevents flash-of-unstyled-content and ensures session restore completes before the user sees anything.
 
 ### AppShell prop groups
 Props to AppShell are organized into 4 groups to keep the call-site readable:

@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { type TransferJob, type TransferStatus, useTransferStore } from "@/modules/sftp/store/transferStore";
-import { Cancel01Icon, ArrowUpDownIcon, Copy01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, ArrowUpDownIcon, Copy01Icon, ArrowDown01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -166,12 +166,28 @@ function TransferItem({ job, onCancel }: { job: TransferJob; onCancel: () => voi
   const pct = job.bytes_total > 0 ? Math.round((job.bytes_transferred / job.bytes_total) * 100) : 0;
   const isActive = job.status === "running" || job.status === "queued";
   const failedMsg = isFailed(job.status) ? job.status.failed : null;
+  const steps = useTransferStore((s) => s.stepsByJob[job.id]);
+  const [logOpen, setLogOpen] = useState(false);
 
   return (
     <div className="px-3 py-2 flex flex-col gap-1.5">
       <div className="flex items-center gap-2 min-w-0">
         <span className="shrink-0 text-[13px]">{job.direction === "download" ? "⬇" : "⬆"}</span>
         <span className="flex-1 text-sm font-medium truncate min-w-0">{fileName}</span>
+        {steps && steps.length > 0 && (
+          <button
+            onClick={() => setLogOpen((v) => !v)}
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            title="Show transfer log"
+          >
+            <HugeiconsIcon
+              icon={ArrowDown01Icon}
+              size={12}
+              strokeWidth={2}
+              className={cn("transition-transform", logOpen && "rotate-180")}
+            />
+          </button>
+        )}
         {failedMsg !== null ? (
           <FailedBadge message={failedMsg} />
         ) : (
@@ -206,12 +222,37 @@ function TransferItem({ job, onCancel }: { job: TransferJob; onCancel: () => voi
         <span className="text-[10px] text-muted-foreground truncate">
           {job.src_path.split("/").slice(-2).join("/")} → {job.dest_path.split("/").slice(-2).join("/")}
         </span>
-        {job.status === "running" && job.speed_bps > 0 && (
-          <span className="text-[10px] text-muted-foreground tabular-nums shrink-0 ml-2">
-            {formatBytes(job.speed_bps)}/s
-          </span>
-        )}
+        <div className="shrink-0 ml-2 flex flex-col items-end gap-0.5">
+          {job.status === "running" && (
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {formatBytes(job.bytes_transferred)} / {formatBytes(job.bytes_total)}
+            </span>
+          )}
+          {job.status === "running" && job.speed_bps > 0 && (
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {formatBytes(job.speed_bps)}/s
+            </span>
+          )}
+          {job.status === "completed" && (
+            <span className="text-[10px] text-muted-foreground tabular-nums">
+              {formatBytes(job.bytes_total)}
+            </span>
+          )}
+        </div>
       </div>
+
+      {logOpen && steps && steps.length > 0 && (
+        <div className="mt-0.5 max-h-32 overflow-y-auto rounded bg-muted/30 px-2 py-1.5 flex flex-col gap-0.5">
+          {steps.map((step, i) => (
+            <div
+              key={`${step.ts}-${i}`}
+              className="text-[10px] font-mono text-muted-foreground leading-relaxed"
+            >
+              <span className="text-muted-foreground/60">{formatTimestamp(step.ts)}</span> {step.message}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -317,6 +358,10 @@ function statusProgressClass(status: TransferStatus): string {
     default:
       return "bg-muted-foreground";
   }
+}
+
+function formatTimestamp(ts: number): string {
+  return new Date(ts).toLocaleTimeString(undefined, { hour12: false });
 }
 
 function formatBytes(bytes: number): string {

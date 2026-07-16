@@ -15,7 +15,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { ShortcutsDialog } from "@/modules/shortcuts";
 import { SnippetLogDrawer } from "@/modules/snippets";
 import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
-import type { SidebarReturn } from "@/modules/statusbar";
+import type { SidebarPanel, SidebarReturn } from "@/modules/statusbar";
 import { StatusBar } from "@/modules/statusbar";
 import {
   type AiDiffStatus,
@@ -210,6 +210,17 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     ],
   );
 
+  // Shared by both Header (JumpHostDropdown's Explorer pill fallback) and
+  // StatusBar (panel switcher buttons) so the "hosts" special-case only
+  // lives in one place.
+  const handlePanelToggle = (panel: SidebarPanel) => {
+    if (panel === "hosts") {
+      actions.openHomeTab();
+      return;
+    }
+    sidebar.handlePanelToggle(panel);
+  };
+
   const shell = (
     <MotionConfig reducedMotion={prefs.reduceMotion ? "always" : "user"}>
       <ThemeProvider>
@@ -237,6 +248,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onOpenHostManager={tabs.onOpenHostManager}
                 onOpenThemes={onOpenThemes}
                 onNewGitGraph={onNewGitGraph}
+                onPanelToggle={handlePanelToggle}
               />
             )}
 
@@ -300,13 +312,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                   if (ctrl.detectedPreviewUrl) tabs.openPreviewTab(ctrl.detectedPreviewUrl);
                 }}
                 activePanel={sidebar.activePanel}
-                onPanelToggle={(panel) => {
-                  if (panel === "hosts") {
-                    actions.openHomeTab();
-                    return;
-                  }
-                  sidebar.handlePanelToggle(panel);
-                }}
+                onPanelToggle={handlePanelToggle}
               />
             )}
 

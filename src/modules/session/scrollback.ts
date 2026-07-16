@@ -7,7 +7,9 @@ import {
 } from "@/modules/terminal/lib/terminalSessionRegistry";
 import type { TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
 
-const MAX_SCROLLBACK_BYTES = 10 * 1024 * 1024;
+function maxScrollbackBytes(): number {
+  return usePreferencesStore.getState().scrollbackMaxSizeMb * 1024 * 1024;
+}
 
 type ScrollbackLive = {
   getAllTerminalRefs: () => Map<string, TerminalPaneHandle>;
@@ -29,9 +31,10 @@ export async function saveAllScrollbacks(sessionIds: string[]): Promise<void> {
       const scrollbackLimit = usePreferencesStore.getState().sessionScrollbackLines;
       const ansi = handle.serialize(scrollbackLimit > 0 ? scrollbackLimit : undefined);
       if (!ansi || ansi.trim().length === 0) return; // empty buffer
-      if (ansi.length > MAX_SCROLLBACK_BYTES) return; // oversized guard
+      const maxBytes = maxScrollbackBytes();
+      if (ansi.length > maxBytes) return; // oversized guard
       try {
-        await invoke("scrollback_save", { sessionId, ansi });
+        await invoke("scrollback_save", { sessionId, ansi, maxBytes });
       } catch (e) {
         console.warn("[scrollback] save failed:", sessionId, e);
       }
@@ -61,10 +64,11 @@ export async function flushDormantScrollback(sessionId: string): Promise<void> {
   const buffered = peekDormantAnsi(sessionId);
   if (!buffered) return;
   try {
-    const existing = (await invoke<string | null>("scrollback_load", { sessionId })) ?? "";
+    const maxBytes = maxScrollbackBytes();
+    const existing = (await invoke<string | null>("scrollback_load", { sessionId, maxBytes })) ?? "";
     const combined = existing ? existing + DORMANT_FLUSH_SEPARATOR + buffered : buffered;
-    if (combined.trim().length === 0 || combined.length > MAX_SCROLLBACK_BYTES) return;
-    await invoke("scrollback_save", { sessionId, ansi: combined });
+    if (combined.trim().length === 0 || combined.length > maxBytes) return;
+    await invoke("scrollback_save", { sessionId, ansi: combined, maxBytes });
     // Only mark these bytes as flushed once they're actually durably saved —
     // an early return above (size cap) or a caught failure below leaves them
     // unflushed so the next tick previews and retries them instead of
@@ -83,7 +87,11 @@ export async function flushAllDormantScrollbacks(): Promise<void> {
 
 export async function cleanupScrollbacks(knownSessionIds: string[]): Promise<void> {
   try {
-    await invoke("scrollback_cleanup", { knownSessionIds });
+    const retentionDays = usePreferencesStore.getState().scrollbackRetentionDays;
+    await invoke("scrollback_cleanup", {
+      knownSessionIds,
+      maxAgeSecs: retentionDays > 0 ? retentionDays * 86400 : null,
+    });
   } catch (e) {
     console.warn("[scrollback] cleanup failed:", e);
   }

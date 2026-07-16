@@ -20,6 +20,8 @@ import {
   setConfirmCloseTerminalTab,
   setConfirmQuitWithSsh,
   setNotifyOnErrors,
+  setScrollbackMaxSizeMb,
+  setScrollbackRetentionDays,
 } from "@/modules/settings/store";
 import { useUpdater } from "@/modules/updater";
 import { AlertDiamondIcon, GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
@@ -30,6 +32,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { arch, platform } from "@tauri-apps/plugin-os";
 import { useEffect, useState } from "react";
+import { NumInput } from "../components/NumInput";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
@@ -90,6 +93,8 @@ export function GeneralSection() {
   const restoreWindowState = usePreferencesStore((s) => s.restoreWindowState);
   const sessionRestore = usePreferencesStore((s) => s.sessionRestore);
   const sessionScrollbackLines = usePreferencesStore((s) => s.sessionScrollbackLines);
+  const scrollbackMaxSizeMb = usePreferencesStore((s) => s.scrollbackMaxSizeMb);
+  const scrollbackRetentionDays = usePreferencesStore((s) => s.scrollbackRetentionDays);
   const vimMode = usePreferencesStore((s) => s.vimMode);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
@@ -331,6 +336,42 @@ export function GeneralSection() {
             </SettingRow>
           )}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label>Scrollback</Label>
+        <SettingRow
+          title="Max scrollback size (MB)"
+          description="Largest per-session scrollback buffer saved to disk (1–50 MB)."
+        >
+          <NumInput
+            value={scrollbackMaxSizeMb}
+            min={1}
+            max={50}
+            step={1}
+            onChange={(v) => void setScrollbackMaxSizeMb(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Scrollback retention"
+          description="Automatically delete saved scrollback older than this many days."
+        >
+          <Select
+            value={String(scrollbackRetentionDays)}
+            onValueChange={(v) => void setScrollbackRetentionDays(Number(v))}
+          >
+            <SelectTrigger className="h-7 w-32 text-[11.5px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0">Never</SelectItem>
+              <SelectItem value="7">7 days</SelectItem>
+              <SelectItem value="30">30 days</SelectItem>
+              <SelectItem value="90">90 days</SelectItem>
+              <SelectItem value="365">1 year</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">

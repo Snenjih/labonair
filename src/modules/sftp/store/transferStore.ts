@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useSftpStore } from "./sftpStore";
 
 export type TransferStatus = "queued" | "running" | "paused" | "cancelled" | "completed" | { failed: string };
@@ -18,12 +19,20 @@ export interface TransferJob {
   conflict?: { src_path: string; dest_path: string };
 }
 
+export interface TransferStep {
+  ts: number;
+  message: string;
+}
+
 interface TransferState {
   jobs: TransferJob[];
+  /** Timestamped per-job log, kept only as long as the job itself is shown. */
+  stepsByJob: Record<string, TransferStep[]>;
   addJob: (job: TransferJob) => void;
   updateJob: (job: TransferJob) => void;
   removeJob: (id: string) => void;
   clearCompleted: () => void;
+  addStep: (jobId: string, step: TransferStep) => void;
   cancelJob: (id: string) => Promise<void>;
   resolveConflict: (
     jobId: string,
@@ -34,6 +43,7 @@ interface TransferState {
 
 export const useTransferStore = create<TransferState>((set) => ({
   jobs: [],
+  stepsByJob: {},
 
   addJob: (job) => set((s) => ({ jobs: [job, ...s.jobs] })),
 
@@ -42,11 +52,25 @@ export const useTransferStore = create<TransferState>((set) => ({
       jobs: s.jobs.map((j) => (j.id === job.id ? { ...j, ...job } : j)),
     })),
 
-  removeJob: (id) => set((s) => ({ jobs: s.jobs.filter((j) => j.id !== id) })),
+  removeJob: (id) =>
+    set((s) => {
+      const { [id]: _, ...rest } = s.stepsByJob;
+      return { jobs: s.jobs.filter((j) => j.id !== id), stepsByJob: rest };
+    }),
 
   clearCompleted: () =>
+    set((s) => {
+      const kept = s.jobs.filter((j) => j.status !== "completed" && j.status !== "cancelled");
+      const keptIds = new Set(kept.map((j) => j.id));
+      const stepsByJob = Object.fromEntries(
+        Object.entries(s.stepsByJob).filter(([jobId]) => keptIds.has(jobId)),
+      );
+      return { jobs: kept, stepsByJob };
+    }),
+
+  addStep: (jobId, step) =>
     set((s) => ({
-      jobs: s.jobs.filter((j) => j.status !== "completed" && j.status !== "cancelled"),
+      stepsByJob: { ...s.stepsByJob, [jobId]: [...(s.stepsByJob[jobId] ?? []), step] },
     })),
 
   cancelJob: async (id) => {
@@ -97,6 +121,11 @@ export async function bootstrapTransferListeners() {
     }
   });
 
+  await listen<{ job_id: string; ts: number; message: string }>("transfer_step", (event) => {
+    const { job_id, ts, message } = event.payload;
+    useTransferStore.getState().addStep(job_id, { ts, message });
+  });
+
   await listen<{ job_id: string; src_path: string; dest_path: string }>("file_conflict", (event) => {
     const store = useTransferStore.getState();
     const job = store.jobs.find((j) => j.id === event.payload.job_id);
@@ -109,5 +138,40 @@ export async function bootstrapTransferListeners() {
         dest_path: event.payload.dest_path,
       },
     });
+  });
+}
+
+/** Pushes the worker-wide transfer settings (concurrency, chunk size,
+ *  default conflict policy) to the Rust worker. Unlike most preferences,
+ *  these affect the SFTP worker loop rather than a single command call, so
+ *  they're synced once at startup and again on every change instead of being
+ *  passed as a per-`enqueue_transfer` argument. */
+async function pushTransferSettings(): Promise<void> {
+  const prefs = usePreferencesStore.getState();
+  try {
+    await invoke("sftp_update_transfer_settings", {
+      maxConcurrent: prefs.sftpMaxConcurrentTransfers,
+      chunkSizeBytes: prefs.sftpChunkSizeKb * 1024,
+      defaultConflictResolution: prefs.sftpDefaultConflictResolution,
+    });
+  } catch (e) {
+    console.warn("[sftp] failed to push transfer settings:", e);
+  }
+}
+
+let _transferSettingsSyncBootstrapped = false;
+
+export function bootstrapTransferSettingsSync(): void {
+  if (_transferSettingsSyncBootstrapped) return;
+  _transferSettingsSyncBootstrapped = true;
+  void pushTransferSettings();
+  usePreferencesStore.subscribe((state, prev) => {
+    if (
+      state.sftpMaxConcurrentTransfers !== prev.sftpMaxConcurrentTransfers ||
+      state.sftpChunkSizeKb !== prev.sftpChunkSizeKb ||
+      state.sftpDefaultConflictResolution !== prev.sftpDefaultConflictResolution
+    ) {
+      void pushTransferSettings();
+    }
   });
 }

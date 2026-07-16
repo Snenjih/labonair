@@ -185,7 +185,11 @@ async function prepareRemoteFileForTab(
 
   let localTempPath: string;
   try {
-    localTempPath = await invoke<string>("prepare_remote_edit", { sessionId: sftpTabId, remotePath });
+    localTempPath = await invoke<string>("prepare_remote_edit", {
+      sessionId: sftpTabId,
+      remotePath,
+      maxBytes: usePreferencesStore.getState().sftpMaxRemoteFileSizeMb * 1024 * 1024,
+    });
   } catch (e) {
     if (showTransfers) {
       useTransferStore.getState().updateJob({

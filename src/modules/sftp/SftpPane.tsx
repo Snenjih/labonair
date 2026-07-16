@@ -1,20 +1,21 @@
+import { Folder01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
-import { useHostsStore } from "@/modules/hosts";
+import { useConnectionStatusStore, useHostsStore } from "@/modules/hosts";
 import { toggleSftpHiddenFiles, usePreferencesStore } from "@/modules/settings/preferences";
-import { Folder01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
 import type { SftpTab } from "@/modules/tabs";
-import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
+import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
+import { isLabonairError } from "@/types";
 import { SftpContextMenu } from "./components/SftpContextMenu";
 import { SftpToolbar } from "./components/SftpToolbar";
 import { VirtualizedFileList } from "./components/VirtualizedFileList";
 import { useSftpStore } from "./store/sftpStore";
 import type { FileNode } from "./types";
-import { parentPath } from "./utils";
+import { blurActiveInput, parentPath } from "./utils";
 
 interface SftpPaneProps {
   tab: SftpTab;
@@ -95,6 +96,37 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     onPathsChange(tab.id, tabState.remotePath, tabState.localPath);
   }, [tab.id, tabState?.remotePath, tabState?.localPath, onPathsChange]);
 
+  // Tracks this pane's live status in the shared cross-tab connection-status
+  // store — feeds the StatusBar jump-host dropdown alongside terminal panes
+  // and explorer/git lazy sessions. Runs unconditionally (not gated behind
+  // isConnected, unlike the init effect above) so remove() always fires on
+  // unmount, even for a tab that errors out before ever connecting.
+  useEffect(() => {
+    const h = useHostsStore.getState().hosts.find((x) => x.id === tab.hostId);
+    const jumpHostName = h?.jump_host_id
+      ? (useHostsStore.getState().hosts.find((x) => x.id === h.jump_host_id)?.name ?? "unknown host")
+      : null;
+    useConnectionStatusStore.getState().upsert(tabId, {
+      hostId: tab.hostId,
+      kind: "sftp",
+      status: "connecting",
+      error: null,
+      jumpHostName,
+      hostLabel: h?.name ?? tab.title,
+      sftpTabId: tab.id,
+    });
+    return () => useConnectionStatusStore.getState().remove(tabId);
+  }, [tabId, tab.hostId, tab.id, tab.title]);
+
+  // Mirrors useSftpStore's disconnected/disconnectReason (populated by the
+  // backend's ssh_connection_lost event) into the shared connection-status
+  // store, instead of adding a second raw event listener for the same session.
+  useEffect(() => {
+    if (tabState?.disconnected) {
+      useConnectionStatusStore.getState().setStatus(tabId, "error", tabState.disconnectReason);
+    }
+  }, [tabId, tabState?.disconnected, tabState?.disconnectReason]);
+
   function handleLocalSelect(path: string, multi: boolean) {
     const current = tabState?.selectedLocalPaths ?? new Set<string>();
     if (multi) {
@@ -170,6 +202,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   }
 
   function startDrag(source: "local" | "remote", paths: string[]) {
+    blurActiveInput();
     dragSourceRef.current = source;
     draggedPathsRef.current = paths;
     setActiveDragSource(source);
@@ -297,6 +330,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
 
   async function handleReconnect() {
     setIsReconnecting(true);
+    useConnectionStatusStore.getState().setStatus(tabId, "connecting");
     try {
       // Force-disconnect first (best-effort) so sftp_connect's idempotency
       // check never silently no-ops against a stale session record the
@@ -305,10 +339,14 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       await invoke("sftp_disconnect", { sessionId: tabId }).catch(() => {});
       await invoke("sftp_connect", { sessionId: tabId, hostId: tab.hostId });
       clearDisconnected(tabId);
+      useConnectionStatusStore.getState().setStatus(tabId, "connected");
       loadLocalDir(tabId, tabState?.localPath ?? "~");
       loadRemoteDir(tabId, tabState?.remotePath ?? host?.default_path_sftp ?? "/");
     } catch (e) {
       handleApiError(e, "Reconnect failed", "SFTP");
+      useConnectionStatusStore
+        .getState()
+        .setStatus(tabId, "error", isLabonairError(e) ? e.message : String(e));
     } finally {
       setIsReconnecting(false);
     }
@@ -345,8 +383,14 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
         hostId={tab.hostId}
         hostName={tab.title}
         connectionType="sftp"
-        onConnected={() => setIsConnected(true)}
-        onError={() => setHasError(true)}
+        onConnected={() => {
+          setIsConnected(true);
+          useConnectionStatusStore.getState().setStatus(tabId, "connected");
+        }}
+        onError={(message) => {
+          setHasError(true);
+          useConnectionStatusStore.getState().setStatus(tabId, "error", message);
+        }}
       />
     );
   }

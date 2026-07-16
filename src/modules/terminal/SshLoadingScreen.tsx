@@ -100,6 +100,7 @@ export function SshLoadingScreen({
     // reconnect must pick up whatever the setting currently is, not a stale
     // value captured at first mount.
     const blocks = usePreferencesStore.getState().terminalBlocksEnabled;
+    const connectTimeoutSecs = usePreferencesStore.getState().sshConnectTimeoutSecs;
 
     const p: Promise<unknown> = isQuickConnect
       ? invoke("ssh_connect_quick", {
@@ -113,6 +114,7 @@ export function SshLoadingScreen({
           initialRows: initialRows ?? null,
           blocks,
           onEvent: channel,
+          connectTimeoutSecs,
         })
       : connectionType === "sftp"
         ? invoke("sftp_connect", {
@@ -130,6 +132,7 @@ export function SshLoadingScreen({
             initialRows: initialRows ?? null,
             blocks,
             onEvent: channel,
+            connectTimeoutSecs,
           });
 
     p.then(() => {
@@ -212,9 +215,10 @@ export function SshLoadingScreen({
         }
         // Start tunnels on a dedicated background SSH connection (non-blocking).
         if (hostId) {
-          invoke("ssh_start_tunnels", { hostId }).catch((e) =>
-            handleApiError(e, "Failed to start SSH tunnels", "SSH"),
-          );
+          invoke("ssh_start_tunnels", {
+            hostId,
+            connectTimeoutSecs: usePreferencesStore.getState().sshConnectTimeoutSecs,
+          }).catch((e) => handleApiError(e, "Failed to start SSH tunnels", "SSH"));
           // Mirror the backend's last_connected_at write locally so "Quick Connect"
           // rankings (e.g. in the command palette) update without a full refetch.
           const connectedAt = Date.now();

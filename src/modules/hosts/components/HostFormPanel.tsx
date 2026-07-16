@@ -7,19 +7,27 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { handleApiError } from "@/lib/errors";
+import { cn } from "@/lib/utils";
 import { invoke } from "@tauri-apps/api/core";
+import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
-import type { CreateHostPayload, Host, TunnelConfig } from "../types";
+import type { CreateHostPayload, Host, TunnelConfig, UpdateHostPayload } from "../types";
 
 interface Props {
   /** If null, panel is in "add new" mode */
@@ -31,6 +39,10 @@ interface Props {
 }
 
 type AuthMethod = "password" | "key" | "credential" | "none";
+type SaveResult = "success" | "error" | null;
+
+/** Minimum time the saving spinner stays visible, so a fast save doesn't just flicker. */
+const MIN_SAVING_DISPLAY_MS = 700;
 
 interface FormState {
   name: string;
@@ -120,6 +132,73 @@ function newTunnel(): TunnelConfig {
   };
 }
 
+function buildUpdatePayload(
+  host: Host,
+  form: FormState,
+  password: string,
+  tunnels: TunnelConfig[],
+): UpdateHostPayload {
+  const payload: Record<string, unknown> = {
+    id: host.id,
+    name: form.name,
+    host_address: form.host_address,
+    port: parseInt(form.port, 10) || host.port,
+    username: form.username,
+    auth_method: form.auth_method,
+    pin_to_top: form.pin_to_top,
+  };
+  if (form.private_key_path) payload.private_key_path = form.private_key_path;
+  if (form.group_id) payload.group_id = form.group_id;
+  if (password) payload.password = password;
+  if (form.sudo_password) payload.sudo_password = form.sudo_password;
+  if (form.default_path_ssh) payload.default_path_ssh = form.default_path_ssh;
+  if (form.default_path_sftp) payload.default_path_sftp = form.default_path_sftp;
+  if (form.keep_alive_interval) payload.keep_alive_interval = parseInt(form.keep_alive_interval, 10);
+  if (form.keep_alive_tries) payload.keep_alive_tries = parseInt(form.keep_alive_tries, 10);
+  payload.tunnels = JSON.stringify(tunnels);
+  payload.credential_id = form.auth_method === "credential" ? form.credential_id : "";
+  payload.startup_snippet_id = form.startup_snippet_id || "";
+  payload.startup_snippet_mode = form.startup_snippet_mode;
+  payload.jump_host_id = form.jump_host_id || null;
+  payload.notes = form.notes || null;
+  return payload as unknown as UpdateHostPayload;
+}
+
+/** Header save-status indicator: idle (muted) → saving (pulse) → success/error flash (~2.5s) → idle */
+function SaveStatusIcon({ saving, result }: { saving: boolean; result: SaveResult }) {
+  if (saving) {
+    // Same spinner as the SSH connect loading screen (SshLoadingScreen.tsx),
+    // scaled down to fit the header icon slot.
+    return (
+      <div title="Saving…" className="flex shrink-0 items-center justify-center rounded-md p-1">
+        <div className="h-3.5 w-3.5 animate-spin rounded-full border-[1.5px] border-muted border-t-primary" />
+      </div>
+    );
+  }
+  const color =
+    result === "success" ? "text-success" : result === "error" ? "text-destructive" : "text-muted-foreground";
+  return (
+    <motion.div
+      key={result ?? "idle"}
+      initial={result ? { scale: 1 } : false}
+      animate={result ? { scale: [1, 1.3, 1] } : {}}
+      transition={{ duration: 0.35 }}
+      title={result === "error" ? "Save failed" : result === "success" ? "Saved" : undefined}
+      className={cn("shrink-0 rounded-md p-1 transition-colors", color)}
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path
+          d="M2 7l3.5 3.5L12 3"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </motion.div>
+  );
+}
+
 export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNavigateToCredentials }: Props) {
   const isNew = hostId === "__new__" || hostId === null;
 
@@ -130,6 +209,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
   const createHost = useHostsStore((s) => s.createHost);
   const updateHost = useHostsStore((s) => s.updateHost);
   const deleteHost = useHostsStore((s) => s.deleteHost);
+  const duplicateHost = useHostsStore((s) => s.duplicateHost);
   const setSelectedHost = useHostsStore((s) => s.setSelectedHost);
 
   const credentials = useCredentialsStore((s) => s.credentials);
@@ -142,56 +222,105 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
   const [form, setForm] = useState<FormState>(isNew ? DEFAULT_FORM : host ? hostToForm(host) : DEFAULT_FORM);
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveResult, setSaveResult] = useState<SaveResult>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [tunnels, setTunnels] = useState<TunnelConfig[]>(() => parseTunnels(host?.tunnels));
 
-  useEffect(() => {
-    if (!isNew && host) {
-      setForm(hostToForm(host));
-      setTunnels(parseTunnels(host.tunnels));
-    }
-  }, [hostId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const isMountedRef = useRef(true);
+  const skipNextSaveRef = useRef(true);
+  const pendingSaveRef = useRef(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleBlur = useCallback(async () => {
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (saveResultTimeoutRef.current) clearTimeout(saveResultTimeoutRef.current);
+    };
+  }, []);
+
+  // No host-sync effect here on purpose: `form`/`tunnels` are already seeded
+  // correctly from `host` by the useState initializers above. HomeDashboard
+  // keys the panel by hostId, so switching hosts fully remounts this
+  // component rather than updating `hostId` in place — resyncing state here
+  // would just re-set it to the same values, causing an extra render that
+  // consumes `skipNextSaveRef` a render early and lets the debounce effect
+  // below fire a real (no-op) save ~1s after opening. If the panel is ever
+  // changed to update in place instead of remounting, this will need a real
+  // resync effect that also re-arms `skipNextSaveRef` in the same render
+  // that changes `form`/`tunnels`.
+
+  const runSave = useCallback(async () => {
     if (isNew || !host) return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(async () => {
-      setSaving(true);
-      try {
-        const payload: Record<string, unknown> = {
-          id: host.id,
-          name: form.name,
-          host_address: form.host_address,
-          port: parseInt(form.port, 10) || host.port,
-          username: form.username,
-          auth_method: form.auth_method,
-          pin_to_top: form.pin_to_top,
-        };
-        if (form.private_key_path) payload.private_key_path = form.private_key_path;
-        if (form.group_id) payload.group_id = form.group_id;
-        if (password) payload.password = password;
-        if (form.sudo_password) payload.sudo_password = form.sudo_password;
-        if (form.default_path_ssh) payload.default_path_ssh = form.default_path_ssh;
-        if (form.default_path_sftp) payload.default_path_sftp = form.default_path_sftp;
-        if (form.keep_alive_interval) payload.keep_alive_interval = parseInt(form.keep_alive_interval, 10);
-        if (form.keep_alive_tries) payload.keep_alive_tries = parseInt(form.keep_alive_tries, 10);
-        payload.tunnels = JSON.stringify(tunnels);
-        payload.credential_id = form.auth_method === "credential" ? form.credential_id : "";
-        payload.startup_snippet_id = form.startup_snippet_id || "";
-        payload.startup_snippet_mode = form.startup_snippet_mode;
-        payload.jump_host_id = form.jump_host_id || null;
-        payload.notes = form.notes || null;
-        await updateHost(payload as unknown as import("../types").UpdateHostPayload);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 1500);
-      } finally {
-        setSaving(false);
-      }
-    }, 300);
+    const startedAt = Date.now();
+    setSaving(true);
+    setSaveResult(null);
+    if (saveResultTimeoutRef.current) clearTimeout(saveResultTimeoutRef.current);
+    let result: SaveResult = "success";
+    try {
+      await updateHost(buildUpdatePayload(host, form, password, tunnels));
+    } catch (e) {
+      result = "error";
+      handleApiError(e, "Failed to save host", "Hosts");
+    }
+    // Keep the spinner visible for at least MIN_SAVING_DISPLAY_MS — a save that
+    // resolves in a few ms would otherwise just flicker.
+    const remaining = MIN_SAVING_DISPLAY_MS - (Date.now() - startedAt);
+    if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
+    if (!isMountedRef.current) return;
+    setSaving(false);
+    setSaveResult(result);
+    saveResultTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current) setSaveResult(null);
+    }, 2500);
   }, [isNew, host, form, password, tunnels, updateHost]);
+
+  // Only used by the flush path (host switch / unmount / duplicate) below, which
+  // fires from effect cleanups that need whatever `runSave` is current *at that
+  // moment*. The normal debounced-save path doesn't need this: its timer callback
+  // is created fresh whenever form/tunnels/password change, so it's never stale.
+  const latestSaveRef = useRef(runSave);
+  useEffect(() => {
+    latestSaveRef.current = runSave;
+  }, [runSave]);
+
+  // Debounced autosave: any edit (typing, toggles, selects) reschedules a save 1s
+  // in the future. Deliberately does NOT flush pending saves on cleanup — its
+  // cleanup fires on every edit (to reset the timer), and flushing there would
+  // save on every keystroke instead of debouncing. See the effect below for that.
+  useEffect(() => {
+    if (isNew || !host) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
+    const canSaveEdit = form.name.trim() && form.host_address.trim() && form.username.trim();
+    if (!canSaveEdit) return;
+    pendingSaveRef.current = true;
+    debounceTimerRef.current = setTimeout(() => {
+      pendingSaveRef.current = false;
+      void runSave();
+    }, 1000);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [form, tunnels, password]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Flush a still-pending save when switching hosts or closing the panel, so the
+  // last <1s of edits isn't silently dropped. Keyed only on `hostId` so it fires
+  // on host-switch/unmount, not on every keystroke.
+  useEffect(() => {
+    return () => {
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        void latestSaveRef.current();
+      }
+    };
+  }, [hostId]);
 
   const handleCreate = async () => {
     if (!form.name.trim() || !form.host_address.trim() || !form.username.trim()) return;
@@ -234,9 +363,30 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
 
   const handleDelete = useCallback(async () => {
     if (!host) return;
+    // Discard any pending autosave first — otherwise the flush-on-hostId-change
+    // effect would try to PATCH a host that no longer exists once this resolves.
+    pendingSaveRef.current = false;
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     await deleteHost(host.id);
     onClose();
   }, [host, deleteHost, onClose]);
+
+  const handleDuplicate = useCallback(async () => {
+    if (!host) return;
+    if (pendingSaveRef.current) {
+      // Flush unsaved edits first so the clone reflects the latest state, not
+      // the last-persisted snapshot in the store.
+      pendingSaveRef.current = false;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      await latestSaveRef.current();
+    }
+    try {
+      const dup = await duplicateHost(host.id);
+      setSelectedHost(dup.id);
+    } catch (e) {
+      handleApiError(e, "Failed to duplicate host", "Hosts");
+    }
+  }, [host, duplicateHost, setSelectedHost]);
 
   const f = (label: string, key: keyof FormState, type = "text", placeholder = "") => (
     <div className="space-y-1.5">
@@ -246,7 +396,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
         placeholder={placeholder}
         value={form[key] as string}
         onChange={(e) => setForm((d) => ({ ...d, [key]: e.target.value }))}
-        onBlur={handleBlur}
         className="h-8 text-sm bg-background"
       />
     </div>
@@ -259,43 +408,58 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-border px-4 py-3 sticky top-0 bg-background z-10">
         <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            {isNew ? "New Host" : "Host Details"}
+          </p>
           <input
             value={form.name}
             onChange={(e) => setForm((d) => ({ ...d, name: e.target.value }))}
-            onBlur={handleBlur}
-            placeholder={isNew ? "New Host" : "Host name"}
-            className="w-full bg-transparent text-base font-semibold text-foreground outline-none placeholder:text-muted-foreground"
+            placeholder={isNew ? "e.g. Production Server" : "Host name"}
+            className="w-full bg-transparent text-sm font-semibold text-foreground outline-none placeholder:text-muted-foreground truncate"
           />
-          {saving && <p className="text-[11px] text-muted-foreground">Saving…</p>}
-          {saved && !saving && <p className="text-[11px] text-success">Saved</p>}
-          {isNew && <p className="text-[11px] text-muted-foreground">New host</p>}
         </div>
-        <button
-          onClick={onClose}
-          className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Connect buttons (only in edit mode) */}
-      {!isNew && host && (
-        <div className="flex gap-2 px-4 py-3 border-b border-border">
-          <Button size="sm" className="flex-1 h-8 text-xs" onClick={() => newSshTab(host.id, form.name)}>
-            Connect SSH
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1 h-8 text-xs"
-            onClick={() => newSftpTab(host.id, form.name)}
+        <div className="flex items-center gap-1 shrink-0">
+          {!isNew && host && <SaveStatusIcon saving={saving} result={saveResult} />}
+          {!isNew && host && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  title="Options"
+                  className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+                    <circle cx="2.5" cy="7" r="1.3" />
+                    <circle cx="7" cy="7" r="1.3" />
+                    <circle cx="11.5" cy="7" r="1.3" />
+                  </svg>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => newSshTab(host.id, form.name)}>Connect SSH</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => newSftpTab(host.id, form.name)}>Open SFTP</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => void handleDuplicate()}>Duplicate</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  Delete Host…
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <button
+            title="Close"
+            onClick={onClose}
+            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
           >
-            Open SFTP
-          </Button>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Tabs */}
       <Tabs defaultValue="general" className="flex flex-col flex-1 overflow-hidden">
@@ -334,7 +498,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
               <select
                 value={form.group_id}
                 onChange={(e) => setForm((d) => ({ ...d, group_id: e.target.value }))}
-                onBlur={handleBlur}
                 className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">None</option>
@@ -352,10 +515,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 <p className="text-[11px] text-muted-foreground">Always show this host first</p>
               </div>
               <button
-                onClick={() => {
-                  setForm((d) => ({ ...d, pin_to_top: !d.pin_to_top }));
-                  setTimeout(handleBlur, 0);
-                }}
+                onClick={() => setForm((d) => ({ ...d, pin_to_top: !d.pin_to_top }))}
                 className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
                   form.pin_to_top ? "bg-primary" : "bg-muted"
                 }`}
@@ -381,10 +541,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 {(["password", "key", "credential", "none"] as const).map((method) => (
                   <button
                     key={method}
-                    onClick={() => {
-                      setForm((d) => ({ ...d, auth_method: method }));
-                      setTimeout(handleBlur, 0);
-                    }}
+                    onClick={() => setForm((d) => ({ ...d, auth_method: method }))}
                     className={`flex-1 rounded-md border py-1.5 text-xs font-medium transition-all ${
                       form.auth_method === method
                         ? "border-primary bg-primary text-primary-foreground"
@@ -415,7 +572,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   placeholder="~/.ssh/id_rsa"
                   value={form.private_key_path}
                   onChange={(e) => setForm((d) => ({ ...d, private_key_path: e.target.value }))}
-                  onBlur={handleBlur}
                   className="h-8 text-sm bg-background"
                 />
               </div>
@@ -426,10 +582,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 <Label className="text-xs text-muted-foreground">Credential</Label>
                 <select
                   value={form.credential_id}
-                  onChange={(e) => {
-                    setForm((d) => ({ ...d, credential_id: e.target.value }));
-                    setTimeout(handleBlur, 0);
-                  }}
+                  onChange={(e) => setForm((d) => ({ ...d, credential_id: e.target.value }))}
                   className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">— Select a credential —</option>
@@ -464,7 +617,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onBlur={handleBlur}
                   className="h-8 text-sm bg-background"
                 />
                 <p className="text-[11px] text-muted-foreground/70">
@@ -483,10 +635,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
               <Label className="text-xs text-muted-foreground">Via Jump Host</Label>
               <select
                 value={form.jump_host_id}
-                onChange={(e) => {
-                  setForm((d) => ({ ...d, jump_host_id: e.target.value }));
-                  setTimeout(handleBlur, 0);
-                }}
+                onChange={(e) => setForm((d) => ({ ...d, jump_host_id: e.target.value }))}
                 className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">None (direct connection)</option>
@@ -514,15 +663,14 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 placeholder="Configuration notes, credentials hints, runbook steps…"
                 value={form.notes}
                 onChange={(e) => setForm((d) => ({ ...d, notes: e.target.value }))}
-                onBlur={handleBlur}
                 rows={4}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y min-h-[80px] max-h-[300px]"
               />
             </div>
           </section>
 
-          {/* Add button (new mode) or Delete button (edit mode) */}
-          {isNew ? (
+          {/* Add button (new mode only — edit-mode actions live in the header dropdown) */}
+          {isNew && (
             <div className="space-y-2">
               {error && (
                 <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>
@@ -536,32 +684,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 {submitting ? "Adding…" : "Add Host"}
               </Button>
             </div>
-          ) : (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm" className="w-full h-8 text-xs mt-2">
-                  Delete Host
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete "{form.name}"?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently remove the host and its stored credentials. This action cannot be
-                    undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
           )}
         </TabsContent>
 
@@ -575,7 +697,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 placeholder="/home/user/projects"
                 value={form.default_path_ssh}
                 onChange={(e) => setForm((d) => ({ ...d, default_path_ssh: e.target.value }))}
-                onBlur={handleBlur}
                 className="h-8 text-sm bg-background"
               />
               <p className="text-[11px] text-muted-foreground/70">
@@ -589,8 +710,12 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   type="number"
                   placeholder="60"
                   value={form.keep_alive_interval}
-                  onChange={(e) => setForm((d) => ({ ...d, keep_alive_interval: e.target.value }))}
-                  onBlur={handleBlur}
+                  onChange={(e) =>
+                    setForm((d) => ({
+                      ...d,
+                      keep_alive_interval: e.target.value,
+                    }))
+                  }
                   className="h-8 text-sm bg-background"
                 />
               </div>
@@ -601,7 +726,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   placeholder="3"
                   value={form.keep_alive_tries}
                   onChange={(e) => setForm((d) => ({ ...d, keep_alive_tries: e.target.value }))}
-                  onBlur={handleBlur}
                   className="h-8 text-sm bg-background"
                 />
               </div>
@@ -617,7 +741,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 placeholder={host?.sudo_password_set ? "••••••••  (set)" : "Leave empty to disable"}
                 value={form.sudo_password}
                 onChange={(e) => setForm((d) => ({ ...d, sudo_password: e.target.value }))}
-                onBlur={handleBlur}
                 className="h-8 text-sm bg-background"
               />
               <p className="text-[11px] text-muted-foreground/70">
@@ -634,10 +757,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
               <Label className="text-xs text-muted-foreground">Snippet</Label>
               <select
                 value={form.startup_snippet_id}
-                onChange={(e) => {
-                  setForm((d) => ({ ...d, startup_snippet_id: e.target.value }));
-                  setTimeout(handleBlur, 0);
-                }}
+                onChange={(e) => setForm((d) => ({ ...d, startup_snippet_id: e.target.value }))}
                 className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">None (disabled)</option>
@@ -658,10 +778,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   {(["execute", "inject"] as const).map((mode) => (
                     <button
                       key={mode}
-                      onClick={() => {
-                        setForm((d) => ({ ...d, startup_snippet_mode: mode }));
-                        setTimeout(handleBlur, 0);
-                      }}
+                      onClick={() => setForm((d) => ({ ...d, startup_snippet_mode: mode }))}
                       className={`flex-1 rounded-md border py-1.5 text-xs font-medium transition-all ${
                         form.startup_snippet_mode === mode
                           ? "border-primary bg-primary text-primary-foreground"
@@ -692,7 +809,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                 placeholder="/var/www"
                 value={form.default_path_sftp}
                 onChange={(e) => setForm((d) => ({ ...d, default_path_sftp: e.target.value }))}
-                onBlur={handleBlur}
                 className="h-8 text-sm bg-background"
               />
               <p className="text-[11px] text-muted-foreground/70">
@@ -729,11 +845,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   size="sm"
                   variant="outline"
                   className="h-7 text-xs mt-1"
-                  onClick={() => {
-                    const updated = [...tunnels, newTunnel()];
-                    setTunnels(updated);
-                    setTimeout(handleBlur, 0);
-                  }}
+                  onClick={() => setTunnels((t) => [...t, newTunnel()])}
                 >
                   Add Tunnel
                 </Button>
@@ -756,11 +868,15 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                           value={tunnel.local_port}
                           onChange={(e) => {
                             const updated = tunnels.map((t, idx) =>
-                              idx === i ? { ...t, local_port: parseInt(e.target.value) || t.local_port } : t,
+                              idx === i
+                                ? {
+                                    ...t,
+                                    local_port: parseInt(e.target.value) || t.local_port,
+                                  }
+                                : t,
                             );
                             setTunnels(updated);
                           }}
-                          onBlur={handleBlur}
                           className="h-7 text-xs bg-background"
                         />
                       </div>
@@ -779,7 +895,6 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                             );
                             setTunnels(updated);
                           }}
-                          onBlur={handleBlur}
                           className="h-7 text-xs bg-background"
                         />
                       </div>
@@ -795,21 +910,19 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                           onChange={(e) => {
                             const updated = tunnels.map((t, idx) =>
                               idx === i
-                                ? { ...t, remote_port: parseInt(e.target.value) || t.remote_port }
+                                ? {
+                                    ...t,
+                                    remote_port: parseInt(e.target.value) || t.remote_port,
+                                  }
                                 : t,
                             );
                             setTunnels(updated);
                           }}
-                          onBlur={handleBlur}
                           className="h-7 text-xs bg-background"
                         />
                       </div>
                       <button
-                        onClick={() => {
-                          const updated = tunnels.filter((_, idx) => idx !== i);
-                          setTunnels(updated);
-                          setTimeout(handleBlur, 0);
-                        }}
+                        onClick={() => setTunnels((t) => t.filter((_, idx) => idx !== i))}
                         className="pt-5 text-muted-foreground hover:text-destructive transition-colors"
                         title="Remove tunnel"
                       >
@@ -839,11 +952,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
                   size="sm"
                   variant="outline"
                   className="w-full h-7 text-xs"
-                  onClick={() => {
-                    const updated = [...tunnels, newTunnel()];
-                    setTunnels(updated);
-                    setTimeout(handleBlur, 0);
-                  }}
+                  onClick={() => setTunnels((t) => [...t, newTunnel()])}
                 >
                   + Add Tunnel
                 </Button>
@@ -852,6 +961,30 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Delete confirmation — triggered from the header dropdown, reachable from any tab */}
+      {!isNew && host && (
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete "{form.name}"?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently remove the host and its stored credentials. This action cannot be
+                undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

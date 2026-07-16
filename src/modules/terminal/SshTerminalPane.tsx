@@ -14,6 +14,7 @@ import {
 import { useChatStore } from "@/modules/ai/store/chatStore";
 import { explorerDrag } from "@/modules/explorer/lib/explorerDrag";
 import { reconnectExplorerSessionForHost } from "@/modules/explorer/lib/useLazyExplorerSession";
+import { useConnectionStatusStore, useHostsStore } from "@/modules/hosts";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { TerminalSessionData } from "@/modules/tabs";
@@ -67,6 +68,9 @@ function getCursorPixelPos(sessionId: string, container: HTMLDivElement): { x: n
 
 interface Props {
   sessionId: string;
+  /** The owning `WorkspaceTab.id` — used only to populate `ConnectionEntry.workspaceTabId`
+   *  so the StatusBar jump-host dropdown can focus the right tab on click. */
+  tabId: number;
   session: TerminalSessionData;
   isActive: boolean;
   tabVisible?: boolean;
@@ -79,7 +83,7 @@ interface Props {
 }
 
 export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function SshTerminalPane(
-  { sessionId, session, isActive, tabVisible = true, onSearchReady, onCwd },
+  { sessionId, tabId, session, isActive, tabVisible = true, onSearchReady, onCwd },
   ref,
 ) {
   const [isConnected, setIsConnected] = useState(false);
@@ -207,6 +211,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     setIsDisconnected(false);
     setIsConnected(false);
     setHasError(false);
+    useConnectionStatusStore.getState().setStatus(sessionId, "connecting");
   }, [sessionId, session.hostId, handlePreConnectData]);
 
   const handleCancelReconnect = useCallback(() => {
@@ -310,6 +315,33 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
     document.addEventListener("pointerup", onUp, { capture: true });
     return () => document.removeEventListener("pointerup", onUp, { capture: true });
   }, [isConnected, sessionId]);
+
+  // Tracks this pane's live status in the shared cross-tab connection-status
+  // store — feeds the StatusBar jump-host dropdown, which aggregates over
+  // every open terminal/SFTP/explorer connection, not just the active tab.
+  // Runs independently of the isConnected-gated effect below (which owns the
+  // PTY/channel lifecycle) so an unconditional `remove()` fires on every
+  // unmount path, including a pane that errors out before ever connecting —
+  // that effect's own cleanup only runs once `isConnected` has been true.
+  useEffect(() => {
+    if (!session.hostId) return; // quick-connect sessions have no Host row, hence no possible jump host
+    const hostId = session.hostId;
+    const host = useHostsStore.getState().hosts.find((h) => h.id === hostId);
+    const jumpHostName = host?.jump_host_id
+      ? (useHostsStore.getState().hosts.find((h) => h.id === host.jump_host_id)?.name ?? "unknown host")
+      : null;
+    useConnectionStatusStore.getState().upsert(sessionId, {
+      hostId,
+      kind: "terminal",
+      status: "connecting",
+      error: null,
+      jumpHostName,
+      hostLabel: session.title,
+      workspaceTabId: tabId,
+      paneId: sessionId,
+    });
+    return () => useConnectionStatusStore.getState().remove(sessionId);
+  }, [sessionId, tabId, session.hostId, session.title]);
 
   // Listen for palette-triggered reconnect
   useEffect(() => {
@@ -416,6 +448,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
           if (payload.session_id !== sessionId) return;
           setIsDisconnected(true);
           setDisconnectReason(payload.reason);
+          useConnectionStatusStore.getState().setStatus(sessionId, "error", payload.reason);
           useNotificationStore.getState().addNotification({
             type: "error",
             title: "SSH Connection Lost",
@@ -435,6 +468,7 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
           reconnectAttemptRef.current = 0;
           setReconnectAttempt(0);
           setAutoReconnectFailed(false);
+          useConnectionStatusStore.getState().setStatus(sessionId, "connected");
           // The sidebar Explorer's lazy session for this host (if any) is a
           // completely separate SSH/SFTP connection from this terminal's PTY
           // session — nothing else tells it the network is back. Quick-
@@ -451,7 +485,10 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
 
       // Restore scrollback BEFORE flushing earlyBuffer so old content appears first.
       try {
-        const ansi = await invoke<string | null>("scrollback_load", { sessionId });
+        const ansi = await invoke<string | null>("scrollback_load", {
+          sessionId,
+          maxBytes: usePreferencesStore.getState().scrollbackMaxSizeMb * 1024 * 1024,
+        });
         if (ansi && !disposed) {
           deliverText(sessionId, ansi);
           const cols = getSlotForLeaf(sessionId)?.term.cols ?? 80;
@@ -544,8 +581,14 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
               initialCols={initialDims.cols}
               initialRows={initialDims.rows}
               channel={channel}
-              onConnected={() => setIsConnected(true)}
-              onError={() => setHasError(true)}
+              onConnected={() => {
+                setIsConnected(true);
+                useConnectionStatusStore.getState().setStatus(sessionId, "connected");
+              }}
+              onError={(message) => {
+                setHasError(true);
+                useConnectionStatusStore.getState().setStatus(sessionId, "error", message);
+              }}
             />
           </div>
         ) : (

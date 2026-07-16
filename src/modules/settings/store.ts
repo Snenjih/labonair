@@ -65,6 +65,8 @@ export type Preferences = {
   sessionRestore: boolean;
   sessionScrollbackLines: number;
   notifyOnErrors: boolean;
+  scrollbackMaxSizeMb: number;
+  scrollbackRetentionDays: number;
 
   // --- App Appearance ---
   appTheme: string;
@@ -123,6 +125,7 @@ export type Preferences = {
   editorTrimTrailingWhitespace: boolean;
   editorInsertFinalNewline: boolean;
   editorAutocompleteDebounceMs: number;
+  editorMaxFileSizeMb: number;
 
   // --- File Manager ---
   sftpFontSize: number;
@@ -133,6 +136,10 @@ export type Preferences = {
   sftpColumnPermissions: boolean;
   sftpColumnType: boolean;
   sftpRemoteEditShowTransfers: boolean;
+  sftpMaxRemoteFileSizeMb: number;
+  sftpMaxConcurrentTransfers: number;
+  sftpDefaultConflictResolution: "ask" | "overwrite" | "skip";
+  sftpChunkSizeKb: number;
 
   // --- Command Palette ---
   commandPaletteBlur: number;
@@ -165,6 +172,8 @@ export type Preferences = {
   aiTerminalContextLines: number;
   aiTemperature: number;
   aiWarnDestructiveCommands: boolean;
+  aiShellMaxTimeoutSecs: number;
+  aiShellMaxOutputKb: number;
 
   // --- Terminal (input / scrolling) ---
   terminalCopyOnSelect: boolean;
@@ -206,6 +215,7 @@ export type Preferences = {
   sshAutoReconnect: boolean;
   sshAutoReconnectDelay: number;
   sshAutoReconnectMaxAttempts: number;
+  sshConnectTimeoutSecs: number;
 
   // --- Explorer (sidebar remote browsing) ---
   explorerShowHiddenByDefault: boolean;
@@ -238,6 +248,8 @@ const KEY_DEFAULT_STARTUP_TAB = "defaultStartupTab";
 const KEY_SESSION_RESTORE = "sessionRestore";
 const KEY_SESSION_SCROLLBACK_LINES = "sessionScrollbackLines";
 const KEY_NOTIFY_ON_ERRORS = "notifyOnErrors";
+const KEY_SCROLLBACK_MAX_SIZE_MB = "scrollbackMaxSizeMb";
+const KEY_SCROLLBACK_RETENTION_DAYS = "scrollbackRetentionDays";
 
 const KEY_APP_THEME = "appTheme";
 const KEY_APP_FONT_FAMILY = "appFontFamily";
@@ -292,6 +304,7 @@ const KEY_EDITOR_INDENTATION_GUIDES = "editor.indentationGuides";
 const KEY_EDITOR_TRIM_TRAILING_WHITESPACE = "editor.trimTrailingWhitespace";
 const KEY_EDITOR_INSERT_FINAL_NEWLINE = "editor.insertFinalNewline";
 const KEY_EDITOR_AUTOCOMPLETE_DEBOUNCE_MS = "editor.autocompleteDebounceMs";
+const KEY_EDITOR_MAX_FILE_SIZE_MB = "editorMaxFileSizeMb";
 
 const KEY_SFTP_FONT_SIZE = "sftpFontSize";
 const KEY_SFTP_SHOW_HIDDEN = "sftpShowHiddenFiles";
@@ -301,6 +314,10 @@ const KEY_SFTP_COLUMN_MODIFIED = "sftpColumnModified";
 const KEY_SFTP_COLUMN_PERMISSIONS = "sftpColumnPermissions";
 const KEY_SFTP_COLUMN_TYPE = "sftpColumnType";
 const KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS = "sftpRemoteEditShowTransfers";
+const KEY_SFTP_MAX_REMOTE_FILE_SIZE_MB = "sftpMaxRemoteFileSizeMb";
+const KEY_SFTP_MAX_CONCURRENT_TRANSFERS = "sftpMaxConcurrentTransfers";
+const KEY_SFTP_DEFAULT_CONFLICT_RESOLUTION = "sftpDefaultConflictResolution";
+const KEY_SFTP_CHUNK_SIZE_KB = "sftpChunkSizeKb";
 const KEY_COMMAND_PALETTE_BLUR = "commandPaletteBlur";
 const KEY_COMMAND_PALETTE_OPACITY = "commandPaletteOpacity";
 const KEY_COMMAND_PALETTE_POSITION = "commandPalettePosition";
@@ -325,6 +342,8 @@ const KEY_AI_MAX_AGENT_STEPS = "aiMaxAgentSteps";
 const KEY_AI_TERMINAL_CONTEXT_LINES = "aiTerminalContextLines";
 const KEY_AI_TEMPERATURE = "aiTemperature";
 const KEY_AI_WARN_DESTRUCTIVE = "aiWarnDestructiveCommands";
+const KEY_AI_SHELL_MAX_TIMEOUT_SECS = "aiShellMaxTimeoutSecs";
+const KEY_AI_SHELL_MAX_OUTPUT_KB = "aiShellMaxOutputKb";
 const KEY_TERMINAL_COPY_ON_SELECT = "terminalCopyOnSelect";
 const KEY_TERMINAL_RIGHT_CLICK_PASTES = "terminalRightClickPastes";
 const KEY_TERMINAL_WORD_SEPARATOR = "terminalWordSeparator";
@@ -341,6 +360,7 @@ const KEY_ZEN_MODE_SHOW_STATUSBAR = "zenModeShowStatusbar";
 const KEY_SSH_AUTO_RECONNECT = "sshAutoReconnect";
 const KEY_SSH_AUTO_RECONNECT_DELAY = "sshAutoReconnectDelay";
 const KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS = "sshAutoReconnectMaxAttempts";
+const KEY_SSH_CONNECT_TIMEOUT_SECS = "sshConnectTimeoutSecs";
 const KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT = "explorerShowHiddenByDefault";
 const KEY_EXPLORER_REMOTE_POLL_INTERVAL = "explorerRemotePollInterval";
 const KEY_EXPLORER_AUTO_RECONNECT = "explorerAutoReconnect";
@@ -379,6 +399,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sessionRestore: false,
   sessionScrollbackLines: 1000,
   notifyOnErrors: false,
+  scrollbackMaxSizeMb: 10,
+  scrollbackRetentionDays: 0,
 
   appTheme: "default",
   appFontFamily: "system-ui",
@@ -432,6 +454,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   editorTrimTrailingWhitespace: false,
   editorInsertFinalNewline: false,
   editorAutocompleteDebounceMs: 350,
+  editorMaxFileSizeMb: 10,
 
   sftpFontSize: 13,
   sftpShowHiddenFiles: false,
@@ -441,6 +464,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sftpColumnPermissions: true,
   sftpColumnType: false,
   sftpRemoteEditShowTransfers: true,
+  sftpMaxRemoteFileSizeMb: 5,
+  sftpMaxConcurrentTransfers: 2,
+  sftpDefaultConflictResolution: "ask",
+  sftpChunkSizeKb: 64,
 
   commandPaletteBlur: 4,
   commandPaletteOpacity: 95,
@@ -467,6 +494,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   aiTerminalContextLines: 300,
   aiTemperature: 0.7,
   aiWarnDestructiveCommands: true,
+  aiShellMaxTimeoutSecs: 300,
+  aiShellMaxOutputKb: 256,
 
   terminalCopyOnSelect: false,
   terminalRightClickPastes: false,
@@ -497,6 +526,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sshAutoReconnect: false,
   sshAutoReconnectDelay: 5,
   sshAutoReconnectMaxAttempts: 3,
+  sshConnectTimeoutSecs: 10,
 
   explorerShowHiddenByDefault: false,
   explorerRemotePollInterval: 20,
@@ -549,6 +579,12 @@ export async function loadPreferences(): Promise<Preferences> {
     sessionScrollbackLines:
       get<number>(KEY_SESSION_SCROLLBACK_LINES) ?? DEFAULT_PREFERENCES.sessionScrollbackLines,
     notifyOnErrors: get<boolean>(KEY_NOTIFY_ON_ERRORS) ?? DEFAULT_PREFERENCES.notifyOnErrors,
+    scrollbackMaxSizeMb: Math.min(
+      50,
+      Math.max(1, get<number>(KEY_SCROLLBACK_MAX_SIZE_MB) ?? DEFAULT_PREFERENCES.scrollbackMaxSizeMb),
+    ),
+    scrollbackRetentionDays:
+      get<number>(KEY_SCROLLBACK_RETENTION_DAYS) ?? DEFAULT_PREFERENCES.scrollbackRetentionDays,
 
     appTheme: get<string>(KEY_APP_THEME) ?? DEFAULT_PREFERENCES.appTheme,
     appFontFamily: get<string>(KEY_APP_FONT_FAMILY) ?? DEFAULT_PREFERENCES.appFontFamily,
@@ -645,6 +681,10 @@ export async function loadPreferences(): Promise<Preferences> {
         get<number>(KEY_EDITOR_AUTOCOMPLETE_DEBOUNCE_MS) ?? DEFAULT_PREFERENCES.editorAutocompleteDebounceMs,
       ),
     ),
+    editorMaxFileSizeMb: Math.min(
+      100,
+      Math.max(1, get<number>(KEY_EDITOR_MAX_FILE_SIZE_MB) ?? DEFAULT_PREFERENCES.editorMaxFileSizeMb),
+    ),
 
     sftpFontSize: get<number>(KEY_SFTP_FONT_SIZE) ?? DEFAULT_PREFERENCES.sftpFontSize,
     sftpShowHiddenFiles: get<boolean>(KEY_SFTP_SHOW_HIDDEN) ?? DEFAULT_PREFERENCES.sftpShowHiddenFiles,
@@ -656,6 +696,28 @@ export async function loadPreferences(): Promise<Preferences> {
     sftpColumnType: get<boolean>(KEY_SFTP_COLUMN_TYPE) ?? DEFAULT_PREFERENCES.sftpColumnType,
     sftpRemoteEditShowTransfers:
       get<boolean>(KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS) ?? DEFAULT_PREFERENCES.sftpRemoteEditShowTransfers,
+    sftpMaxRemoteFileSizeMb: Math.min(
+      100,
+      Math.max(
+        1,
+        get<number>(KEY_SFTP_MAX_REMOTE_FILE_SIZE_MB) ?? DEFAULT_PREFERENCES.sftpMaxRemoteFileSizeMb,
+      ),
+    ),
+    sftpMaxConcurrentTransfers: Math.min(
+      6,
+      Math.max(
+        1,
+        get<number>(KEY_SFTP_MAX_CONCURRENT_TRANSFERS) ?? DEFAULT_PREFERENCES.sftpMaxConcurrentTransfers,
+      ),
+    ),
+    sftpDefaultConflictResolution: ((): "ask" | "overwrite" | "skip" => {
+      const v = get<string>(KEY_SFTP_DEFAULT_CONFLICT_RESOLUTION);
+      return v === "overwrite" || v === "skip" ? v : "ask";
+    })(),
+    sftpChunkSizeKb: Math.min(
+      1024,
+      Math.max(16, get<number>(KEY_SFTP_CHUNK_SIZE_KB) ?? DEFAULT_PREFERENCES.sftpChunkSizeKb),
+    ),
 
     commandPaletteBlur: get<number>(KEY_COMMAND_PALETTE_BLUR) ?? DEFAULT_PREFERENCES.commandPaletteBlur,
     commandPaletteOpacity:
@@ -700,6 +762,14 @@ export async function loadPreferences(): Promise<Preferences> {
     aiTemperature: get<number>(KEY_AI_TEMPERATURE) ?? DEFAULT_PREFERENCES.aiTemperature,
     aiWarnDestructiveCommands:
       get<boolean>(KEY_AI_WARN_DESTRUCTIVE) ?? DEFAULT_PREFERENCES.aiWarnDestructiveCommands,
+    aiShellMaxTimeoutSecs: Math.min(
+      1800,
+      Math.max(30, get<number>(KEY_AI_SHELL_MAX_TIMEOUT_SECS) ?? DEFAULT_PREFERENCES.aiShellMaxTimeoutSecs),
+    ),
+    aiShellMaxOutputKb: Math.min(
+      2048,
+      Math.max(64, get<number>(KEY_AI_SHELL_MAX_OUTPUT_KB) ?? DEFAULT_PREFERENCES.aiShellMaxOutputKb),
+    ),
     terminalCopyOnSelect:
       get<boolean>(KEY_TERMINAL_COPY_ON_SELECT) ?? DEFAULT_PREFERENCES.terminalCopyOnSelect,
     terminalRightClickPastes:
@@ -732,6 +802,10 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_SSH_AUTO_RECONNECT_DELAY) ?? DEFAULT_PREFERENCES.sshAutoReconnectDelay,
     sshAutoReconnectMaxAttempts:
       get<number>(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS) ?? DEFAULT_PREFERENCES.sshAutoReconnectMaxAttempts,
+    sshConnectTimeoutSecs: Math.min(
+      60,
+      Math.max(3, get<number>(KEY_SSH_CONNECT_TIMEOUT_SECS) ?? DEFAULT_PREFERENCES.sshConnectTimeoutSecs),
+    ),
 
     explorerShowHiddenByDefault:
       get<boolean>(KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT) ?? DEFAULT_PREFERENCES.explorerShowHiddenByDefault,
@@ -885,6 +959,17 @@ export async function setSessionScrollbackLines(value: number): Promise<void> {
 
 export async function setNotifyOnErrors(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_NOTIFY_ON_ERRORS, value);
+  await (await getStore()).save();
+}
+
+export async function setScrollbackMaxSizeMb(value: number): Promise<void> {
+  const clamped = Math.min(50, Math.max(1, Math.round(value)));
+  await (await getStore()).set(KEY_SCROLLBACK_MAX_SIZE_MB, clamped);
+  await (await getStore()).save();
+}
+
+export async function setScrollbackRetentionDays(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SCROLLBACK_RETENTION_DAYS, value);
   await (await getStore()).save();
 }
 
@@ -1075,6 +1160,12 @@ export async function setSshAutoReconnectMaxAttempts(value: number): Promise<voi
   await (await getStore()).save();
 }
 
+export async function setSshConnectTimeoutSecs(value: number): Promise<void> {
+  const clamped = Math.min(60, Math.max(3, Math.round(value)));
+  await (await getStore()).set(KEY_SSH_CONNECT_TIMEOUT_SECS, clamped);
+  await (await getStore()).save();
+}
+
 export async function setExplorerShowHiddenByDefault(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT, value);
   await (await getStore()).save();
@@ -1194,6 +1285,29 @@ export async function setSftpRemoteEditShowTransfers(value: boolean): Promise<vo
   await (await getStore()).save();
 }
 
+export async function setSftpMaxRemoteFileSizeMb(value: number): Promise<void> {
+  const clamped = Math.min(100, Math.max(1, Math.round(value)));
+  await (await getStore()).set(KEY_SFTP_MAX_REMOTE_FILE_SIZE_MB, clamped);
+  await (await getStore()).save();
+}
+
+export async function setSftpMaxConcurrentTransfers(value: number): Promise<void> {
+  const clamped = Math.min(6, Math.max(1, Math.round(value)));
+  await (await getStore()).set(KEY_SFTP_MAX_CONCURRENT_TRANSFERS, clamped);
+  await (await getStore()).save();
+}
+
+export async function setSftpDefaultConflictResolution(value: "ask" | "overwrite" | "skip"): Promise<void> {
+  await (await getStore()).set(KEY_SFTP_DEFAULT_CONFLICT_RESOLUTION, value);
+  await (await getStore()).save();
+}
+
+export async function setSftpChunkSizeKb(value: number): Promise<void> {
+  const clamped = Math.min(1024, Math.max(16, Math.round(value)));
+  await (await getStore()).set(KEY_SFTP_CHUNK_SIZE_KB, clamped);
+  await (await getStore()).save();
+}
+
 export async function setCommandPaletteBlur(value: number): Promise<void> {
   await (await getStore()).set(KEY_COMMAND_PALETTE_BLUR, value);
   await (await getStore()).save();
@@ -1304,6 +1418,18 @@ export async function setAiWarnDestructiveCommands(value: boolean): Promise<void
   await (await getStore()).save();
 }
 
+export async function setAiShellMaxTimeoutSecs(value: number): Promise<void> {
+  const clamped = Math.min(1800, Math.max(30, Math.round(value)));
+  await (await getStore()).set(KEY_AI_SHELL_MAX_TIMEOUT_SECS, clamped);
+  await (await getStore()).save();
+}
+
+export async function setAiShellMaxOutputKb(value: number): Promise<void> {
+  const clamped = Math.min(2048, Math.max(64, Math.round(value)));
+  await (await getStore()).set(KEY_AI_SHELL_MAX_OUTPUT_KB, clamped);
+  await (await getStore()).save();
+}
+
 export async function setTerminalCopyOnSelect(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_TERMINAL_COPY_ON_SELECT, value);
   await (await getStore()).save();
@@ -1411,6 +1537,12 @@ export async function setEditorAutocompleteDebounceMs(value: number): Promise<vo
   await (await getStore()).save();
 }
 
+export async function setEditorMaxFileSizeMb(value: number): Promise<void> {
+  const clamped = Math.min(100, Math.max(1, Math.round(value)));
+  await (await getStore()).set(KEY_EDITOR_MAX_FILE_SIZE_MB, clamped);
+  await (await getStore()).save();
+}
+
 export async function setTabsLocation(value: "titlebar" | "sidebar"): Promise<void> {
   await (await getStore()).set(KEY_TABS_LOCATION, value);
   await (await getStore()).save();
@@ -1479,6 +1611,8 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SESSION_RESTORE]: "sessionRestore",
     [KEY_SESSION_SCROLLBACK_LINES]: "sessionScrollbackLines",
     [KEY_NOTIFY_ON_ERRORS]: "notifyOnErrors",
+    [KEY_SCROLLBACK_MAX_SIZE_MB]: "scrollbackMaxSizeMb",
+    [KEY_SCROLLBACK_RETENTION_DAYS]: "scrollbackRetentionDays",
 
     [KEY_APP_THEME]: "appTheme",
     [KEY_APP_FONT_FAMILY]: "appFontFamily",
@@ -1532,6 +1666,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_EDITOR_TRIM_TRAILING_WHITESPACE]: "editorTrimTrailingWhitespace",
     [KEY_EDITOR_INSERT_FINAL_NEWLINE]: "editorInsertFinalNewline",
     [KEY_EDITOR_AUTOCOMPLETE_DEBOUNCE_MS]: "editorAutocompleteDebounceMs",
+    [KEY_EDITOR_MAX_FILE_SIZE_MB]: "editorMaxFileSizeMb",
 
     [KEY_SFTP_FONT_SIZE]: "sftpFontSize",
     [KEY_SFTP_SHOW_HIDDEN]: "sftpShowHiddenFiles",
@@ -1541,6 +1676,10 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SFTP_COLUMN_PERMISSIONS]: "sftpColumnPermissions",
     [KEY_SFTP_COLUMN_TYPE]: "sftpColumnType",
     [KEY_SFTP_REMOTE_EDIT_SHOW_TRANSFERS]: "sftpRemoteEditShowTransfers",
+    [KEY_SFTP_MAX_REMOTE_FILE_SIZE_MB]: "sftpMaxRemoteFileSizeMb",
+    [KEY_SFTP_MAX_CONCURRENT_TRANSFERS]: "sftpMaxConcurrentTransfers",
+    [KEY_SFTP_DEFAULT_CONFLICT_RESOLUTION]: "sftpDefaultConflictResolution",
+    [KEY_SFTP_CHUNK_SIZE_KB]: "sftpChunkSizeKb",
     [KEY_COMMAND_PALETTE_BLUR]: "commandPaletteBlur",
     [KEY_COMMAND_PALETTE_OPACITY]: "commandPaletteOpacity",
     [KEY_COMMAND_PALETTE_POSITION]: "commandPalettePosition",
@@ -1563,6 +1702,8 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_AI_TERMINAL_CONTEXT_LINES]: "aiTerminalContextLines",
     [KEY_AI_TEMPERATURE]: "aiTemperature",
     [KEY_AI_WARN_DESTRUCTIVE]: "aiWarnDestructiveCommands",
+    [KEY_AI_SHELL_MAX_TIMEOUT_SECS]: "aiShellMaxTimeoutSecs",
+    [KEY_AI_SHELL_MAX_OUTPUT_KB]: "aiShellMaxOutputKb",
     [KEY_TERMINAL_COPY_ON_SELECT]: "terminalCopyOnSelect",
     [KEY_TERMINAL_RIGHT_CLICK_PASTES]: "terminalRightClickPastes",
     [KEY_TERMINAL_WORD_SEPARATOR]: "terminalWordSeparator",
@@ -1579,6 +1720,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SSH_AUTO_RECONNECT]: "sshAutoReconnect",
     [KEY_SSH_AUTO_RECONNECT_DELAY]: "sshAutoReconnectDelay",
     [KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS]: "sshAutoReconnectMaxAttempts",
+    [KEY_SSH_CONNECT_TIMEOUT_SECS]: "sshConnectTimeoutSecs",
     [KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT]: "explorerShowHiddenByDefault",
     [KEY_EXPLORER_REMOTE_POLL_INTERVAL]: "explorerRemotePollInterval",
     [KEY_EXPLORER_AUTO_RECONNECT]: "explorerAutoReconnect",

@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { handleApiError } from "@/lib/errors";
 import { useHostsStore } from "@/modules/hosts";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useWhisperRecording } from "../hooks/useWhisperRecording";
 import { type Directive, expandDirectiveTokens } from "../lib/directives";
 import { getOrCreateChat, useChatStore } from "../store/chatStore";
@@ -185,8 +186,12 @@ export function AiComposerProvider({ children }: ProviderProps) {
         ? await invoke<ReadResult>("sftp_read_file_content", {
             sessionId: remote.sessionId,
             remotePath: path,
+            maxBytes: usePreferencesStore.getState().sftpMaxRemoteFileSizeMb * 1024 * 1024,
           })
-        : await invoke<ReadResult>("fs_read_file", { path });
+        : await invoke<ReadResult>("fs_read_file", {
+            path,
+            maxBytes: usePreferencesStore.getState().editorMaxFileSizeMb * 1024 * 1024,
+          });
       if (result.kind !== "text") {
         const msg =
           result.kind === "toolarge"
