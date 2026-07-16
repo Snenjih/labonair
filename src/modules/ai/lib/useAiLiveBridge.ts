@@ -1,7 +1,7 @@
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useChatStore, useHasComposer } from "@/modules/ai";
-import type { AiAttachFileDetail } from "@/modules/ai/lib/composer";
+import type { AiAttachFileDetail } from "@/modules/ai/lib/composerContext";
 import type { EditorPaneHandle } from "@/modules/editor";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { useTabsStore, type WorkspaceTab } from "@/modules/tabs";

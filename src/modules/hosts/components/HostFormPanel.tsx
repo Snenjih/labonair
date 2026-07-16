@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { invoke } from "@tauri-apps/api/core";
-import { motion } from "motion/react";
+import { domAnimation, LazyMotion, m } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
@@ -178,24 +178,26 @@ function SaveStatusIcon({ saving, result }: { saving: boolean; result: SaveResul
   const color =
     result === "success" ? "text-success" : result === "error" ? "text-destructive" : "text-muted-foreground";
   return (
-    <motion.div
-      key={result ?? "idle"}
-      initial={result ? { scale: 1 } : false}
-      animate={result ? { scale: [1, 1.3, 1] } : {}}
-      transition={{ duration: 0.35 }}
-      title={result === "error" ? "Save failed" : result === "success" ? "Saved" : undefined}
-      className={cn("shrink-0 rounded-md p-1 transition-colors", color)}
-    >
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <path
-          d="M2 7l3.5 3.5L12 3"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </motion.div>
+    <LazyMotion features={domAnimation}>
+      <m.div
+        key={result ?? "idle"}
+        initial={result ? { scale: 1 } : false}
+        animate={result ? { scale: [1, 1.3, 1] } : {}}
+        transition={{ duration: 0.35 }}
+        title={result === "error" ? "Save failed" : result === "success" ? "Saved" : undefined}
+        className={cn("shrink-0 rounded-md p-1 transition-colors", color)}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path
+            d="M2 7l3.5 3.5L12 3"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </m.div>
+    </LazyMotion>
   );
 }
 

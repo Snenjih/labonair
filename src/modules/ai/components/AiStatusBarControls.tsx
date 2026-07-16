@@ -6,7 +6,7 @@ import { Add01Icon, Message01Icon, Mic01Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react";
 import { motion } from "motion/react";
 import { useRef } from "react";
-import { ACCEPTED_FILES, useComposer } from "../lib/composer";
+import { ACCEPTED_FILES, useComposer } from "../lib/composerContext";
 import { useChatStore } from "../store/chatStore";
 import { ModelPicker } from "./ModelPicker";
 

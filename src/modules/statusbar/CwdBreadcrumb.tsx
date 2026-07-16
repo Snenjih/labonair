@@ -24,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { AiAttachFileDetail } from "@/modules/ai/lib/composer";
+import type { AiAttachFileDetail } from "@/modules/ai/lib/composerContext";
 import type { FsProvider } from "@/modules/explorer/lib/fsProvider";
 import { createLocalFsProvider } from "@/modules/explorer/lib/providers/localFsProvider";
 import { createRemoteFsProvider } from "@/modules/explorer/lib/providers/remoteFsProvider";

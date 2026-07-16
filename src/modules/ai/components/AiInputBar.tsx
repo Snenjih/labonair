@@ -31,7 +31,7 @@ import {
   type WorkspaceTab,
 } from "@/modules/tabs";
 import { ShellComposerInput } from "@/modules/terminal/block";
-import { type FileAttachment, useComposer } from "../lib/composer";
+import { type FileAttachment, useComposer } from "../lib/composerContext";
 import type { Directive } from "../lib/directives";
 import { SLASH_COMMANDS } from "../lib/slashCommands";
 import { useChatStore } from "../store/chatStore";

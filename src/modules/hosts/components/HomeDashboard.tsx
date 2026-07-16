@@ -393,7 +393,7 @@ export function HomeDashboard({
   return (
     <div className="flex h-full w-full overflow-hidden">
       {/* LEFT MASTER PANE */}
-      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+      <motion.div layout className="flex flex-1 flex-col overflow-hidden min-w-0">
         {/* ── Row 1: Search ── */}
         <div className="flex items-center gap-2 px-4 pt-2.5 pb-2">
           <div className="relative flex-1">
@@ -857,18 +857,22 @@ export function HomeDashboard({
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* RIGHT PANEL (Form / Inspector) */}
       <AnimatePresence>
         {showPanel && (
           <motion.div
             key={viewMode === "hosts" ? (panelHostId ?? "__new__") : (selectedCredentialId ?? "__new__cred")}
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 340, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="shrink-0 border-l border-border overflow-hidden bg-background flex flex-col"
+            layout
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{
+              layout: { type: "spring", stiffness: 300, damping: 30 },
+              opacity: { duration: 0.15 },
+            }}
+            className="w-[340px] shrink-0 border-l border-border overflow-hidden bg-background flex flex-col"
           >
             <div className="h-full w-[340px] flex flex-col">
               {viewMode === "hosts" ? (
