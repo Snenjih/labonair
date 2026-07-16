@@ -29,6 +29,8 @@ const {
   setContainer,
   setVisible,
   deliverText,
+  setCommandRunning,
+  isCommandRunning,
   terminalDebugStats,
 } = await import("./terminalSessionRegistry");
 
@@ -121,5 +123,97 @@ describe("terminalSessionRegistry — SSH busy fallback (output recency)", () =>
     expect(hasSlot(id)).toBe(false);
 
     disposeSession(id);
+  });
+});
+
+describe("terminalSessionRegistry — local commandRunning watchdog", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("resets a stuck commandRunning flag for a local session once the OS confirms no foreground job", async () => {
+    const id = "local-stuck";
+    const container = document.createElement("div");
+    const checkForegroundJob = vi.fn(async () => false);
+    registerSession({ sessionId: id, bridge: stubBridge(), callbacks: {}, checkForegroundJob });
+    setContainer(id, container);
+    setVisible(id, true);
+
+    setCommandRunning(id, true);
+    expect(isCommandRunning(id)).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(checkForegroundJob).toHaveBeenCalled();
+    expect(isCommandRunning(id)).toBe(false);
+
+    disposeSession(id);
+  });
+
+  it("keeps commandRunning true across repeated checks while the OS confirms a foreground job is still running", async () => {
+    const id = "local-busy";
+    const container = document.createElement("div");
+    const checkForegroundJob = vi.fn(async () => true);
+    registerSession({ sessionId: id, bridge: stubBridge(), callbacks: {}, checkForegroundJob });
+    setContainer(id, container);
+    setVisible(id, true);
+
+    setCommandRunning(id, true);
+    await vi.advanceTimersByTimeAsync(3000 * 3);
+
+    expect(checkForegroundJob.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(isCommandRunning(id)).toBe(true);
+
+    disposeSession(id);
+  });
+
+  it("never auto-resets an SSH session's commandRunning flag, even stuck true for a long time", async () => {
+    const id = "ssh-stuck";
+    const container = document.createElement("div");
+    registerSession({ sessionId: id, bridge: stubBridge(), callbacks: {}, isRemote: true });
+    setContainer(id, container);
+    setVisible(id, true);
+
+    setCommandRunning(id, true);
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(isCommandRunning(id)).toBe(true);
+
+    disposeSession(id);
+  });
+
+  it("does not arm the watchdog for a local session with no checkForegroundJob supplied", async () => {
+    const id = "local-no-check";
+    const container = document.createElement("div");
+    registerSession({ sessionId: id, bridge: stubBridge(), callbacks: {} });
+    setContainer(id, container);
+    setVisible(id, true);
+
+    setCommandRunning(id, true);
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(isCommandRunning(id)).toBe(true);
+
+    disposeSession(id);
+  });
+
+  it("clears a pending watchdog timer on dispose instead of firing against a deleted session", async () => {
+    const id = "local-dispose";
+    const container = document.createElement("div");
+    const checkForegroundJob = vi.fn(async () => false);
+    registerSession({ sessionId: id, bridge: stubBridge(), callbacks: {}, checkForegroundJob });
+    setContainer(id, container);
+    setVisible(id, true);
+
+    setCommandRunning(id, true);
+    disposeSession(id);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(checkForegroundJob).not.toHaveBeenCalled();
   });
 });

@@ -147,6 +147,17 @@ export class BlockDecorations {
     this.finishBlock(exitCode);
   }
 
+  /** Force-finishes the live block with an unknown result — the same
+   *  "abandoned" path `startBlock` already takes when a new command starts
+   *  over an unfinished one (`finishBlock(null)`). Used by the registry's
+   *  commandRunning watchdog when the OS confirms no foreground process is
+   *  actually running anymore but the closing OSC 133 D/A never arrived, so
+   *  the live block would otherwise show "running" forever. No-op if no
+   *  block is currently live. */
+  abandonLiveBlock(): void {
+    this.finishBlock(null);
+  }
+
   hasAnyBlock(): boolean {
     return this.entries.length > 0 || this.live !== null;
   }

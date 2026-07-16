@@ -398,6 +398,7 @@ function pickSlotFor(sessionId: string): PickResult {
   const candidates: EvictionCandidate[] = slots.map((s) => ({
     sessionId: s.currentLeafId as string,
     visible: s.currentLeafId !== null && (adapter?.isLeafVisible(s.currentLeafId) ?? false),
+    altScreen: isAltScreen(s),
     score: evictionScore(s),
   }));
   const chosenId = selectEvictionCandidate(candidates);

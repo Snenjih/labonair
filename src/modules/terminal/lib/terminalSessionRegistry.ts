@@ -116,6 +116,9 @@ type SessionRecord = {
    *  byte-capped DormantRing — while genuinely producing output. */
   lastOutputAt: number;
   outputQuietTimer: ReturnType<typeof setTimeout> | null;
+  /** Local-only stuck-flag watchdog — see scheduleCommandWatchdog. Always
+   *  null for SSH sessions (no checkForegroundJob to check against). */
+  commandWatchdogTimer: ReturnType<typeof setTimeout> | null;
 };
 
 const sessions = new Map<string, SessionRecord>();
@@ -163,6 +166,11 @@ const HIDDEN_RELEASE_DELAY_MS = 300;
 // enough to bridge typical pauses in chatty build/log output, short enough
 // that a genuinely finished session still frees its slot promptly. Tunable.
 const SSH_IDLE_OUTPUT_MS = 5000;
+// Local-only stuck-flag watchdog re-check interval — see
+// scheduleCommandWatchdog. Each tick re-verifies against an OS-level fact
+// (pty_has_foreground_job), not a heuristic, so this can be short without
+// any false-positive risk.
+const COMMAND_WATCHDOG_CHECK_MS = 3000;
 
 function leafBusy(s: SessionRecord): boolean {
   if (s.commandRunning) return true;
@@ -221,6 +229,49 @@ async function checkForegroundBusy(s: SessionRecord): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function cancelCommandWatchdog(s: SessionRecord): void {
+  if (s.commandWatchdogTimer !== null) {
+    clearTimeout(s.commandWatchdogTimer);
+    s.commandWatchdogTimer = null;
+  }
+}
+
+// Local-only: re-armed every COMMAND_WATCHDOG_CHECK_MS while commandRunning
+// stays true. Guards against the shell's closing OSC 133 D/A never arriving
+// (e.g. output dropped during a renderer-pool eviction while a TUI like
+// vim/htop was showing — see rendererPool.ts's alt-screen eviction guard) by
+// periodically asking the OS whether a foreground child process actually
+// still exists — ground truth, not a guess, so unlike a plain elapsed-time
+// heuristic this can never misfire on a legitimately long-running plain
+// command (npm install, tail -f, an idle REPL, ...). SSH sessions never call
+// this (no checkForegroundJob — see setCommandRunning).
+function scheduleCommandWatchdog(sessionId: string, s: SessionRecord): void {
+  cancelCommandWatchdog(s);
+  s.commandWatchdogTimer = setTimeout(() => {
+    s.commandWatchdogTimer = null;
+    void checkCommandWatchdog(sessionId, s);
+  }, COMMAND_WATCHDOG_CHECK_MS);
+}
+
+async function checkCommandWatchdog(sessionId: string, s: SessionRecord): Promise<void> {
+  if (s.disposed || !s.commandRunning) return;
+  const busy = await checkForegroundBusy(s);
+  if (s.disposed || !s.commandRunning) return; // state may have changed during the await
+  if (busy) {
+    scheduleCommandWatchdog(sessionId, s);
+    return;
+  }
+  // The OS confirms no foreground child process is running, so the shell is
+  // already back at its own prompt — the closing OSC 133 D/A must have been
+  // lost. Reset the OSC-7 gate directly (setCommandRunning alone doesn't
+  // touch it) and let the block engine — which tracks "running" off the same
+  // OSC event independently of this flag — know its live block is abandoned,
+  // not left showing "running" forever.
+  s.shellState.inCommand = false;
+  s.blockEngine?.abandonLiveBlock();
+  setCommandRunning(sessionId, false);
 }
 
 async function releaseIfIdle(sessionId: string, s: SessionRecord): Promise<void> {
@@ -361,6 +412,7 @@ export function registerSession(opts: RegisterOptions): void {
     isRemote: opts.isRemote ?? false,
     lastOutputAt: 0,
     outputQuietTimer: null,
+    commandWatchdogTimer: null,
   });
 }
 
@@ -552,10 +604,14 @@ export function setCommandRunning(sessionId: string, running: boolean): void {
   s.commandRunning = running;
   notifyIntegrationState(sessionId);
   if (!running) {
+    cancelCommandWatchdog(s);
     scheduleHiddenRelease(sessionId, s);
     return;
   }
   cancelHiddenRelease(s);
+  // Local-only stuck-flag safety net — see scheduleCommandWatchdog's doc
+  // comment. No equivalent for SSH: checkForegroundJob is never set there.
+  if (!s.isRemote && s.checkForegroundJob) scheduleCommandWatchdog(sessionId, s);
   // A command started in a hidden, released session (e.g. submitted by the
   // AI): rebind so output parses live instead of filling the dormant ring.
   // Deferred: this callback fires inside xterm's parse loop.
@@ -657,6 +713,7 @@ export function resetForReconnect(sessionId: string): void {
   notifyIntegrationState(sessionId);
   cancelHiddenRelease(s);
   cancelOutputQuietTimer(s);
+  cancelCommandWatchdog(s);
   const slot = getSlotForLeaf(sessionId);
   if (slot) {
     slot.term.options.disableStdin = false;
@@ -780,6 +837,7 @@ export function disposeSession(sessionId: string): void {
   s.disposed = true;
   cancelHiddenRelease(s);
   cancelOutputQuietTimer(s);
+  cancelCommandWatchdog(s);
   disposeLeafSlot(sessionId);
   s.hasSlot = false;
   s.snapshot = null;

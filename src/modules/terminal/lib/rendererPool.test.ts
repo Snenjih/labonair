@@ -35,33 +35,58 @@ describe("selectEvictionCandidate", () => {
 
   it("picks the lowest-scoring non-visible candidate over a higher-scoring one", () => {
     const candidates: EvictionCandidate[] = [
-      { sessionId: "a", visible: false, score: 50 },
-      { sessionId: "b", visible: false, score: 10 },
+      { sessionId: "a", visible: false, altScreen: false, score: 50 },
+      { sessionId: "b", visible: false, altScreen: false, score: 10 },
     ];
     expect(selectEvictionCandidate(candidates)).toBe("b");
   });
 
   it("never picks a visible candidate while a non-visible one exists, regardless of score", () => {
     const candidates: EvictionCandidate[] = [
-      { sessionId: "visible-low-score", visible: true, score: 1 },
-      { sessionId: "hidden-high-score", visible: false, score: 999 },
+      { sessionId: "visible-low-score", visible: true, altScreen: false, score: 1 },
+      { sessionId: "hidden-high-score", visible: false, altScreen: false, score: 999 },
     ];
     expect(selectEvictionCandidate(candidates)).toBe("hidden-high-score");
   });
 
   it("falls back to the lowest-scoring visible candidate when every candidate is visible", () => {
     const candidates: EvictionCandidate[] = [
-      { sessionId: "a", visible: true, score: 1200 },
-      { sessionId: "b", visible: true, score: 1005 },
+      { sessionId: "a", visible: true, altScreen: false, score: 1200 },
+      { sessionId: "b", visible: true, altScreen: false, score: 1005 },
     ];
     expect(selectEvictionCandidate(candidates)).toBe("b");
   });
 
   it("breaks ties deterministically by picking the first minimum encountered", () => {
     const candidates: EvictionCandidate[] = [
-      { sessionId: "first", visible: false, score: 5 },
-      { sessionId: "second", visible: false, score: 5 },
+      { sessionId: "first", visible: false, altScreen: false, score: 5 },
+      { sessionId: "second", visible: false, altScreen: false, score: 5 },
     ];
     expect(selectEvictionCandidate(candidates)).toBe("first");
+  });
+
+  it("never picks an alt-screen candidate while a non-alt-screen one exists, regardless of score or visibility", () => {
+    const candidates: EvictionCandidate[] = [
+      { sessionId: "alt-screen-low-score", visible: false, altScreen: true, score: 1 },
+      { sessionId: "plain-high-score", visible: true, altScreen: false, score: 999 },
+    ];
+    expect(selectEvictionCandidate(candidates)).toBe("plain-high-score");
+  });
+
+  it("falls back to the lowest-scored alt-screen candidate when every candidate is alt-screen", () => {
+    const candidates: EvictionCandidate[] = [
+      { sessionId: "a", visible: false, altScreen: true, score: 200 },
+      { sessionId: "b", visible: false, altScreen: true, score: 150 },
+    ];
+    expect(selectEvictionCandidate(candidates)).toBe("b");
+  });
+
+  it("applies the visible-vs-hidden tiebreak within the non-alt-screen tier", () => {
+    const candidates: EvictionCandidate[] = [
+      { sessionId: "alt-screen", visible: false, altScreen: true, score: 1 },
+      { sessionId: "plain-visible", visible: true, altScreen: false, score: 1 },
+      { sessionId: "plain-hidden", visible: false, altScreen: false, score: 999 },
+    ];
+    expect(selectEvictionCandidate(candidates)).toBe("plain-hidden");
   });
 });

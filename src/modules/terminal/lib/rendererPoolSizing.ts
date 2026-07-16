@@ -18,15 +18,21 @@ export function computePoolCeiling(visibleCount: number): number {
   return Math.min(POOL_HARD_CAP, Math.max(POOL_BASE_SIZE, visibleCount + RESERVED_HEADROOM));
 }
 
-export type EvictionCandidate = { sessionId: string; visible: boolean; score: number };
+export type EvictionCandidate = { sessionId: string; visible: boolean; altScreen: boolean; score: number };
 
 /** Picks the lowest-scoring (least "protected") candidate to evict. Never
- *  picks a visible candidate unless every candidate is visible (the
- *  pathological case where visible sessions alone exceed the pool ceiling). */
+ *  picks an alt-screen candidate (a TUI like vim/htop — evicting it discards
+ *  its renderer-pool ring buffer on rebind, which can silently drop the
+ *  shell's closing OSC 133/7 sequences and desync cwd tracking) unless every
+ *  candidate is alt-screen, and within that, never picks a visible candidate
+ *  unless every remaining candidate is visible (the pathological case where
+ *  visible sessions alone exceed the pool ceiling). */
 export function selectEvictionCandidate(candidates: EvictionCandidate[]): string | null {
   if (candidates.length === 0) return null;
-  const preferred = candidates.filter((c) => !c.visible);
-  const pool = preferred.length > 0 ? preferred : candidates;
+  const nonAltScreen = candidates.filter((c) => !c.altScreen);
+  const altScreenTier = nonAltScreen.length > 0 ? nonAltScreen : candidates;
+  const preferred = altScreenTier.filter((c) => !c.visible);
+  const pool = preferred.length > 0 ? preferred : altScreenTier;
   let best: EvictionCandidate | null = null;
   for (const c of pool) {
     if (!best || c.score < best.score) best = c;
