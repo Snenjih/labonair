@@ -137,7 +137,7 @@ export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialo
       // Only chown when at least one field is filled. Empty = leave unchanged.
       if (owner.trim() || group.trim()) {
         await invoke("sftp_chown", {
-          tabId,
+          sessionId: tabId,
           path: file.path,
           owner: owner.trim(),
           group: group.trim(),

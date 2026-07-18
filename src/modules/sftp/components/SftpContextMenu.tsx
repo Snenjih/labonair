@@ -78,9 +78,14 @@ export function SftpContextMenu({
       } else {
         await Promise.all([...selectedPaths].map((p) => invoke("fs_delete", { path: p })));
       }
-      onRefresh();
     } catch (e) {
       handleApiError(e, "Failed to delete files", "SFTP");
+    } finally {
+      // Always refresh, even on partial failure (e.g. permission-denied
+      // partway through a multi-select batch) — otherwise paths that were
+      // already deleted before the failure stay visible until a manual
+      // refresh.
+      onRefresh();
     }
   }
 

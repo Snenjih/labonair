@@ -41,6 +41,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     loadLocalDir,
     loadRemoteDir,
     loadMoreRemoteDir,
+    loadMoreLocalDir,
     setSelectedLocal,
     setSelectedRemote,
     clearDisconnected,
@@ -484,7 +485,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     setIsDeepSearching(true);
     try {
       const results = await invoke<string[]>("sftp_deep_search", {
-        tabId,
+        sessionId: tabId,
         startPath: tabState?.remotePath ?? "/",
         query,
       });
@@ -701,6 +702,8 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                     onCreatingEntryChange={setCreatingEntryName}
                     onCreatingEntryCommit={commitCreatingEntry}
                     onCreatingEntryCancel={cancelCreatingEntry}
+                    hasMore={tabState?.localHasMore}
+                    onLoadMore={() => loadMoreLocalDir(tabId)}
                   />
                 </div>
               </SftpContextMenu>

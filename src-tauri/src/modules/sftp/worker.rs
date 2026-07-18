@@ -390,7 +390,17 @@ async fn walk_remote_tree(
         for entry in entries {
             let name = entry.file_name();
             let full_path = entry.path();
-            let metadata = entry.metadata();
+            let mut metadata = entry.metadata();
+            // `read_dir`'s per-entry metadata is lstat-based, so a symlink
+            // pointing at a directory reports `is_dir() == false` here. Follow
+            // it with a real `stat()` to resolve the actual target type,
+            // otherwise a symlinked subdirectory silently gets skipped/mis-typed
+            // during a recursive download instead of being descended into.
+            if metadata.is_symlink() {
+                if let Ok(resolved) = sftp.metadata(full_path.clone()).await {
+                    metadata = resolved;
+                }
+            }
             let rel = if rel_prefix.is_empty() { name.clone() } else { format!("{rel_prefix}/{name}") };
             if metadata.is_dir() {
                 out.push(TreeEntry { rel_path: rel.clone(), is_dir: true, size: 0 });
@@ -455,7 +465,13 @@ async fn download_file(
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             log::debug!("[sftp/download] conflict detected, waiting for resolution");
             emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
-            let resolution = ask_conflict(job, app, conflicts, settings).await?;
+            let resolution = tokio::select! {
+                _ = cancel_token.cancelled() => {
+                    conflicts.lock().await.remove(&job.id);
+                    return Err("cancelled".to_string());
+                }
+                r = ask_conflict(job, app, conflicts, settings) => r?,
+            };
             emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
             match resolution.resolution.as_str() {
                 "skip" => { log::debug!("[sftp/download] skipped by user"); return Ok(()); }
@@ -841,7 +857,13 @@ async fn upload_file(
         Err(_) => {
             log::debug!("[sftp/upload] conflict at dest: {}", job.dest_path);
             emit_step(app, &job.id, "Destination already exists — waiting for conflict resolution");
-            let resolution = ask_conflict(job, app, conflicts, settings).await?;
+            let resolution = tokio::select! {
+                _ = cancel_token.cancelled() => {
+                    conflicts.lock().await.remove(&job.id);
+                    return Err("cancelled".to_string());
+                }
+                r = ask_conflict(job, app, conflicts, settings) => r?,
+            };
             emit_step(app, &job.id, format!("Conflict resolved: {}", resolution.resolution));
             match resolution.resolution.as_str() {
                 "skip" => { log::debug!("[sftp/upload] skipped by user"); return Ok(()); }

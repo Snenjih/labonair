@@ -18,15 +18,21 @@ interface SftpReadDirPage {
   next_offset: number | null;
 }
 
+interface FsReadDirPage {
+  entries: DirEntry[];
+  has_more: boolean;
+}
+
 interface SftpTabState {
   localPath: string;
   remotePath: string;
   localFiles: FileNode[];
   remoteFiles: FileNode[];
   /** Whether the remote directory has more entries beyond `remoteFiles` —
-   *  drives the "Load more…" row. Local listing is never paginated
-   *  server-side (fs_read_dir always returns everything in one shot). */
+   *  drives the "Load more…" row. */
   remoteHasMore: boolean;
+  /** Same as `remoteHasMore` but for the local pane (`fs_read_dir_page`). */
+  localHasMore: boolean;
   isLoadingLocal: boolean;
   isLoadingRemote: boolean;
   selectedLocalPaths: Set<string>;
@@ -52,6 +58,9 @@ interface SftpStore {
   /** Appends the next page of the current remote directory (offset =
    *  `remoteFiles.length`). No-op if already loading or there's nothing more. */
   loadMoreRemoteDir: (tabId: string) => Promise<void>;
+  /** Appends the next page of the current local directory (offset =
+   *  `localFiles.length`). No-op if already loading or there's nothing more. */
+  loadMoreLocalDir: (tabId: string) => Promise<void>;
 
   setSelectedLocal: (tabId: string, paths: Set<string>) => void;
   setSelectedRemote: (tabId: string, paths: Set<string>) => void;
@@ -66,6 +75,7 @@ const DEFAULT_TAB_STATE = (): SftpTabState => ({
   localFiles: [],
   remoteFiles: [],
   remoteHasMore: false,
+  localHasMore: false,
   isLoadingLocal: false,
   isLoadingRemote: false,
   selectedLocalPaths: new Set(),
@@ -126,17 +136,26 @@ export const useSftpStore = create<SftpStore>((set, get) => ({
     }));
     try {
       // Resolve ~ to an absolute path so file.path values are always absolute.
-      // The Rust fs_read_dir expands ~ internally but returns only names, so
-      // we need the real base path to build correct absolute file paths.
+      // The Rust fs_read_dir_page expands ~ internally but returns only names,
+      // so we need the real base path to build correct absolute file paths.
       const resolvedPath = await invoke<string>("fs_resolve_path", { path });
-      const entries = await invoke<DirEntry[]>("fs_read_dir", { path: resolvedPath, showHidden: true });
-      const files = entries.map((e) => mapDirEntry(resolvedPath, e));
+      // Paginated (fs_read_dir_page) instead of the one-shot fs_read_dir — a
+      // large local directory (e.g. node_modules) no longer transfers its
+      // full entry list in a single IPC round trip, matching the remote
+      // pane's existing pagination.
+      const page = await invoke<FsReadDirPage>("fs_read_dir_page", {
+        path: resolvedPath,
+        offset: 0,
+        showHidden: true,
+      });
+      const files = page.entries.map((e) => mapDirEntry(resolvedPath, e));
       set((s) => ({
         tabs: {
           ...s.tabs,
           [tabId]: {
             ...s.tabs[tabId],
             localFiles: files,
+            localHasMore: page.has_more,
             localPath: resolvedPath,
             isLoadingLocal: false,
           },
@@ -144,6 +163,45 @@ export const useSftpStore = create<SftpStore>((set, get) => ({
       }));
     } catch (e) {
       handleApiError(e, "Failed to load local directory", "SFTP");
+      set((s) => ({
+        tabs: {
+          ...s.tabs,
+          [tabId]: {
+            ...s.tabs[tabId],
+            isLoadingLocal: false,
+            error: isLabonairError(e) ? e.message : String(e),
+          },
+        },
+      }));
+    }
+  },
+
+  loadMoreLocalDir: async (tabId) => {
+    const tab = get().tabs[tabId];
+    if (!tab || tab.isLoadingLocal || !tab.localHasMore) return;
+    set((s) => ({
+      tabs: { ...s.tabs, [tabId]: { ...s.tabs[tabId], isLoadingLocal: true } },
+    }));
+    try {
+      const page = await invoke<FsReadDirPage>("fs_read_dir_page", {
+        path: tab.localPath,
+        offset: tab.localFiles.length,
+        showHidden: true,
+      });
+      const files = page.entries.map((e) => mapDirEntry(tab.localPath, e));
+      set((s) => ({
+        tabs: {
+          ...s.tabs,
+          [tabId]: {
+            ...s.tabs[tabId],
+            localFiles: [...s.tabs[tabId].localFiles, ...files],
+            localHasMore: page.has_more,
+            isLoadingLocal: false,
+          },
+        },
+      }));
+    } catch (e) {
+      handleApiError(e, "Failed to load more local entries", "SFTP");
       set((s) => ({
         tabs: {
           ...s.tabs,
