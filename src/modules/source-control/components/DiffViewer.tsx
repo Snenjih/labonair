@@ -1,13 +1,29 @@
-import { useEffect, useRef, useMemo } from "react";
+import {
+  Cancel01Icon,
+  FilterIcon,
+  LayoutTwoColumnIcon,
+  MinusSignIcon,
+  PlusSignIcon,
+  SourceCodeIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Cancel01Icon, SourceCodeIcon, FilterIcon, LayoutTwoColumnIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import {
+  buildHunkPatch,
+  type DiffHunk,
+  type FileDiff,
+  isWholeFileSingleHunk,
+  parseDiffHunks,
+} from "../lib/diffHunks";
+import { git } from "../lib/gitInvoke";
 import { useSourceControlStore } from "../store/sourceControlStore";
+import type { GitStatus, SelectionMode } from "../types";
 import { SideBySideDiff } from "./SideBySideDiff";
-import type { SelectionMode, GitStatus } from "../types";
 
 function basename(path: string): string {
   const parts = path.split("/").filter(Boolean);
@@ -92,6 +108,40 @@ function DiffLine({ line, isInOurs, isInTheirs }: DiffLineProps) {
   );
 }
 
+interface HunkHeaderDiffLineProps {
+  line: string;
+  /** Whether the diff currently shown is the staged side — determines Stage vs. Unstage. */
+  staged: boolean;
+  busy: boolean;
+  onAction: () => void;
+}
+
+/** Same row/typography as `DiffLine`'s hunk styling, plus a hover-revealed
+ *  per-hunk Stage/Unstage action — same icon pair and 4x4 sizing as the
+ *  always-visible per-file button in `FileChangeItem.tsx`. */
+function HunkHeaderDiffLine({ line, staged, busy, onAction }: HunkHeaderDiffLineProps) {
+  return (
+    <div className="group/hunk flex items-center gap-1.5 bg-info/5 px-2 font-mono text-[11px] leading-5 text-info/80">
+      <span className="min-w-0 flex-1 truncate">{line || " "}</span>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              disabled={busy}
+              className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 hover:text-foreground group-hover/hunk:opacity-100 disabled:opacity-40"
+              onClick={onAction}
+            >
+              <HugeiconsIcon icon={staged ? MinusSignIcon : PlusSignIcon} size={10} strokeWidth={2} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left">{staged ? "Unstage Hunk" : "Stage Hunk"}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  );
+}
+
 export function DiffViewer() {
   const status = useSourceControlStore((s) => s.status);
   const selectionMode = useSourceControlStore((s) => s.selectionMode);
@@ -102,9 +152,91 @@ export function DiffViewer() {
   const clearSelectedFile = useSourceControlStore((s) => s.clearSelectedFile);
   const setDiffViewMode = useSourceControlStore((s) => s.setDiffViewMode);
   const setIgnoreWhitespace = useSourceControlStore((s) => s.setIgnoreWhitespace);
+  const repoRoot = useSourceControlStore((s) => s.repoRoot);
+  const sessionId = useSourceControlStore((s) => s.sessionId);
+  const setDiffContent = useSourceControlStore((s) => s.setDiffContent);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const ROW_HEIGHT = 20;
+  const [pendingHunkHeader, setPendingHunkHeader] = useState<string | null>(null);
+
+  // Hunk staging needs an unambiguous "is this the staged or unstaged side"
+  // answer for the *entire* diff text being rendered. A single-file
+  // selection and a "staged"/"unstaged" section selection both give that
+  // directly; "all" concatenates a staged and an unstaged diff into one
+  // string with no marker distinguishing which half a given file chunk came
+  // from, and a "commit" selection is a historical diff with no staging
+  // concept at all — hunk actions are disabled for both rather than risk
+  // staging/unstaging the wrong side.
+  const hunkStagingContext = useMemo((): { staged: boolean } | null => {
+    if (!selectionMode) return null;
+    if (selectionMode.type === "file") return { staged: selectionMode.staged };
+    if (selectionMode.type === "section" && selectionMode.section !== "untracked") {
+      return { staged: selectionMode.section === "staged" };
+    }
+    return null;
+  }, [selectionMode]);
+
+  const hunksByFile = useMemo(() => {
+    const map = new Map<string, FileDiff>();
+    if (!hunkStagingContext || !diffContent || diffContent === "__UNTRACKED_ONLY__") return map;
+    for (const file of parseDiffHunks(diffContent)) {
+      map.set(file.path, file);
+    }
+    return map;
+  }, [diffContent, hunkStagingContext]);
+
+  async function handleHunkAction(file: FileDiff, hunk: DiffHunk) {
+    if (!repoRoot || !hunkStagingContext) return;
+    const { staged } = hunkStagingContext;
+    setPendingHunkHeader(hunk.header);
+    try {
+      if (isWholeFileSingleHunk(file)) {
+        if (staged) {
+          await git.unstageFile(repoRoot, file.path, sessionId ?? undefined);
+        } else {
+          await git.stageFile(repoRoot, file.path, sessionId ?? undefined);
+        }
+      } else {
+        const patch = buildHunkPatch(file, hunk);
+        if (staged) {
+          await git.unstageHunk(repoRoot, file.path, patch, sessionId ?? undefined);
+        } else {
+          await git.stageHunk(repoRoot, file.path, patch, sessionId ?? undefined);
+        }
+      }
+      // This component doesn't own the fetch that originally populated
+      // `diffContent` (that lives in `useGitStatus.ts`'s poll/selection
+      // effect) — re-run the same single-file/section fetch here so the
+      // pane reflects the mutation immediately instead of waiting for the
+      // next poll tick.
+      if (selectionMode?.type === "file") {
+        const content = await git.getDiff(
+          repoRoot,
+          selectionMode.path,
+          selectionMode.staged,
+          ignoreWhitespace,
+          sessionId ?? undefined,
+        );
+        setDiffContent(content);
+      } else if (selectionMode?.type === "section") {
+        const content = await git.getDiff(
+          repoRoot,
+          ".",
+          selectionMode.section === "staged",
+          ignoreWhitespace,
+          sessionId ?? undefined,
+        );
+        setDiffContent(content);
+      }
+    } catch (e) {
+      useNotificationStore
+        .getState()
+        .addNotification({ type: "error", title: "Hunk Staging Failed", message: String(e) });
+    } finally {
+      setPendingHunkHeader(null);
+    }
+  }
 
   // Derive whether the current selection is still valid
   const selectionStillValid = useMemo(() => {
@@ -167,8 +299,10 @@ export function DiffViewer() {
 
   const parsedLines = useMemo(
     () =>
-      diffContent && diffContent !== "__UNTRACKED_ONLY__" ? parseDiffLines(diffContent, binaryFilePaths) : [],
-    [diffContent, binaryFilePaths],
+      diffContent && diffContent !== "__UNTRACKED_ONLY__"
+        ? parseDiffLines(diffContent, binaryFilePaths, hunksByFile)
+        : [],
+    [diffContent, binaryFilePaths, hunksByFile],
   );
 
   const virtualizer = useVirtualizer({
@@ -329,6 +463,8 @@ export function DiffViewer() {
           >
             {virtualizer.getVirtualItems().map((virtualItem) => {
               const entry = parsedLines[virtualItem.index];
+              const hunk = entry.hunk;
+              const hunkFile = entry.hunkFile;
               return (
                 <div
                   key={virtualItem.key}
@@ -339,6 +475,13 @@ export function DiffViewer() {
                     <div className="font-mono text-[11px] leading-5 px-2 text-center text-muted-foreground/60">
                       Binary file changed
                     </div>
+                  ) : hunk && hunkFile && hunkStagingContext ? (
+                    <HunkHeaderDiffLine
+                      line={entry.line}
+                      staged={hunkStagingContext.staged}
+                      busy={pendingHunkHeader === hunk.header}
+                      onAction={() => void handleHunkAction(hunkFile, hunk)}
+                    />
                   ) : (
                     <DiffLine line={entry.line} isInOurs={entry.isInOurs} isInTheirs={entry.isInTheirs} />
                   )}
@@ -358,9 +501,16 @@ interface ParsedDiffLine {
   isInTheirs: boolean;
   fileAnchor?: string;
   isBinaryPlaceholder?: boolean;
+  /** Set on a "@@ ... @@" line when hunk staging is available for it — see `hunkStagingContext`. */
+  hunk?: DiffHunk;
+  hunkFile?: FileDiff;
 }
 
-function parseDiffLines(diffContent: string, binaryFilePaths: Set<string>): ParsedDiffLine[] {
+function parseDiffLines(
+  diffContent: string,
+  binaryFilePaths: Set<string>,
+  hunksByFile: Map<string, FileDiff> = new Map(),
+): ParsedDiffLine[] {
   const lines = diffContent.split("\n");
   const result: ParsedDiffLine[] = [];
   let isInOurs = false;
@@ -369,6 +519,12 @@ function parseDiffLines(diffContent: string, binaryFilePaths: Set<string>): Pars
   // "Binary files a/x and b/x differ") are suppressed in favor of a single
   // placeholder row, until the next file header line resets it.
   let skippingBinaryFile = false;
+  // Which file's hunks (if any) apply to the section we're currently in,
+  // and how many "@@" headers of that file we've already consumed — reset
+  // on every new "diff --git" header, mirroring the order hunks appear in
+  // both the raw text and `parseDiffHunks`'s per-file hunk array.
+  let currentFileHunks: FileDiff | undefined;
+  let hunkIdx = 0;
 
   for (const line of lines) {
     const match = /^diff --git a\/.+ b\/(.+)$/.exec(line);
@@ -379,14 +535,30 @@ function parseDiffLines(diffContent: string, binaryFilePaths: Set<string>): Pars
       const currentFile = match[1];
       result.push({ line, isInOurs: false, isInTheirs: false, fileAnchor: currentFile });
       skippingBinaryFile = binaryFilePaths.has(currentFile);
+      currentFileHunks = hunksByFile.get(currentFile);
+      hunkIdx = 0;
       if (skippingBinaryFile) {
-        result.push({ line: "Binary file changed", isInOurs: false, isInTheirs: false, isBinaryPlaceholder: true });
+        result.push({
+          line: "Binary file changed",
+          isInOurs: false,
+          isInTheirs: false,
+          isBinaryPlaceholder: true,
+        });
       }
       continue;
     }
 
     if (skippingBinaryFile) {
       continue;
+    }
+
+    if (currentFileHunks && /^@@ -/.test(line)) {
+      const hunk = currentFileHunks.hunks[hunkIdx];
+      hunkIdx++;
+      if (hunk) {
+        result.push({ line, isInOurs: false, isInTheirs: false, hunk, hunkFile: currentFileHunks });
+        continue;
+      }
     }
 
     const enterOurs = line.startsWith("<<<<<<<");

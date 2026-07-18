@@ -535,6 +535,68 @@ pub async fn git_unstage_all(
     }
 }
 
+/// Stages a single hunk by applying `hunk_patch_text` — a standalone
+/// one-hunk unified-diff patch built by the frontend's `parseDiffHunks`
+/// (`src/modules/source-control/lib/diffHunks.ts`) — directly to the index
+/// via `git apply --cached`. Never touches the worktree.
+#[tauri::command]
+pub async fn git_stage_hunk(
+    path: String,
+    file: String,
+    hunk_patch_text: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SshState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    apply_hunk_patch(&executor, &file, hunk_patch_text, false).await
+}
+
+/// Unstages a single hunk — the reverse of `git_stage_hunk`, via `git apply
+/// --cached --reverse`.
+#[tauri::command]
+pub async fn git_unstage_hunk(
+    path: String,
+    file: String,
+    hunk_patch_text: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SshState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    apply_hunk_patch(&executor, &file, hunk_patch_text, true).await
+}
+
+/// Shared `git apply --cached[--reverse]` dispatch for hunk stage/unstage.
+async fn apply_hunk_patch(
+    executor: &GitExecutor,
+    file: &str,
+    hunk_patch_text: String,
+    reverse: bool,
+) -> Result<(), String> {
+    let mut args: Vec<&str> = vec!["apply", "--cached"];
+    if reverse {
+        args.push("--reverse");
+    }
+    executor.run_with_stdin(&args, hunk_patch_text.into_bytes()).await.map_err(|e| classify_apply_error(&e, file))
+}
+
+/// `git apply --cached` fails with a "the patch doesn't match the index"
+/// class of error when the file changed (was re-staged, amended, etc.)
+/// since the diff the hunk patch was built from was fetched — surface a
+/// clear, actionable message instead of git's raw stderr, which is written
+/// for a terminal user, not a UI toast (e.g. `error: patch failed:
+/// file.txt:1\nerror: file.txt: patch does not apply`).
+fn classify_apply_error(err: &str, file: &str) -> String {
+    let lower = err.to_lowercase();
+    if lower.contains("patch does not apply") || lower.contains("patch failed") || lower.contains("does not match index")
+    {
+        format!("Diff is stale for \"{file}\" — refresh and try again.")
+    } else {
+        err.to_string()
+    }
+}
+
 /// Discards worktree changes for a specific file.
 #[tauri::command]
 pub async fn git_discard_file(
@@ -1443,5 +1505,145 @@ mod tests {
         // Truncating at byte 2 lands inside 'é' — must back off to byte 1.
         let truncated = safe_truncate_utf8(bytes, 2);
         assert!(std::str::from_utf8(truncated).is_ok());
+    }
+
+    #[test]
+    fn classify_apply_error_recognizes_stale_patch_messages() {
+        let stale1 = "error: patch failed: file.txt:1\nerror: file.txt: patch does not apply";
+        assert!(classify_apply_error(stale1, "file.txt").starts_with("Diff is stale"));
+
+        let stale2 = "error: file.txt: does not match index";
+        assert!(classify_apply_error(stale2, "file.txt").starts_with("Diff is stale"));
+    }
+
+    #[test]
+    fn classify_apply_error_passes_through_unrelated_errors() {
+        let err = "fatal: not a git repository (or any of the parent directories): .git";
+        assert_eq!(classify_apply_error(err, "file.txt"), err);
+    }
+
+    // ─── Hunk staging: live end-to-end smoke test against a real, throwaway
+    // git repo (not this project's own repo) ───────────────────────────────
+    //
+    // Exercises the exact async path a real `git_stage_hunk`/`git_unstage_hunk`
+    // IPC call takes — `GitExecutor::Local::run_with_stdin` →
+    // `run_local_with_stdin` (tokio::process::Command, Stdio::piped stdin,
+    // explicit close-before-wait) — end to end, rather than only unit-testing
+    // the pure helpers around it. Mirrors the manual smoke test performed
+    // outside the repo during development (see PR description).
+
+    /// Creates an isolated temp git repo, unique per test invocation and per
+    /// process, so parallel `cargo test` runs never collide.
+    fn make_temp_repo(name: &str) -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir()
+            .join(format!("labonair_git_hunk_test_{}_{}_{}", std::process::id(), name, unique));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp repo dir");
+
+        let run = |args: &[&str]| {
+            let out = std::process::Command::new("git")
+                .args(args)
+                .current_dir(&dir)
+                .output()
+                .unwrap_or_else(|e| panic!("failed to run git {args:?}: {e}"));
+            assert!(out.status.success(), "git {args:?} failed: {}", String::from_utf8_lossy(&out.stderr));
+        };
+        run(&["init", "-q"]);
+        run(&["config", "user.email", "test@example.com"]);
+        run(&["config", "user.name", "Test"]);
+        dir
+    }
+
+    fn write_file(dir: &std::path::Path, name: &str, content: &str) {
+        std::fs::write(dir.join(name), content).expect("write test file");
+    }
+
+    fn git_output(dir: &std::path::Path, args: &[&str]) -> String {
+        let out = std::process::Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .unwrap_or_else(|e| panic!("failed to run git {args:?}: {e}"));
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    }
+
+    /// Splits a raw `git diff` for a single file into (header lines up to
+    /// but excluding the first `@@`, first hunk's full text including its
+    /// `@@` line) — a minimal Rust-side mirror of what the frontend's
+    /// `parseDiffHunks` does, just enough to build a standalone one-hunk
+    /// patch for this test.
+    fn split_first_hunk(raw_diff: &str) -> (String, String) {
+        let lines: Vec<&str> = raw_diff.lines().collect();
+        let first_hunk_idx = lines.iter().position(|l| l.starts_with("@@ -")).expect("no hunk header found");
+        let second_hunk_idx =
+            lines[first_hunk_idx + 1..].iter().position(|l| l.starts_with("@@ -")).map(|i| i + first_hunk_idx + 1);
+        let header = lines[..first_hunk_idx].join("\n");
+        let hunk_end = second_hunk_idx.unwrap_or(lines.len());
+        let hunk = lines[first_hunk_idx..hunk_end].join("\n");
+        (header, hunk)
+    }
+
+    #[tokio::test]
+    async fn stage_and_unstage_single_hunk_via_apply_cached() {
+        let dir = make_temp_repo("stage_unstage");
+
+        // 15 lines gives enough distance between an early and a late edit
+        // for git to emit two separate hunks (matches the manual smoke test
+        // performed during development).
+        let initial: String = (1..=15).map(|i| format!("a{i}\n")).collect();
+        write_file(&dir, "tracked.txt", &initial);
+        std::process::Command::new("git").args(["add", "tracked.txt"]).current_dir(&dir).output().unwrap();
+        std::process::Command::new("git")
+            .args(["commit", "-q", "-m", "init"])
+            .current_dir(&dir)
+            .output()
+            .unwrap();
+
+        let mut lines: Vec<String> = (1..=15).map(|i| format!("a{i}")).collect();
+        lines[1] = "a2_CHANGED".to_string();
+        lines[13] = "a14_CHANGED".to_string();
+        let modified = lines.join("\n") + "\n";
+        write_file(&dir, "tracked.txt", &modified);
+
+        let raw_diff = git_output(&dir, &["diff", "--", "tracked.txt"]);
+        assert!(raw_diff.matches("@@ -").count() >= 2, "expected two hunks, got diff:\n{raw_diff}");
+        let (header, hunk1) = split_first_hunk(&raw_diff);
+        let patch = format!("{header}\n{hunk1}\n");
+
+        let executor = GitExecutor::Local { cwd: dir.to_string_lossy().into_owned() };
+
+        // Stage only hunk 1 (the a2 change).
+        apply_hunk_patch(&executor, "tracked.txt", patch.clone(), false).await.expect("stage hunk 1");
+
+        let staged = git_output(&dir, &["diff", "--cached", "--", "tracked.txt"]);
+        assert!(staged.contains("a2_CHANGED"), "staged diff missing hunk 1:\n{staged}");
+        assert!(!staged.contains("a14_CHANGED"), "staged diff leaked hunk 2:\n{staged}");
+
+        let remaining_unstaged = git_output(&dir, &["diff", "--", "tracked.txt"]);
+        assert!(
+            remaining_unstaged.contains("a14_CHANGED"),
+            "hunk 2 should remain unstaged:\n{remaining_unstaged}"
+        );
+        assert!(
+            !remaining_unstaged.contains("a2_CHANGED"),
+            "hunk 1 should no longer be in the unstaged diff:\n{remaining_unstaged}"
+        );
+
+        // Re-applying the same (now stale) patch must fail and classify as
+        // a stale-diff error, not a raw git stderr dump.
+        let stale_result = apply_hunk_patch(&executor, "tracked.txt", patch.clone(), false).await;
+        assert!(stale_result.is_err());
+        assert!(stale_result.unwrap_err().starts_with("Diff is stale"));
+
+        // Unstage hunk 1 again (--reverse) and confirm the index is back to
+        // matching HEAD for this file.
+        apply_hunk_patch(&executor, "tracked.txt", patch, true).await.expect("unstage hunk 1");
+        let staged_after_unstage = git_output(&dir, &["diff", "--cached", "--", "tracked.txt"]);
+        assert!(staged_after_unstage.is_empty(), "expected nothing staged after unstaging hunk 1:\n{staged_after_unstage}");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

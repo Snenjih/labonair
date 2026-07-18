@@ -633,6 +633,8 @@ pub fn run() {
             git::git_get_diff,
             git::git_stage_file,
             git::git_unstage_file,
+            git::git_stage_hunk,
+            git::git_unstage_hunk,
             git::git_stage_all,
             git::git_unstage_all,
             git::git_discard_file,

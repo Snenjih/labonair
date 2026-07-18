@@ -49,6 +49,10 @@ export const git = {
     invoke<void>("git_stage_file", { path, file, sessionId: sessionId ?? null }),
   unstageFile: (path: string, file: string, sessionId?: string) =>
     invoke<void>("git_unstage_file", { path, file, sessionId: sessionId ?? null }),
+  stageHunk: (path: string, file: string, hunkPatchText: string, sessionId?: string) =>
+    invoke<void>("git_stage_hunk", { path, file, hunkPatchText, sessionId: sessionId ?? null }),
+  unstageHunk: (path: string, file: string, hunkPatchText: string, sessionId?: string) =>
+    invoke<void>("git_unstage_hunk", { path, file, hunkPatchText, sessionId: sessionId ?? null }),
   stageAll: (path: string, sessionId?: string) =>
     invoke<void>("git_stage_all", { path, sessionId: sessionId ?? null }),
   unstageAll: (path: string, sessionId?: string) =>

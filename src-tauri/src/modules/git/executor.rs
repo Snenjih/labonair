@@ -3,6 +3,8 @@ use crate::modules::ssh::SshState;
 use crate::modules::ssh::shell::shell_quote;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use tokio::io::AsyncWriteExt;
+use tokio::process::Command as TokioCommand;
 
 /// The exact error string the local codepath already produces when `git`
 /// isn't on PATH (`Command::spawn`'s `io::ErrorKind::NotFound`) — the
@@ -136,6 +138,31 @@ impl GitExecutor {
         }
     }
 
+    /// Runs a single git subcommand with `stdin_bytes` piped to the child's
+    /// stdin — used exclusively by hunk staging's `git apply --cached[
+    /// --reverse]`, which reads the patch to apply from stdin. Every other
+    /// command in this module runs with no stdin at all (`Stdio::null()`),
+    /// so this is a dedicated variant rather than a retrofit of
+    /// `run`/`run_raw`/`run_merged`.
+    pub(crate) async fn run_with_stdin(&self, args: &[&str], stdin_bytes: Vec<u8>) -> Result<(), String> {
+        match self {
+            GitExecutor::Local { cwd } => run_local_with_stdin(args, cwd, &stdin_bytes).await.map(|_| ()),
+            GitExecutor::Remote { session_id, cwd, ssh_state, app } => {
+                let quoted_args: String = args.iter().map(|a| shell_quote(a)).collect::<Vec<_>>().join(" ");
+                let cwd_quoted = shell_quote(cwd);
+                let script = format!("LC_ALL=C GIT_TERMINAL_PROMPT=0 git -C {cwd_quoted} {quoted_args}");
+                let (_stdout, stderr, exit_code) =
+                    run_remote_script_with_stdin(ssh_state, app, session_id, &script, &stdin_bytes).await?;
+                if exit_code == 0 {
+                    Ok(())
+                } else {
+                    let err = String::from_utf8_lossy(&stderr).trim_end().to_string();
+                    Err(normalize_git_error(exit_code, &err))
+                }
+            }
+        }
+    }
+
     async fn exec_remote_args(&self, args: &[&str]) -> Result<(Vec<u8>, Vec<u8>, i32), String> {
         let GitExecutor::Remote { session_id, cwd, ssh_state, app } = self else {
             unreachable!("exec_remote_args called on Local executor");
@@ -250,6 +277,56 @@ fn run_local_merged(args: &[&str], cwd: &str) -> Result<String, String> {
     }
 }
 
+/// Runs a git subcommand locally with `stdin_bytes` piped to its stdin —
+/// the only local execution path that needs a real (non-null) stdin, so it
+/// uses `tokio::process::Command` directly instead of the
+/// `spawn_blocking`-wrapped sync `std::process::Command` the other local
+/// paths use. Writes the patch, then explicitly closes the write half by
+/// dropping it *before* awaiting the child's output: git reads its patch
+/// from stdin until EOF, so a stdin handle left open would make `git apply`
+/// hang forever waiting for more input that will never come.
+async fn run_local_with_stdin(args: &[&str], cwd: &str, stdin_bytes: &[u8]) -> Result<Vec<u8>, String> {
+    let cwd_path = PathBuf::from(cwd);
+    if !cwd_path.is_dir() {
+        return Err(format!("not a directory: {cwd}"));
+    }
+
+    let mut child = TokioCommand::new("git")
+        .env("LC_ALL", "C")
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .args(args)
+        .current_dir(&cwd_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                GIT_NOT_INSTALLED.to_string()
+            } else {
+                e.to_string()
+            }
+        })?;
+
+    {
+        // `.take()` moves the handle out of `child` into this block scope —
+        // it's dropped (closing the pipe's write end) at the end of the
+        // block, before `wait_with_output()` is called below.
+        let mut stdin = child.stdin.take().ok_or_else(|| "failed to open child stdin".to_string())?;
+        stdin.write_all(stdin_bytes).await.map_err(|e| e.to_string())?;
+        stdin.flush().await.map_err(|e| e.to_string())?;
+    }
+
+    let output = child.wait_with_output().await.map_err(|e| e.to_string())?;
+    let code = output.status.code().unwrap_or(-1);
+    if output.status.success() {
+        Ok(output.stdout)
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim_end().to_string();
+        Err(if stderr.is_empty() { format!("git exited with code {code}") } else { stderr })
+    }
+}
+
 /// Runs an arbitrary script locally via `sh -c` (only used by the bundled
 /// workspace-state probe, which needs real shell semantics) — everything
 /// else stays on the shell-free `Command::args()` path above.
@@ -353,6 +430,99 @@ async fn run_remote_script(
                     // which explicitly warns against leaving the loop early.
                     // `channel.wait()` returns `None` on its own once the
                     // channel is fully closed, ending the loop naturally.
+                    russh::ChannelMsg::ExitStatus { exit_status } => exit_code = exit_status as i32,
+                    _ => {}
+                }
+            }
+            Ok::<(Vec<u8>, Vec<u8>, i32), String>((stdout, stderr, exit_code))
+        }
+    };
+
+    let attempt = exec_via("bash", "-lc").await.map_err(report_and_pass)?;
+
+    if attempt.2 == 127 && shell_missing(&attempt.1, "bash") {
+        return exec_via("sh", "-c").await.map_err(report_and_pass);
+    }
+    Ok(attempt)
+}
+
+/// Same execution shape as `run_remote_script` (login-shell exec via `bash
+/// -lc`, falling back to `sh -c` only if bash itself is missing; dead-session
+/// detection via `is_network_error`) but additionally pipes `stdin_bytes` to
+/// the remote process before reading its output. Used only by the hunk
+/// staging `git apply --cached` path, which reads the patch to apply from
+/// stdin — every other remote command has nothing to write, so this is a
+/// separate function rather than an extra parameter threaded through
+/// `run_remote_script`.
+async fn run_remote_script_with_stdin(
+    ssh_state: &SshState,
+    app: &tauri::AppHandle,
+    session_id: &str,
+    script: &str,
+    stdin_bytes: &[u8],
+) -> Result<(Vec<u8>, Vec<u8>, i32), String> {
+    let emit_connection_lost = |reason: &str| {
+        use tauri::Emitter;
+        let _ = app.emit(
+            "ssh_connection_lost",
+            serde_json::json!({ "session_id": session_id, "reason": reason }),
+        );
+    };
+
+    let session = {
+        let map = ssh_state.0.lock().map_err(|e| e.to_string())?;
+        map.get(session_id)
+            .ok_or_else(|| {
+                let reason = "no SSH session for this host — reconnect and try again".to_string();
+                emit_connection_lost(&reason);
+                reason
+            })?
+            .clone()
+    };
+
+    let report_and_pass = |e: String| -> String {
+        if is_network_error(&e) {
+            if let Ok(mut map) = ssh_state.0.lock() {
+                map.remove(session_id);
+            }
+            emit_connection_lost(&e);
+        }
+        e
+    };
+
+    let exec_via = |shell: &'static str, flag: &'static str| {
+        let session = session.clone();
+        let cmd = format!("{shell} {flag} {}", shell_quote(script));
+        async move {
+            let mut channel = session
+                .handle
+                .channel_open_session()
+                .await
+                .map_err(|e| e.to_string())?;
+            channel.exec(true, cmd).await.map_err(|e| e.to_string())?;
+
+            // Write the patch to the remote process's stdin, then signal EOF
+            // — *before* entering the read loop below. `git apply` blocks
+            // reading stdin until it sees EOF, so this must happen first or
+            // the exchange deadlocks (we'd be waiting for output the remote
+            // process won't produce until it's done reading, and it won't
+            // finish reading until we send EOF).
+            channel.data_bytes(stdin_bytes.to_vec()).await.map_err(|e| e.to_string())?;
+            channel.eof().await.map_err(|e| e.to_string())?;
+
+            let mut stdout = Vec::new();
+            let mut stderr = Vec::new();
+            let mut exit_code: i32 = -1;
+            while let Some(msg) = channel.wait().await {
+                match msg {
+                    russh::ChannelMsg::Data { data } => stdout.extend_from_slice(&data),
+                    russh::ChannelMsg::ExtendedData { data, ext: 1 } => stderr.extend_from_slice(&data),
+                    russh::ChannelMsg::ExtendedData { .. } => {}
+                    // Same Eof/ExitStatus ordering caveat as `run_remote_script`:
+                    // the server sends `ExitStatus` *after* `Eof` (and before
+                    // `Close`), so breaking out of this loop early would leave
+                    // `exit_code` stuck at -1. `channel.wait()` returns `None`
+                    // on its own once the channel is fully closed.
                     russh::ChannelMsg::ExitStatus { exit_status } => exit_code = exit_status as i32,
                     _ => {}
                 }
