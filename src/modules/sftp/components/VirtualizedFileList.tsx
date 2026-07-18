@@ -7,7 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { FileNode } from "../types";
@@ -584,6 +584,60 @@ function FileRow({
   onCreatingEntryCancel,
 }: FileRowProps) {
   const isUpEntry = file.name === "..";
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const renameSettledRef = useRef(false);
+  const creatingInputRef = useRef<HTMLInputElement>(null);
+  const creatingSettledRef = useRef(false);
+
+  // Two-tick focus (immediate + next animation frame) so this wins against
+  // the context menu's Radix focus-scope teardown, which restores focus to
+  // the menu trigger via a setTimeout(0) fired *after* our own mount-time
+  // focus already landed (see onCloseAutoFocus on SftpContextMenu's
+  // ContextMenuContent, which stops that — this is the second line of
+  // defense). Until the second tick lands, a blur is treated as that
+  // focus-steal rather than the user dismissing the field, so it refocuses
+  // instead of canceling. Also pre-selects the name up to the extension
+  // (matching the explorer module's InlineInput) so typing immediately
+  // replaces it.
+  useEffect(() => {
+    if (!isRenaming) {
+      renameSettledRef.current = false;
+      return;
+    }
+    const el = renameInputRef.current;
+    if (!el) return;
+    renameSettledRef.current = false;
+    const focus = () => {
+      el.focus({ preventScroll: true });
+      const dot = (renameValue ?? "").lastIndexOf(".");
+      if (dot > 0) el.setSelectionRange(0, dot);
+      else el.select();
+    };
+    focus();
+    const raf = requestAnimationFrame(() => {
+      focus();
+      renameSettledRef.current = true;
+    });
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRenaming, file.path]);
+
+  useEffect(() => {
+    if (!isCreatingEntry) {
+      creatingSettledRef.current = false;
+      return;
+    }
+    const el = creatingInputRef.current;
+    if (!el) return;
+    creatingSettledRef.current = false;
+    el.focus({ preventScroll: true });
+    const raf = requestAnimationFrame(() => {
+      el.focus({ preventScroll: true });
+      creatingSettledRef.current = true;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isCreatingEntry]);
+
   const getIcon = () => {
     if (isUpEntry || file.is_dir) return <HugeiconsIcon icon={Folder01Icon} size={16} />;
     if (file.is_symlink) return <HugeiconsIcon icon={Link01Icon} size={16} />;
@@ -649,27 +703,39 @@ function FileRow({
       </span>
       {isRenaming ? (
         <input
-          autoFocus
+          ref={renameInputRef}
           value={renameValue}
           onChange={(e) => onRenameChange?.(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") onRenameCommit?.();
             if (e.key === "Escape") onRenameCancel?.();
           }}
-          onBlur={onRenameCancel}
+          onBlur={() => {
+            if (!renameSettledRef.current) {
+              renameInputRef.current?.focus({ preventScroll: true });
+              return;
+            }
+            onRenameCancel?.();
+          }}
           className="flex-1 h-5 text-sm bg-transparent border-none outline-none text-foreground"
           onClick={(e) => e.stopPropagation()}
         />
       ) : isCreatingEntry ? (
         <input
-          autoFocus
+          ref={creatingInputRef}
           value={creatingEntryValue}
           onChange={(e) => onCreatingEntryChange?.(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") onCreatingEntryCommit?.();
             if (e.key === "Escape") onCreatingEntryCancel?.();
           }}
-          onBlur={onCreatingEntryCancel}
+          onBlur={() => {
+            if (!creatingSettledRef.current) {
+              creatingInputRef.current?.focus({ preventScroll: true });
+              return;
+            }
+            onCreatingEntryCancel?.();
+          }}
           placeholder={file.is_dir ? "New folder name" : "New file name"}
           className="flex-1 h-5 text-sm bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/40"
           onClick={(e) => e.stopPropagation()}

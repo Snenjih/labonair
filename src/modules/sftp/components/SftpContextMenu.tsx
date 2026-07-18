@@ -155,7 +155,12 @@ export function SftpContextMenu({
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-        <ContextMenuContent className="w-52">
+        {/* Without this, Radix restores focus to the trigger row via a
+         *  setTimeout(0) after the menu closes — landing after our
+         *  rename/new-folder/new-file <input> has already auto-focused
+         *  itself, silently stealing focus (and, since the input's onBlur
+         *  cancels the edit, aborting it) right as the user starts typing. */}
+        <ContextMenuContent className="w-52" onCloseAutoFocus={(e) => e.preventDefault()}>
           <ContextMenuItem onClick={() => onStartNewFolder?.()}>New Folder</ContextMenuItem>
           <ContextMenuItem onClick={() => onStartNewFile?.()}>New File</ContextMenuItem>
 
