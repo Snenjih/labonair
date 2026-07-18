@@ -101,6 +101,18 @@ export function HostCard({
   const hasActiveSftpTab = useTabsStore((s) =>
     s.tabs.some((t) => t.kind === "sftp" && (t as { hostId: string }).hostId === host.id),
   );
+  // Same active-connection check as above, but across the whole bulk
+  // selection — used by the bulk delete dialog below.
+  const bulkHasActiveTabs = useTabsStore((s) =>
+    bulkIds.some((id) =>
+      s.tabs.some(
+        (t) =>
+          (t.kind === "workspace" &&
+            Object.values(t.sessions).some((sess) => sess.kind === "ssh" && sess.hostId === id)) ||
+          (t.kind === "sftp" && (t as { hostId: string }).hostId === id),
+      ),
+    ),
+  );
 
   const connectSsh = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -375,6 +387,11 @@ export function HostCard({
               This will permanently remove the host and its stored credentials.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {(hasActiveSshTab || hasActiveSftpTab) && (
+            <p className="text-[12px] text-warning">
+              This host has an active SSH/SFTP connection — deleting it will leave that tab disconnected.
+            </p>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
@@ -399,6 +416,12 @@ export function HostCard({
               undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {bulkHasActiveTabs && (
+            <p className="text-[12px] text-warning">
+              One or more of these hosts has an active SSH/SFTP connection — deleting them will leave those
+              tabs disconnected.
+            </p>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
