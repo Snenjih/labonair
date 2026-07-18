@@ -176,7 +176,7 @@ function SortableHostCard({
     opacity: isDragging ? 0.5 : 1,
   };
   return (
-    <div ref={setNodeRef} style={style} className={layoutMode === "grid" ? "w-[260px]" : undefined}>
+    <div ref={setNodeRef} style={style}>
       {layoutMode === "list" ? (
         <HostListItem
           host={host}
@@ -713,11 +713,9 @@ export function HomeDashboard({
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-4">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
                     {[...Array(3)].map((_, i) => (
-                      <div key={i} className="w-[260px]">
-                        <SkeletonCard />
-                      </div>
+                      <SkeletonCard key={i} />
                     ))}
                   </div>
                 )
@@ -754,7 +752,7 @@ export function HomeDashboard({
                         ))}
                       </div>
                     ) : (
-                      <div className="flex flex-wrap gap-4">
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
                         {sortedHosts.map((host) => (
                           <SortableHostCard
                             key={host.id}
@@ -817,23 +815,22 @@ export function HomeDashboard({
                   No credentials match your search
                 </div>
               ) : layoutMode === "grid" ? (
-                <div className="flex flex-wrap gap-4">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
                   {sortedCredentials.map((cred) => (
-                    <div key={cred.id} className="w-[260px]">
-                      <CredentialCard
-                        credential={cred}
-                        hostsCount={hosts.filter((h) => h.credential_id === cred.id).length}
-                        isSelected={selectedCredentialId === cred.id}
-                        onClick={() =>
-                          setSelectedCredential(selectedCredentialId === cred.id ? null : cred.id)
-                        }
-                        onEdit={() => setSelectedCredential(cred.id)}
-                        onDuplicate={async () => {
-                          const dup = await duplicateCredential(cred.id);
-                          setSelectedCredential(dup.id);
-                        }}
-                      />
-                    </div>
+                    <CredentialCard
+                      key={cred.id}
+                      credential={cred}
+                      hostsCount={hosts.filter((h) => h.credential_id === cred.id).length}
+                      isSelected={selectedCredentialId === cred.id}
+                      onClick={() =>
+                        setSelectedCredential(selectedCredentialId === cred.id ? null : cred.id)
+                      }
+                      onEdit={() => setSelectedCredential(cred.id)}
+                      onDuplicate={async () => {
+                        const dup = await duplicateCredential(cred.id);
+                        setSelectedCredential(dup.id);
+                      }}
+                    />
                   ))}
                 </div>
               ) : (
