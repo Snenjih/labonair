@@ -502,6 +502,28 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
     [fetchChildren, options, provider],
   );
 
+  const chmod = useCallback(
+    async (path: string, permissions: number) => {
+      try {
+        await provider.chmod?.(path, permissions);
+      } catch (e) {
+        handleApiError(e, "Failed to set permissions", "File Tree");
+      }
+    },
+    [provider],
+  );
+
+  const chown = useCallback(
+    async (path: string, owner: string, group: string) => {
+      try {
+        await provider.chown?.(path, owner, group);
+      } catch (e) {
+        handleApiError(e, "Failed to change owner", "File Tree");
+      }
+    },
+    [provider],
+  );
+
   return {
     nodes,
     expanded,
@@ -522,6 +544,8 @@ export function useFileTree(provider: FsProvider, rootPath: string | null, optio
     commitRename,
     movePath,
     deletePath,
+    chmod,
+    chown,
     joinPath: provider.joinPath,
   };
 }

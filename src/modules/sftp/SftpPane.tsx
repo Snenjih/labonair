@@ -386,38 +386,40 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
 
   async function enqueueDownloads(remotePaths: string[]) {
     const localBase = tabState?.localPath ?? "~";
-    for (const remotePath of remotePaths) {
-      const fileName = remotePath.split("/").pop() ?? "file";
-      const destPath = `${localBase}/${fileName}`;
-      try {
-        await invoke("enqueue_transfer", {
+    const results = await Promise.allSettled(
+      remotePaths.map((remotePath) => {
+        const fileName = remotePath.split("/").pop() ?? "file";
+        const destPath = `${localBase}/${fileName}`;
+        return invoke("enqueue_transfer", {
           sessionId: String(tab.id),
           srcPath: remotePath,
           destPath,
           direction: "download",
         });
-      } catch (e) {
-        handleApiError(e, "Failed to enqueue download", "SFTP");
-      }
+      }),
+    );
+    for (const r of results) {
+      if (r.status === "rejected") handleApiError(r.reason, "Failed to enqueue download", "SFTP");
     }
   }
 
   async function enqueueUploads(localPaths: string[]) {
     const remoteBase = tabState?.remotePath ?? "/";
-    for (const localPath of localPaths) {
-      const fileName = localPath.split(/[\\/]/).pop() ?? "file";
-      const sep = remoteBase.endsWith("/") ? "" : "/";
-      const destPath = `${remoteBase}${sep}${fileName}`;
-      try {
-        await invoke("enqueue_transfer", {
+    const results = await Promise.allSettled(
+      localPaths.map((localPath) => {
+        const fileName = localPath.split(/[\\/]/).pop() ?? "file";
+        const sep = remoteBase.endsWith("/") ? "" : "/";
+        const destPath = `${remoteBase}${sep}${fileName}`;
+        return invoke("enqueue_transfer", {
           sessionId: String(tab.id),
           srcPath: localPath,
           destPath,
           direction: "upload",
         });
-      } catch (e) {
-        handleApiError(e, "Failed to enqueue upload", "SFTP");
-      }
+      }),
+    );
+    for (const r of results) {
+      if (r.status === "rejected") handleApiError(r.reason, "Failed to enqueue upload", "SFTP");
     }
   }
 
@@ -508,6 +510,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       // Explorer's lazy-session reconnect (see useLazyExplorerSession.ts).
       await invoke("sftp_disconnect", { sessionId: tabId }).catch(() => {});
       await invoke("sftp_connect", { sessionId: tabId, hostId: tab.hostId });
+      // Any transfer job still running against the old session captured its
+      // session Arc once at job start and would otherwise keep limping along
+      // against the now-dead connection — cancel + re-enqueue those against
+      // the fresh session. No-op if nothing was in flight for this tab.
+      await invoke("sftp_session_reconnected", { sessionId: tabId }).catch(() => {});
       clearDisconnected(tabId);
       useConnectionStatusStore.getState().setStatus(tabId, "connected");
       loadLocalDir(tabId, tabState?.localPath ?? "~");

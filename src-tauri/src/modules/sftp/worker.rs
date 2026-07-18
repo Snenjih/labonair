@@ -97,6 +97,19 @@ pub async fn run_worker(
     // chunks.
     let mut cancel_tokens: std::collections::HashMap<String, CancellationToken> =
         std::collections::HashMap::new();
+    // Snapshot of each currently-running job (session_id/src/dest/direction),
+    // keyed by job id — lets `SessionReconnected` find which in-flight jobs
+    // belong to a given session without having to reach into `in_flight`
+    // (whose `TransferJob`s are moved into their spawned tasks and only come
+    // back out via `join_next()`). Populated right before spawn, removed in
+    // `finish_job`.
+    let mut running_snapshots: std::collections::HashMap<String, TransferJob> =
+        std::collections::HashMap::new();
+    // Job ids cancelled specifically because their session was reconnected
+    // (as opposed to a genuine user-initiated cancel) — `finish_job` consults
+    // this to know whether to re-enqueue a fresh equivalent job once the
+    // cancelled one actually finishes.
+    let mut reconnect_requeue: std::collections::HashSet<String> = std::collections::HashSet::new();
     // Jobs currently running as their own spawned tasks, up to
     // `settings.max_concurrent` at a time. Bounding this via `JoinSet` (rather
     // than awaiting `process_job` inline like before) is what actually enables
@@ -124,6 +137,9 @@ pub async fn run_worker(
                         let _ = tx.send(ConflictResolution { resolution, new_name });
                     }
                 }
+                Ok(WorkerMessage::SessionReconnected(session_id)) => {
+                    handle_session_reconnected(&session_id, &running_snapshots, &cancel_tokens, &mut reconnect_requeue);
+                }
                 Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return,
             }
@@ -144,6 +160,7 @@ pub async fn run_worker(
             job.status = TransferStatus::Running;
             emit_progress(&app, &job);
 
+            running_snapshots.insert(job.id.clone(), job.clone());
             let job_id = job.id.clone();
             let ssh_state_c = ssh_state.clone();
             let app_c = app.clone();
@@ -175,6 +192,13 @@ pub async fn run_worker(
                         let _ = tx.send(ConflictResolution { resolution, new_name });
                     }
                 }
+                Some(WorkerMessage::SessionReconnected(session_id)) => {
+                    // Nothing can be running while `in_flight` is empty (we
+                    // only reach this branch then), so this is always a no-op
+                    // here — kept for exhaustiveness, not because it does
+                    // anything in this branch.
+                    handle_session_reconnected(&session_id, &running_snapshots, &cancel_tokens, &mut reconnect_requeue);
+                }
                 None => return,
             }
             continue;
@@ -197,16 +221,41 @@ pub async fn run_worker(
                         let _ = tx.send(ConflictResolution { resolution, new_name });
                     }
                 }
+                Some(WorkerMessage::SessionReconnected(session_id)) => {
+                    handle_session_reconnected(&session_id, &running_snapshots, &cancel_tokens, &mut reconnect_requeue);
+                }
                 None => {
                     while let Some(joined) = in_flight.join_next().await {
-                        finish_job(joined, &app, &ssh_state, &mut cancel_tokens);
+                        finish_job(joined, &app, &ssh_state, &mut cancel_tokens, &mut running_snapshots, &mut reconnect_requeue, &mut queue);
                     }
                     return;
                 }
             },
             Some(joined) = in_flight.join_next() => {
-                finish_job(joined, &app, &ssh_state, &mut cancel_tokens);
+                finish_job(joined, &app, &ssh_state, &mut cancel_tokens, &mut running_snapshots, &mut reconnect_requeue, &mut queue);
             }
+        }
+    }
+}
+
+/// Cancels every currently-running job belonging to `session_id` (e.g. after
+/// a dual-pane SFTP tab reconnects) and marks them in `reconnect_requeue` so
+/// `finish_job` re-enqueues a fresh equivalent job once each one actually
+/// finishes. No-op (and therefore safe to call repeatedly, including twice in
+/// quick succession) if nothing is currently running for that session.
+fn handle_session_reconnected(
+    session_id: &str,
+    running_snapshots: &std::collections::HashMap<String, TransferJob>,
+    cancel_tokens: &std::collections::HashMap<String, CancellationToken>,
+    reconnect_requeue: &mut std::collections::HashSet<String>,
+) {
+    for (job_id, snapshot) in running_snapshots {
+        if snapshot.session_id != session_id {
+            continue;
+        }
+        if let Some(token) = cancel_tokens.get(job_id) {
+            reconnect_requeue.insert(job_id.clone());
+            token.cancel();
         }
     }
 }
@@ -216,10 +265,15 @@ fn finish_job(
     app: &tauri::AppHandle,
     ssh_state: &SshState,
     cancel_tokens: &mut std::collections::HashMap<String, CancellationToken>,
+    running_snapshots: &mut std::collections::HashMap<String, TransferJob>,
+    reconnect_requeue: &mut std::collections::HashSet<String>,
+    queue: &mut std::collections::VecDeque<TransferJob>,
 ) {
     match joined {
         Ok((job_id, mut job, result, token)) => {
             cancel_tokens.remove(&job_id);
+            running_snapshots.remove(&job_id);
+            let requeue_for_reconnect = reconnect_requeue.remove(&job_id);
             match result {
                 Ok(()) => {
                     job.status = TransferStatus::Completed;
@@ -249,6 +303,23 @@ fn finish_job(
                     };
                     emit_progress(app, &job);
                 }
+            }
+            if requeue_for_reconnect {
+                let fresh = TransferJob {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    session_id: job.session_id.clone(),
+                    src_path: job.src_path.clone(),
+                    dest_path: job.dest_path.clone(),
+                    direction: job.direction.clone(),
+                    status: TransferStatus::Queued,
+                    bytes_total: 0,
+                    bytes_transferred: 0,
+                    speed_bps: 0.0,
+                    skipped_count: 0,
+                };
+                cancel_tokens.entry(fresh.id.clone()).or_default();
+                emit_progress(app, &fresh);
+                queue.push_back(fresh);
             }
         }
         Err(join_err) => {

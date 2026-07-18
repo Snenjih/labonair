@@ -58,5 +58,9 @@ export interface FsProvider {
   unwatch?(path: string): Promise<void>;
   syncWatchers?(paths: string[]): Promise<void>;
 
+  /** Only present when `capabilities.supportsChmod`/`supportsChown` is true. */
+  chmod?(path: string, permissions: number): Promise<void>;
+  chown?(path: string, owner: string, group: string): Promise<void>;
+
   joinPath(parent: string, name: string): string;
 }

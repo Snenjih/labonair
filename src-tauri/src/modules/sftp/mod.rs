@@ -69,6 +69,17 @@ pub enum WorkerMessage {
         resolution: String,
         new_name: Option<String>,
     },
+    /// Sent after a dual-pane SFTP tab reconnects (`sftp_disconnect` +
+    /// `sftp_connect` under the same `session_id`). Any job already running
+    /// against that session captured its `Arc<RushSession>`/`Arc<SftpSession>`
+    /// once at job start (see `get_session_and_sftp`), so it keeps limping
+    /// along against the now-dead connection instead of picking up the fresh
+    /// one — this cancels those in-flight jobs and re-enqueues equivalent
+    /// fresh jobs that will resolve the new session when they start. Queued
+    /// (not-yet-started) jobs for the same session need no action: they
+    /// resolve the session lazily at start time, so they already pick up
+    /// whatever session is current by then.
+    SessionReconnected(String),
 }
 
 pub type ConflictMap = Arc<Mutex<HashMap<String, oneshot::Sender<ConflictResolution>>>>;

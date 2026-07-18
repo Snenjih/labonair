@@ -101,6 +101,14 @@ export function createRemoteFsProvider(sessionId: string, hostId: string): FsPro
       await invoke("sftp_create_file", { sessionId, path });
     },
 
+    async chmod(path, permissions) {
+      await invoke("sftp_chmod", { sessionId, path, permissions });
+    },
+
+    async chown(path, owner, group) {
+      await invoke("sftp_chown", { sessionId, path, owner, group });
+    },
+
     async search(root, query, opts) {
       // sftp_deep_search only returns matching paths (via remote `find`), not
       // full stat info — file/dir distinction isn't available without an

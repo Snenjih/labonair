@@ -27,7 +27,8 @@ function formatDate(unixSecs: number): string {
 }
 
 // Parse octal string (e.g. "755") → 3×3 boolean matrix [owner,group,public][r,w,x]
-function octalToMatrix(oct: string): boolean[][] {
+// Exported for reuse by the sidebar explorer's minimal ChmodChownDialog.
+export function octalToMatrix(oct: string): boolean[][] {
   const n = parseInt(oct.slice(-3).padStart(3, "0"), 8);
   if (isNaN(n))
     return [
@@ -42,7 +43,7 @@ function octalToMatrix(oct: string): boolean[][] {
   ];
 }
 
-function matrixToOctal(m: boolean[][]): string {
+export function matrixToOctal(m: boolean[][]): string {
   const bits = [
     [0o400, 0o200, 0o100],
     [0o040, 0o020, 0o010],
@@ -53,19 +54,20 @@ function matrixToOctal(m: boolean[][]): string {
   return n.toString(8).padStart(3, "0");
 }
 
+// Parse a 9-char rwxr-xr-x style permission string → octal string.
+// Exported for reuse by the sidebar explorer's minimal ChmodChownDialog.
+export function permStringToOctal(perm: string): string {
+  const chars = perm.slice(0, 9).padEnd(9, "-");
+  let n = 0;
+  const weights = [0o400, 0o200, 0o100, 0o040, 0o020, 0o010, 0o004, 0o002, 0o001];
+  for (let i = 0; i < 9; i++) if (chars[i] !== "-") n |= weights[i];
+  return n.toString(8).padStart(3, "0");
+}
+
 export function PropertiesDialog({ open, onClose, file, tabId }: PropertiesDialogProps) {
   const [calculatedSize, setCalculatedSize] = useState<string | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [sizeError, setSizeError] = useState<string | null>(null);
-
-  // Permissions state
-  function permStringToOctal(perm: string): string {
-    const chars = perm.slice(0, 9).padEnd(9, "-");
-    let n = 0;
-    const weights = [0o400, 0o200, 0o100, 0o040, 0o020, 0o010, 0o004, 0o002, 0o001];
-    for (let i = 0; i < 9; i++) if (chars[i] !== "-") n |= weights[i];
-    return n.toString(8).padStart(3, "0");
-  }
 
   const [octalInput, setOctalInput] = useState(() => permStringToOctal(file.permissions ?? ""));
   const [matrix, setMatrix] = useState<boolean[][]>(() =>
