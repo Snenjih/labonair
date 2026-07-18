@@ -14,7 +14,6 @@ import {
   setSessionRestore,
   setSessionScrollbackLines,
   setStartupTerminalCount,
-  setVimMode,
   setReduceMotion,
   setNewTabInheritsCwd,
   setConfirmCloseTerminalTab,
@@ -95,7 +94,6 @@ export function GeneralSection() {
   const sessionScrollbackLines = usePreferencesStore((s) => s.sessionScrollbackLines);
   const scrollbackMaxSizeMb = usePreferencesStore((s) => s.scrollbackMaxSizeMb);
   const scrollbackRetentionDays = usePreferencesStore((s) => s.scrollbackRetentionDays);
-  const vimMode = usePreferencesStore((s) => s.vimMode);
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
   const startupTerminalCount = usePreferencesStore((s) => s.startupTerminalCount);
@@ -242,13 +240,6 @@ export function GeneralSection() {
             </button>
           ))}
         </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>Editor</Label>
-        <SettingRow title="Vim mode" description="Enable Vim keybindings in the code editor.">
-          <Switch checked={vimMode} onCheckedChange={(v) => void setVimMode(v)} />
-        </SettingRow>
       </div>
 
       <div className="flex flex-col gap-2">

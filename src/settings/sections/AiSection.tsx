@@ -37,7 +37,6 @@ import {
   setAutocompleteProvider,
   setCustomInstructions,
   setDefaultModel,
-  setShowEditPrediction,
   setAiEnabled,
   setAiWarnDestructiveCommands,
   setAiMaxAgentSteps,
@@ -181,7 +180,6 @@ function DefaultsContent() {
 
   const handleAutocompleteToggle = (v: boolean) => {
     void setAutocompleteEnabled(v);
-    void setShowEditPrediction(v);
   };
 
   const onAutocompleteProviderChange = (next: AutocompleteProviderId) => {

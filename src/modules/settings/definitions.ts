@@ -7,6 +7,7 @@ export type SettingCategory =
   | "Editor"
   | "Command Palette"
   | "File Manager"
+  | "Source Control"
   | "AI"
   | "Directives"
   | "About";
@@ -41,9 +42,32 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "Switch",
   },
   {
-    id: "vimMode",
-    label: "Vim mode",
-    description: "Enable Vim keybindings in the code editor.",
+    id: "sessionRestore",
+    label: "Session restore",
+    description:
+      "Reopen all tabs, SSH connections, SFTP paths, and editor files on the next launch. Periodically auto-saved.",
+    category: "General",
+    controlType: "Switch",
+  },
+  {
+    id: "sessionScrollbackLines",
+    label: "Scrollback history",
+    description: "How many lines of terminal output to save and restore per session.",
+    category: "General",
+    controlType: "Select",
+    options: [
+      { value: "200", label: "200 lines" },
+      { value: "500", label: "500 lines" },
+      { value: "1000", label: "1 000 lines" },
+      { value: "2000", label: "2 000 lines" },
+      { value: "5000", label: "5 000 lines" },
+      { value: "0", label: "Full scrollback" },
+    ],
+  },
+  {
+    id: "checkForUpdates",
+    label: "Check for updates on launch",
+    description: "Show an update button in the titlebar when a new version is available.",
     category: "General",
     controlType: "Switch",
   },
@@ -90,6 +114,50 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
       { value: "90", label: "90 days" },
       { value: "365", label: "1 year" },
     ],
+  },
+  {
+    id: "credentialEncryption",
+    label: "Encrypt stored credentials",
+    description:
+      "Credentials are encrypted on disk using an app-managed AES-256-GCM key. No master password required — encryption and decryption happen automatically.",
+    category: "General",
+    controlType: "Switch",
+  },
+  {
+    id: "confirmQuitWithSsh",
+    label: "Confirm quit with active SSH connections",
+    description: "Show a confirmation dialog before closing the app when SSH sessions are open.",
+    category: "General",
+    controlType: "Switch",
+  },
+  {
+    id: "newTabInheritsCwd",
+    label: "New tab inherits current directory",
+    description:
+      "Open new terminal tabs in the working directory of the active tab instead of the home directory.",
+    category: "General",
+    controlType: "Switch",
+  },
+  {
+    id: "confirmCloseTerminalTab",
+    label: "Confirm before closing terminal tab",
+    description: "Show a confirmation dialog when closing a terminal tab with a running shell.",
+    category: "General",
+    controlType: "Switch",
+  },
+  {
+    id: "reduceMotion",
+    label: "Reduce motion",
+    description: "Disable all UI animations. Useful for motion sensitivity or older hardware.",
+    category: "General",
+    controlType: "Switch",
+  },
+  {
+    id: "notifyOnErrors",
+    label: "Notify on errors",
+    description: "Show a notification whenever an error occurs. Disabled by default.",
+    category: "General",
+    controlType: "Switch",
   },
 
   // --- Appearance ---
@@ -238,6 +306,79 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     description: "Line height multiplier for the application interface.",
     category: "Appearance",
     controlType: "NumberInput",
+  },
+  {
+    id: "backgroundImage",
+    label: "Background image",
+    description: "The wallpaper image displayed behind the app UI.",
+    category: "Appearance",
+    controlType: "Input",
+  },
+  {
+    id: "backgroundOpacity",
+    label: "Wallpaper opacity",
+    description: "Higher values reveal more of the background.",
+    category: "Appearance",
+    controlType: "NumberInput",
+  },
+  {
+    id: "backgroundBlur",
+    label: "Image blur",
+    description: "Gaussian blur applied to the wallpaper.",
+    category: "Appearance",
+    controlType: "NumberInput",
+  },
+  {
+    id: "backgroundTintColor",
+    label: "Tint color",
+    description: "Pick the overlay color.",
+    category: "Appearance",
+    controlType: "Input",
+  },
+  {
+    id: "backgroundTintOpacity",
+    label: "Color tint",
+    description: "Overlay color blended on top of the background image.",
+    category: "Appearance",
+    controlType: "NumberInput",
+  },
+  {
+    id: "zenModeShowHeader",
+    label: "Show header bar",
+    description: "Display the header bar with tabs and window controls. Hide it to maximise vertical space.",
+    category: "Appearance",
+    controlType: "Switch",
+  },
+  {
+    id: "zenModeShowStatusbar",
+    label: "Show status bar",
+    description: "Display the status bar at the bottom. Hide it to maximise vertical space.",
+    category: "Appearance",
+    controlType: "Switch",
+  },
+  {
+    id: "titlebarsIconsPosition",
+    label: "Titlebar icons position",
+    description:
+      "Follows platform conventions — right side on macOS (traffic lights occupy the left) and on Windows (before the window controls).",
+    category: "Appearance",
+    controlType: "Select",
+    options: [
+      { value: "auto", label: "Auto" },
+      { value: "left", label: "Left" },
+      { value: "right", label: "Right" },
+    ],
+  },
+  {
+    id: "tabsLocation",
+    label: "Tab bar location",
+    description: "Display the tab bar in the titlebar or move it into the sidebar panel.",
+    category: "Appearance",
+    controlType: "Select",
+    options: [
+      { value: "titlebar", label: "Titlebar" },
+      { value: "sidebar", label: "Sidebar" },
+    ],
   },
 
   // --- Terminal ---
@@ -389,8 +530,112 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "Terminal",
     controlType: "NumberInput",
   },
+  {
+    id: "terminalShowPaneHeader",
+    label: "Show pane headers",
+    description: "Display a header bar above each terminal pane in split-pane workspaces.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "terminalShowPaneFooter",
+    label: "Show pane footer",
+    description: "Display a bottom margin below each terminal workspace.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "terminalUseWebGL",
+    label: "Use WebGL renderer",
+    description:
+      "Accelerates terminal rendering using your GPU. Turn off if terminal text flickers, appears blurry, or causes graphics issues. Applies to new terminal sessions.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "terminalShell",
+    label: "Shell path",
+    description:
+      "Full path to the shell binary. Leave empty to use the system default ($SHELL). Applies to new terminal sessions.",
+    category: "Terminal",
+    controlType: "Input",
+  },
+  {
+    id: "terminalDefaultPath",
+    label: "Default working directory",
+    description:
+      "Path opened when a new terminal tab starts. Leave empty to use $HOME. Ignored when 'Inherit cwd from current tab' is enabled.",
+    category: "Terminal",
+    controlType: "Input",
+  },
+  {
+    id: "terminalCopyOnSelect",
+    label: "Copy on select",
+    description: "Automatically copy selected text to the clipboard.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "terminalRightClickPastes",
+    label: "Right-click pastes",
+    description: "Paste clipboard content on right-click instead of showing a context menu.",
+    category: "Terminal",
+    controlType: "Switch",
+  },
+  {
+    id: "terminalWordSeparator",
+    label: "Word separators",
+    description: "Characters treated as word boundaries when double-clicking to select.",
+    category: "Terminal",
+    controlType: "Input",
+  },
+  {
+    id: "terminalScrollSensitivity",
+    label: "Scroll sensitivity",
+    description: "Number of lines scrolled per mouse wheel tick.",
+    category: "Terminal",
+    controlType: "NumberInput",
+  },
+  {
+    id: "terminalFastScrollModifier",
+    label: "Fast scroll modifier",
+    description: "Hold this key to scroll faster. Applies to new terminal sessions.",
+    category: "Terminal",
+    controlType: "Select",
+    options: [
+      { value: "none", label: "None" },
+      { value: "alt", label: "Alt" },
+      { value: "ctrl", label: "Ctrl" },
+      { value: "shift", label: "Shift" },
+    ],
+  },
 
   // --- Editor ---
+  {
+    id: "vimMode",
+    label: "Vim mode",
+    description: "Enable Vim keybindings in the code editor.",
+    category: "Editor",
+    controlType: "Switch",
+  },
+  {
+    id: "editorTheme",
+    label: "Syntax theme",
+    description: "Syntax highlighting color theme for the code editor.",
+    category: "Editor",
+    controlType: "Select",
+    options: [
+      { value: "atomone", label: "Atom One" },
+      { value: "aura", label: "Aura" },
+      { value: "copilot", label: "Copilot" },
+      { value: "github-dark", label: "GitHub Dark" },
+      { value: "github-light", label: "GitHub Light" },
+      { value: "nord", label: "Nord" },
+      { value: "tokyo-night", label: "Tokyo Night" },
+      { value: "xcode-dark", label: "Xcode Dark" },
+      { value: "xcode-light", label: "Xcode Light" },
+    ],
+  },
   {
     id: "editorFontFamily",
     label: "Editor font family",
@@ -446,6 +691,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     ],
   },
   {
+    id: "editorAutoSaveDelay",
+    label: "Auto save delay",
+    description: "Milliseconds of inactivity before the file is auto-saved (100 – 60 000 ms).",
+    category: "Editor",
+    controlType: "NumberInput",
+  },
+  {
     id: "editorTabSize",
     label: "Tab size",
     description: "Number of spaces per indentation level.",
@@ -475,6 +727,42 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "editorBracketMatching",
     label: "Bracket matching",
     description: "Highlight matching brackets and parentheses.",
+    category: "Editor",
+    controlType: "Switch",
+  },
+  {
+    id: "editorShowCursorPosition",
+    label: "Cursor position",
+    description: "Display the current line and column in the status bar while editing.",
+    category: "Editor",
+    controlType: "Switch",
+  },
+  {
+    id: "editorShowSelectionStats",
+    label: "Selection stats",
+    description: "Show selected character and line count in the editor toolbar.",
+    category: "Editor",
+    controlType: "Switch",
+  },
+  {
+    id: "editorShowOutline",
+    label: "Outline panel",
+    description: "Show a document outline panel with headings and symbol names.",
+    category: "Editor",
+    controlType: "Switch",
+  },
+  {
+    id: "editorFormatOnSave",
+    label: "Format on Save",
+    description:
+      "Automatically format the document with Prettier when saving (Cmd+S). Also triggered by Cmd+Shift+F.",
+    category: "Editor",
+    controlType: "Switch",
+  },
+  {
+    id: "editorIndentationGuides",
+    label: "Indentation guides",
+    description: "Show vertical guide lines at each indentation level.",
     category: "Editor",
     controlType: "Switch",
   },
@@ -574,7 +862,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "sftpOnFolderFileError",
     label: "On file error in folder transfers",
     description:
-      "What to do when an individual file fails during a folder transfer. \"Always ask\" shows the failing file and lets you abort, skip it, or skip all remaining errors in that transfer.",
+      'What to do when an individual file fails during a folder transfer. "Always ask" shows the failing file and lets you abort, skip it, or skip all remaining errors in that transfer.',
     category: "File Manager",
     controlType: "Select",
     options: [
@@ -582,14 +870,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
       { value: "skip", label: "Always skip" },
       { value: "abort", label: "Always abort" },
     ],
-  },
-  {
-    id: "gitStatusPollIntervalMs",
-    label: "Source Control refresh interval",
-    description:
-      "How often Source Control polls for status changes (in ms). Remote repositories over SSH automatically use a longer effective interval since each check is a network round-trip.",
-    category: "File Manager",
-    controlType: "NumberInput",
   },
   {
     id: "explorerShowHiddenByDefault",
@@ -662,6 +942,16 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     ],
   },
 
+  // --- Source Control ---
+  {
+    id: "gitStatusPollIntervalMs",
+    label: "Source Control refresh interval",
+    description:
+      "How often Source Control polls for status changes (in ms). Remote repositories over SSH automatically use a longer effective interval since each check is a network round-trip.",
+    category: "Source Control",
+    controlType: "NumberInput",
+  },
+
   // --- AI ---
   {
     id: "aiEnabled",
@@ -671,11 +961,11 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "Switch",
   },
   {
-    id: "showEditPrediction",
-    label: "Show edit completion",
-    description: "Show inline ghost-text edit predictions in the code editor.",
+    id: "defaultModelId",
+    label: "Default model",
+    description: "The model used by default for new AI chat sessions.",
     category: "AI",
-    controlType: "Switch",
+    controlType: "Select",
   },
   {
     id: "autocompleteEnabled",
@@ -683,6 +973,86 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     description: "Enable ultra-fast inline suggestions powered by Cerebras, Groq, or a local model.",
     category: "AI",
     controlType: "Switch",
+  },
+  {
+    id: "autocompleteProvider",
+    label: "Autocomplete provider",
+    description: "Which provider powers inline editor autocomplete suggestions.",
+    category: "AI",
+    controlType: "Select",
+  },
+  {
+    id: "autocompleteModelId",
+    label: "Autocomplete model ID",
+    description: "The model ID used for editor autocomplete requests to the selected provider.",
+    category: "AI",
+    controlType: "Input",
+  },
+  {
+    id: "lmstudioBaseURL",
+    label: "LM Studio: Base URL",
+    description: "URL of your local LM Studio HTTP server (Developer tab → Enable server).",
+    category: "AI",
+    controlType: "Input",
+  },
+  {
+    id: "lmstudioChatModelId",
+    label: "LM Studio: Model ID",
+    description:
+      "The model ID loaded in LM Studio, used for AI chat when LM Studio is the selected provider.",
+    category: "AI",
+    controlType: "Input",
+  },
+  {
+    id: "openaiCompatibleBaseURL",
+    label: "OpenAI-compatible: Base URL",
+    description: "Any OpenAI-compatible HTTPS endpoint — vLLM, Z.AI, Fireworks, hosted Ollama, etc.",
+    category: "AI",
+    controlType: "Input",
+  },
+  {
+    id: "openaiCompatibleModelId",
+    label: "OpenAI-compatible: Model ID",
+    description: "The model ID to request from the configured OpenAI-compatible endpoint.",
+    category: "AI",
+    controlType: "Input",
+  },
+  {
+    id: "customInstructions",
+    label: "Custom instructions",
+    description: "Personal instructions appended to Labonair's system prompt for every AI conversation.",
+    category: "AI",
+    controlType: "Input",
+  },
+  {
+    id: "aiWarnDestructiveCommands",
+    label: "Warn on destructive commands",
+    description:
+      "Show an amber warning badge on the approval card when the AI tries to run rm -rf, DROP TABLE, git reset --hard, or similar.",
+    category: "AI",
+    controlType: "Switch",
+  },
+  {
+    id: "aiMaxAgentSteps",
+    label: "Max agent steps",
+    description:
+      "Maximum number of tool-use steps the agent may take before stopping. Lower = faster, more predictable. Higher = can handle complex multi-step tasks.",
+    category: "AI",
+    controlType: "NumberInput",
+  },
+  {
+    id: "aiTemperature",
+    label: "Temperature",
+    description: "Controls response creativity. 0.0 = deterministic, 1.0 = more varied. Default 0.7.",
+    category: "AI",
+    controlType: "NumberInput",
+  },
+  {
+    id: "aiTerminalContextLines",
+    label: "Terminal context lines",
+    description: "How many lines of terminal output are sent to the AI with each message.",
+    category: "AI",
+    controlType: "NumberInput",
   },
   {
     id: "aiShellMaxTimeoutSecs",
@@ -707,6 +1077,7 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Editor",
   "Command Palette",
   "File Manager",
+  "Source Control",
   "AI",
   "Directives",
   "About",

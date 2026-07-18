@@ -184,7 +184,14 @@ export function SettingsApp() {
         <main className="flex min-w-0 flex-1 flex-col overflow-y-auto px-8 pt-6 pb-7">
           <div className={cn("mx-auto w-full", active === "themes" ? "max-w-[680px]" : "max-w-[580px]")}>
             {isSearching ? (
-              <SearchResults query={trimmed} results={searchResults} />
+              <SearchResults
+                query={trimmed}
+                results={searchResults}
+                onNavigateToThemes={() => {
+                  setActive("themes");
+                  setSearchQuery("");
+                }}
+              />
             ) : (
               <>
                 {active === "general" && <GeneralSection />}
@@ -275,9 +282,6 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "aiEnabled":
       void store.setAiEnabled(value as boolean);
       break;
-    case "showEditPrediction":
-      void store.setShowEditPrediction(value as boolean);
-      break;
     case "autocompleteEnabled":
       void store.setAutocompleteEnabled(value as boolean);
       break;
@@ -359,9 +363,11 @@ function applySettingChange(id: PrefKey, value: unknown): void {
 function SearchResults({
   query,
   results,
+  onNavigateToThemes,
 }: {
   query: string;
   results: ReturnType<typeof SETTING_DEFINITIONS.filter>;
+  onNavigateToThemes: () => void;
 }) {
   const prefs = usePrefs();
 
@@ -414,6 +420,19 @@ function SearchResults({
                         ))}
                       </SelectContent>
                     </Select>
+                  </SettingRow>
+                );
+              }
+              if (def.controlType === "Custom") {
+                return (
+                  <SettingRow key={def.id} title={def.label} description={def.description}>
+                    <button
+                      type="button"
+                      onClick={onNavigateToThemes}
+                      className="text-[11.5px] text-foreground underline underline-offset-2 hover:text-muted-foreground"
+                    >
+                      Open in Themes
+                    </button>
                   </SettingRow>
                 );
               }
