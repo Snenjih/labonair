@@ -137,14 +137,28 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     }
   }, [tabId, tabState?.disconnected, tabState?.disconnectReason]);
 
+  /** Selecting in one pane clears any selection in the other — the two
+   *  panes act as a single mutually-exclusive selection for bulk actions
+   *  (matches conventional dual-pane file managers), rather than letting
+   *  independent local + remote selections coexist. */
+  function selectLocalPaths(paths: Set<string>) {
+    setSelectedLocal(tabId, paths);
+    if (tabState?.selectedRemotePaths.size) setSelectedRemote(tabId, new Set());
+  }
+
+  function selectRemotePaths(paths: Set<string>) {
+    setSelectedRemote(tabId, paths);
+    if (tabState?.selectedLocalPaths.size) setSelectedLocal(tabId, new Set());
+  }
+
   function handleLocalSelect(path: string, multi: boolean) {
     const current = tabState?.selectedLocalPaths ?? new Set<string>();
     if (multi) {
       const next = new Set(current);
       next.has(path) ? next.delete(path) : next.add(path);
-      setSelectedLocal(tabId, next);
+      selectLocalPaths(next);
     } else {
-      setSelectedLocal(tabId, new Set([path]));
+      selectLocalPaths(new Set([path]));
     }
   }
 
@@ -153,9 +167,9 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     if (multi) {
       const next = new Set(current);
       next.has(path) ? next.delete(path) : next.add(path);
-      setSelectedRemote(tabId, next);
+      selectRemotePaths(next);
     } else {
-      setSelectedRemote(tabId, new Set([path]));
+      selectRemotePaths(new Set([path]));
     }
   }
 
@@ -167,9 +181,9 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     const files = side === "local" ? displayedLocalFiles : displayedRemoteFiles;
     const paths = new Set(files.filter((f) => f.name !== "..").map((f) => f.path));
     if (side === "local") {
-      setSelectedLocal(tabId, paths);
+      selectLocalPaths(paths);
     } else {
-      setSelectedRemote(tabId, paths);
+      selectRemotePaths(paths);
     }
   }
 
@@ -572,7 +586,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                     onMarqueeSelect={(paths, additive) => {
                       const base = additive ? new Set(tabState?.selectedLocalPaths) : new Set<string>();
                       paths.forEach((p) => base.add(p));
-                      setSelectedLocal(tabId, base);
+                      selectLocalPaths(base);
                     }}
                     draggable
                     onDragStart={(paths) => startDrag("local", paths)}
@@ -708,7 +722,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                       onMarqueeSelect={(paths, additive) => {
                         const base = additive ? new Set(tabState?.selectedRemotePaths) : new Set<string>();
                         paths.forEach((p) => base.add(p));
-                        setSelectedRemote(tabId, base);
+                        selectRemotePaths(base);
                       }}
                       draggable
                       onDragStart={(paths) => startDrag("remote", paths)}
