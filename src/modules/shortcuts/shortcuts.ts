@@ -18,6 +18,7 @@ export type ShortcutId =
   | "pane.splitRight"
   | "pane.splitDown"
   | "pane.close"
+  | "pane.focusNext"
   | "search.focus"
   | "ai.toggle"
   | "ai.askSelection"
@@ -130,6 +131,13 @@ export const SHORTCUTS: Shortcut[] = [
     keys: ["⌘", "⇧", "W"],
     group: "Tabs",
     match: (e) => isMod(e) && e.shiftKey && e.key.toLowerCase() === "w",
+  },
+  {
+    id: "pane.focusNext",
+    label: "Focus next pane",
+    keys: ["⌘", "]"],
+    group: "Tabs",
+    match: (e) => isMeta(e) && !e.shiftKey && e.key === "]",
   },
   {
     id: "search.focus",
