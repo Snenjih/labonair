@@ -3,18 +3,21 @@ use std::process::Stdio;
 use std::sync::{Arc, RwLock};
 use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::Mutex as AsyncMutex;
 
 /// Tracks in-flight snippet runs so `snippet_run_cancel` can reach back into
-/// them — local runs by their `tokio::process::Child` handle, SSH runs by the
-/// split-off write half of their exec channel (same `Arc<ChannelWriteHalf<..>>`,
-/// no-lock-needed shape as `ssh::PtyChannelState`, since all of its methods
-/// take `&self`). `cancelled` records which `run_id`s were cancelled so the
-/// owning task can report a distinct "cancelled" outcome instead of treating
-/// the resulting kill/close as a plain failure.
+/// them — local runs by PID (see the doc comment on `snippet_run_cancel` for
+/// why this signals by PID rather than locking a shared `Child` handle), SSH
+/// runs by the split-off write half of their exec channel (same
+/// `Arc<ChannelWriteHalf<..>>`, no-lock-needed shape as `ssh::PtyChannelState`,
+/// since all of its methods take `&self`). `cancelled` records which
+/// `run_id`s were cancelled so the owning task can report a distinct
+/// "cancelled" outcome instead of treating the resulting kill/close as a
+/// plain failure — only ever inserted *after* a cancel attempt is confirmed
+/// to have actually reached a still-running process/channel, so a cancel
+/// racing a process's own natural exit can't mislabel a successful run.
 #[derive(Default)]
 pub struct SnippetRunState {
-    local: RwLock<HashMap<String, Arc<AsyncMutex<tokio::process::Child>>>>,
+    local_pids: RwLock<HashMap<String, u32>>,
     ssh: RwLock<HashMap<String, Arc<russh::ChannelWriteHalf<russh::client::Msg>>>>,
     cancelled: RwLock<HashSet<String>>,
 }
@@ -24,22 +27,45 @@ pub struct SnippetRunState {
 /// channel, whichever is registered under `run_id`. The owning command
 /// notices the resulting exit/close and emits `snippet_run_done` with
 /// `cancelled: true` so the frontend can show a distinct "Cancelled" status.
+///
+/// The local case signals the process directly by PID rather than going
+/// through `Child::kill()`/`start_kill()`, which needs `&mut Child` — and
+/// `snippet_run_local`'s owning task holds `wait()` open on that same child
+/// for as long as the process runs. Requiring a lock here would mean cancel
+/// can't act until the process exits on its own, which is exactly what
+/// cancel is trying to make happen (the identical deadlock class already
+/// documented and fixed in `shell/background.rs`'s `BackgroundProc::kill`).
 #[tauri::command]
 pub async fn snippet_run_cancel(
     run_id: String,
     state: tauri::State<'_, SnippetRunState>,
 ) -> Result<(), String> {
-    let local_child = state.local.read().unwrap().get(&run_id).cloned();
-    if let Some(child) = local_child {
-        state.cancelled.write().unwrap().insert(run_id);
-        child.lock().await.start_kill().map_err(|e| e.to_string())?;
+    let local_pid = state.local_pids.read().unwrap().get(&run_id).copied();
+    if let Some(pid) = local_pid {
+        // SAFETY: `pid` came from `Child::id()` at spawn time; `kill(2)` with
+        // a stale/reused pid is a normal, safe (if rare) race — checked via
+        // the return value below rather than assumed away.
+        let killed = unsafe { libc::kill(pid as libc::pid_t, libc::SIGKILL) };
+        if killed == 0 {
+            // Signal actually reached a live process — genuinely our cancel,
+            // not a race against a natural exit that already happened.
+            state.cancelled.write().unwrap().insert(run_id);
+            return Ok(());
+        }
+        // ESRCH (no such process) means it already exited naturally before
+        // the signal was sent — let the real exit code stand, don't mark
+        // this a cancellation.
         return Ok(());
     }
 
     let ssh_write_half = state.ssh.read().unwrap().get(&run_id).cloned();
     if let Some(write_half) = ssh_write_half {
-        state.cancelled.write().unwrap().insert(run_id);
+        // Same natural-completion race as the local path: only mark
+        // cancelled if this call is the one that actually closed the
+        // channel, not one that raced a channel already closed by the
+        // command finishing on its own.
         write_half.close().await.map_err(|e| e.to_string())?;
+        state.cancelled.write().unwrap().insert(run_id);
         return Ok(());
     }
 
@@ -76,8 +102,13 @@ pub async fn snippet_run_local(
     let stdout = child.stdout.take().map(BufReader::new);
     let stderr = child.stderr.take().map(BufReader::new);
 
-    let child = Arc::new(AsyncMutex::new(child));
-    state.local.write().unwrap().insert(run_id.clone(), child.clone());
+    // Registered by PID only (see `snippet_run_cancel`'s doc comment) — this
+    // task keeps sole, unshared ownership of `child` for its `wait()` below,
+    // so no lock is needed here at all, and none is available for cancel to
+    // contend with.
+    if let Some(pid) = child.id() {
+        state.local_pids.write().unwrap().insert(run_id.clone(), pid);
+    }
 
     let app_out = app.clone();
     let run_id_out = run_id.clone();
@@ -113,15 +144,9 @@ pub async fn snippet_run_local(
 
     let _ = tokio::join!(out_task, err_task);
 
-    let exit_code = child
-        .lock()
-        .await
-        .wait()
-        .await
-        .map(|s| s.code().unwrap_or(-1))
-        .unwrap_or(-1);
+    let exit_code = child.wait().await.map(|s| s.code().unwrap_or(-1)).unwrap_or(-1);
 
-    state.local.write().unwrap().remove(&run_id);
+    state.local_pids.write().unwrap().remove(&run_id);
     let cancelled = state.cancelled.write().unwrap().remove(&run_id);
 
     let _ = app.emit(

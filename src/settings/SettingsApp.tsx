@@ -357,6 +357,87 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "terminalBlocksAutoCollapseOnAltScreen":
       void store.setTerminalBlocksAutoCollapseOnAltScreen(value as boolean);
       break;
+    case "sessionRestore":
+      void store.setSessionRestore(value as boolean);
+      break;
+    case "sessionScrollbackLines":
+      void store.setSessionScrollbackLines(Number(value));
+      break;
+    case "checkForUpdates":
+      void store.setCheckForUpdates(value as boolean);
+      break;
+    case "credentialEncryption":
+      void store.setCredentialEncryption(value as boolean);
+      break;
+    case "confirmQuitWithSsh":
+      void store.setConfirmQuitWithSsh(value as boolean);
+      break;
+    case "newTabInheritsCwd":
+      void store.setNewTabInheritsCwd(value as boolean);
+      break;
+    case "confirmCloseTerminalTab":
+      void store.setConfirmCloseTerminalTab(value as boolean);
+      break;
+    case "reduceMotion":
+      void store.setReduceMotion(value as boolean);
+      break;
+    case "notifyOnErrors":
+      void store.setNotifyOnErrors(value as boolean);
+      break;
+    case "zenModeShowHeader":
+      void store.setZenModeShowHeader(value as boolean);
+      break;
+    case "zenModeShowStatusbar":
+      void store.setZenModeShowStatusbar(value as boolean);
+      break;
+    case "titlebarsIconsPosition":
+      void store.setTitlebarsIconsPosition(value as "auto" | "left" | "right");
+      break;
+    case "tabsLocation":
+      void store.setTabsLocation(value as "titlebar" | "sidebar");
+      break;
+    case "terminalShowPaneHeader":
+      void store.setTerminalShowPaneHeader(value as boolean);
+      break;
+    case "terminalShowPaneFooter":
+      void store.setTerminalShowPaneFooter(value as boolean);
+      break;
+    case "terminalUseWebGL":
+      void store.setTerminalUseWebGL(value as boolean);
+      break;
+    case "terminalCopyOnSelect":
+      void store.setTerminalCopyOnSelect(value as boolean);
+      break;
+    case "terminalRightClickPastes":
+      void store.setTerminalRightClickPastes(value as boolean);
+      break;
+    case "terminalFastScrollModifier":
+      void store.setTerminalFastScrollModifier(value as "none" | "alt" | "ctrl" | "shift");
+      break;
+    case "editorTheme":
+      void store.setEditorTheme(value as store.EditorThemeId);
+      break;
+    case "editorShowCursorPosition":
+      void store.setEditorShowCursorPosition(value as boolean);
+      break;
+    case "editorShowSelectionStats":
+      void store.setEditorShowSelectionStats(value as boolean);
+      break;
+    case "editorShowOutline":
+      void store.setEditorShowOutline(value as boolean);
+      break;
+    case "editorFormatOnSave":
+      void store.setEditorFormatOnSave(value as boolean);
+      break;
+    case "editorIndentationGuides":
+      void store.setEditorIndentationGuides(value as boolean);
+      break;
+    case "autocompleteProvider":
+      void store.setAutocompleteProvider(value as "cerebras" | "groq" | "lmstudio" | "openai-compatible");
+      break;
+    case "aiWarnDestructiveCommands":
+      void store.setAiWarnDestructiveCommands(value as boolean);
+      break;
   }
 }
 

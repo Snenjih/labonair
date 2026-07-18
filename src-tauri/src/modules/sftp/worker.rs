@@ -453,6 +453,16 @@ async fn walk_remote_tree(
 ) -> Result<Vec<TreeEntry>, String> {
     let mut out = Vec::new();
     let mut stack: Vec<(String, String)> = vec![(String::new(), root.trim_end_matches('/').to_string())];
+    // Only symlinked directories can turn this walk into a graph traversal
+    // instead of a tree one (a plain directory is visited exactly once by
+    // construction) — e.g. a symlink pointing at an ancestor of itself, a
+    // common backup-layout pattern, would otherwise grow `stack` forever
+    // since each hop produces a longer-but-distinct rel_path string that a
+    // naive "seen this exact path before" check wouldn't catch. Canonicalize
+    // (real SFTP realpath, one extra round-trip) only for the symlink case —
+    // the common no-symlinks tree still pays zero extra cost — and refuse to
+    // descend into a real target already seen during this walk.
+    let mut visited_symlink_targets: std::collections::HashSet<String> = std::collections::HashSet::new();
     while let Some((rel_prefix, abs_path)) = stack.pop() {
         let entries = sftp
             .read_dir(&abs_path)
@@ -462,18 +472,29 @@ async fn walk_remote_tree(
             let name = entry.file_name();
             let full_path = entry.path();
             let mut metadata = entry.metadata();
+            let was_symlink = metadata.is_symlink();
             // `read_dir`'s per-entry metadata is lstat-based, so a symlink
             // pointing at a directory reports `is_dir() == false` here. Follow
             // it with a real `stat()` to resolve the actual target type,
             // otherwise a symlinked subdirectory silently gets skipped/mis-typed
             // during a recursive download instead of being descended into.
-            if metadata.is_symlink() {
+            if was_symlink {
                 if let Ok(resolved) = sftp.metadata(full_path.clone()).await {
                     metadata = resolved;
                 }
             }
             let rel = if rel_prefix.is_empty() { name.clone() } else { format!("{rel_prefix}/{name}") };
             if metadata.is_dir() {
+                if was_symlink {
+                    let canonical = sftp.canonicalize(full_path.clone()).await.unwrap_or_else(|_| full_path.clone());
+                    if !visited_symlink_targets.insert(canonical) {
+                        // Omit entirely rather than adding a doomed entry —
+                        // marking it `is_dir: false` would make the transfer
+                        // loop try (and fail) an `open()` on a directory.
+                        log::warn!("[sftp/download] skipping symlink cycle at {full_path} (target already visited)");
+                        continue;
+                    }
+                }
                 out.push(TreeEntry { rel_path: rel.clone(), is_dir: true, size: 0 });
                 stack.push((rel, full_path));
             } else {

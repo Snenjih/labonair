@@ -75,9 +75,18 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
           ? "Submodule: has untracked files in its own working tree"
           : "Submodule"
     : null;
+  // Distinct badge per submodule condition, not just distinct tooltip text —
+  // commit-pointer-changed (info/blue, matches the "moved" R/C convention),
+  // dirty-worktree (warning/amber, matches the "modified" M convention), and
+  // untracked-inside (muted, matches the plain "?" convention) must be
+  // visually distinguishable at a glance, not collapse into one gray "S".
   const statusChar = file.submodule ? "S" : rawStatusChar;
   const statusColor = file.submodule
-    ? "bg-info/20 text-info"
+    ? file.submodule.commitChanged
+      ? "bg-info/20 text-info"
+      : file.submodule.modified
+        ? "bg-warning/20 text-warning"
+        : "bg-muted/80 text-muted-foreground"
     : (STATUS_COLORS[rawStatusChar] ?? "bg-muted/80 text-muted-foreground/60");
 
   const stat =

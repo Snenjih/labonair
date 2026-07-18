@@ -961,13 +961,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "Switch",
   },
   {
-    id: "defaultModelId",
-    label: "Default model",
-    description: "The model used by default for new AI chat sessions.",
-    category: "AI",
-    controlType: "Select",
-  },
-  {
     id: "autocompleteEnabled",
     label: "Editor autocomplete",
     description: "Enable ultra-fast inline suggestions powered by Cerebras, Groq, or a local model.",

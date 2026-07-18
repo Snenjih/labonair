@@ -53,7 +53,16 @@ export function useSnippetExec({
 
   const promptForHost = useCallback((snippetName: string): Promise<string | null> => {
     return new Promise((resolve) => {
-      setHostPickerRequest({ snippetName, resolve });
+      // A second snippet run starting its own host prompt while an earlier
+      // one is still awaiting an answer would otherwise silently replace
+      // this single-slot request — orphaning the earlier run's `await`
+      // forever (no error, no timeout, nothing the user could act on).
+      // Resolving the stale one as cancelled first means the earlier run
+      // aborts cleanly instead of hanging indefinitely.
+      setHostPickerRequest((prev) => {
+        prev?.resolve(null);
+        return { snippetName, resolve };
+      });
     });
   }, []);
 
@@ -82,7 +91,13 @@ export function useSnippetExec({
   const promptForVariables = useCallback(
     (snippetName: string, variables: SnippetVariable[]): Promise<Record<string, string> | null> => {
       return new Promise((resolve) => {
-        setVariablePromptRequest({ snippetName, variables, resolve });
+        // Same stale-request hazard as promptForHost above — resolve any
+        // still-pending variable prompt as cancelled before replacing it,
+        // so an earlier run can never hang forever on an orphaned promise.
+        setVariablePromptRequest((prev) => {
+          prev?.resolve(null);
+          return { snippetName, variables, resolve };
+        });
       });
     },
     [],
