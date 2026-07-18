@@ -162,8 +162,8 @@ impl russh::client::Handler for ClientHandler {
                 log_step!(self.app, self.session_id, format!("Host key mismatch! Fingerprint: {}", fingerprint));
                 if self.fail_fast_untrusted_host {
                     return Err(ClientHandlerError::Other(format!(
-                        "host key mismatch for {} — open a terminal tab to this host to verify and trust its new fingerprint",
-                        self.host_address
+                        "host key mismatch for {} — fingerprint: {} — open a terminal tab to this host to verify and trust its new fingerprint",
+                        self.host_address, fingerprint
                     )));
                 }
                 self.app
@@ -189,8 +189,8 @@ impl russh::client::Handler for ClientHandler {
                 log_step!(self.app, self.session_id, format!("Unknown host — fingerprint: {}", fingerprint));
                 if self.fail_fast_untrusted_host {
                     return Err(ClientHandlerError::Other(format!(
-                        "host key not yet trusted for {} — open a terminal tab to this host to verify and trust its fingerprint",
-                        self.host_address
+                        "host key not yet trusted for {} — fingerprint: {} — open a terminal tab to this host to verify and trust its fingerprint",
+                        self.host_address, fingerprint
                     )));
                 }
                 self.app
@@ -860,6 +860,173 @@ pub(crate) async fn establish_authenticated_session(
         password, passphrase, trust_state, app, fail_fast_untrusted_host,
         Arc::new(std::sync::Mutex::new(None)),
     ).await
+}
+
+/// Outcome of `ssh_test_connection`. An unknown/changed host key is reported
+/// as an informational variant rather than an error — testing a connection
+/// must never silently trust-on-first-use (or otherwise auto-accept) a host
+/// key as a side effect; that's a deliberate, visible action the user takes
+/// via the real connect flow's trust dialog.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum TestConnectionResult {
+    /// Transport connected and authentication succeeded.
+    Success,
+    /// First-time connection — this host's key isn't in `known_hosts` yet.
+    UnknownHostKey { fingerprint: String },
+    /// The host's key differs from the one stored in `known_hosts`.
+    HostKeyChanged { fingerprint: String },
+}
+
+/// Pulls the `fingerprint: <fp>` token out of one of `check_server_key`'s
+/// fail-fast error messages (see its `fail_fast_untrusted_host` branches
+/// above). The fingerprint itself is colon-separated hex with no whitespace,
+/// so the first whitespace-delimited token after the marker is the value.
+fn extract_fingerprint(msg: &str) -> Option<String> {
+    msg.split("fingerprint: ")
+        .nth(1)
+        .and_then(|rest| rest.split_whitespace().next())
+        .map(|s| s.to_string())
+}
+
+/// Pure connectivity + authentication check for a saved host. Reuses the
+/// exact same building blocks `ssh_connect_async` uses *before* it ever
+/// opens a shell channel or registers a session — `connect_transport_maybe_via_jump`
+/// then `establish_authenticated_session_from_stream` — called directly here
+/// instead of through the full connect flow, so this never opens a PTY
+/// channel and never inserts anything into `SshState`. On success the
+/// authenticated handle is disconnected immediately; nothing usable is left
+/// behind.
+///
+/// Always runs with `fail_fast_untrusted_host = true`: there is no
+/// interactive tab/trust dialog backing a test call, so an unknown or
+/// changed host key is reported back as an informational
+/// `TestConnectionResult` variant instead of hanging on (or silently
+/// resolving) a trust prompt.
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn ssh_test_connection(
+    host_id: String,
+    passphrase: Option<String>,
+    password_override: Option<String>,
+    trust_state: tauri::State<'_, super::TrustState>,
+    hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
+    secrets: tauri::State<'_, crate::modules::secrets::SecretsState>,
+    app: tauri::AppHandle,
+    connect_timeout_secs: Option<u64>,
+) -> Result<TestConnectionResult, LabonairError> {
+    // Step 1: fetch host configuration (same shape as `ssh_connect`'s step 1).
+    let (host_address, port, username, auth_method, private_key_path, keep_alive_interval, keep_alive_tries, credential_id, jump_host_id) = {
+        let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+        conn.query_row(
+            "SELECT host_address, port, username, auth_method, private_key_path, \
+             keep_alive_interval, keep_alive_tries, credential_id, jump_host_id \
+             FROM hosts WHERE id = ?1",
+            rusqlite::params![host_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<i64>>(5)?,
+                    row.get::<_, Option<i64>>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                ))
+            },
+        )?
+    };
+
+    // Step 1b: resolve credential — same override as `ssh_connect`.
+    let (auth_method, private_key_path) = if let Some(cid) = &credential_id {
+        let (cred_type, cred_key_path): (String, Option<String>) = {
+            let conn = hosts_db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+            conn.query_row(
+                "SELECT cred_type, key_path FROM credentials WHERE id=?1",
+                rusqlite::params![cid],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .map_err(|_| LabonairError::Internal(format!("Credential '{}' not found — it may have been deleted. Please update the host's auth settings.", cid)))?
+        };
+        (cred_type, cred_key_path)
+    } else {
+        (auth_method, private_key_path)
+    };
+
+    // Step 2: password — explicit override wins, else keyring lookup.
+    let password: Option<String> = if auth_method == "password" {
+        if password_override.is_some() {
+            password_override
+        } else if let Some(cid) = &credential_id {
+            crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", cid).ok().flatten()
+        } else {
+            crate::modules::secrets::get_password(&app, &secrets, "labonair-app", &host_id).ok().flatten()
+        }
+    } else {
+        None
+    };
+
+    // Same credential-sourced-passphrase fallback as `ssh_connect`.
+    let passphrase = if credential_id.is_some() && auth_method == "key" && passphrase.is_none() {
+        if let Some(cid) = &credential_id {
+            crate::modules::secrets::get_password(&app, &secrets, "labonair-cred", cid).ok().flatten()
+        } else {
+            passphrase
+        }
+    } else {
+        passphrase
+    };
+
+    // Step 3: jump host, if any.
+    let jump = match jump_host_id.as_deref() {
+        Some(jid) => Some(resolve_jump_host(&hosts_db, &secrets, &app, jid)?),
+        None => None,
+    };
+
+    // Synthetic session id — this never becomes a real session, so it just
+    // needs to be unique enough not to collide with a live tab's session_id
+    // for the log-step/event emits along the way.
+    let session_id = format!("test-{}", uuid::Uuid::new_v4());
+    let timeout = connect_timeout_secs.unwrap_or(10);
+
+    let attempt: Result<Arc<russh::client::Handle<ClientHandler>>, String> = async {
+        let tcp = connect_transport_maybe_via_jump(
+            &session_id, &host_address, port, jump.as_ref(), &trust_state, &app, timeout,
+        )
+        .await?;
+        establish_authenticated_session_from_stream(
+            &session_id, tcp, &host_address, port, &username, &auth_method,
+            private_key_path.as_deref(), keep_alive_interval, keep_alive_tries,
+            password.as_deref(), passphrase.as_deref(), &trust_state, &app,
+            true, // fail_fast_untrusted_host — never waits on, or auto-accepts, a trust dialog
+            Arc::new(std::sync::Mutex::new(None)),
+        )
+        .await
+    }
+    .await;
+
+    match attempt {
+        Ok(handle) => {
+            // This is a connectivity check, not a real session — no PTY
+            // channel was opened and nothing was inserted into `SshState`.
+            // Close the transport immediately rather than leaving it dangling.
+            let _ = handle.disconnect(russh::Disconnect::ByApplication, "Connection test complete", "").await;
+            Ok(TestConnectionResult::Success)
+        }
+        Err(msg) => {
+            let lower = msg.to_lowercase();
+            let fingerprint = extract_fingerprint(&msg).unwrap_or_default();
+            if lower.contains("host key mismatch") {
+                Ok(TestConnectionResult::HostKeyChanged { fingerprint })
+            } else if lower.contains("not yet trusted") {
+                Ok(TestConnectionResult::UnknownHostKey { fingerprint })
+            } else {
+                Err(classify_ssh_error(msg))
+            }
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

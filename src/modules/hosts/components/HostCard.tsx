@@ -26,6 +26,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { save as dialogSave } from "@tauri-apps/plugin-dialog";
+import { handleApiError } from "@/lib/errors";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import type { Group, Host } from "../types";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
@@ -136,6 +140,30 @@ export function HostCard({
       const h = hosts.find((x) => x.id === id);
       if (h) newSftpTab(id, h.name);
     });
+  };
+
+  const handleExportSshConfig = async () => {
+    try {
+      const configText = await invoke<string>("export_ssh_config", { hostIds: [host.id] });
+      const target = await dialogSave({
+        defaultPath: `${host.name}_ssh_config`,
+        filters: [{ name: "All Files", extensions: ["*"] }],
+      });
+      if (!target) return;
+      await invoke("fs_write_file", { path: target, content: configText });
+      useNotificationStore.getState().addNotification({
+        type: "success",
+        title: "SSH config exported",
+        message:
+          `Exported "${host.name}" to ${target}.` +
+          (host.jump_host_id
+            ? " Note: its jump host isn't included in this export — the ProxyJump line is included by name only."
+            : ""),
+        source: "Hosts",
+      });
+    } catch (e) {
+      handleApiError(e, "Export failed", "Hosts");
+    }
   };
 
   return (
@@ -327,6 +355,9 @@ export function HostCard({
                   <DropdownMenuItem onClick={() => togglePin(host.id)}>
                     {host.pin_to_top ? "Unpin" : "Pin to Top"}
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void handleExportSshConfig()}>
+                    Export SSH Config
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
@@ -367,6 +398,7 @@ export function HostCard({
               <ContextMenuItem onClick={() => togglePin(host.id)}>
                 {host.pin_to_top ? "Unpin" : "Pin to Top"}
               </ContextMenuItem>
+              <ContextMenuItem onClick={() => void handleExportSshConfig()}>Export SSH Config</ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem
                 className="text-destructive focus:text-destructive"

@@ -1,5 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { invoke } from "@tauri-apps/api/core";
+import { save as dialogSave } from "@tauri-apps/plugin-dialog";
+import { handleApiError } from "@/lib/errors";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +56,13 @@ import type { Group, Host } from "../types";
 
 type LayoutMode = "grid" | "list";
 type SortMode = "last_connected" | "a_z" | "z_a";
+
+// Mirrors the Rust `TestConnectionResult` enum's `#[serde(tag = "status")]`
+// shape (src-tauri/src/modules/ssh/client.rs).
+type TestConnectionResult =
+  | { status: "success" }
+  | { status: "unknown_host_key"; fingerprint: string }
+  | { status: "host_key_changed"; fingerprint: string };
 
 function applySorting<T extends { name: string; last_connected_at?: number; created_at: number }>(
   items: T[],
@@ -354,6 +365,72 @@ export function HomeDashboard({
     }
   };
 
+  const handleTestConnection = async () => {
+    if (!selectedHostId) return;
+    const host = hosts.find((h) => h.id === selectedHostId);
+    const hostLabel = host ? `"${host.name}"` : "the selected host";
+    try {
+      const result = await invoke<TestConnectionResult>("ssh_test_connection", { hostId: selectedHostId });
+      if (result.status === "success") {
+        useNotificationStore.getState().addNotification({
+          type: "success",
+          title: "Connection successful",
+          message: `Connected to ${hostLabel} successfully.`,
+          source: "Hosts",
+        });
+      } else if (result.status === "unknown_host_key") {
+        useNotificationStore.getState().addNotification({
+          type: "info",
+          title: "Unknown host key",
+          message: `${hostLabel}'s key isn't trusted yet (fingerprint: ${result.fingerprint}). Open a terminal tab to this host to verify and trust it.`,
+          source: "Hosts",
+        });
+      } else {
+        useNotificationStore.getState().addNotification({
+          type: "warning",
+          title: "Host key changed",
+          message: `${hostLabel}'s key differs from the one in known_hosts (fingerprint: ${result.fingerprint}) — verify before connecting.`,
+          source: "Hosts",
+        });
+      }
+    } catch (e) {
+      handleApiError(e, "Connection test failed", "Hosts");
+    }
+  };
+
+  const handleExportSshConfig = async () => {
+    // Respects whatever group filter / search is currently active, not the
+    // entire DB — `sortedHosts` is the same list rendered in the pane.
+    const ids = sortedHosts.map((h) => h.id);
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    // Best-effort ProxyJump export still resolves a jump host's name even if
+    // it's outside this batch — flag that so the resulting file's known
+    // limitation (not fully self-contained) isn't a silent surprise.
+    const hasExternalJump = sortedHosts.some((h) => h.jump_host_id && !idSet.has(h.jump_host_id));
+    try {
+      const configText = await invoke<string>("export_ssh_config", { hostIds: ids });
+      const target = await dialogSave({
+        defaultPath: "ssh_config",
+        filters: [{ name: "All Files", extensions: ["*"] }],
+      });
+      if (!target) return;
+      await invoke("fs_write_file", { path: target, content: configText });
+      useNotificationStore.getState().addNotification({
+        type: "success",
+        title: "SSH config exported",
+        message:
+          `Exported ${ids.length} host${ids.length === 1 ? "" : "s"} to ${target}.` +
+          (hasExternalJump
+            ? " Note: some hosts reference a jump host outside this export — its ProxyJump line is included by name only, so the file isn't fully self-contained."
+            : ""),
+        source: "Hosts",
+      });
+    } catch (e) {
+      handleApiError(e, "Export failed", "Hosts");
+    }
+  };
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -489,6 +566,21 @@ export function HomeDashboard({
                   onClick={() => setShowImportDialog(true)}
                 >
                   Import SSH Config
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={viewMode === "credentials" || !selectedHostId}
+                  title={
+                    viewMode === "hosts" && !selectedHostId ? "Select a host first" : undefined
+                  }
+                  onClick={() => void handleTestConnection()}
+                >
+                  Test Connection
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={viewMode === "credentials" || sortedHosts.length === 0}
+                  onClick={() => void handleExportSshConfig()}
+                >
+                  Export SSH Config
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

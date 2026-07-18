@@ -184,3 +184,127 @@ pub async fn import_ssh_config_entries(
 
     Ok(created_ids)
 }
+
+/// `(cred_type, key_path)` per credential id, used by `export_ssh_config` to
+/// decide whether a `"credential"`-auth host's `IdentityFile` is safe to
+/// emit (only for file-based, `cred_type == "key"` credentials).
+type CredentialExportMap = std::collections::HashMap<String, (String, Option<String>)>;
+
+/// A host row's fields relevant to SSH config export, keyed by host id in
+/// `export_ssh_config` so a jump host's name can be resolved even when the
+/// jump host itself isn't part of the requested `host_ids` batch.
+struct ExportHostRow {
+    name: String,
+    host_address: String,
+    port: i64,
+    username: String,
+    auth_method: String,
+    private_key_path: Option<String>,
+    credential_id: Option<String>,
+    jump_host_id: Option<String>,
+}
+
+/// Generates an `~/.ssh/config`-format text block for the given hosts — the
+/// exact reverse of `flush_entry`'s field mapping: `Host` <- name,
+/// `HostName` <- host_address, `Port` <- port (omitted when 22, the
+/// default), `User` <- username, `IdentityFile` <- private_key_path (only
+/// for `auth_method == "key"`, or a `"credential"`-auth host whose
+/// credential is itself file-based), `ProxyJump` <- the jump host's name.
+///
+/// `ProxyJump` resolution is best-effort against the *entire* hosts table,
+/// not just `host_ids` — a jump host outside the exported batch still gets
+/// a `ProxyJump <name>` line, it just won't be self-contained as a file on
+/// its own. Never writes a secret: password-auth hosts and password-type
+/// credentials always omit `IdentityFile`, since no plaintext value is ever
+/// safe to embed in a `~/.ssh/config`-style file.
+#[tauri::command]
+pub async fn export_ssh_config(
+    host_ids: Vec<String>,
+    hosts_db: tauri::State<'_, crate::modules::hosts::HostsDb>,
+) -> Result<String, String> {
+    let (all_hosts, credentials): (std::collections::HashMap<String, ExportHostRow>, CredentialExportMap) = {
+        let conn = hosts_db.0.lock().map_err(|e| e.to_string())?;
+
+        let mut host_stmt = conn
+            .prepare(
+                "SELECT id, name, host_address, port, username, auth_method, \
+                 private_key_path, credential_id, jump_host_id FROM hosts",
+            )
+            .map_err(|e| e.to_string())?;
+        let hosts = host_stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    ExportHostRow {
+                        name: row.get(1)?,
+                        host_address: row.get(2)?,
+                        port: row.get(3)?,
+                        username: row.get(4)?,
+                        auth_method: row.get(5)?,
+                        private_key_path: row.get(6)?,
+                        credential_id: row.get(7)?,
+                        jump_host_id: row.get(8)?,
+                    },
+                ))
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect::<std::collections::HashMap<_, _>>();
+
+        let mut cred_stmt = conn
+            .prepare("SELECT id, cred_type, key_path FROM credentials")
+            .map_err(|e| e.to_string())?;
+        let creds = cred_stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, (row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?)))
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect::<std::collections::HashMap<_, _>>();
+
+        (hosts, creds)
+    };
+
+    let mut out = String::new();
+    for id in &host_ids {
+        let Some(host) = all_hosts.get(id) else { continue };
+
+        // IdentityFile: direct key auth, or a file-based ("key"-type)
+        // credential. Everything else (password auth, password-type
+        // credential, "none") omits the line entirely.
+        let identity_file = match host.auth_method.as_str() {
+            "key" => host.private_key_path.clone(),
+            "credential" => host
+                .credential_id
+                .as_ref()
+                .and_then(|cid| credentials.get(cid))
+                .filter(|(cred_type, _)| cred_type.as_str() == "key")
+                .and_then(|(_, key_path)| key_path.clone()),
+            _ => None,
+        };
+
+        let proxy_jump = host
+            .jump_host_id
+            .as_ref()
+            .and_then(|jid| all_hosts.get(jid))
+            .map(|jh| jh.name.clone());
+
+        out.push_str(&format!("Host {}\n", host.name));
+        out.push_str(&format!("    HostName {}\n", host.host_address));
+        if host.port != 22 {
+            out.push_str(&format!("    Port {}\n", host.port));
+        }
+        if !host.username.is_empty() {
+            out.push_str(&format!("    User {}\n", host.username));
+        }
+        if let Some(key) = identity_file {
+            out.push_str(&format!("    IdentityFile {}\n", key));
+        }
+        if let Some(pj) = proxy_jump {
+            out.push_str(&format!("    ProxyJump {}\n", pj));
+        }
+        out.push('\n');
+    }
+
+    Ok(out)
+}
