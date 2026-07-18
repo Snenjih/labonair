@@ -86,9 +86,33 @@ export function CommitDiffTabPane({ repositoryPath, hash, sessionId }: Props) {
       .filter(Boolean);
   }, [diffContent]);
 
+  // Per-file binary detection — split the multi-file diff into per-file
+  // chunks (same header regex used for file navigation) and check each
+  // chunk independently, so one binary file in a multi-file commit doesn't
+  // hide the real text diffs of the other files.
+  const binaryFilePaths = useMemo(() => {
+    if (!diffContent) return new Set<string>();
+    const chunks = diffContent.split(/^(?=diff --git a\/.+ b\/.+$)/m);
+    const result = new Set<string>();
+    for (const chunk of chunks) {
+      const match = /^diff --git a\/.+ b\/(.+)$/m.exec(chunk);
+      if (match && chunk.includes("Binary files")) {
+        result.add(match[1]);
+      }
+    }
+    return result;
+  }, [diffContent]);
+
   const shortHash = hash.slice(0, 7);
   const isTruncated = diffContent?.includes("[diff truncated") ?? false;
-  const isBinary = diffContent?.includes("Binary files") ?? false;
+  // Only collapse the whole pane to "Binary files changed" when every file
+  // in the commit is binary — a mixed commit falls through to the normal
+  // line rendering below, where each binary file gets its own inline
+  // placeholder instead of hiding everything.
+  const isBinary =
+    filePaths.length > 0
+      ? filePaths.every((fp) => binaryFilePaths.has(fp))
+      : (diffContent?.includes("Binary files") ?? false);
   const lines = diffContent?.split("\n") ?? [];
 
   function scrollToFile(fp: string) {
@@ -159,7 +183,32 @@ export function CommitDiffTabPane({ repositoryPath, hash, sessionId }: Props) {
             {(() => {
               let isInOurs = false;
               let isInTheirs = false;
+              // While `true`, the current file's raw diff lines (e.g.
+              // "index ...", "Binary files a/x and b/x differ") are
+              // suppressed in favor of a single placeholder row, until the
+              // next file header line resets it.
+              let skippingBinaryFile = false;
               return lines.map((line, i) => {
+                const fileMatch = /^diff --git a\/.+ b\/(.+)$/.exec(line);
+                if (fileMatch) {
+                  const fp = fileMatch[1];
+                  skippingBinaryFile = binaryFilePaths.has(fp);
+                  return (
+                    <div key={i} id={`commit-diff-file-${encodeURIComponent(fp)}`}>
+                      <DiffLine line={line} isInOurs={false} isInTheirs={false} />
+                      {skippingBinaryFile && (
+                        <div className="font-mono text-[11px] leading-5 px-3 text-center text-muted-foreground/60">
+                          Binary file changed
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (skippingBinaryFile) {
+                  return null;
+                }
+
                 if (line.startsWith("<<<<<<<")) {
                   isInOurs = true;
                   isInTheirs = false;
@@ -169,15 +218,7 @@ export function CommitDiffTabPane({ repositoryPath, hash, sessionId }: Props) {
                 } else if (line.startsWith(">>>>>>>")) {
                   isInTheirs = false;
                 }
-                const fileMatch = /^diff --git a\/.+ b\/(.+)$/.exec(line);
-                if (fileMatch) {
-                  const fp = fileMatch[1];
-                  return (
-                    <div key={i} id={`commit-diff-file-${encodeURIComponent(fp)}`}>
-                      <DiffLine line={line} isInOurs={false} isInTheirs={false} />
-                    </div>
-                  );
-                }
+
                 return <DiffLine key={i} line={line} isInOurs={isInOurs} isInTheirs={isInTheirs} />;
               });
             })()}

@@ -22,7 +22,7 @@ export interface SourceControlState {
   diffContent: string | null;
   isDiffLoading: boolean;
   isStatusLoading: boolean;
-  operationInProgress: "commit" | "push" | "pull" | "fetch" | "abort" | null;
+  operationInProgress: "commit" | "push" | "pull" | "fetch" | "abort" | "continue" | null;
   error: string | null;
   commitMessage: string;
   diffViewMode: "unified" | "split";

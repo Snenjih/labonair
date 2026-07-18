@@ -644,6 +644,32 @@ pub async fn git_abort(
     Err("no merge, rebase, or cherry-pick in progress to abort".to_string())
 }
 
+/// Continues an in-progress merge, rebase, or cherry-pick (e.g. after
+/// resolving conflicts).
+#[tauri::command]
+pub async fn git_continue(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SshState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    let (raw, _exit) = executor.run_shell_script(STATE_FLAGS_SCRIPT).await?;
+    let flags_str = String::from_utf8_lossy(&raw).into_owned();
+    let (merge, rebase, cherry) = parse_state_flags(&flags_str);
+
+    if merge {
+        return executor.run(&["merge", "--continue"]).await.map(|_| ());
+    }
+    if rebase {
+        return executor.run(&["rebase", "--continue"]).await.map(|_| ());
+    }
+    if cherry {
+        return executor.run(&["cherry-pick", "--continue"]).await.map(|_| ());
+    }
+    Err("no merge, rebase, or cherry-pick in progress to continue".to_string())
+}
+
 /// Returns the commit log.
 #[tauri::command]
 pub async fn git_get_log(
@@ -651,6 +677,7 @@ pub async fn git_get_log(
     limit: Option<u32>,
     all_branches: bool,
     session_id: Option<String>,
+    skip: Option<usize>,
     sftp_state: tauri::State<'_, SshState>,
     app: tauri::AppHandle,
 ) -> Result<Vec<CommitInfo>, String> {
@@ -659,6 +686,7 @@ pub async fn git_get_log(
     // + remote CPU cost is higher per commit than a local process.
     let default_limit = if session_id.is_some() { 200 } else { 500 };
     let n = limit.unwrap_or(default_limit).to_string();
+    let skip_str = skip.map(|s| s.to_string());
     let format = "--format=%x1e%H%x00%P%x00%an%x00%ae%x00%at%x00%s%x00%D".to_string();
 
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
@@ -666,6 +694,10 @@ pub async fn git_get_log(
     let mut args: Vec<&str> = vec!["log"];
     if all_branches {
         args.push("--all");
+    }
+    if let Some(ref s) = skip_str {
+        args.push("--skip");
+        args.push(s);
     }
     args.push("-n");
     args.push(&n);
@@ -1102,7 +1134,11 @@ pub async fn git_get_workspace_state(
          printf '\\x1d'\n\
          git rev-list --count --left-right '@{{upstream}}...HEAD' 2>/dev/null\n\
          printf '\\x1d'\n\
-         {STATE_FLAGS_SCRIPT}"
+         {STATE_FLAGS_SCRIPT}\n\
+         printf '\\x1d'\n\
+         git branch --show-current\n\
+         printf '\\x1d'\n\
+         git rev-parse --short HEAD 2>/dev/null"
     );
 
     let (raw, _exit) = executor.run_shell_script(&script).await?;
@@ -1115,6 +1151,8 @@ pub async fn git_get_workspace_state(
     let diffstats_raw = sections.get(4).copied().unwrap_or(&[]);
     let ahead_behind_str = sections.get(5).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
     let flags_str = sections.get(6).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let show_current_str = sections.get(7).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let short_hash_str = sections.get(8).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
 
     let (staged, unstaged, untracked, has_conflicts) = parse_porcelain_status(porcelain);
     let (ahead, behind) = parse_ahead_behind(&ahead_behind_str);
@@ -1133,7 +1171,22 @@ pub async fn git_get_workspace_state(
     };
 
     let branches = parse_branches(&branches_str);
-    let current_branch = branches.iter().find(|b| b.is_current).map(|b| b.name.clone()).unwrap_or_default();
+    // Same detached-HEAD-safe derivation as `git_get_current_branch`: `branch
+    // --show-current` is empty while detached (it never invents a synthetic
+    // branch name), unlike `git branch -a`'s `(HEAD detached at <hash>)`
+    // entry, which `parse_branches` would otherwise surface as a bogus
+    // "current" branch name.
+    let show_current = show_current_str.trim();
+    let current_branch = if !show_current.is_empty() {
+        show_current.to_string()
+    } else {
+        let short_hash = short_hash_str.trim();
+        if short_hash.is_empty() {
+            String::new()
+        } else {
+            format!("HEAD detached at {short_hash}")
+        }
+    };
     let stash = parse_stash_list(&stash_str);
     let tags = parse_tags(&tags_str);
 

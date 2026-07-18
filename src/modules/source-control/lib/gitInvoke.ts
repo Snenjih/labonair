@@ -70,12 +70,15 @@ export const git = {
     invoke<string>("git_fetch", { path, sessionId: sessionId ?? null }),
   abort: (path: string, sessionId?: string) =>
     invoke<void>("git_abort", { path, sessionId: sessionId ?? null }),
-  getLog: (path: string, limit?: number, allBranches?: boolean, sessionId?: string) =>
+  continue: (path: string, sessionId?: string) =>
+    invoke<void>("git_continue", { path, sessionId: sessionId ?? null }),
+  getLog: (path: string, limit?: number, allBranches?: boolean, sessionId?: string, skip?: number) =>
     invoke<CommitInfo[]>("git_get_log", {
       path,
       limit: limit ?? null,
       allBranches: allBranches ?? true,
       sessionId: sessionId ?? null,
+      skip: skip ?? null,
     }),
   getCommitDetail: (path: string, hash: string, sessionId?: string) =>
     invoke<string>("git_get_commit_detail", { path, hash, sessionId: sessionId ?? null }),

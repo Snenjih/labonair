@@ -637,6 +637,7 @@ pub fn run() {
             git::git_pull,
             git::git_fetch,
             git::git_abort,
+            git::git_continue,
             git::git_get_log,
             git::git_get_commit_detail,
             git::git_checkout_branch,

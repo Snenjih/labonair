@@ -148,9 +148,27 @@ export function DiffViewer() {
       .filter(Boolean);
   }, [diffContent]);
 
+  // Per-file binary detection — split the multi-file diff into per-file
+  // chunks (same header regex used for file navigation) and check each
+  // chunk independently, so one binary file in a multi-file diff doesn't
+  // hide the real text diffs of the other files.
+  const binaryFilePaths = useMemo(() => {
+    if (!diffContent || diffContent === "__UNTRACKED_ONLY__") return new Set<string>();
+    const chunks = diffContent.split(/^(?=diff --git a\/.+ b\/.+$)/m);
+    const result = new Set<string>();
+    for (const chunk of chunks) {
+      const match = /^diff --git a\/.+ b\/(.+)$/m.exec(chunk);
+      if (match && chunk.includes("Binary files")) {
+        result.add(match[1]);
+      }
+    }
+    return result;
+  }, [diffContent]);
+
   const parsedLines = useMemo(
-    () => (diffContent && diffContent !== "__UNTRACKED_ONLY__" ? parseDiffLines(diffContent) : []),
-    [diffContent],
+    () =>
+      diffContent && diffContent !== "__UNTRACKED_ONLY__" ? parseDiffLines(diffContent, binaryFilePaths) : [],
+    [diffContent, binaryFilePaths],
   );
 
   const virtualizer = useVirtualizer({
@@ -169,7 +187,14 @@ export function DiffViewer() {
 
   if (!selectionMode) return null;
 
-  const isBinary = diffContent?.includes("Binary files") ?? false;
+  // Only collapse the whole viewer to "Binary file changed" when every file
+  // in the selection is binary — a mixed multi-file diff falls through to
+  // the normal line rendering below, where each binary file gets its own
+  // inline placeholder (see `parseDiffLines`) instead of hiding everything.
+  const isBinary =
+    filePaths.length > 0
+      ? filePaths.every((fp) => binaryFilePaths.has(fp))
+      : (diffContent?.includes("Binary files") ?? false);
   const isTruncated = diffContent?.includes("[truncated]") || diffContent?.includes("[diff too large]");
 
   const isMultiFile = selectionMode.type !== "file" && filePaths.length > 1;
@@ -310,7 +335,13 @@ export function DiffViewer() {
                   id={entry.fileAnchor ? `diff-file-${encodeURIComponent(entry.fileAnchor)}` : undefined}
                   style={{ position: "absolute", top: virtualItem.start, width: "100%" }}
                 >
-                  <DiffLine line={entry.line} isInOurs={entry.isInOurs} isInTheirs={entry.isInTheirs} />
+                  {entry.isBinaryPlaceholder ? (
+                    <div className="font-mono text-[11px] leading-5 px-2 text-center text-muted-foreground/60">
+                      Binary file changed
+                    </div>
+                  ) : (
+                    <DiffLine line={entry.line} isInOurs={entry.isInOurs} isInTheirs={entry.isInTheirs} />
+                  )}
                 </div>
               );
             })}
@@ -326,16 +357,38 @@ interface ParsedDiffLine {
   isInOurs: boolean;
   isInTheirs: boolean;
   fileAnchor?: string;
+  isBinaryPlaceholder?: boolean;
 }
 
-function parseDiffLines(diffContent: string): ParsedDiffLine[] {
+function parseDiffLines(diffContent: string, binaryFilePaths: Set<string>): ParsedDiffLine[] {
   const lines = diffContent.split("\n");
   const result: ParsedDiffLine[] = [];
-  let currentFile: string | null = null;
   let isInOurs = false;
   let isInTheirs = false;
+  // While `true`, the current file's raw diff lines (e.g. "index ...",
+  // "Binary files a/x and b/x differ") are suppressed in favor of a single
+  // placeholder row, until the next file header line resets it.
+  let skippingBinaryFile = false;
 
   for (const line of lines) {
+    const match = /^diff --git a\/.+ b\/(.+)$/.exec(line);
+    if (match) {
+      // Reset conflict state on new file
+      isInOurs = false;
+      isInTheirs = false;
+      const currentFile = match[1];
+      result.push({ line, isInOurs: false, isInTheirs: false, fileAnchor: currentFile });
+      skippingBinaryFile = binaryFilePaths.has(currentFile);
+      if (skippingBinaryFile) {
+        result.push({ line: "Binary file changed", isInOurs: false, isInTheirs: false, isBinaryPlaceholder: true });
+      }
+      continue;
+    }
+
+    if (skippingBinaryFile) {
+      continue;
+    }
+
     const enterOurs = line.startsWith("<<<<<<<");
     const enterSep = line.startsWith("=======");
     const enterTheirs = line.startsWith(">>>>>>>");
@@ -353,16 +406,7 @@ function parseDiffLines(diffContent: string): ParsedDiffLine[] {
       isInTheirs = false;
     }
 
-    const match = /^diff --git a\/.+ b\/(.+)$/.exec(line);
-    if (match) {
-      // Reset conflict state on new file
-      isInOurs = false;
-      isInTheirs = false;
-      currentFile = match[1];
-      result.push({ line, isInOurs: false, isInTheirs: false, fileAnchor: currentFile });
-    } else {
-      result.push({ line, isInOurs: lineIsInOurs, isInTheirs: lineIsInTheirs });
-    }
+    result.push({ line, isInOurs: lineIsInOurs, isInTheirs: lineIsInTheirs });
   }
 
   return result;
