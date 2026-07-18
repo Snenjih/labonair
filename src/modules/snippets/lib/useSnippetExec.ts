@@ -5,9 +5,10 @@ import { useHostsStore } from "@/modules/hosts/store/hostsStore";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import type { WorkspaceTab } from "@/modules/tabs";
 import type { TerminalPaneHandle } from "@/modules/terminal";
-import type { CommandSnippet, SnippetExecMode } from "../types";
+import type { CommandSnippet, SnippetExecMode, SnippetVariable } from "../types";
 import { useCommandSnippetsStore } from "../store/commandSnippetsStore";
 import { newRunId } from "./snippetUtils";
+import { extractSnippetVariables, substituteSnippetVariables } from "./snippetVariables";
 
 interface UseSnippetExecOptions {
   tabs: WorkspaceTab[];
@@ -69,6 +70,37 @@ export function useSnippetExec({
     setHostPickerRequest(null);
   }, [hostPickerRequest]);
 
+  // Pending "${VAR_NAME}" prompt — resolved by the variable prompt dialog
+  // rendered from `variablePrompt` below, one run at a time. `resolve(null)`
+  // means the user cancelled, which must abort the run entirely.
+  const [variablePromptRequest, setVariablePromptRequest] = useState<{
+    snippetName: string;
+    variables: SnippetVariable[];
+    resolve: (values: Record<string, string> | null) => void;
+  } | null>(null);
+
+  const promptForVariables = useCallback(
+    (snippetName: string, variables: SnippetVariable[]): Promise<Record<string, string> | null> => {
+      return new Promise((resolve) => {
+        setVariablePromptRequest({ snippetName, variables, resolve });
+      });
+    },
+    [],
+  );
+
+  const handleVariablePromptSubmit = useCallback(
+    (values: Record<string, string>) => {
+      variablePromptRequest?.resolve(values);
+      setVariablePromptRequest(null);
+    },
+    [variablePromptRequest],
+  );
+
+  const handleVariablePromptCancel = useCallback(() => {
+    variablePromptRequest?.resolve(null);
+    setVariablePromptRequest(null);
+  }, [variablePromptRequest]);
+
   useEffect(() => {
     return () => {
       for (const cleanup of cleanupRef.current.values()) cleanup();
@@ -117,11 +149,24 @@ export function useSnippetExec({
     async (snippet: CommandSnippet, modeOverride?: SnippetExecMode) => {
       const mode = modeOverride ?? snippet.defaultExecMode;
 
+      // Resolve `${VAR_NAME}` placeholders before any exec path runs, so the
+      // substituted command is shared by all three paths below (terminal
+      // injection, silent invoke, direct PTY inject). Extraction is skipped
+      // entirely when the command has none — this is the common case (most
+      // snippets have no variables) and must add zero friction/delay to it.
+      const variables = extractSnippetVariables(snippet.command);
+      let command = snippet.command;
+      if (variables.length > 0) {
+        const values = await promptForVariables(snippet.name, variables);
+        if (!values) return; // user cancelled the variable prompt — don't run at all
+        command = substituteSnippetVariables(snippet.command, values);
+      }
+
       if (mode === "inject") {
         // Paste command into active terminal without executing
         const handle = activeTerminalRef();
         if (handle) {
-          handle.write(snippet.command);
+          handle.write(command);
         }
         return;
       }
@@ -140,9 +185,9 @@ export function useSnippetExec({
           const hostId =
             resolution.kind === "ok" ? resolution.hostId : await promptForHost(snippet.name);
           if (!hostId) return; // user cancelled the host picker
-          onNewSshTab(hostId, snippet.name, undefined, snippet.command);
+          onNewSshTab(hostId, snippet.name, undefined, command);
         } else {
-          onNewLocalTab(snippet.workingDir ?? undefined, snippet.command);
+          onNewLocalTab(snippet.workingDir ?? undefined, command);
         }
         return;
       }
@@ -199,7 +244,7 @@ export function useSnippetExec({
           await invoke("snippet_run_ssh", {
             runId,
             sessionId: sshSession,
-            command: snippet.command,
+            command,
           });
         } catch (err) {
           updateRunLog(runId, { status: "error" });
@@ -210,7 +255,7 @@ export function useSnippetExec({
         try {
           await invoke("snippet_run_local", {
             runId,
-            command: snippet.command,
+            command,
             workingDir: snippet.workingDir ?? null,
           });
         } catch (err) {
@@ -230,6 +275,7 @@ export function useSnippetExec({
       appendRunLine,
       registerRunListeners,
       promptForHost,
+      promptForVariables,
     ],
   );
 
@@ -240,7 +286,15 @@ export function useSnippetExec({
     onCancel: handleHostPickerCancel,
   };
 
-  return { execSnippet, cancelRun, hostPicker };
+  const variablePrompt = {
+    open: variablePromptRequest !== null,
+    snippetName: variablePromptRequest?.snippetName,
+    variables: variablePromptRequest?.variables ?? [],
+    onSubmit: handleVariablePromptSubmit,
+    onCancel: handleVariablePromptCancel,
+  };
+
+  return { execSnippet, cancelRun, hostPicker, variablePrompt };
 }
 
 function findSshSessionForHost(tabs: WorkspaceTab[], hostId: string | null | undefined): string | null {

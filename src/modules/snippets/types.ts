@@ -33,6 +33,12 @@ export interface SnippetReorderItem {
 
 export type SnippetRunStatus = "running" | "done" | "error" | "cancelled";
 
+/** A `${VAR_NAME}` (or `${VAR_NAME:-default}`) placeholder found in a snippet's command. */
+export interface SnippetVariable {
+  name: string;
+  defaultValue: string | null;
+}
+
 export interface SnippetRunLog {
   runId: string;
   snippetName: string;
