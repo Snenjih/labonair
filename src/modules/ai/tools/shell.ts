@@ -37,9 +37,24 @@ async function getSessionShell(sessionId: string, cwd: string | null): Promise<n
   return p;
 }
 
-/** Remove a session's cached shell on session delete (cleanup only; shell exits naturally). */
-export function clearSessionShell(sessionId: string): void {
+/**
+ * Removes a session's cached shell entry and closes the backing Rust shell
+ * process (`shell_session_close`). Previously only cleared the JS-side map,
+ * leaving the actual spawned shell process running server-side for the rest
+ * of the app's lifetime — every AI session that ever called `bash_run` leaked
+ * one. Safe to call for a session that never opened a shell (nothing to await).
+ */
+export async function clearSessionShell(sessionId: string): Promise<void> {
+  const pending = sessionShells.get(sessionId);
   sessionShells.delete(sessionId);
+  if (!pending) return;
+  try {
+    const shellId = await pending;
+    await native.shellSessionClose(shellId);
+  } catch {
+    // Shell was never actually created (creation promise rejected) or is
+    // already gone — nothing to close.
+  }
 }
 
 export function buildShellTools(ctx: ToolContext) {

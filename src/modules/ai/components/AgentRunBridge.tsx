@@ -5,7 +5,7 @@ import type { AiDiffStatus } from "@/modules/tabs";
 import { native } from "../lib/native";
 import { checkReadable } from "../lib/security";
 import { resolvePath } from "../tools/tools";
-import { flushPersist, getOrCreateChat, useChatStore, type AgentRunStatus } from "../store/chatStore";
+import { deriveRunStatus, flushPersist, getOrCreateChat, useChatStore, type AgentRunStatus } from "../store/chatStore";
 
 /**
  * Headless bridge that mirrors chat lifecycle into the store, so the status
@@ -81,24 +81,14 @@ function Bridge({ sessionId, openAiDiffTab, setAiDiffStatus }: { sessionId: stri
     return () => flushPersist(sessionId);
   }, [sessionId]);
 
-  const approvalsPending = useMemo(() => {
-    let n = 0;
-    for (const m of messages) {
-      if (m.role !== "assistant") continue;
-      for (const p of m.parts) {
-        if ((p as { state?: string }).state === "approval-requested") n++;
-      }
-    }
-    return n;
-  }, [messages]);
+  // Shared with LRU eviction / session-switch (chatStore.ts's deriveRunStatus)
+  // so every code path that needs a chat's *real* current status agrees.
+  const { status: runStatus, approvalsPending } = useMemo(
+    () => deriveRunStatus(status, messages),
+    [status, messages],
+  );
 
   useEffect(() => {
-    let runStatus: AgentRunStatus;
-    if (approvalsPending > 0) runStatus = "awaiting-approval";
-    else if (status === "submitted") runStatus = "thinking";
-    else if (status === "streaming") runStatus = "streaming";
-    else if (status === "error") runStatus = "error";
-    else runStatus = "idle";
     patch({
       status: runStatus,
       approvalsPending,
@@ -122,7 +112,7 @@ function Bridge({ sessionId, openAiDiffTab, setAiDiffStatus }: { sessionId: stri
         } as Parameters<typeof c.sendMessage>[0]);
       }
     }
-  }, [status, approvalsPending, patch, sessionId]);
+  }, [runStatus, approvalsPending, patch, sessionId]);
 
   useEffect(() => {
     if (approvalsPending > 0) openMini();
