@@ -58,8 +58,27 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
   const [showDiscard, setShowDiscard] = useState(false);
 
   const isStaged = section === "staged";
-  const statusChar = isStaged ? file.indexStatus : file.worktreeStatus;
-  const statusColor = STATUS_COLORS[statusChar] ?? "bg-muted/80 text-muted-foreground/60";
+  const rawStatusChar = isStaged ? file.indexStatus : file.worktreeStatus;
+  // A submodule gitlink entry still carries a normal M/A/D-style status char
+  // (from the superproject's point of view), but that alone can't tell a
+  // "submodule commit pointer changed" from a "submodule's own worktree is
+  // dirty" — both need to render distinguishably, not as a generic "M". The
+  // dedicated "S" badge below always wins over the raw status char when
+  // `file.submodule` is present (recognize + label only, per this feature's
+  // scope — no recursive submodule diff/stage/commit UI).
+  const submoduleLabel = file.submodule
+    ? file.submodule.commitChanged
+      ? "Submodule: checked-out commit differs from the recorded pointer"
+      : file.submodule.modified
+        ? "Submodule: has uncommitted changes in its own working tree"
+        : file.submodule.untracked
+          ? "Submodule: has untracked files in its own working tree"
+          : "Submodule"
+    : null;
+  const statusChar = file.submodule ? "S" : rawStatusChar;
+  const statusColor = file.submodule
+    ? "bg-info/20 text-info"
+    : (STATUS_COLORS[rawStatusChar] ?? "bg-muted/80 text-muted-foreground/60");
 
   const stat =
     diffStats.find((s) => s.path === file.path && s.staged === isStaged) ??
@@ -156,6 +175,7 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
                 "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-[9px] font-bold leading-none",
                 statusColor,
               )}
+              title={submoduleLabel ?? undefined}
             >
               {statusChar}
             </span>

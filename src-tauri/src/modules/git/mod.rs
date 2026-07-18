@@ -8,13 +8,55 @@ use serde::{Deserialize, Serialize};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/// The `S<c><m><u>` submodule-state field of a `git status --porcelain=v2`
+/// entry (only present when the entry's `<sub>` field starts with `S`, i.e.
+/// the path is a submodule gitlink). `commit_changed` means the submodule's
+/// checked-out commit differs from what the superproject's index records;
+/// `modified`/`untracked` mean the submodule's own working tree has tracked
+/// changes / untracked files respectively. Note this can NOT represent an
+/// uninitialized submodule — an uninitialized (empty-directory) submodule
+/// produces no `git status` line at all, so that state is only visible via
+/// `SubmoduleStatus` (from `git submodule status`).
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmoduleState {
+    pub commit_changed: bool,
+    pub modified: bool,
+    pub untracked: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FileStatus {
     pub path: String,
     pub original_path: Option<String>, // for renames
-    pub index_status: char,            // space, A, M, D, R, C, U, ?
+    pub index_status: char,            // '.', A, M, D, R, C, U
     pub worktree_status: char,
+    pub submodule: Option<SubmoduleState>,
+}
+
+/// One line of `git submodule status` output — the only way to detect an
+/// *uninitialized* submodule (an empty gitlink directory produces zero lines
+/// from `git status`, so it can't be represented via `FileStatus`).
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum SubmoduleSyncState {
+    /// `-` prefix: not initialized (submodule directory is empty).
+    Uninitialized,
+    /// `+` prefix: checked-out commit differs from the superproject's index.
+    PointerChanged,
+    /// `U` prefix: the submodule itself has merge conflicts.
+    Conflict,
+    /// No prefix: initialized and matches the recorded commit.
+    Clean,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmoduleStatus {
+    pub path: String,
+    pub commit: String,
+    pub state: SubmoduleSyncState,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -97,6 +139,7 @@ pub struct WorkspaceGitState {
     pub stash: Vec<StashEntry>,
     pub tags: Vec<String>,
     pub diff_stats: Vec<FileDiffStat>,
+    pub submodules: Vec<SubmoduleStatus>,
 }
 
 // ─── Pure parsers (shared by the standalone commands and the bundle) ──────────
@@ -118,8 +161,79 @@ fn parse_shortstat(s: &str) -> (u32, u32, u32) {
     (files, ins, del)
 }
 
-/// Parses `git status --porcelain=v1 -z` NUL-terminated output into the
+/// Parses the 4-character `<sub>` field of a v2 status entry ("N..." for a
+/// non-submodule entry, "S<c><m><u>" for a submodule) into a `SubmoduleState`,
+/// or `None` when the entry isn't a submodule at all.
+fn parse_submodule_field(sub: &str) -> Option<SubmoduleState> {
+    let mut chars = sub.chars();
+    if chars.next() != Some('S') {
+        return None;
+    }
+    Some(SubmoduleState {
+        commit_changed: chars.next() == Some('C'),
+        modified: chars.next() == Some('M'),
+        untracked: chars.next() == Some('U'),
+    })
+}
+
+/// Builds a `FileStatus` from a shared `<XY> <sub> ... <path>` entry and
+/// files it into the staged/unstaged buckets.
+///
+/// Critical v1-vs-v2 difference: v1's short-format XY used a *space* to mean
+/// "unchanged on this side"; v2 uses `.` instead (space is no longer a
+/// meaningful value here at all). Checking `!= ' '` against v2 output would
+/// treat every untouched side as changed and duplicate every unstaged-only
+/// entry into the staged bucket too (and vice versa) — so bucket membership
+/// below is gated on `!= '.'`, not `!= ' '`.
+fn push_status_entry(
+    xy: &str,
+    sub: &str,
+    path: &str,
+    original_path: Option<String>,
+    staged: &mut Vec<FileStatus>,
+    unstaged: &mut Vec<FileStatus>,
+) {
+    let mut chars = xy.chars();
+    let x = chars.next().unwrap_or('.');
+    let y = chars.next().unwrap_or('.');
+
+    let fs = FileStatus {
+        path: path.to_string(),
+        original_path,
+        index_status: x,
+        worktree_status: y,
+        submodule: parse_submodule_field(sub),
+    };
+
+    if x != '.' {
+        staged.push(fs.clone());
+    }
+    if y != '.' {
+        unstaged.push(fs);
+    }
+}
+
+/// Parses `git status --porcelain=v2 -z` NUL-terminated output into the
 /// staged/unstaged/untracked buckets `GitStatus` exposes.
+///
+/// v2 defines three tracked-entry line types (mixed in undefined order) plus
+/// untracked/ignored lines — see `git-status(1)` "Porcelain Format Version
+/// 2":
+///   - Ordinary:        `1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>`
+///   - Renamed/copied:  `2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>`,
+///     immediately followed — as a *separate* NUL-terminated token when `-z`
+///     is used (a tab-joined suffix on the SAME token only in the non-`-z`
+///     form we don't use here) — by `<origPath>`.
+///   - Unmerged:        `u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>`
+///   - Untracked:       `? <path>` (single `?`, unlike v1's doubled `??`)
+///   - Ignored:         `! <path>` (not requested — our invocation omits
+///     `--ignored`, matching the pre-migration v1 behavior — but tolerated
+///     here rather than mis-parsed if it ever shows up).
+///
+/// Unlike v1, conflicts are never folded into an ordinary entry's XY code
+/// (there is no v2 equivalent of v1's "UU"/"AA"/"DD" ordinary-line encoding)
+/// — every conflicted path gets its own dedicated `u` line instead, which is
+/// the sole source of `has_conflicts` below.
 fn parse_porcelain_status(raw: &[u8]) -> (Vec<FileStatus>, Vec<FileStatus>, Vec<FileStatus>, bool) {
     let raw_str = String::from_utf8_lossy(raw);
     let tokens: Vec<&str> = raw_str.split('\0').collect();
@@ -132,50 +246,92 @@ fn parse_porcelain_status(raw: &[u8]) -> (Vec<FileStatus>, Vec<FileStatus>, Vec<
     let mut i = 0;
     while i < tokens.len() {
         let token = tokens[i];
-        if token.len() < 3 {
+        if token.is_empty() {
             i += 1;
             continue;
         }
-        let mut chars = token.chars();
-        let x = chars.next().unwrap_or(' ');
-        let y = chars.next().unwrap_or(' ');
-        let _ = chars.next();
-        let filename: String = chars.collect();
 
-        let original_path: Option<String> = if x == 'R' || x == 'C' || y == 'R' || y == 'C' {
-            let orig = tokens.get(i + 1).map(|s| s.to_string()).filter(|s| !s.is_empty());
-            i += 1;
-            orig
-        } else {
-            None
-        };
-
-        if x == 'U' || y == 'U' || (x == 'A' && y == 'A') || (x == 'D' && y == 'D') {
-            has_conflicts = true;
-        }
-
-        let fs = FileStatus {
-            path: filename,
-            original_path,
-            index_status: x,
-            worktree_status: y,
-        };
-
-        if x == '?' && y == '?' {
-            untracked.push(fs);
-        } else {
-            if x != ' ' && x != '?' {
-                staged.push(fs.clone());
+        match token.as_bytes()[0] {
+            b'1' => {
+                // "1 XY sub mH mI mW hH hI path" — 9 space-separated fields,
+                // splitn keeps a path containing spaces intact in the tail.
+                let fields: Vec<&str> = token.splitn(9, ' ').collect();
+                if fields.len() == 9 {
+                    push_status_entry(fields[1], fields[2], fields[8], None, &mut staged, &mut unstaged);
+                }
             }
-            if y != ' ' && y != '?' {
-                unstaged.push(fs);
+            b'2' => {
+                // "2 XY sub mH mI mW hH hI Xscore path" — 10 fields; origPath
+                // is the NEXT NUL-terminated token (this uses -z).
+                let fields: Vec<&str> = token.splitn(10, ' ').collect();
+                if fields.len() == 10 {
+                    let orig_path = tokens.get(i + 1).map(|s| s.to_string()).filter(|s| !s.is_empty());
+                    i += 1;
+                    push_status_entry(fields[1], fields[2], fields[9], orig_path, &mut staged, &mut unstaged);
+                }
             }
+            b'u' => {
+                // "u XY sub m1 m2 m3 mW h1 h2 h3 path" — 11 fields.
+                let fields: Vec<&str> = token.splitn(11, ' ').collect();
+                if fields.len() == 11 {
+                    has_conflicts = true;
+                    push_status_entry(fields[1], fields[2], fields[10], None, &mut staged, &mut unstaged);
+                }
+            }
+            b'?' => {
+                if let Some((_, path)) = token.split_once(' ') {
+                    untracked.push(FileStatus {
+                        path: path.to_string(),
+                        original_path: None,
+                        index_status: '?',
+                        worktree_status: '?',
+                        submodule: None,
+                    });
+                }
+            }
+            b'!' => {
+                // Ignored entries: no bucket in `GitStatus` (same as v1,
+                // which never surfaced them either) — skip.
+            }
+            _ => {}
         }
 
         i += 1;
     }
 
     (staged, unstaged, untracked, has_conflicts)
+}
+
+/// Parses `git submodule status` output. Each line is
+/// `[-+U ]<sha1> <path>( (<describe>))?` where the leading character (`-`,
+/// `+`, `U`, or a plain space) is the ONLY signal that distinguishes an
+/// uninitialized submodule from every other state — see `SubmoduleSyncState`.
+fn parse_submodule_status(output: &str) -> Vec<SubmoduleStatus> {
+    let mut result = Vec::new();
+    for line in output.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let (state, rest) = match line.chars().next() {
+            Some('-') => (SubmoduleSyncState::Uninitialized, &line[1..]),
+            Some('+') => (SubmoduleSyncState::PointerChanged, &line[1..]),
+            Some('U') => (SubmoduleSyncState::Conflict, &line[1..]),
+            Some(' ') => (SubmoduleSyncState::Clean, &line[1..]),
+            _ => (SubmoduleSyncState::Clean, line),
+        };
+
+        let mut parts = rest.splitn(2, ' ');
+        let commit = parts.next().unwrap_or_default().to_string();
+        let path_and_describe = parts.next().unwrap_or_default();
+        // Strip the optional trailing " (<describe>)" suffix.
+        let path = path_and_describe.split(" (").next().unwrap_or(path_and_describe).trim().to_string();
+
+        if path.is_empty() || commit.is_empty() {
+            continue;
+        }
+        result.push(SubmoduleStatus { path, commit, state });
+    }
+    result
 }
 
 /// Parses `<behind>\t<ahead>` from `git rev-list --count --left-right`.
@@ -372,7 +528,7 @@ pub async fn git_get_status(
 ) -> Result<GitStatus, String> {
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
     let script = format!(
-        "git status --porcelain=v1 -z\nprintf '\\x1d'\ngit rev-list --count --left-right '@{{upstream}}...HEAD' 2>/dev/null\nprintf '\\x1d'\n{STATE_FLAGS_SCRIPT}"
+        "git status --porcelain=v2 -z\nprintf '\\x1d'\ngit rev-list --count --left-right '@{{upstream}}...HEAD' 2>/dev/null\nprintf '\\x1d'\n{STATE_FLAGS_SCRIPT}"
     );
     let (raw, _exit) = executor.run_shell_script(&script).await?;
     let sections: Vec<&[u8]> = raw.split(|b| *b == 0x1d).collect();
@@ -1182,7 +1338,7 @@ pub async fn git_get_workspace_state(
     let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
 
     let script = format!(
-        "git status --porcelain=v1 -z\n\
+        "git status --porcelain=v2 -z\n\
          printf '\\x1d'\n\
          git branch -a --format='{BRANCH_FORMAT}'\n\
          printf '\\x1d'\n\
@@ -1200,7 +1356,9 @@ pub async fn git_get_workspace_state(
          printf '\\x1d'\n\
          git branch --show-current\n\
          printf '\\x1d'\n\
-         git rev-parse --short HEAD 2>/dev/null"
+         git rev-parse --short HEAD 2>/dev/null\n\
+         printf '\\x1d'\n\
+         git submodule status 2>/dev/null"
     );
 
     let (raw, _exit) = executor.run_shell_script(&script).await?;
@@ -1215,6 +1373,7 @@ pub async fn git_get_workspace_state(
     let flags_str = sections.get(6).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
     let show_current_str = sections.get(7).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
     let short_hash_str = sections.get(8).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
+    let submodule_status_str = sections.get(9).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
 
     let (staged, unstaged, untracked, has_conflicts) = parse_porcelain_status(porcelain);
     let (ahead, behind) = parse_ahead_behind(&ahead_behind_str);
@@ -1257,8 +1416,9 @@ pub async fn git_get_workspace_state(
     let unstaged_numstat = diffstats_parts.get(1).map(|b| String::from_utf8_lossy(b).into_owned()).unwrap_or_default();
     let mut diff_stats = parse_numstat(&staged_numstat, true);
     diff_stats.extend(parse_numstat(&unstaged_numstat, false));
+    let submodules = parse_submodule_status(&submodule_status_str);
 
-    Ok(WorkspaceGitState { status, branches, current_branch, stash, tags, diff_stats })
+    Ok(WorkspaceGitState { status, branches, current_branch, stash, tags, diff_stats, submodules })
 }
 
 /// Builds a POSIX-sh script that appends `entry` to a file at relative path
@@ -1441,29 +1601,153 @@ mod tests {
         assert_eq!(parse_state_flags(""), (false, false, false));
     }
 
+    // All fixtures below are real `git status --porcelain=v2 -z` /
+    // `git submodule status` output, captured from actual scratch repos
+    // exercising each scenario (not hand-written from memory) — porcelain v2
+    // has enough field-count/separator subtlety (space- vs. tab-delimited
+    // rename paths, the `.` vs space "unchanged" sentinel, `-z`'s
+    // NUL-terminated origPath as a *separate* token) that guessing the
+    // format risked silently breaking status for every user, not just
+    // submodule users, since this is the same parser the whole Source
+    // Control panel depends on.
+
     #[test]
-    fn porcelain_status_splits_staged_unstaged_untracked() {
-        let raw = b"M  staged.txt\0 M unstaged.txt\0?? untracked.txt\0";
+    fn porcelain_status_v2_splits_staged_unstaged_untracked() {
+        // Mixed working tree: staged add, unstaged modify, staged rename,
+        // staged delete, one untracked file — captured together in one
+        // `git status --porcelain=v2 -z` call against a real repo.
+        let raw = b"1 A. N... 000000 100644 100644 0000000000000000000000000000000000000000 3e757656cf36eca53338e520d134963a44f793f8 added.txt\0\
+1 .M N... 100644 100644 100644 ce013625030ba8dba906f756967f9e9ca394464a ce013625030ba8dba906f756967f9e9ca394464a modified.txt\0\
+2 R. N... 100644 100644 100644 3b3570473a7fc4ba3bbfa565a2ade87ad77b814c 3b3570473a7fc4ba3bbfa565a2ade87ad77b814c R100 rename_dst.txt\0\
+rename_src.txt\0\
+1 D. N... 100644 000000 000000 e4b45a07409d288d8aacd00717bb98d97d2022aa 0000000000000000000000000000000000000000 todelete.txt\0\
+? untracked.txt\0";
         let (staged, unstaged, untracked, conflicts) = parse_porcelain_status(raw);
+        // Staged: added.txt (A.), rename_dst.txt (R.), todelete.txt (D.) — 3.
+        assert_eq!(staged.len(), 3, "staged: {staged:?}");
+        // Unstaged: modified.txt (.M) — 1.
+        assert_eq!(unstaged.len(), 1, "unstaged: {unstaged:?}");
+        assert_eq!(untracked.len(), 1);
+        assert_eq!(untracked[0].path, "untracked.txt");
+        assert!(!conflicts);
+
+        let rename = staged.iter().find(|f| f.path == "rename_dst.txt").expect("rename entry present");
+        assert_eq!(rename.original_path.as_deref(), Some("rename_src.txt"));
+        let modified = &unstaged[0];
+        assert_eq!(modified.path, "modified.txt");
+        assert_eq!(modified.index_status, '.');
+        assert_eq!(modified.worktree_status, 'M');
+    }
+
+    #[test]
+    fn porcelain_status_v2_uses_dot_not_space_for_unchanged_side() {
+        // The v1-vs-v2 gotcha this migration exists to get right: v1 used a
+        // space to mean "unchanged on this side"; v2 uses '.'. A regression
+        // here (checking `!= ' '` against v2 output) would duplicate every
+        // single-sided change into both buckets.
+        let raw = b"1 .M N... 100644 100644 100644 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa only_unstaged.txt\0";
+        let (staged, unstaged, _, _) = parse_porcelain_status(raw);
+        assert_eq!(staged.len(), 0, "an unstaged-only change must not also appear staged");
+        assert_eq!(unstaged.len(), 1);
+    }
+
+    #[test]
+    fn porcelain_status_v2_detects_conflicts_via_u_line() {
+        // Real conflict capture from an actual merge — porcelain v2 never
+        // folds conflicts into an ordinary '1'/'2' line's XY code (unlike
+        // v1's AA/DD/UU), every conflicted path gets its own 'u' line.
+        let raw = b"u UU N... 100644 100644 100644 100644 df967b96a579e45a18b8251732d16804b2e56a55 2930e61b1aa4ed093e18b78366ec793e169ff88f e3c8025608a6c4ddd7b1e451e7c0a1c74b489617 conflict.txt\0";
+        let (staged, unstaged, _, conflicts) = parse_porcelain_status(raw);
+        assert!(conflicts);
+        // A conflict's XY (UU) means both sides differ from '.', so it's
+        // filed into both buckets — matches how the UI already surfaces
+        // conflicted files (visible regardless of which pane is open).
         assert_eq!(staged.len(), 1);
         assert_eq!(unstaged.len(), 1);
+    }
+
+    #[test]
+    fn porcelain_status_v2_handles_copied_entry() {
+        let raw = b"2 C. N... 100644 100644 100644 3b3570473a7fc4ba3bbfa565a2ade87ad77b814c 3b3570473a7fc4ba3bbfa565a2ade87ad77b814c C100 copy_dst.txt\0copy_src.txt\0";
+        let (staged, _, _, _) = parse_porcelain_status(raw);
+        assert_eq!(staged.len(), 1);
+        assert_eq!(staged[0].index_status, 'C');
+        assert_eq!(staged[0].original_path.as_deref(), Some("copy_src.txt"));
+    }
+
+    #[test]
+    fn porcelain_status_v2_ignores_bang_lines_when_present() {
+        // Our invocation never passes --ignored (matches pre-migration v1
+        // behavior), but tolerate a '!' line rather than mis-parse it if it
+        // ever shows up.
+        let raw = b"? untracked.txt\0! ignored.txt\0";
+        let (_, _, untracked, _) = parse_porcelain_status(raw);
         assert_eq!(untracked.len(), 1);
+        assert_eq!(untracked[0].path, "untracked.txt");
+    }
+
+    #[test]
+    fn porcelain_status_v2_clean_repo_is_empty() {
+        let (staged, unstaged, untracked, conflicts) = parse_porcelain_status(b"");
+        assert!(staged.is_empty());
+        assert!(unstaged.is_empty());
+        assert!(untracked.is_empty());
         assert!(!conflicts);
     }
 
     #[test]
-    fn porcelain_status_detects_conflicts() {
-        let raw = b"UU conflict.txt\0";
-        let (_, _, _, conflicts) = parse_porcelain_status(raw);
-        assert!(conflicts);
+    fn porcelain_status_v2_parses_submodule_dirty_worktree() {
+        // Real capture: uncommitted change *inside* the submodule's own
+        // working tree, submodule's recorded commit pointer unchanged.
+        let raw = b"1 .M S.M. 160000 160000 160000 9533341af956c9055329769452f2bf84f386b8fe 9533341af956c9055329769452f2bf84f386b8fe sub\0";
+        let (_, unstaged, _, _) = parse_porcelain_status(raw);
+        assert_eq!(unstaged.len(), 1);
+        let sub = unstaged[0].submodule.as_ref().expect("submodule field present");
+        assert!(!sub.commit_changed);
+        assert!(sub.modified);
+        assert!(!sub.untracked);
     }
 
     #[test]
-    fn porcelain_status_handles_rename_with_original_path() {
-        let raw = b"R  new.txt\0old.txt\0";
-        let (staged, _, _, _) = parse_porcelain_status(raw);
-        assert_eq!(staged.len(), 1);
-        assert_eq!(staged[0].original_path.as_deref(), Some("old.txt"));
+    fn porcelain_status_v2_parses_submodule_pointer_changed() {
+        // Real capture: committed inside the submodule without updating the
+        // superproject's recorded pointer.
+        let raw = b"1 .M SC.. 160000 160000 160000 9533341af956c9055329769452f2bf84f386b8fe 9533341af956c9055329769452f2bf84f386b8fe sub\0";
+        let (_, unstaged, _, _) = parse_porcelain_status(raw);
+        let sub = unstaged[0].submodule.as_ref().expect("submodule field present");
+        assert!(sub.commit_changed);
+        assert!(!sub.modified);
+        assert!(!sub.untracked);
+    }
+
+    #[test]
+    fn parse_submodule_field_returns_none_for_non_submodule_entries() {
+        assert_eq!(parse_submodule_field("N..."), None);
+    }
+
+    #[test]
+    fn parse_submodule_status_maps_all_three_required_states() {
+        // Real `git submodule status` captures for each state — note only
+        // Uninitialized/PointerChanged/Clean were exercised against a real
+        // repo (Conflict, 'U', is documented but far rarer — its mapping
+        // follows the same one-char-prefix scheme as the other three).
+        let raw = "-9533341af956c9055329769452f2bf84f386b8fe sub\n\
++5b276bbf6fd8afd8b889df24e4eb2428c3f5c7ee sub (heads/main)\n\
+ 9533341af956c9055329769452f2bf84f386b8fe sub (heads/main)";
+        let statuses = parse_submodule_status(raw);
+        assert_eq!(statuses.len(), 3);
+        assert_eq!(statuses[0].state, SubmoduleSyncState::Uninitialized);
+        assert_eq!(statuses[0].path, "sub");
+        assert_eq!(statuses[0].commit, "9533341af956c9055329769452f2bf84f386b8fe");
+        assert_eq!(statuses[1].state, SubmoduleSyncState::PointerChanged);
+        assert_eq!(statuses[1].commit, "5b276bbf6fd8afd8b889df24e4eb2428c3f5c7ee");
+        assert_eq!(statuses[2].state, SubmoduleSyncState::Clean);
+    }
+
+    #[test]
+    fn parse_submodule_status_handles_empty_output() {
+        assert!(parse_submodule_status("").is_empty());
+        assert!(parse_submodule_status("\n\n").is_empty());
     }
 
     #[test]

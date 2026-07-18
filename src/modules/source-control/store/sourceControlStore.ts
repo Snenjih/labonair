@@ -1,6 +1,6 @@
 import { load } from "@tauri-apps/plugin-store";
 import { create } from "zustand";
-import type { Branch, FileDiffStat, GitStatus, SelectionMode, StashEntry } from "../types";
+import type { Branch, FileDiffStat, GitStatus, SelectionMode, StashEntry, SubmoduleStatus } from "../types";
 
 const STORE_FILE = "labonair-git.json";
 const STORE_KEY = "recentMessages";
@@ -44,6 +44,9 @@ export interface SourceControlState {
   // diff stats per file
   diffStats: FileDiffStat[];
 
+  // submodules (recognize + label only — see FileChangeItem's badge)
+  submodules: SubmoduleStatus[];
+
   // recent commit messages
   recentMessages: string[];
 
@@ -51,6 +54,7 @@ export interface SourceControlState {
   setRepoInfo: (isRepo: boolean, repoRoot: string | null) => void;
   setTarget: (hostId: string | null, sessionId: string | null) => void;
   setDiffStats: (stats: FileDiffStat[]) => void;
+  setSubmodules: (submodules: SubmoduleStatus[]) => void;
   setStatus: (status: GitStatus | null) => void;
   setIsStatusLoading: (loading: boolean) => void;
   selectFile: (path: string, staged: boolean) => void;
@@ -111,11 +115,13 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   tags: [],
 
   diffStats: [],
+  submodules: [],
   recentMessages: [],
 
   setRepoInfo: (isRepo, repoRoot) => set({ isRepo, repoRoot }),
   setTarget: (hostId, sessionId) => set({ hostId, sessionId }),
   setDiffStats: (diffStats) => set({ diffStats }),
+  setSubmodules: (submodules) => set({ submodules }),
   setStatus: (status) => set({ status }),
   setIsStatusLoading: (isStatusLoading) => set({ isStatusLoading }),
   selectFile: (path, staged) => set({ selectionMode: { type: "file", path, staged } }),
