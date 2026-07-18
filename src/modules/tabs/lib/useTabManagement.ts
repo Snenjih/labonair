@@ -65,6 +65,8 @@ export interface TabManagementReturn {
   handleDetectedLocalUrl: (sessionId: string, url: string) => void;
   handleSnippetRun: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
   execSnippet: ReturnType<typeof useSnippetExec>["execSnippet"];
+  cancelSnippetRun: ReturnType<typeof useSnippetExec>["cancelRun"];
+  snippetHostPicker: ReturnType<typeof useSnippetExec>["hostPicker"];
   captureActiveSelection: () => string | null;
   openGitGraphTab: (
     repositoryPath: string,
@@ -399,7 +401,7 @@ export function useTabManagement({
   }, []);
 
   // ── Snippet exec ───────────────────────────────────────────────────────────
-  const { execSnippet } = useSnippetExec({
+  const { execSnippet, cancelRun: cancelSnippetRun, hostPicker: snippetHostPicker } = useSnippetExec({
     tabs: workspaceTabs,
     activeTerminalRef: () => (activePaneId ? (terminalRefs.current.get(activePaneId) ?? null) : null),
     onNewLocalTab: (cwd, command) => newTab(cwd ?? inheritedCwdForNewTab(), command),
@@ -456,6 +458,8 @@ export function useTabManagement({
     handleDetectedLocalUrl,
     handleSnippetRun,
     execSnippet,
+    cancelSnippetRun,
+    snippetHostPicker,
     captureActiveSelection,
     openGitGraphTab,
   };

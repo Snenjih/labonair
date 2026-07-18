@@ -71,6 +71,18 @@ export function SnippetItem({ snippet, hostName, groupColor, onRun, onEdit, onDu
                   {hostName}
                 </span>
               )}
+              {isSSH && !hostName && (
+                <span
+                  className="shrink-0 rounded border border-warning/40 bg-warning/10 px-1.5 py-px font-mono text-[9px] leading-none text-warning"
+                  title={
+                    snippet.hostId
+                      ? "This snippet's target host no longer exists"
+                      : "Prompts for a host each time it runs"
+                  }
+                >
+                  {snippet.hostId ? "Host missing" : "Ask at runtime"}
+                </span>
+              )}
             </div>
 
             {/* Command preview */}

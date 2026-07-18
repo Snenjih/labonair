@@ -8,7 +8,7 @@ use modules::{
     ssh::{SshState, TrustState, client::{ssh_connect, ssh_connect_quick, ssh_trust_host, ssh_remove_known_host, ssh_disconnect, ssh_test_connection}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_read_dir_page, sftp_rename, sftp_delete, sftp_mkdir, sftp_create_file, sftp_chmod, sftp_calculate_size, sftp_chown, sftp_deep_search, prepare_remote_edit, save_remote_edit, sftp_read_file_content, cleanup_remote_edit_temp}, tunnels::{TunnelState, ssh_start_tunnels, ssh_stop_tunnels}},
     sftp::{TransferWorkerState, TransferSettings, commands::{enqueue_transfer, cancel_transfer, resolve_conflict, sftp_update_transfer_settings, sftp_session_reconnected}, connection::{sftp_connect, sftp_disconnect}, worker::run_worker},
     snippets::db::{snippets_get_all, snippets_create, snippets_update, snippets_delete, snippets_reorder, snippet_groups_get_all, snippet_groups_create, snippet_groups_update, snippet_groups_delete},
-    snippets::exec::{snippet_run_local, snippet_run_ssh},
+    snippets::exec::{snippet_run_local, snippet_run_ssh, snippet_run_cancel, SnippetRunState},
     themes::{themes_get_all, theme_import, theme_export, theme_delete, theme_fetch_index, theme_download, theme_create, themes_get_dir},
     backgrounds::{backgrounds_list, background_import, background_delete, background_read_data_url},
 };
@@ -497,6 +497,7 @@ pub fn run() {
         })
         .manage(pty::PtyState::default())
         .manage(shell::ShellState::default())
+        .manage(SnippetRunState::default())
         .manage(secrets::SecretsState::default())
         .manage(fs::watcher::WatcherState::default())
         .invoke_handler(tauri::generate_handler![
@@ -606,6 +607,7 @@ pub fn run() {
             snippet_groups_delete,
             snippet_run_local,
             snippet_run_ssh,
+            snippet_run_cancel,
             themes_get_all,
             theme_import,
             theme_export,

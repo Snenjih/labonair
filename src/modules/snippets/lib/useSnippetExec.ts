@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import type { WorkspaceTab } from "@/modules/tabs";
 import type { TerminalPaneHandle } from "@/modules/terminal";
 import type { CommandSnippet, SnippetExecMode } from "../types";
@@ -15,6 +17,18 @@ interface UseSnippetExecOptions {
   onOpenLogDrawer: () => void;
 }
 
+/** Result of resolving a snippet's target host before an SSH-mode run. */
+type HostResolution = { kind: "ask" } | { kind: "missing" } | { kind: "ok"; hostId: string };
+
+function resolveSshHost(hostId: string | null | undefined): HostResolution {
+  if (!hostId) return { kind: "ask" };
+  const exists = useHostsStore.getState().hosts.some((h) => h.id === hostId);
+  return exists ? { kind: "ok", hostId } : { kind: "missing" };
+}
+
+const MISSING_HOST_MESSAGE =
+  "This snippet's target host no longer exists — edit the snippet to pick a new host.";
+
 export function useSnippetExec({
   tabs,
   activeTerminalRef,
@@ -28,6 +42,32 @@ export function useSnippetExec({
 
   // Track active run listeners so we can clean up
   const cleanupRef = useRef<Map<string, () => void>>(new Map());
+
+  // Pending "ask at runtime" host prompt — resolved by the picker dialog
+  // rendered from `hostPicker` below, one run at a time.
+  const [hostPickerRequest, setHostPickerRequest] = useState<{
+    snippetName: string;
+    resolve: (hostId: string | null) => void;
+  } | null>(null);
+
+  const promptForHost = useCallback((snippetName: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      setHostPickerRequest({ snippetName, resolve });
+    });
+  }, []);
+
+  const handleHostPickerSelect = useCallback(
+    (hostId: string) => {
+      hostPickerRequest?.resolve(hostId);
+      setHostPickerRequest(null);
+    },
+    [hostPickerRequest],
+  );
+
+  const handleHostPickerCancel = useCallback(() => {
+    hostPickerRequest?.resolve(null);
+    setHostPickerRequest(null);
+  }, [hostPickerRequest]);
 
   useEffect(() => {
     return () => {
@@ -44,16 +84,19 @@ export function useSnippetExec({
           appendRunLine(runId, e.payload.data, e.payload.stream);
         },
       );
-      const donePromise = listen<{ runId: string; exitCode: number }>("snippet_run_done", (e) => {
-        if (e.payload.runId !== runId) return;
-        updateRunLog(runId, {
-          status: e.payload.exitCode === 0 ? "done" : "error",
-          exitCode: e.payload.exitCode,
-        });
-        // Clean up this run's listeners
-        cleanupRef.current.get(runId)?.();
-        cleanupRef.current.delete(runId);
-      });
+      const donePromise = listen<{ runId: string; exitCode: number; cancelled?: boolean }>(
+        "snippet_run_done",
+        (e) => {
+          if (e.payload.runId !== runId) return;
+          updateRunLog(runId, {
+            status: e.payload.cancelled ? "cancelled" : e.payload.exitCode === 0 ? "done" : "error",
+            exitCode: e.payload.exitCode,
+          });
+          // Clean up this run's listeners
+          cleanupRef.current.get(runId)?.();
+          cleanupRef.current.delete(runId);
+        },
+      );
 
       const cleanup = () => {
         void outPromise.then((fn) => fn());
@@ -63,6 +106,12 @@ export function useSnippetExec({
     },
     [appendRunLine, updateRunLog],
   );
+
+  const cancelRun = useCallback((runId: string) => {
+    void invoke("snippet_run_cancel", { runId }).catch((err) => {
+      console.warn("Failed to cancel snippet run:", err);
+    });
+  }, []);
 
   const execSnippet = useCallback(
     async (snippet: CommandSnippet, modeOverride?: SnippetExecMode) => {
@@ -79,12 +128,19 @@ export function useSnippetExec({
 
       if (mode === "terminal") {
         if (snippet.target === "ssh") {
-          if (!snippet.hostId) {
-            console.warn("Snippet has no hostId, falling back to local terminal");
-            onNewLocalTab(snippet.workingDir ?? undefined, snippet.command);
-          } else {
-            onNewSshTab(snippet.hostId, snippet.name, undefined, snippet.command);
+          const resolution = resolveSshHost(snippet.hostId);
+          if (resolution.kind === "missing") {
+            useNotificationStore.getState().addNotification({
+              type: "error",
+              title: "Snippet host missing",
+              message: MISSING_HOST_MESSAGE,
+            });
+            return;
           }
+          const hostId =
+            resolution.kind === "ok" ? resolution.hostId : await promptForHost(snippet.name);
+          if (!hostId) return; // user cancelled the host picker
+          onNewSshTab(hostId, snippet.name, undefined, snippet.command);
         } else {
           onNewLocalTab(snippet.workingDir ?? undefined, snippet.command);
         }
@@ -108,8 +164,24 @@ export function useSnippetExec({
       // registering listeners for a runId that never gets a matching "done"
       // event leaks them until this hook unmounts.
       if (snippet.target === "ssh") {
+        const resolution = resolveSshHost(snippet.hostId);
+        if (resolution.kind === "missing") {
+          updateRunLog(runId, {
+            status: "error",
+            lines: [{ data: `${MISSING_HOST_MESSAGE}\n`, stream: "stderr" }],
+          });
+          return;
+        }
+        const hostId = resolution.kind === "ok" ? resolution.hostId : await promptForHost(snippet.name);
+        if (!hostId) {
+          updateRunLog(runId, {
+            status: "error",
+            lines: [{ data: `Run cancelled — no host selected.\n`, stream: "stderr" }],
+          });
+          return;
+        }
         // Find an active SSH session for this host
-        const sshSession = findSshSessionForHost(tabs, snippet.hostId);
+        const sshSession = findSshSessionForHost(tabs, hostId);
         if (!sshSession) {
           updateRunLog(runId, {
             status: "error",
@@ -157,10 +229,18 @@ export function useSnippetExec({
       updateRunLog,
       appendRunLine,
       registerRunListeners,
+      promptForHost,
     ],
   );
 
-  return { execSnippet };
+  const hostPicker = {
+    open: hostPickerRequest !== null,
+    snippetName: hostPickerRequest?.snippetName,
+    onSelect: handleHostPickerSelect,
+    onCancel: handleHostPickerCancel,
+  };
+
+  return { execSnippet, cancelRun, hostPicker };
 }
 
 function findSshSessionForHost(tabs: WorkspaceTab[], hostId: string | null | undefined): string | null {

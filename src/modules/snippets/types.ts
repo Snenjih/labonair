@@ -31,7 +31,7 @@ export interface SnippetReorderItem {
   sortOrder: number;
 }
 
-export type SnippetRunStatus = "running" | "done" | "error";
+export type SnippetRunStatus = "running" | "done" | "error" | "cancelled";
 
 export interface SnippetRunLog {
   runId: string;
