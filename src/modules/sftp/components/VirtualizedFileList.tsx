@@ -1,17 +1,17 @@
-import { cn } from "@/lib/utils";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useRef, useState } from "react";
 import {
-  Folder01Icon,
-  File01Icon,
-  Link01Icon,
   ArrowDown01Icon,
   ArrowUp01Icon,
+  File01Icon,
+  Folder01Icon,
+  Link01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useCallback, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { FileNode } from "../types";
-import { blurActiveInput } from "../utils";
+import { blurActiveInput, isSyntheticEntry } from "../utils";
 
 const DRAG_THRESHOLD_PX = 6;
 
@@ -81,6 +81,13 @@ interface VirtualizedFileListProps {
   onRenameChange?: (v: string) => void;
   onRenameCommit?: () => void;
   onRenameCancel?: () => void;
+  /** Value/handlers for the synthetic "new file/folder" row, rendered as an
+   *  editable row like `isRenaming` but backed by separate state (a row is
+   *  never both at once). */
+  creatingEntryValue?: string;
+  onCreatingEntryChange?: (v: string) => void;
+  onCreatingEntryCommit?: () => void;
+  onCreatingEntryCancel?: () => void;
   /** When set, shows a "Load more…" row below the list (remote/paginated
    *  listings only — local directories are always loaded in full). */
   hasMore?: boolean;
@@ -114,6 +121,10 @@ export function VirtualizedFileList({
   onRenameChange,
   onRenameCommit,
   onRenameCancel,
+  creatingEntryValue,
+  onCreatingEntryChange,
+  onCreatingEntryCommit,
+  onCreatingEntryCancel,
   hasMore,
   onLoadMore,
 }: VirtualizedFileListProps) {
@@ -188,7 +199,7 @@ export function VirtualizedFileList({
       .getVirtualItems()
       .filter((vr) => {
         const file = files[vr.index];
-        if (!file || file.name === "..") return false;
+        if (!file || file.name === ".." || isSyntheticEntry(file)) return false;
         return vr.start < bottom && vr.start + vr.size > top;
       })
       .map((vr) => files[vr.index].path);
@@ -424,6 +435,11 @@ export function VirtualizedFileList({
                   onRenameChange={onRenameChange}
                   onRenameCommit={onRenameCommit}
                   onRenameCancel={onRenameCancel}
+                  isCreatingEntry={isSyntheticEntry(file)}
+                  creatingEntryValue={creatingEntryValue ?? ""}
+                  onCreatingEntryChange={onCreatingEntryChange}
+                  onCreatingEntryCommit={onCreatingEntryCommit}
+                  onCreatingEntryCancel={onCreatingEntryCancel}
                 />
               );
             })}
@@ -533,6 +549,11 @@ interface FileRowProps {
   onRenameChange?: (v: string) => void;
   onRenameCommit?: () => void;
   onRenameCancel?: () => void;
+  isCreatingEntry?: boolean;
+  creatingEntryValue?: string;
+  onCreatingEntryChange?: (v: string) => void;
+  onCreatingEntryCommit?: () => void;
+  onCreatingEntryCancel?: () => void;
 }
 
 function FileRow({
@@ -556,6 +577,11 @@ function FileRow({
   onRenameChange,
   onRenameCommit,
   onRenameCancel,
+  isCreatingEntry,
+  creatingEntryValue,
+  onCreatingEntryChange,
+  onCreatingEntryCommit,
+  onCreatingEntryCancel,
 }: FileRowProps) {
   const isUpEntry = file.name === "..";
   const getIcon = () => {
@@ -571,7 +597,7 @@ function FileRow({
       : "—";
 
   function handlePointerDown(e: React.PointerEvent) {
-    if (!draggable || !onDragStart || isUpEntry || e.button !== 0) return;
+    if (!draggable || !onDragStart || isUpEntry || isRenaming || isCreatingEntry || e.button !== 0) return;
     const fireDragStart = onDragStart;
     const startX = e.clientX;
     const startY = e.clientY;
@@ -606,15 +632,17 @@ function FileRow({
         "h-7 flex items-center px-2 gap-1 cursor-default select-none overflow-hidden",
         isEven && !isSelected && !isHovered && "bg-muted/10",
         isSelected ? "bg-primary/20 ring-1 ring-inset ring-primary/40" : isHovered && "bg-accent/20",
-        draggable && !isUpEntry && "cursor-grab",
+        draggable && !isUpEntry && !isRenaming && !isCreatingEntry && "cursor-grab",
         isUpEntry && "opacity-60",
         !isUpEntry && !isSelected && file.name.startsWith(".") && "opacity-50",
       )}
       onPointerEnter={() => onHoverChange(rowKey)}
       onPointerLeave={() => onHoverChange(null)}
-      onPointerDown={draggable && !isUpEntry ? handlePointerDown : undefined}
-      onClick={isRenaming ? undefined : onClick}
-      onDoubleClick={isRenaming ? undefined : onDoubleClick}
+      onPointerDown={
+        draggable && !isUpEntry && !isRenaming && !isCreatingEntry ? handlePointerDown : undefined
+      }
+      onClick={isRenaming || isCreatingEntry ? undefined : onClick}
+      onDoubleClick={isRenaming || isCreatingEntry ? undefined : onDoubleClick}
     >
       <span className="w-5 flex items-center justify-center shrink-0 leading-none text-muted-foreground">
         {getIcon()}
@@ -629,7 +657,21 @@ function FileRow({
             if (e.key === "Escape") onRenameCancel?.();
           }}
           onBlur={onRenameCancel}
-          className="flex-1 h-5 text-sm bg-background border border-primary/60 rounded px-1 outline-none text-foreground"
+          className="flex-1 h-5 text-sm bg-transparent border-none outline-none text-foreground"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : isCreatingEntry ? (
+        <input
+          autoFocus
+          value={creatingEntryValue}
+          onChange={(e) => onCreatingEntryChange?.(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onCreatingEntryCommit?.();
+            if (e.key === "Escape") onCreatingEntryCancel?.();
+          }}
+          onBlur={onCreatingEntryCancel}
+          placeholder={file.is_dir ? "New folder name" : "New file name"}
+          className="flex-1 h-5 text-sm bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/40"
           onClick={(e) => e.stopPropagation()}
         />
       ) : (

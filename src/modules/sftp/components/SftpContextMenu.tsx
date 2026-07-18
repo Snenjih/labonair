@@ -1,3 +1,6 @@
+import { invoke } from "@tauri-apps/api/core";
+import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,9 +20,6 @@ import {
 } from "@/components/ui/context-menu";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { handleApiError } from "@/lib/errors";
-import { invoke } from "@tauri-apps/api/core";
-import { open as dialogOpen } from "@tauri-apps/plugin-dialog";
-import { useState } from "react";
 import { useBookmarksStore } from "../store/bookmarksStore";
 import type { FileNode } from "../types";
 import { PropertiesDialog } from "./PropertiesDialog";
@@ -35,6 +35,7 @@ interface SftpContextMenuProps {
   onRefresh: () => void;
   onStartRename?: (path: string) => void;
   onStartNewFolder?: () => void;
+  onStartNewFile?: () => void;
   onOpenRemoteEditor: (
     tabId: string,
     remotePath: string,
@@ -55,6 +56,7 @@ export function SftpContextMenu({
   onRefresh,
   onStartRename,
   onStartNewFolder,
+  onStartNewFile,
   onOpenRemoteEditor,
   children,
 }: SftpContextMenuProps) {
@@ -155,6 +157,7 @@ export function SftpContextMenu({
         <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
         <ContextMenuContent className="w-52">
           <ContextMenuItem onClick={() => onStartNewFolder?.()}>New Folder</ContextMenuItem>
+          <ContextMenuItem onClick={() => onStartNewFile?.()}>New File</ContextMenuItem>
 
           {count === 1 && (
             <ContextMenuItem onClick={() => onStartRename?.(singlePath!)}>Rename</ContextMenuItem>

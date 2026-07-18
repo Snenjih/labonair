@@ -1,5 +1,3 @@
-import { Folder01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -7,7 +5,7 @@ import { handleApiError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useConnectionStatusStore, useHostsStore } from "@/modules/hosts";
 import { toggleSftpHiddenFiles, usePreferencesStore } from "@/modules/settings/preferences";
-import { useTabsStore, type SftpTab } from "@/modules/tabs";
+import { type SftpTab, useTabsStore } from "@/modules/tabs";
 import { SshLoadingScreen } from "@/modules/terminal/SshLoadingScreen";
 import { isLabonairError } from "@/types";
 import { SftpContextMenu } from "./components/SftpContextMenu";
@@ -15,7 +13,13 @@ import { SftpToolbar } from "./components/SftpToolbar";
 import { VirtualizedFileList } from "./components/VirtualizedFileList";
 import { useSftpStore } from "./store/sftpStore";
 import type { FileNode } from "./types";
-import { blurActiveInput, parentPath } from "./utils";
+import {
+  blurActiveInput,
+  buildSyntheticEntry,
+  isSyntheticEntry,
+  parentPath,
+  sanitizeEntryName,
+} from "./utils";
 
 interface SftpPaneProps {
   tab: SftpTab;
@@ -75,13 +79,20 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   const remotePaneRef = useRef<HTMLDivElement>(null);
   const draggedPathsRef = useRef<string[]>([]);
 
-  // Inline rename state
+  // Inline rename state — renamingSide is tracked explicitly (rather than
+  // derived from selection) since a local and remote item could in theory
+  // share the same absolute path string, which would make derivation ambiguous.
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renamingSide, setRenamingSide] = useState<"local" | "remote" | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  // Inline new folder state (separate for local/remote)
-  const [creatingFolderSide, setCreatingFolderSide] = useState<"local" | "remote" | null>(null);
-  const [newFolderName, setNewFolderName] = useState("");
+  // Inline new file/folder state (one shared slot — creating on one side/kind
+  // implicitly cancels any other in-flight create or rename, see startCreatingEntry/startRename)
+  const [creatingEntry, setCreatingEntry] = useState<{
+    side: "local" | "remote";
+    kind: "folder" | "file";
+  } | null>(null);
+  const [creatingEntryName, setCreatingEntryName] = useState("");
 
   // Deep search state
   const [deepSearchResults, setDeepSearchResults] = useState<string[] | null>(null);
@@ -179,7 +190,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   function handleSelectAll(side: "local" | "remote") {
     if (side === "remote" && deepSearchResults !== null) return; // no bulk selection over search results
     const files = side === "local" ? displayedLocalFiles : displayedRemoteFiles;
-    const paths = new Set(files.filter((f) => f.name !== "..").map((f) => f.path));
+    const paths = new Set(files.filter((f) => f.name !== ".." && !isSyntheticEntry(f)).map((f) => f.path));
     if (side === "local") {
       selectLocalPaths(paths);
     } else {
@@ -240,31 +251,67 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     );
   }
 
-  function startRename(path: string) {
+  function startRename(path: string, side: "local" | "remote") {
     const name = path.split("/").pop() ?? path;
+    // Mutual exclusion — starting a rename cancels any in-flight create.
+    setCreatingEntry(null);
+    setCreatingEntryName("");
     setRenamingPath(path);
+    setRenamingSide(side);
     setRenameValue(name);
   }
 
-  async function commitRename(side: "local" | "remote") {
-    if (!renamingPath || !renameValue.trim()) {
-      setRenamingPath(null);
-      return;
+  /** Removes `path` from the given side's selection set. Called on every
+   *  rename exit (commit or cancel, name changed or not) so the row's
+   *  selection ring never lingers after editing ends — rename is only
+   *  reachable on an already-selected row, and nothing else clears it. */
+  function clearRenameSelection(side: "local" | "remote", path: string) {
+    if (side === "local") {
+      const next = new Set(tabState?.selectedLocalPaths);
+      next.delete(path);
+      setSelectedLocal(tabId, next);
+    } else {
+      const next = new Set(tabState?.selectedRemotePaths);
+      next.delete(path);
+      setSelectedRemote(tabId, next);
     }
-    const dir = renamingPath.substring(0, renamingPath.lastIndexOf("/"));
-    const newPath = `${dir}/${renameValue.trim()}`;
+  }
+
+  function cancelRename() {
+    if (renamingPath && renamingSide) clearRenameSelection(renamingSide, renamingPath);
+    setRenamingPath(null);
+    setRenamingSide(null);
+  }
+
+  async function commitRename() {
+    const path = renamingPath;
+    const side = renamingSide;
+    if (!path || !side) return;
+    const sanitized = sanitizeEntryName(renameValue);
+    const currentName = path.split("/").pop() ?? path;
+    // Clear state synchronously, before the invoke() below — makes the row
+    // disappear immediately and guards against a second stray Enter/blur
+    // re-entering this function while the first call is still in flight.
+    clearRenameSelection(side, path);
+    setRenamingPath(null);
+    setRenamingSide(null);
+    // Invalid name, or unchanged name (renaming "to" the same name would
+    // always fail server-side since the target path already exists) — just
+    // close, no backend call, no error.
+    if (!sanitized || sanitized === currentName) return;
+    const dir = path.substring(0, path.lastIndexOf("/"));
+    const newPath = `${dir}/${sanitized}`;
     try {
       if (side === "remote") {
-        await invoke("sftp_rename", { sessionId: tabId, oldPath: renamingPath, newPath });
+        await invoke("sftp_rename", { sessionId: tabId, oldPath: path, newPath });
         loadRemoteDir(tabId, tabState?.remotePath ?? "/");
       } else {
-        await invoke("fs_rename", { from: renamingPath, to: newPath });
+        await invoke("fs_rename", { from: path, to: newPath });
         loadLocalDir(tabId, tabState?.localPath ?? "~");
       }
     } catch (e) {
       handleApiError(e, "Failed to rename", "SFTP");
     }
-    setRenamingPath(null);
   }
 
   function startDrag(source: "local" | "remote", paths: string[]) {
@@ -373,27 +420,55 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     }
   }
 
-  async function commitNewFolder(side: "local" | "remote") {
-    if (!newFolderName.trim()) {
-      setCreatingFolderSide(null);
-      return;
-    }
+  function startCreatingEntry(side: "local" | "remote", kind: "folder" | "file") {
+    // Mutual exclusion — starting a create cancels any in-flight rename.
+    cancelRename();
+    setCreatingEntry({ side, kind });
+    setCreatingEntryName("");
+  }
+
+  function cancelCreatingEntry() {
+    setCreatingEntry(null);
+    setCreatingEntryName("");
+  }
+
+  async function commitCreatingEntry() {
+    const entry = creatingEntry;
+    if (!entry) return;
+    const { side, kind } = entry;
+    // Local "New Folder" intentionally allows a nested "a/b/c" name to create
+    // the full chain (fs_create_dir uses create_dir_all) — preserved here by
+    // only allowing "/" for folders. New File would just hit a raw backend
+    // error for a nested name (fs_create_file/sftp_create_file don't create
+    // parent dirs), so it's rejected client-side with a clean cancel instead.
+    const sanitized = sanitizeEntryName(creatingEntryName, { allowNested: kind === "folder" });
+    // Clear state synchronously, before the invoke() below — same
+    // double-submit guard as commitRename.
+    setCreatingEntry(null);
+    setCreatingEntryName("");
+    if (!sanitized) return;
     const basePath = side === "remote" ? (tabState?.remotePath ?? "/") : (tabState?.localPath ?? "~");
     const sep = basePath.endsWith("/") ? "" : "/";
-    const newPath = `${basePath}${sep}${newFolderName.trim()}`;
+    const newPath = `${basePath}${sep}${sanitized}`;
     try {
       if (side === "remote") {
-        await invoke("sftp_mkdir", { sessionId: tabId, path: newPath });
+        if (kind === "folder") {
+          await invoke("sftp_mkdir", { sessionId: tabId, path: newPath });
+        } else {
+          await invoke("sftp_create_file", { sessionId: tabId, path: newPath });
+        }
         loadRemoteDir(tabId, basePath);
       } else {
-        await invoke("fs_create_dir", { path: newPath });
+        if (kind === "folder") {
+          await invoke("fs_create_dir", { path: newPath });
+        } else {
+          await invoke("fs_create_file", { path: newPath });
+        }
         loadLocalDir(tabId, basePath);
       }
     } catch (e) {
-      handleApiError(e, "Failed to create folder", "SFTP");
+      handleApiError(e, `Failed to create ${kind}`, "SFTP");
     }
-    setCreatingFolderSide(null);
-    setNewFolderName("");
   }
 
   async function handleDeepSearch(query: string) {
@@ -401,6 +476,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
       setDeepSearchResults(null);
       return;
     }
+    // The search-results overlay unmounts the remote VirtualizedFileList
+    // without changing remotePath, so the path-keyed cancel effects below
+    // wouldn't otherwise catch a rename/create left in-flight on that side.
+    if (renamingSide === "remote") cancelRename();
+    if (creatingEntry?.side === "remote") cancelCreatingEntry();
     setIsDeepSearching(true);
     try {
       const results = await invoke<string[]>("sftp_deep_search", {
@@ -462,8 +542,41 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
     return result;
   }
 
-  const displayedLocalFiles = buildFileList(tabState?.localFiles ?? [], localPath);
-  const displayedRemoteFiles = buildFileList(tabState?.remoteFiles ?? [], remotePath);
+  /** Splices the synthetic "creating a new entry" row in right after the
+   *  ".." row (or at the top if it isn't shown) — same insertion point
+   *  regardless of directory contents, settling into its real sorted
+   *  position once the directory reloads after commit. */
+  function withCreatingEntry(files: FileNode[], side: "local" | "remote"): FileNode[] {
+    if (creatingEntry?.side !== side) return files;
+    const insertAt = files[0]?.name === ".." ? 1 : 0;
+    return [...files.slice(0, insertAt), buildSyntheticEntry(creatingEntry.kind), ...files.slice(insertAt)];
+  }
+
+  const displayedLocalFiles = withCreatingEntry(
+    buildFileList(tabState?.localFiles ?? [], localPath),
+    "local",
+  );
+  const displayedRemoteFiles = withCreatingEntry(
+    buildFileList(tabState?.remoteFiles ?? [], remotePath),
+    "remote",
+  );
+
+  // Navigating away (folder double-click, breadcrumb, "..", bookmark — all of
+  // which funnel through loadLocalDir/loadRemoteDir and thus change
+  // localPath/remotePath) should cancel any rename/create left in-flight on
+  // that side, rather than leaving a stale edit row pointing at a path from
+  // the directory the user just left.
+  useEffect(() => {
+    if (renamingSide === "local") cancelRename();
+    if (creatingEntry?.side === "local") cancelCreatingEntry();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localPath]);
+
+  useEffect(() => {
+    if (renamingSide === "remote") cancelRename();
+    if (creatingEntry?.side === "remote") cancelCreatingEntry();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remotePath]);
 
   if (!isConnected && !hasError) {
     return (
@@ -538,7 +651,7 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
           >
             <PaneLabel
               label="LOCAL"
-              count={displayedLocalFiles.length}
+              count={displayedLocalFiles.filter((f) => !isSyntheticEntry(f)).length}
               selected={tabState?.selectedLocalPaths.size}
             />
             <SftpToolbar
@@ -548,17 +661,6 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
               onToggleHidden={toggleSftpHiddenFiles}
               bookmarkKey="local"
             />
-            {creatingFolderSide === "local" && (
-              <NewFolderInput
-                value={newFolderName}
-                onChange={setNewFolderName}
-                onCommit={() => commitNewFolder("local")}
-                onCancel={() => {
-                  setCreatingFolderSide(null);
-                  setNewFolderName("");
-                }}
-              />
-            )}
             <div className="flex-1 min-h-0">
               <SftpContextMenu
                 tabId={tabId}
@@ -569,11 +671,9 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                 hostAddress={hostAddress}
                 files={displayedLocalFiles}
                 onRefresh={() => loadLocalDir(tabId, localPath)}
-                onStartRename={startRename}
-                onStartNewFolder={() => {
-                  setCreatingFolderSide("local");
-                  setNewFolderName("");
-                }}
+                onStartRename={(path) => startRename(path, "local")}
+                onStartNewFolder={() => startCreatingEntry("local", "folder")}
+                onStartNewFile={() => startCreatingEntry("local", "file")}
                 onOpenRemoteEditor={onOpenRemoteEditor}
               >
                 <div className="h-full">
@@ -592,11 +692,15 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                     onDragStart={(paths) => startDrag("local", paths)}
                     dropDirection={activeDragSource === "remote" ? "download" : undefined}
                     isDropHovered={dropHoveredPane === "local"}
-                    renamingPath={renamingPath}
+                    renamingPath={renamingSide === "local" ? renamingPath : null}
                     renameValue={renameValue}
                     onRenameChange={setRenameValue}
-                    onRenameCommit={() => commitRename("local")}
-                    onRenameCancel={() => setRenamingPath(null)}
+                    onRenameCommit={commitRename}
+                    onRenameCancel={cancelRename}
+                    creatingEntryValue={creatingEntryName}
+                    onCreatingEntryChange={setCreatingEntryName}
+                    onCreatingEntryCommit={commitCreatingEntry}
+                    onCreatingEntryCancel={cancelCreatingEntry}
                   />
                 </div>
               </SftpContextMenu>
@@ -615,7 +719,11 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
           >
             <PaneLabel
               label={deepSearchResults !== null ? `SEARCH RESULTS (${deepSearchResults.length})` : "REMOTE"}
-              count={deepSearchResults !== null ? deepSearchResults.length : displayedRemoteFiles.length}
+              count={
+                deepSearchResults !== null
+                  ? deepSearchResults.length
+                  : displayedRemoteFiles.filter((f) => !isSyntheticEntry(f)).length
+              }
               selected={tabState?.selectedRemotePaths.size}
             />
             <SftpToolbar
@@ -633,18 +741,6 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
               onDeepSearch={handleDeepSearch}
               isSearching={isDeepSearching}
             />
-            {creatingFolderSide === "remote" && (
-              <NewFolderInput
-                value={newFolderName}
-                onChange={setNewFolderName}
-                onCommit={() => commitNewFolder("remote")}
-                onCancel={() => {
-                  setCreatingFolderSide(null);
-                  setNewFolderName("");
-                }}
-              />
-            )}
-
             {/* Deep search results overlay or normal file list */}
             {deepSearchResults !== null ? (
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -705,11 +801,9 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                   hostAddress={hostAddress}
                   files={displayedRemoteFiles}
                   onRefresh={() => loadRemoteDir(tabId, remotePath)}
-                  onStartRename={startRename}
-                  onStartNewFolder={() => {
-                    setCreatingFolderSide("remote");
-                    setNewFolderName("");
-                  }}
+                  onStartRename={(path) => startRename(path, "remote")}
+                  onStartNewFolder={() => startCreatingEntry("remote", "folder")}
+                  onStartNewFile={() => startCreatingEntry("remote", "file")}
                   onOpenRemoteEditor={onOpenRemoteEditor}
                 >
                   <div className="h-full">
@@ -728,11 +822,15 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                       onDragStart={(paths) => startDrag("remote", paths)}
                       dropDirection={activeDragSource === "local" ? "upload" : undefined}
                       isDropHovered={dropHoveredPane === "remote"}
-                      renamingPath={renamingPath}
+                      renamingPath={renamingSide === "remote" ? renamingPath : null}
                       renameValue={renameValue}
                       onRenameChange={setRenameValue}
-                      onRenameCommit={() => commitRename("remote")}
-                      onRenameCancel={() => setRenamingPath(null)}
+                      onRenameCommit={commitRename}
+                      onRenameCancel={cancelRename}
+                      creatingEntryValue={creatingEntryName}
+                      onCreatingEntryChange={setCreatingEntryName}
+                      onCreatingEntryCommit={commitCreatingEntry}
+                      onCreatingEntryCancel={cancelCreatingEntry}
                       hasMore={tabState?.remoteHasMore}
                       onLoadMore={() => loadMoreRemoteDir(tabId)}
                     />
@@ -771,33 +869,6 @@ function PaneLabel({ label, count, selected }: PaneLabelProps) {
           {selected ? ` · ${selected} selected` : ""}
         </span>
       )}
-    </div>
-  );
-}
-
-interface NewFolderInputProps {
-  value: string;
-  onChange: (v: string) => void;
-  onCommit: () => void;
-  onCancel: () => void;
-}
-
-function NewFolderInput({ value, onChange, onCommit, onCancel }: NewFolderInputProps) {
-  return (
-    <div className={cn("flex items-center gap-1 px-2 h-7 border-b border-border bg-muted/10 shrink-0")}>
-      <HugeiconsIcon icon={Folder01Icon} size={16} className="shrink-0 text-muted-foreground" />
-      <input
-        autoFocus
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onCommit();
-          if (e.key === "Escape") onCancel();
-        }}
-        onBlur={onCancel}
-        placeholder="New folder name"
-        className="flex-1 h-5 text-xs bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/40"
-      />
     </div>
   );
 }
