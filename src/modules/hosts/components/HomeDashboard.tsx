@@ -944,11 +944,21 @@ export function HomeDashboard({
         </div>
       </motion.div>
 
-      {/* RIGHT PANEL (Form / Inspector) */}
+      {/* RIGHT PANEL (Form / Inspector) — keyed by a stable constant, not by
+          hostId/credentialId, so AnimatePresence only plays its enter/exit
+          transition when the panel actually opens or closes. Switching
+          between two hosts (or two credentials) while it's already open
+          swaps the inner content in place instead of unmounting/remounting
+          this wrapper — that unmount/remount was what caused the master
+          list's `layout`-animated pane and CSS grid to briefly reflow on
+          every host switch. The inner HostFormPanel/CredentialFormPanel
+          still remount per-id (see the comment in HostFormPanel about why
+          that's deliberate for its own form-state reset), just without
+          taking this wrapper's mount lifecycle down with them. */}
       <AnimatePresence>
         {showPanel && (
           <motion.div
-            key={viewMode === "hosts" ? (panelHostId ?? "__new__") : (selectedCredentialId ?? "__new__cred")}
+            key="panel"
             layout
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -962,6 +972,7 @@ export function HomeDashboard({
             <div className="h-full w-[340px] flex flex-col">
               {viewMode === "hosts" ? (
                 <HostFormPanel
+                  key={panelHostId ?? "__new__"}
                   hostId={panelHostId}
                   onClose={() => setSelectedHost(null)}
                   newSshTab={newSshTab}
@@ -973,6 +984,7 @@ export function HomeDashboard({
                 />
               ) : (
                 <CredentialFormPanel
+                  key={selectedCredentialId ?? "__new__cred"}
                   credentialId={selectedCredentialId}
                   onClose={() => setSelectedCredential(null)}
                 />
