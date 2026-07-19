@@ -32,6 +32,7 @@ export interface Host {
   credential_id?: string;
   jump_host_id?: string | null;
   notes?: string;
+  icon?: string | null;
 }
 
 export interface Credential {
@@ -105,6 +106,7 @@ export interface CreateHostPayload {
   credential_id?: string;
   jump_host_id?: string | null;
   notes?: string;
+  icon?: string;
 }
 
 export interface UpdateHostPayload extends Partial<CreateHostPayload> {

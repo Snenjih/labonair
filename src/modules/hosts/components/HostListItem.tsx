@@ -30,6 +30,7 @@ import type { Group, Host } from "../types";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import { HostAvatar } from "./HostAvatar";
 
 interface HostListItemProps {
   host: Host;
@@ -53,14 +54,6 @@ function relativeTime(ms: number): string {
   if (hours > 0) return `${hours}h ago`;
   if (minutes > 0) return `${minutes}m ago`;
   return "just now";
-}
-
-function initials(name: string): string {
-  return name
-    .split(/[\s\-_]+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
 }
 
 export function HostListItem({
@@ -166,21 +159,7 @@ export function HostListItem({
               className="flex flex-1 items-center gap-3 py-3 text-left outline-none min-w-0"
             >
               {/* Avatar with ping dot */}
-              <div className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40 text-[11px] font-semibold text-muted-foreground">
-                {host.pin_to_top ? (
-                  <span className="text-[8px] text-primary absolute -top-1 -right-1">★</span>
-                ) : null}
-                {initials(host.name) || "?"}
-                <span
-                  className={cn(
-                    "absolute -bottom-0.5 -right-0.5 size-2 rounded-full border-2 border-background",
-                    pingStatus === "online" &&
-                      "bg-success [box-shadow:0_0_4px_color-mix(in_oklch,var(--color-success)_70%,transparent)]",
-                    pingStatus === "offline" && "bg-destructive",
-                    (!pingStatus || pingStatus === "checking") && "bg-muted-foreground/40 animate-pulse",
-                  )}
-                />
-              </div>
+              <HostAvatar host={host} size="sm" pingStatus={pingStatus} />
 
               {/* Name + subtitle */}
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">

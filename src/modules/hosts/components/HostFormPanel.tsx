@@ -28,6 +28,7 @@ import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
 import type { CreateHostPayload, Host, TunnelConfig, UpdateHostPayload } from "../types";
+import { HostIconPicker } from "./HostIconPicker";
 
 interface Props {
   /** If null, panel is in "add new" mode */
@@ -67,6 +68,7 @@ interface FormState {
   // Jump host & notes
   jump_host_id: string;
   notes: string;
+  icon: string | null;
 }
 
 function hostToForm(host: Host): FormState {
@@ -89,6 +91,7 @@ function hostToForm(host: Host): FormState {
     startup_snippet_mode: (host.startup_snippet_mode as "execute" | "inject") ?? "execute",
     jump_host_id: host.jump_host_id ?? "",
     notes: host.notes ?? "",
+    icon: host.icon ?? null,
   };
 }
 
@@ -111,6 +114,7 @@ const DEFAULT_FORM: FormState = {
   startup_snippet_mode: "execute",
   jump_host_id: "",
   notes: "",
+  icon: null,
 };
 
 function parseTunnels(raw?: string): TunnelConfig[] {
@@ -161,6 +165,7 @@ function buildUpdatePayload(
   payload.startup_snippet_mode = form.startup_snippet_mode;
   payload.jump_host_id = form.jump_host_id || null;
   payload.notes = form.notes || null;
+  payload.icon = form.icon || "";
   return payload as unknown as UpdateHostPayload;
 }
 
@@ -352,6 +357,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
       }
       if (form.jump_host_id) payload.jump_host_id = form.jump_host_id;
       if (form.notes) payload.notes = form.notes;
+      if (form.icon) payload.icon = form.icon;
 
       const newHost = await createHost(payload as unknown as CreateHostPayload);
       setSelectedHost(newHost.id);
@@ -417,6 +423,11 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex items-center gap-2 border-b border-border px-4 py-3 sticky top-0 bg-background z-10">
+        <HostIconPicker
+          value={form.icon}
+          name={form.name}
+          onChange={(icon) => setForm((d) => ({ ...d, icon }))}
+        />
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             {isNew ? "New Host" : "Host Details"}
