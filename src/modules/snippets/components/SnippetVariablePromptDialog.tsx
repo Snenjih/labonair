@@ -40,8 +40,8 @@ export function SnippetVariablePromptDialog({ open, snippetName, variables, onSu
         <DialogHeader>
           <DialogTitle>Fill in variables</DialogTitle>
           <DialogDescription>
-            {snippetName ? `"${snippetName}"` : "This snippet"} uses variables — fill in a value for each
-            one. This is used for this run only.
+            {snippetName ? `"${snippetName}"` : "This snippet"} uses variables — fill in a value for each one.
+            This is used for this run only.
           </DialogDescription>
         </DialogHeader>
 

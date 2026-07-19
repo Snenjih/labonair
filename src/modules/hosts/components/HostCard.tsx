@@ -398,7 +398,9 @@ export function HostCard({
               <ContextMenuItem onClick={() => togglePin(host.id)}>
                 {host.pin_to_top ? "Unpin" : "Pin to Top"}
               </ContextMenuItem>
-              <ContextMenuItem onClick={() => void handleExportSshConfig()}>Export SSH Config</ContextMenuItem>
+              <ContextMenuItem onClick={() => void handleExportSshConfig()}>
+                Export SSH Config
+              </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem
                 className="text-destructive focus:text-destructive"

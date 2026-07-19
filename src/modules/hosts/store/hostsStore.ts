@@ -196,9 +196,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       const ids = new Set(s.selectedHostIds);
       ids.delete(id);
       return {
-        hosts: s.hosts
-          .filter((h) => h.id !== id)
-          .map((h) => clearDanglingHostRefs(h, new Set([id]))),
+        hosts: s.hosts.filter((h) => h.id !== id).map((h) => clearDanglingHostRefs(h, new Set([id]))),
         selectedHostId: s.selectedHostId === id ? null : s.selectedHostId,
         selectedHostIds: ids,
       };
@@ -214,9 +212,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       else failed.push(ids[i]);
     });
     set((s) => ({
-      hosts: s.hosts
-        .filter((h) => !deleted.has(h.id))
-        .map((h) => clearDanglingHostRefs(h, deleted)),
+      hosts: s.hosts.filter((h) => !deleted.has(h.id)).map((h) => clearDanglingHostRefs(h, deleted)),
       selectedHostId: deleted.has(s.selectedHostId ?? "") ? null : s.selectedHostId,
       // Failed deletes stay selected — a still-visible host disappearing from
       // the selection would be confusing given it's still in the list.

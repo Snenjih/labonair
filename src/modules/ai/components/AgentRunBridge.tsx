@@ -5,7 +5,13 @@ import type { AiDiffStatus } from "@/modules/tabs";
 import { native } from "../lib/native";
 import { checkReadable } from "../lib/security";
 import { resolvePath } from "../tools/tools";
-import { deriveRunStatus, flushPersist, getOrCreateChat, useChatStore, type AgentRunStatus } from "../store/chatStore";
+import {
+  deriveRunStatus,
+  flushPersist,
+  getOrCreateChat,
+  useChatStore,
+  type AgentRunStatus,
+} from "../store/chatStore";
 
 /**
  * Headless bridge that mirrors chat lifecycle into the store, so the status

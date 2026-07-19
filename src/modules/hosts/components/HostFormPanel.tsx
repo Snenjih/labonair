@@ -496,8 +496,8 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
             {f("Display Name", "name", "text", "My Server")}
             {duplicateNameHost && (
               <p className="text-[11px] text-warning">
-                Another host is already named "{duplicateNameHost.name}" — this won't cause conflicts, just
-                a heads-up.
+                Another host is already named "{duplicateNameHost.name}" — this won't cause conflicts, just a
+                heads-up.
               </p>
             )}
             <div className="flex gap-2">

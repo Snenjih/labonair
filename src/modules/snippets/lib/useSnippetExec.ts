@@ -197,8 +197,7 @@ export function useSnippetExec({
             });
             return;
           }
-          const hostId =
-            resolution.kind === "ok" ? resolution.hostId : await promptForHost(snippet.name);
+          const hostId = resolution.kind === "ok" ? resolution.hostId : await promptForHost(snippet.name);
           if (!hostId) return; // user cancelled the host picker
           onNewSshTab(hostId, snippet.name, undefined, command);
         } else {

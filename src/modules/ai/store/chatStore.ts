@@ -1,7 +1,14 @@
 import { Chat, type UIMessage } from "@ai-sdk/react";
 import { type ChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { create } from "zustand";
-import { DEFAULT_MODEL_ID, findModel, getModel, providerNeedsKey, type ModelId, type ProviderId } from "../config";
+import {
+  DEFAULT_MODEL_ID,
+  findModel,
+  getModel,
+  providerNeedsKey,
+  type ModelId,
+  type ProviderId,
+} from "../config";
 import { parseModelRef } from "../lib/modelRef";
 import { useProvidersStore } from "./providersStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";

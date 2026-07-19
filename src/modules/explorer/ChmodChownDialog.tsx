@@ -21,9 +21,18 @@ interface ChmodChownDialogProps {
  * Deliberately smaller than the dual-pane SFTP tab's `PropertiesDialog`
  * (no size calculation, no tabs) — just the two permission actions.
  */
-export function ChmodChownDialog({ open, onClose, path, permissions, onChmod, onChown }: ChmodChownDialogProps) {
+export function ChmodChownDialog({
+  open,
+  onClose,
+  path,
+  permissions,
+  onChmod,
+  onChown,
+}: ChmodChownDialogProps) {
   const [octalInput, setOctalInput] = useState(() => permStringToOctal(permissions ?? ""));
-  const [matrix, setMatrix] = useState<boolean[][]>(() => octalToMatrix(permStringToOctal(permissions ?? "")));
+  const [matrix, setMatrix] = useState<boolean[][]>(() =>
+    octalToMatrix(permStringToOctal(permissions ?? "")),
+  );
   const [owner, setOwner] = useState("");
   const [group, setGroup] = useState("");
   const [isApplying, setIsApplying] = useState(false);
