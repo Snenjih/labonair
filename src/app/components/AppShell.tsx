@@ -13,7 +13,7 @@ import { BackgroundImageLayer } from "@/modules/settings/BackgroundImageLayer";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { ShortcutsDialog } from "@/modules/shortcuts";
-import { SnippetLogDrawer } from "@/modules/snippets";
+import { SnippetHostPickerDialog, SnippetLogDrawer, SnippetVariablePromptDialog } from "@/modules/snippets";
 import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
 import type { SidebarPanel, SidebarReturn } from "@/modules/statusbar";
 import { StatusBar } from "@/modules/statusbar";
@@ -298,6 +298,22 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
             <SnippetLogDrawer
               open={tabs.snippetLogDrawerOpen}
               onClose={() => tabs.setSnippetLogDrawerOpen(false)}
+              onCancelRun={tabs.cancelSnippetRun}
+            />
+
+            <SnippetHostPickerDialog
+              open={tabs.snippetHostPicker.open}
+              snippetName={tabs.snippetHostPicker.snippetName}
+              onSelect={tabs.snippetHostPicker.onSelect}
+              onCancel={tabs.snippetHostPicker.onCancel}
+            />
+
+            <SnippetVariablePromptDialog
+              open={tabs.snippetVariablePrompt.open}
+              snippetName={tabs.snippetVariablePrompt.snippetName}
+              variables={tabs.snippetVariablePrompt.variables}
+              onSubmit={tabs.snippetVariablePrompt.onSubmit}
+              onCancel={tabs.snippetVariablePrompt.onCancel}
             />
 
             {prefs.zenModeShowStatusbar && (

@@ -42,6 +42,7 @@ export function useGitStatus(target: ExplorerTarget) {
   const setDiffContent = useSourceControlStore((s) => s.setDiffContent);
   const setIsDiffLoading = useSourceControlStore((s) => s.setIsDiffLoading);
   const setDiffStats = useSourceControlStore((s) => s.setDiffStats);
+  const setSubmodules = useSourceControlStore((s) => s.setSubmodules);
   const selectionMode = useSourceControlStore((s) => s.selectionMode);
   const ignoreWhitespace = useSourceControlStore((s) => s.ignoreWhitespace);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
@@ -157,6 +158,7 @@ export function useGitStatus(target: ExplorerTarget) {
       setStashEntries(state.stash);
       setTags(state.tags);
       setDiffStats(state.diffStats);
+      setSubmodules(state.submodules);
     } catch (e) {
       if (!isStale()) setError(String(e));
     } finally {
@@ -181,6 +183,7 @@ export function useGitStatus(target: ExplorerTarget) {
     setCurrentBranch,
     setTags,
     setDiffStats,
+    setSubmodules,
     setError,
   ]);
 

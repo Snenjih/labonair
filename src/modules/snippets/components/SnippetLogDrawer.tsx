@@ -7,6 +7,7 @@ import {
   CheckmarkCircle02Icon,
   Alert02Icon,
   Loading03Icon,
+  StopCircleIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AnimatePresence, motion } from "motion/react";
@@ -17,9 +18,10 @@ import type { SnippetRunLog } from "../types";
 interface Props {
   open: boolean;
   onClose: () => void;
+  onCancelRun: (runId: string) => void;
 }
 
-export function SnippetLogDrawer({ open, onClose }: Props) {
+export function SnippetLogDrawer({ open, onClose, onCancelRun }: Props) {
   const runLogs = useCommandSnippetsStore((s) => s.runLogs);
   const clearRunLogs = useCommandSnippetsStore((s) => s.clearRunLogs);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -85,9 +87,26 @@ export function SnippetLogDrawer({ open, onClose }: Props) {
                 </div>
 
                 {/* Log output */}
-                <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-1 flex-col">
                   {selectedLog ? (
-                    <LogOutput log={selectedLog} />
+                    <>
+                      {selectedLog.status === "running" && (
+                        <div className="flex h-7 shrink-0 items-center justify-end border-b border-border/40 px-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 gap-1 px-2 text-[10px] text-muted-foreground hover:text-destructive"
+                            onClick={() => onCancelRun(selectedLog.runId)}
+                          >
+                            <HugeiconsIcon icon={StopCircleIcon} size={11} strokeWidth={1.75} />
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+                      <div className="min-h-0 flex-1">
+                        <LogOutput log={selectedLog} />
+                      </div>
+                    </>
                   ) : (
                     <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                       Select a run
@@ -140,6 +159,11 @@ function StatusIcon({ status }: { status: SnippetRunLog["status"] }) {
       />
     );
   }
+  if (status === "cancelled") {
+    return (
+      <HugeiconsIcon icon={StopCircleIcon} size={12} strokeWidth={2} className="shrink-0 text-warning" />
+    );
+  }
   return <HugeiconsIcon icon={Alert02Icon} size={12} strokeWidth={2} className="shrink-0 text-destructive" />;
 }
 
@@ -161,7 +185,10 @@ function LogOutput({ log }: { log: SnippetRunLog }) {
             {line.data}
           </span>
         ))}
-        {log.status !== "running" && log.exitCode !== undefined && (
+        {log.status === "cancelled" && (
+          <span className="mt-1 block border-t border-border/40 pt-1 text-warning">[cancelled]</span>
+        )}
+        {log.status !== "running" && log.status !== "cancelled" && log.exitCode !== undefined && (
           <span
             className={cn(
               "mt-1 block border-t border-border/40 pt-1 text-muted-foreground",

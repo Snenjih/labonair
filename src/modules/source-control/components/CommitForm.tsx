@@ -70,7 +70,10 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
   const canCommit =
     commitMessage.trim().length > 0 && (status?.staged.length ?? 0) > 0 && operationInProgress === null;
 
-  const inSpecialState = (status?.mergeInProgress ?? false) || (status?.rebaseInProgress ?? false);
+  const inSpecialState =
+    (status?.mergeInProgress ?? false) ||
+    (status?.rebaseInProgress ?? false) ||
+    (status?.cherryPickInProgress ?? false);
 
   async function handleCommit() {
     if (!canCommit) return;
@@ -122,6 +125,20 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
     setError(null);
     try {
       await git.abort(repoRoot, sessionId ?? undefined);
+      onRefresh();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setOperationInProgress(null);
+    }
+  }
+
+  async function handleContinue() {
+    if (operationInProgress) return;
+    setOperationInProgress("continue");
+    setError(null);
+    try {
+      await git.continue(repoRoot, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
       setError(String(e));
@@ -249,6 +266,10 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
               {inSpecialState && (
                 <>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => void handleContinue()} className="text-xs font-medium">
+                    <HugeiconsIcon icon={GitCommitIcon} size={11} strokeWidth={2} className="mr-2" />
+                    Continue
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => void handleAbort()}
                     className="text-xs text-red-500 focus:text-red-500"

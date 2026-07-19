@@ -1,7 +1,15 @@
 import { Chat, type UIMessage } from "@ai-sdk/react";
 import { type ChatTransport, lastAssistantMessageIsCompleteWithApprovalResponses } from "ai";
 import { create } from "zustand";
-import { DEFAULT_MODEL_ID, getModel, providerNeedsKey, type ModelId, type ProviderId } from "../config";
+import {
+  DEFAULT_MODEL_ID,
+  findModel,
+  getModel,
+  providerNeedsKey,
+  type ModelId,
+  type ProviderId,
+} from "../config";
+import { parseModelRef } from "../lib/modelRef";
 import { useProvidersStore } from "./providersStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { BUILTIN_AGENTS } from "../lib/agents";
@@ -78,6 +86,42 @@ const IDLE_META: AgentMeta = {
   hitStepCap: false,
   compactionNotice: null,
 };
+
+/**
+ * Derives the `AgentRunStatus` + pending-approval count from a Chat
+ * instance's raw `status`/`messages` — the exact mapping `AgentRunBridge`
+ * applies when it mounts for a session (`components/AgentRunBridge.tsx`).
+ * Shared here so any code path that needs to know a chat's *real* current
+ * status without a mounted bridge (LRU eviction, session switch) reuses the
+ * same logic instead of re-deriving it.
+ */
+export function deriveRunStatus(
+  status: "submitted" | "streaming" | "ready" | "error",
+  messages: UIMessage[],
+): { status: AgentRunStatus; approvalsPending: number } {
+  let approvalsPending = 0;
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const p of m.parts) {
+      if ((p as { state?: string }).state === "approval-requested") approvalsPending++;
+    }
+  }
+  let runStatus: AgentRunStatus;
+  if (approvalsPending > 0) runStatus = "awaiting-approval";
+  else if (status === "submitted") runStatus = "thinking";
+  else if (status === "streaming") runStatus = "streaming";
+  else if (status === "error") runStatus = "error";
+  else runStatus = "idle";
+  return { status: runStatus, approvalsPending };
+}
+
+/** Resolves the `ProviderId` backing the currently globally-selected model,
+ *  or null for a dynamically-fetched model id not in the static `MODELS`
+ *  list (can't determine its provider without a network round trip). */
+function activeModelProviderId(): ProviderId | null {
+  const { modelDefId } = parseModelRef(useChatStore.getState().selectedModelId);
+  return findModel(modelDefId)?.provider ?? null;
+}
 
 export type MiniState = {
   open: boolean;
@@ -184,8 +228,23 @@ function touchChat(id: string, c: Chat<UIMessage>): void {
   const activeId = useChatStore.getState().activeSessionId;
   for (const oldest of chats.keys()) {
     if (oldest === activeId) continue;
-    flushPersistEntry(oldest);
-    void chats.get(oldest)?.stop();
+    const evicted = chats.get(oldest);
+    if (pendingPersist.has(oldest)) {
+      // A mounted AgentRunBridge already queued a debounced write — flush it.
+      flushPersistEntry(oldest);
+    } else if (evicted) {
+      // No bridge was ever mounted for this background session (it only
+      // streams via its own Chat object, see AgentRunBridge's single-
+      // activeSessionId-only mount), so nothing was ever queued here even if
+      // it's mid-stream — read its current messages directly before it gets
+      // stopped, or an in-progress response is both killed and never saved.
+      void saveMessages(oldest, evicted.messages);
+    }
+    void evicted?.stop();
+    // Same reasoning as `deleteSession` below — an evicted background
+    // session's backing Rust shell process would otherwise leak for the rest
+    // of the app's lifetime, since nothing else ever closes it.
+    void clearSessionShell(oldest);
     chats.delete(oldest);
     if (chats.size <= CHATS_LRU_CAP) break;
   }
@@ -334,10 +393,32 @@ export const useChatStore = create<StoreState>((set, get) => ({
   },
 
   apiKeys: { ...EMPTY_PROVIDER_KEYS },
-  setApiKeys: (keys) => set({ apiKeys: keys, agentMeta: IDLE_META }),
+  // Resetting `agentMeta` to idle here used to be unconditional — but
+  // `setApiKeys` is called from a global `onKeysChanged` listener that fires
+  // on ANY provider key edit anywhere in Settings, so editing an unrelated
+  // provider's key while a session is mid-stream/awaiting-approval falsely
+  // cleared that status. This is a partial mitigation, not a full fix: there
+  // is currently no per-session provider/model binding (`selectedModelId` is
+  // one global value shared by every session), so this can only compare
+  // against the *globally* selected model, not each session's own model.
+  setApiKeys: (keys) => {
+    const prev = get().apiKeys;
+    const changedProviders = (Object.keys(keys) as ProviderId[]).filter((p) => prev[p] !== keys[p]);
+    const activeProvider = activeModelProviderId();
+    const affectsActiveModel = activeProvider === null || changedProviders.includes(activeProvider);
+    set({
+      apiKeys: keys,
+      ...(affectsActiveModel && get().agentMeta.status !== "idle" ? { agentMeta: IDLE_META } : {}),
+    });
+  },
   setApiKey: (provider, key) => {
     const next = { ...get().apiKeys, [provider]: key };
-    set({ apiKeys: next, agentMeta: IDLE_META });
+    const activeProvider = activeModelProviderId();
+    const affectsActiveModel = activeProvider === null || activeProvider === provider;
+    set({
+      apiKeys: next,
+      ...(affectsActiveModel && get().agentMeta.status !== "idle" ? { agentMeta: IDLE_META } : {}),
+    });
   },
 
   selectedModelId: (() => {
@@ -491,14 +572,19 @@ export const useChatStore = create<StoreState>((set, get) => ({
 
     // Lazily seed the chat with persisted messages the first time we open
     // this session. Subsequent switches reuse the cached Chat instance.
-    const flip = () => {
-      set({ activeSessionId: id, agentMeta: IDLE_META });
+    const flip = (chat?: Chat<UIMessage>) => {
+      // A cached chat may still be streaming/awaiting-approval in the
+      // background (see `touchChat`'s LRU note) — hardcoding idle here used
+      // to briefly show the wrong status until `AgentRunBridge` re-mounted
+      // and corrected it. Derive the real status up front instead.
+      const meta = chat ? { ...IDLE_META, ...deriveRunStatus(chat.status, chat.messages) } : IDLE_META;
+      set({ activeSessionId: id, agentMeta: meta });
       void saveActiveId(id);
     };
     if (chats.has(id) || seedMessages.has(id)) {
       const existing = chats.get(id);
       if (existing) touchChat(id, existing);
-      flip();
+      flip(existing);
       return;
     }
     void loadMessages(id).then((m) => {
@@ -519,7 +605,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
     }
     void deleteSessionData(id);
     void useTodosStore.getState().clearSession(id);
-    clearSessionShell(id);
+    void clearSessionShell(id);
     get().clearQueue(id);
 
     if (remaining.length === 0) {

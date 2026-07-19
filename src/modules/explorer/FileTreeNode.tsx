@@ -10,6 +10,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
+import { ChmodChownDialog } from "./ChmodChownDialog";
 import { InlineInput } from "./InlineInput";
 import { copyToClipboard, relativePath, revealInFinder } from "./lib/contextActions";
 import { explorerDrag } from "./lib/explorerDrag";
@@ -70,6 +71,7 @@ function FileTreeNodeImpl({
   const isRenaming = tree.renaming === path;
 
   const [isConfirming, setIsConfirming] = useState(false);
+  const [chmodChownOpen, setChmodChownOpen] = useState(false);
 
   const iconUrl = isDir ? folderIconUrl(entry.name, isExpanded) : fileIconUrl(entry.name);
 
@@ -222,10 +224,17 @@ function FileTreeNodeImpl({
             Reveal in Finder
           </ContextMenuItem>
         )}
+        {(tree.capabilities.supportsChmod || tree.capabilities.supportsChown) && (
+          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => setChmodChownOpen(true)}>
+            Permissions…
+          </ContextMenuItem>
+        )}
         {(!isDir ||
           (canPreview && !!onOpenPreview) ||
           (isDir && !!onRevealInTerminal) ||
-          tree.capabilities.supportsReveal) && <ContextMenuSeparator />}
+          tree.capabilities.supportsReveal ||
+          tree.capabilities.supportsChmod ||
+          tree.capabilities.supportsChown) && <ContextMenuSeparator />}
         <ContextMenuItem className={COMPACT_ITEM} onSelect={() => tree.beginCreate(createTarget, "file")}>
           New File
         </ContextMenuItem>
@@ -266,6 +275,16 @@ function FileTreeNodeImpl({
           {isConfirming ? "Click again to confirm" : "Delete"}
         </ContextMenuItem>
       </ContextMenuContent>
+      {(tree.capabilities.supportsChmod || tree.capabilities.supportsChown) && (
+        <ChmodChownDialog
+          open={chmodChownOpen}
+          onClose={() => setChmodChownOpen(false)}
+          path={path}
+          permissions={entry.permissions}
+          onChmod={tree.chmod}
+          onChown={tree.chown}
+        />
+      )}
     </ContextMenu>
   );
 }

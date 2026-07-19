@@ -42,6 +42,21 @@ pub async fn cancel_transfer(
         .map_err(|e| e.to_string())
 }
 
+/// Called after a dual-pane SFTP tab reconnects, so any transfer job still
+/// running against the old (now-replaced) session gets cancelled and
+/// re-enqueued against the fresh one instead of silently limping along
+/// against a dead connection. No-op if nothing is currently running for
+/// this session.
+#[tauri::command]
+pub async fn sftp_session_reconnected(
+    session_id: String,
+    worker: tauri::State<'_, TransferWorkerState>,
+) -> Result<(), String> {
+    worker.sender.send(WorkerMessage::SessionReconnected(session_id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn resolve_conflict(
     job_id: String,

@@ -11,6 +11,34 @@ function maxScrollbackBytes(): number {
   return usePreferencesStore.getState().scrollbackMaxSizeMb * 1024 * 1024;
 }
 
+// Visible marker prepended once `truncateScrollback` has to cut content —
+// mirrors DormantRing's OVERFLOW_NOTICE (dormantRing.ts) so an on-disk
+// scrollback that got trimmed to fit `maxBytes` reads the same way a
+// dropped-while-backgrounded ring does, instead of just silently starting
+// mid-stream with no explanation.
+const SCROLLBACK_OVERFLOW_NOTICE =
+  "\r\n\x1b[0m\x1b[2m[labonair: earlier scrollback was truncated to fit the size limit]\x1b[0m\r\n";
+
+/**
+ * Truncates `ansi` from the front (oldest content first) once it exceeds
+ * `maxBytes`, keeping the most recent output instead of dropping the whole
+ * blob outright — same truncate-with-overflow-notice pattern
+ * `DormantRing.push()` uses for its in-memory ring (dormantRing.ts:43-73),
+ * applied here to the string about to be persisted to disk. The cut point is
+ * advanced to the next line boundary so an ANSI escape sequence never gets
+ * split mid-sequence. Shared by both scrollback write paths below so the
+ * truncation logic isn't duplicated.
+ */
+function truncateScrollback(ansi: string, maxBytes: number): string {
+  if (ansi.length <= maxBytes) return ansi;
+  const budget = maxBytes - SCROLLBACK_OVERFLOW_NOTICE.length;
+  if (budget <= 0) return SCROLLBACK_OVERFLOW_NOTICE.slice(0, maxBytes);
+  const cutStart = ansi.length - budget;
+  const lf = ansi.indexOf("\n", cutStart);
+  const start = lf >= 0 ? lf + 1 : cutStart;
+  return SCROLLBACK_OVERFLOW_NOTICE + ansi.slice(start);
+}
+
 type ScrollbackLive = {
   getAllTerminalRefs: () => Map<string, TerminalPaneHandle>;
 };
@@ -32,9 +60,9 @@ export async function saveAllScrollbacks(sessionIds: string[]): Promise<void> {
       const ansi = handle.serialize(scrollbackLimit > 0 ? scrollbackLimit : undefined);
       if (!ansi || ansi.trim().length === 0) return; // empty buffer
       const maxBytes = maxScrollbackBytes();
-      if (ansi.length > maxBytes) return; // oversized guard
+      const truncated = truncateScrollback(ansi, maxBytes);
       try {
-        await invoke("scrollback_save", { sessionId, ansi, maxBytes });
+        await invoke("scrollback_save", { sessionId, ansi: truncated, maxBytes });
       } catch (e) {
         console.warn("[scrollback] save failed:", sessionId, e);
       }
@@ -59,6 +87,13 @@ const DORMANT_FLUSH_SEPARATOR = `\r\n\x1b[2m\x1b[90m${"─".repeat(24)} backgrou
  * ticks append rather than re-duplicate the whole ring each time.
  * No-op if nothing new was buffered (the common case for a quiet background
  * tab, and always the case for a currently-bound session, whose ring is empty).
+ *
+ * Known perf limitation (deliberately deferred): this is a full read-modify-
+ * write of the whole scrollback file on every 30s tick, so cost scales with
+ * the existing file's size rather than just the new delta. An append-only
+ * write path would need a new/changed Rust command; left as-is for now since
+ * that's a riskier change than this pass's correctness fix (the truncation
+ * below) warrants.
  */
 export async function flushDormantScrollback(sessionId: string): Promise<void> {
   const buffered = peekDormantAnsi(sessionId);
@@ -67,8 +102,9 @@ export async function flushDormantScrollback(sessionId: string): Promise<void> {
     const maxBytes = maxScrollbackBytes();
     const existing = (await invoke<string | null>("scrollback_load", { sessionId, maxBytes })) ?? "";
     const combined = existing ? existing + DORMANT_FLUSH_SEPARATOR + buffered : buffered;
-    if (combined.trim().length === 0 || combined.length > maxBytes) return;
-    await invoke("scrollback_save", { sessionId, ansi: combined, maxBytes });
+    if (combined.trim().length === 0) return;
+    const truncated = truncateScrollback(combined, maxBytes);
+    await invoke("scrollback_save", { sessionId, ansi: truncated, maxBytes });
     // Only mark these bytes as flushed once they're actually durably saved —
     // an early return above (size cap) or a caught failure below leaves them
     // unflushed so the next tick previews and retries them instead of

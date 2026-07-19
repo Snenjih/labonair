@@ -208,9 +208,7 @@ function TransferItem({ job, onCancel }: { job: TransferJob; onCancel: () => voi
             )}
           >
             {statusLabel(job.status)}
-            {job.status === "completed" && job.skipped_count > 0
-              ? ` · ${job.skipped_count} skipped`
-              : ""}
+            {job.status === "completed" && job.skipped_count > 0 ? ` · ${job.skipped_count} skipped` : ""}
           </span>
         )}
         {isActive && (

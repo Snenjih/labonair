@@ -1,11 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
 import { tokenizeFull } from "./commandTokenizer";
-
-// TODO: also search src/modules/snippets (user-saved reusable commands, see
-// commandSnippetsStore.ts) as a suggestion source alongside shell history —
-// snippets are curated/named, history is just "what the shell already knows
-// you ran". Merging the two lets Tab-complete surface saved snippets too.
 
 export type HistorySource = { kind: "local" } | { kind: "ssh"; sessionId: string };
 
@@ -40,6 +36,24 @@ const MAX_ARGUMENT_CANDIDATES = 20;
 // quick succession) resolving out of order and letting a slower, older
 // fetch clobber a newer one's result.
 const latestRequest = new Map<string, number>();
+
+// Which kind of session each sessionId is — set alongside sessionCache in
+// loadHistory, read by suggestFor/suggestArguments to filter in only
+// same-kind snippets (see snippetCommandsFor) when merging saved snippet
+// commands into history-derived suggestions.
+const sessionKindCache = new Map<string, "local" | "ssh">();
+
+/** Saved snippet commands usable as extra completion candidates for a
+ *  session of the given kind — curated/named alongside shell history's
+ *  "what the shell already knows you ran". Filtered to `target === kind` so
+ *  an SSH-only snippet never surfaces in a local terminal's suggestions (or
+ *  a local-only one in an SSH session). */
+function snippetCommandsFor(kind: "local" | "ssh"): string[] {
+  return useCommandSnippetsStore
+    .getState()
+    .snippets.filter((s) => s.target === kind)
+    .map((s) => s.command);
+}
 
 // zsh's EXTENDED_HISTORY option (on by default in most modern setups, e.g.
 // Oh My Zsh) prefixes each line with `: <timestamp>:<duration>;`; bash with
@@ -146,6 +160,7 @@ async function readSshHistory(sessionId: string): Promise<string[]> {
 export async function loadHistory(sessionId: string, source: HistorySource): Promise<void> {
   const seq = (latestRequest.get(sessionId) ?? 0) + 1;
   latestRequest.set(sessionId, seq);
+  sessionKindCache.set(sessionId, source.kind);
   const list = source.kind === "local" ? await readLocalHistory() : await readSshHistory(source.sessionId);
   if (latestRequest.get(sessionId) !== seq) return; // superseded by a newer call
   sessionCache.set(sessionId, list);
@@ -168,13 +183,22 @@ export function historyListFor(sessionId: string): string[] {
 }
 
 /** Ghost-text suggestion for `prefix` within one session's history — the
- *  most recent matching command (searched newest-first), or null. */
+ *  most recent matching command (searched newest-first), falling back to a
+ *  matching saved snippet command (see snippetCommandsFor) when history has
+ *  no match, or null if neither does. */
 export function suggestFor(sessionId: string, prefix: string): string | null {
   if (!prefix) return null;
   const list = sessionCache.get(sessionId);
-  if (!list) return null;
-  for (let i = list.length - 1; i >= 0; i--) {
-    if (list[i] !== prefix && list[i].startsWith(prefix)) return list[i];
+  if (list) {
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (list[i] !== prefix && list[i].startsWith(prefix)) return list[i];
+    }
+  }
+  const kind = sessionKindCache.get(sessionId);
+  if (kind) {
+    for (const command of snippetCommandsFor(kind)) {
+      if (command !== prefix && command.startsWith(prefix)) return command;
+    }
   }
   return null;
 }
@@ -190,32 +214,50 @@ export function suggestFor(sessionId: string, prefix: string): string | null {
  *  fully typed) is kept in the results: the UI lists full candidate strings
  *  (not just remainders), and the already-typed value is still a legitimate,
  *  selectable entry (mirrors Warp's completion menu, which lists the exact
- *  match too). */
+ *  match too).
+ *
+ *  At `precedingTokens: []` (completing the first word), saved snippet
+ *  commands (see snippetCommandsFor) matching `activePrefix` are also mixed
+ *  in as full-command candidates — applyArgCandidate (shellComposerEditor.ts)
+ *  replaces the whole line from the token start, so a multi-word snippet
+ *  command works the same way a single-token history candidate does. */
 export function suggestArguments(
   sessionId: string,
   precedingTokens: string[],
   activePrefix: string,
 ): string[] {
   const segmentsPerLine = sessionSegmentsCache.get(sessionId);
-  if (!segmentsPerLine) return [];
   const seen = new Set<string>();
   const out: string[] = [];
-  for (let i = segmentsPerLine.length - 1; i >= 0 && out.length < MAX_ARGUMENT_CANDIDATES; i--) {
-    for (const segment of segmentsPerLine[i]) {
-      if (segment.length <= precedingTokens.length) continue;
-      let matches = true;
-      for (let j = 0; j < precedingTokens.length; j++) {
-        if (segment[j] !== precedingTokens[j]) {
-          matches = false;
-          break;
+  if (segmentsPerLine) {
+    for (let i = segmentsPerLine.length - 1; i >= 0 && out.length < MAX_ARGUMENT_CANDIDATES; i--) {
+      for (const segment of segmentsPerLine[i]) {
+        if (segment.length <= precedingTokens.length) continue;
+        let matches = true;
+        for (let j = 0; j < precedingTokens.length; j++) {
+          if (segment[j] !== precedingTokens[j]) {
+            matches = false;
+            break;
+          }
         }
+        if (!matches) continue;
+        const candidate = segment[precedingTokens.length];
+        if (!candidate.startsWith(activePrefix) || seen.has(candidate)) continue;
+        seen.add(candidate);
+        out.push(candidate);
+        if (out.length >= MAX_ARGUMENT_CANDIDATES) break;
       }
-      if (!matches) continue;
-      const candidate = segment[precedingTokens.length];
-      if (!candidate.startsWith(activePrefix) || seen.has(candidate)) continue;
-      seen.add(candidate);
-      out.push(candidate);
-      if (out.length >= MAX_ARGUMENT_CANDIDATES) break;
+    }
+  }
+  if (precedingTokens.length === 0) {
+    const kind = sessionKindCache.get(sessionId);
+    if (kind) {
+      for (const command of snippetCommandsFor(kind)) {
+        if (out.length >= MAX_ARGUMENT_CANDIDATES) break;
+        if (!command.startsWith(activePrefix) || seen.has(command)) continue;
+        seen.add(command);
+        out.push(command);
+      }
     }
   }
   return out;
@@ -225,6 +267,7 @@ export function disposeHistory(sessionId: string): void {
   sessionCache.delete(sessionId);
   sessionSegmentsCache.delete(sessionId);
   latestRequest.delete(sessionId);
+  sessionKindCache.delete(sessionId);
 }
 
 // Dev-only inspection hook — call __labonairHistory() in the WebView

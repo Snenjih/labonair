@@ -49,6 +49,10 @@ export const git = {
     invoke<void>("git_stage_file", { path, file, sessionId: sessionId ?? null }),
   unstageFile: (path: string, file: string, sessionId?: string) =>
     invoke<void>("git_unstage_file", { path, file, sessionId: sessionId ?? null }),
+  stageHunk: (path: string, file: string, hunkPatchText: string, sessionId?: string) =>
+    invoke<void>("git_stage_hunk", { path, file, hunkPatchText, sessionId: sessionId ?? null }),
+  unstageHunk: (path: string, file: string, hunkPatchText: string, sessionId?: string) =>
+    invoke<void>("git_unstage_hunk", { path, file, hunkPatchText, sessionId: sessionId ?? null }),
   stageAll: (path: string, sessionId?: string) =>
     invoke<void>("git_stage_all", { path, sessionId: sessionId ?? null }),
   unstageAll: (path: string, sessionId?: string) =>
@@ -70,12 +74,15 @@ export const git = {
     invoke<string>("git_fetch", { path, sessionId: sessionId ?? null }),
   abort: (path: string, sessionId?: string) =>
     invoke<void>("git_abort", { path, sessionId: sessionId ?? null }),
-  getLog: (path: string, limit?: number, allBranches?: boolean, sessionId?: string) =>
+  continue: (path: string, sessionId?: string) =>
+    invoke<void>("git_continue", { path, sessionId: sessionId ?? null }),
+  getLog: (path: string, limit?: number, allBranches?: boolean, sessionId?: string, skip?: number) =>
     invoke<CommitInfo[]>("git_get_log", {
       path,
       limit: limit ?? null,
       allBranches: allBranches ?? true,
       sessionId: sessionId ?? null,
+      skip: skip ?? null,
     }),
   getCommitDetail: (path: string, hash: string, sessionId?: string) =>
     invoke<string>("git_get_commit_detail", { path, hash, sessionId: sessionId ?? null }),

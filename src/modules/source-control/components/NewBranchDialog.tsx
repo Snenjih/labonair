@@ -9,6 +9,19 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { git } from "../lib/gitInvoke";
 
+const DETACHED_HEAD_PREFIX = "HEAD detached at ";
+
+/** `currentBranch` may be the literal, unusable "HEAD detached at <hash>"
+ *  label (see `git_get_current_branch`/`git_get_workspace_state`) — in that
+ *  case fall back to the short hash itself, which `git branch --from` can
+ *  actually resolve. */
+function resolveDefaultFromRef(currentBranch: string): string {
+  if (currentBranch.startsWith(DETACHED_HEAD_PREFIX)) {
+    return currentBranch.slice(DETACHED_HEAD_PREFIX.length).trim();
+  }
+  return currentBranch;
+}
+
 interface NewBranchDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,7 +42,7 @@ export function NewBranchDialog({
   onSuccess,
 }: NewBranchDialogProps) {
   const [name, setName] = useState("");
-  const [from, setFrom] = useState(fromRef ?? currentBranch);
+  const [from, setFrom] = useState(fromRef ?? resolveDefaultFromRef(currentBranch));
   const [checkout, setCheckout] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +54,7 @@ export function NewBranchDialog({
   useEffect(() => {
     if (open) {
       setName("");
-      setFrom(fromRef ?? currentBranch);
+      setFrom(fromRef ?? resolveDefaultFromRef(currentBranch));
       setCheckout(true);
       setIsLoading(false);
       setError(null);

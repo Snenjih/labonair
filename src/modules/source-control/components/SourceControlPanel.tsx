@@ -33,7 +33,17 @@ export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPane
   const sessionId = useSourceControlStore((s) => s.sessionId);
   const status = useSourceControlStore((s) => s.status);
   const diffStats = useSourceControlStore((s) => s.diffStats);
+  const submodules = useSourceControlStore((s) => s.submodules);
   const error = useSourceControlStore((s) => s.error);
+
+  // Uninitialized submodules (empty gitlink directory) never produce a
+  // `git status` entry at all — the only way to see them is `git submodule
+  // status`'s separate `-` prefix — so they can't appear in TrackedSection/
+  // UntrackedSection's file lists like a dirty or pointer-changed submodule
+  // can. Surfaced as its own small banner instead, so all three submodule
+  // states (uninitialized / pointer-changed / dirty) are represented
+  // somewhere, not just the two that happen to produce a status line.
+  const uninitializedSubmodules = submodules.filter((s) => s.state === "uninitialized");
 
   useEffect(() => {
     void useSourceControlStore.getState().hydrateRecentMessages();
@@ -97,6 +107,13 @@ export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPane
       {error && (
         <div className="mx-3 my-1 rounded border border-error/30 bg-error/10 px-2 py-1 text-[10px] text-error">
           {error}
+        </div>
+      )}
+
+      {uninitializedSubmodules.length > 0 && (
+        <div className="mx-3 my-1 rounded border border-muted-foreground/20 bg-muted/30 px-2 py-1 text-[10px] text-muted-foreground">
+          Uninitialized submodule{uninitializedSubmodules.length !== 1 ? "s" : ""}:{" "}
+          {uninitializedSubmodules.map((s) => s.path).join(", ")}
         </div>
       )}
 

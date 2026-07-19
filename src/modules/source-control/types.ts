@@ -1,8 +1,32 @@
+/** The `S<c><m><u>` submodule-state field of a porcelain v2 status entry —
+ *  only present when `path` is a submodule gitlink. Reflects the submodule's
+ *  own working-tree state (dirty/untracked) and whether its checked-out
+ *  commit differs from what the superproject's index records. Does NOT
+ *  cover an *uninitialized* submodule — that state produces no status entry
+ *  at all and is only visible via `WorkspaceGitState.submodules`. */
+export interface SubmoduleState {
+  commitChanged: boolean;
+  modified: boolean;
+  untracked: boolean;
+}
+
 export interface FileStatus {
   path: string;
   originalPath: string | null;
-  indexStatus: string; // single char: ' ', 'A', 'M', 'D', 'R', 'C', 'U', '?'
+  indexStatus: string; // single char: '.', 'A', 'M', 'D', 'R', 'C', 'U'
   worktreeStatus: string;
+  submodule: SubmoduleState | null;
+}
+
+export type SubmoduleSyncState = "uninitialized" | "pointerChanged" | "conflict" | "clean";
+
+/** One line of `git submodule status` — the only way to detect an
+ *  uninitialized submodule (empty gitlink directory), which produces zero
+ *  lines from `git status` itself. */
+export interface SubmoduleStatus {
+  path: string;
+  commit: string;
+  state: SubmoduleSyncState;
 }
 
 export interface GitStatus {
@@ -67,6 +91,7 @@ export interface WorkspaceGitState {
   stash: StashEntry[];
   tags: string[];
   diffStats: FileDiffStat[];
+  submodules: SubmoduleStatus[];
 }
 
 export type SelectionMode =

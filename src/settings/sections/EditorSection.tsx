@@ -22,6 +22,7 @@ import {
   setEditorInsertFinalNewline,
   setEditorAutocompleteDebounceMs,
   setEditorMaxFileSizeMb,
+  setVimMode,
   EDITOR_THEMES,
   EDITOR_THEME_LABELS,
   type EditorThemeId,
@@ -31,6 +32,7 @@ import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
 export function EditorSection() {
+  const vimMode = usePreferencesStore((s) => s.vimMode);
   const editorTheme = usePreferencesStore((s) => s.editorTheme);
   const editorFontFamily = usePreferencesStore((s) => s.editorFontFamily);
   const editorLineHeight = usePreferencesStore((s) => s.editorLineHeight);
@@ -54,6 +56,13 @@ export function EditorSection() {
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader title="Editor" description="Code editor appearance and behaviour settings." />
+
+      <div className="flex flex-col gap-2">
+        <Label>Keybindings</Label>
+        <SettingRow title="Vim mode" description="Enable Vim keybindings in the code editor.">
+          <Switch checked={vimMode} onCheckedChange={(v) => void setVimMode(v)} />
+        </SettingRow>
+      </div>
 
       <div className="flex flex-col gap-2">
         <Label>Theme</Label>

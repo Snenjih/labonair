@@ -13,6 +13,7 @@ import {
 import { useGlobalShortcuts } from "@/modules/shortcuts";
 import { useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import type { WorkspaceTab } from "@/modules/tabs";
+import { collectLeafIds } from "@/modules/tabs/types";
 import type { WorkspacePaneHandle } from "@/modules/terminal";
 import type { EditorPaneHandle } from "@/modules/editor";
 
@@ -46,7 +47,7 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
 
   const toggleCommandPalette = useCommandStore((s) => s.toggle);
 
-  const { openUntitledTab, selectByIndex, splitPane, closePane } = useTabsStore.getState();
+  const { openUntitledTab, selectByIndex, splitPane, closePane, setActivePaneId } = useTabsStore.getState();
 
   const shortcutHandlers = useMemo(
     () => ({
@@ -86,6 +87,17 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
         const { tabs: storeTabs, activeId: aid } = useTabsStore.getState();
         const tab = storeTabs.find((t) => t.id === aid);
         if (tab?.kind === "workspace") closePane(aid, (tab as WorkspaceTab).activePaneId);
+      },
+      "pane.focusNext": () => {
+        const { tabs: storeTabs, activeId: aid } = useTabsStore.getState();
+        const tab = storeTabs.find((t) => t.id === aid);
+        if (tab?.kind !== "workspace") return;
+        const workspaceTab = tab as WorkspaceTab;
+        const leafIds = collectLeafIds(workspaceTab.layout);
+        if (leafIds.length <= 1) return; // single-pane tab — nothing to focus
+        const currentIndex = leafIds.indexOf(workspaceTab.activePaneId);
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % leafIds.length;
+        setActivePaneId(aid, leafIds[nextIndex]);
       },
       "view.zoomIn": () => {
         const kind = selectActiveTabKind(useTabsStore.getState());
@@ -128,6 +140,7 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
       selectByIndex,
       splitPane,
       closePane,
+      setActivePaneId,
     ],
   );
 

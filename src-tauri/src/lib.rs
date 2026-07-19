@@ -5,10 +5,10 @@ use modules::{
     git, pty, secrets, shell,
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_duplicate, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete, groups_update}},
     credentials::{credentials_get_all, credentials_create, credentials_update, credentials_delete, credentials_get_hosts_using, credential_generate_keypair},
-    ssh::{SshState, TrustState, client::{ssh_connect, ssh_connect_quick, ssh_trust_host, ssh_remove_known_host, ssh_disconnect}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_read_dir_page, sftp_rename, sftp_delete, sftp_mkdir, sftp_create_file, sftp_chmod, sftp_calculate_size, sftp_chown, sftp_deep_search, prepare_remote_edit, save_remote_edit, sftp_read_file_content, cleanup_remote_edit_temp}, tunnels::{TunnelState, ssh_start_tunnels, ssh_stop_tunnels}},
-    sftp::{TransferWorkerState, TransferSettings, commands::{enqueue_transfer, cancel_transfer, resolve_conflict, sftp_update_transfer_settings}, connection::{sftp_connect, sftp_disconnect}, worker::run_worker},
+    ssh::{SshState, TrustState, client::{ssh_connect, ssh_connect_quick, ssh_trust_host, ssh_remove_known_host, ssh_disconnect, ssh_test_connection}, exec::ssh_exec_command, pty::{ssh_pty_write, ssh_pty_resize}, sftp::{sftp_read_dir, sftp_read_dir_page, sftp_rename, sftp_delete, sftp_mkdir, sftp_create_file, sftp_chmod, sftp_calculate_size, sftp_chown, sftp_deep_search, prepare_remote_edit, save_remote_edit, sftp_read_file_content, cleanup_remote_edit_temp}, tunnels::{TunnelState, ssh_start_tunnels, ssh_stop_tunnels}},
+    sftp::{TransferWorkerState, TransferSettings, commands::{enqueue_transfer, cancel_transfer, resolve_conflict, sftp_update_transfer_settings, sftp_session_reconnected}, connection::{sftp_connect, sftp_disconnect}, worker::run_worker},
     snippets::db::{snippets_get_all, snippets_create, snippets_update, snippets_delete, snippets_reorder, snippet_groups_get_all, snippet_groups_create, snippet_groups_update, snippet_groups_delete},
-    snippets::exec::{snippet_run_local, snippet_run_ssh},
+    snippets::exec::{snippet_run_local, snippet_run_ssh, snippet_run_cancel, SnippetRunState},
     themes::{themes_get_all, theme_import, theme_export, theme_delete, theme_fetch_index, theme_download, theme_create, themes_get_dir},
     backgrounds::{backgrounds_list, background_import, background_delete, background_read_data_url},
 };
@@ -497,6 +497,7 @@ pub fn run() {
         })
         .manage(pty::PtyState::default())
         .manage(shell::ShellState::default())
+        .manage(SnippetRunState::default())
         .manage(secrets::SecretsState::default())
         .manage(fs::watcher::WatcherState::default())
         .invoke_handler(tauri::generate_handler![
@@ -565,8 +566,10 @@ pub fn run() {
             ssh_trust_host,
             ssh_remove_known_host,
             ssh_disconnect,
+            ssh_test_connection,
             crate::modules::ssh::config_parser::parse_ssh_config_cmd,
             crate::modules::ssh::config_parser::import_ssh_config_entries,
+            crate::modules::ssh::config_parser::export_ssh_config,
             ssh_start_tunnels,
             ssh_stop_tunnels,
             ssh_exec_command,
@@ -587,6 +590,7 @@ pub fn run() {
             enqueue_transfer,
             cancel_transfer,
             resolve_conflict,
+            sftp_session_reconnected,
             sftp_update_transfer_settings,
             prepare_remote_edit,
             save_remote_edit,
@@ -603,6 +607,7 @@ pub fn run() {
             snippet_groups_delete,
             snippet_run_local,
             snippet_run_ssh,
+            snippet_run_cancel,
             themes_get_all,
             theme_import,
             theme_export,
@@ -628,6 +633,8 @@ pub fn run() {
             git::git_get_diff,
             git::git_stage_file,
             git::git_unstage_file,
+            git::git_stage_hunk,
+            git::git_unstage_hunk,
             git::git_stage_all,
             git::git_unstage_all,
             git::git_discard_file,
@@ -636,6 +643,7 @@ pub fn run() {
             git::git_pull,
             git::git_fetch,
             git::git_abort,
+            git::git_continue,
             git::git_get_log,
             git::git_get_commit_detail,
             git::git_checkout_branch,

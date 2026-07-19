@@ -168,7 +168,6 @@ export type Preferences = {
 
   // --- AI ---
   aiEnabled: boolean;
-  showEditPrediction: boolean;
   aiMaxAgentSteps: number;
   aiTerminalContextLines: number;
   aiTemperature: number;
@@ -339,7 +338,6 @@ const KEY_HOST_PING_INTERVAL = "hostPingInterval";
 const KEY_HM_LAYOUT = "hmLayout";
 const KEY_HM_SORT = "hmSort";
 const KEY_AI_ENABLED = "aiEnabled";
-const KEY_SHOW_EDIT_PREDICTION = "showEditPrediction";
 const KEY_AI_MAX_AGENT_STEPS = "aiMaxAgentSteps";
 const KEY_AI_TERMINAL_CONTEXT_LINES = "aiTerminalContextLines";
 const KEY_AI_TEMPERATURE = "aiTemperature";
@@ -492,7 +490,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   hmSort: "last_connected",
 
   aiEnabled: true,
-  showEditPrediction: true,
   aiMaxAgentSteps: 24,
   aiTerminalContextLines: 300,
   aiTemperature: 0.7,
@@ -762,7 +759,6 @@ export async function loadPreferences(): Promise<Preferences> {
     hmSort: get<"last_connected" | "a_z" | "z_a">(KEY_HM_SORT) ?? DEFAULT_PREFERENCES.hmSort,
 
     aiEnabled: get<boolean>(KEY_AI_ENABLED) ?? DEFAULT_PREFERENCES.aiEnabled,
-    showEditPrediction: get<boolean>(KEY_SHOW_EDIT_PREDICTION) ?? DEFAULT_PREFERENCES.showEditPrediction,
     aiMaxAgentSteps: get<number>(KEY_AI_MAX_AGENT_STEPS) ?? DEFAULT_PREFERENCES.aiMaxAgentSteps,
     aiTerminalContextLines:
       get<number>(KEY_AI_TERMINAL_CONTEXT_LINES) ?? DEFAULT_PREFERENCES.aiTerminalContextLines,
@@ -1405,11 +1401,6 @@ export async function setAiEnabled(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setShowEditPrediction(value: boolean): Promise<void> {
-  await (await getStore()).set(KEY_SHOW_EDIT_PREDICTION, value);
-  await (await getStore()).save();
-}
-
 export async function setAiMaxAgentSteps(value: number): Promise<void> {
   await (await getStore()).set(KEY_AI_MAX_AGENT_STEPS, value);
   await (await getStore()).save();
@@ -1710,7 +1701,6 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_HM_LAYOUT]: "hmLayout",
     [KEY_HM_SORT]: "hmSort",
     [KEY_AI_ENABLED]: "aiEnabled",
-    [KEY_SHOW_EDIT_PREDICTION]: "showEditPrediction",
     [KEY_AI_MAX_AGENT_STEPS]: "aiMaxAgentSteps",
     [KEY_AI_TERMINAL_CONTEXT_LINES]: "aiTerminalContextLines",
     [KEY_AI_TEMPERATURE]: "aiTemperature",

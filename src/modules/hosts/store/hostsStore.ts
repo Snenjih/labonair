@@ -38,6 +38,22 @@ interface HostsState {
   renameGroup: (id: string, name: string) => Promise<void>;
 }
 
+// The DB enforces ON DELETE SET NULL for jump_host_id/credential_id, but that
+// only applies to the persisted row — other hosts already held in the
+// in-memory `hosts` array still carry the stale id until the next fetchData().
+// Patch those references locally right after a delete so the UI reflects
+// reality immediately instead of showing a dangling jump-host/credential.
+function clearDanglingHostRefs(host: Host, deletedIds: Set<string>): Host {
+  const jumpDangling = host.jump_host_id != null && deletedIds.has(host.jump_host_id);
+  const credDangling = host.credential_id != null && deletedIds.has(host.credential_id);
+  if (!jumpDangling && !credDangling) return host;
+  return {
+    ...host,
+    ...(jumpDangling && { jump_host_id: null }),
+    ...(credDangling && { credential_id: undefined }),
+  };
+}
+
 let _pingIntervalId: ReturnType<typeof setInterval> | null = null;
 
 async function runPingCycle(
@@ -180,7 +196,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       const ids = new Set(s.selectedHostIds);
       ids.delete(id);
       return {
-        hosts: s.hosts.filter((h) => h.id !== id),
+        hosts: s.hosts.filter((h) => h.id !== id).map((h) => clearDanglingHostRefs(h, new Set([id]))),
         selectedHostId: s.selectedHostId === id ? null : s.selectedHostId,
         selectedHostIds: ids,
       };
@@ -196,7 +212,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       else failed.push(ids[i]);
     });
     set((s) => ({
-      hosts: s.hosts.filter((h) => !deleted.has(h.id)),
+      hosts: s.hosts.filter((h) => !deleted.has(h.id)).map((h) => clearDanglingHostRefs(h, deleted)),
       selectedHostId: deleted.has(s.selectedHostId ?? "") ? null : s.selectedHostId,
       // Failed deletes stay selected — a still-visible host disappearing from
       // the selection would be confusing given it's still in the list.

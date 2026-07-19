@@ -405,6 +405,14 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
 
   const canSave = form.name.trim() && form.host_address.trim() && form.username.trim();
 
+  // Soft, non-blocking heads-up when another host already has this name —
+  // no DB UNIQUE constraint exists on purpose (two hosts legitimately named
+  // "prod" at different addresses is a valid setup), so this never blocks save.
+  const trimmedName = form.name.trim();
+  const duplicateNameHost = trimmedName
+    ? hosts.find((h) => h.id !== hostId && h.name.trim().toLowerCase() === trimmedName.toLowerCase())
+    : undefined;
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -486,6 +494,12 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
           <section className="rounded-lg border border-border bg-card p-4 space-y-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Connection</p>
             {f("Display Name", "name", "text", "My Server")}
+            {duplicateNameHost && (
+              <p className="text-[11px] text-warning">
+                Another host is already named "{duplicateNameHost.name}" — this won't cause conflicts, just a
+                heads-up.
+              </p>
+            )}
             <div className="flex gap-2">
               <div className="flex-1">{f("Host / IP Address", "host_address", "text", "192.168.1.1")}</div>
               <div className="w-20">{f("Port", "port", "number", "22")}</div>

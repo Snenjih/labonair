@@ -1,6 +1,6 @@
 import { ArrowDown01Icon, ArrowUp01Icon, Cancel01Icon, GitBranchIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,9 +36,6 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
   const operationInProgress = useSourceControlStore((s) => s.operationInProgress);
   const setOperationInProgress = useSourceControlStore((s) => s.setOperationInProgress);
   const currentBranch = useSourceControlStore((s) => s.currentBranch);
-  const branchList = useSourceControlStore((s) => s.branchList);
-
-  const localBranch = useMemo(() => branchList.find((b) => b.isCurrent)?.name ?? "", [branchList]);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +62,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
       useNotificationStore.getState().addNotification({
         type: "success",
         title: "Pushed",
-        message: localBranch ? `${localBranch} pushed to remote` : "Pushed to remote",
+        message: currentBranch ? `${currentBranch} pushed to remote` : "Pushed to remote",
       });
     } catch (e) {
       const errMsg = String(e);
@@ -137,7 +134,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
       useNotificationStore.getState().addNotification({
         type: "success",
         title: "Force Pushed",
-        message: localBranch ? `${localBranch} force-pushed to remote` : "Force-pushed to remote",
+        message: currentBranch ? `${currentBranch} force-pushed to remote` : "Force-pushed to remote",
       });
     } catch (e) {
       setError(String(e));
@@ -160,7 +157,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
       useNotificationStore.getState().addNotification({
         type: "success",
         title: "Pushed & Upstream Set",
-        message: localBranch ? `${localBranch} pushed with upstream set` : "Upstream set and pushed",
+        message: currentBranch ? `${currentBranch} pushed with upstream set` : "Upstream set and pushed",
       });
     } catch (e) {
       setError(String(e));
@@ -178,7 +175,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
       type="button"
       className="flex max-w-[200px] items-center gap-0.5 rounded px-1 py-0.5 text-[11px] font-medium text-foreground/90 transition-colors hover:bg-foreground/6"
     >
-      <span className="truncate">{localBranch || "—"}</span>
+      <span className="truncate">{currentBranch || "—"}</span>
       <HugeiconsIcon
         icon={ArrowDown01Icon}
         size={10}
@@ -209,11 +206,11 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
             trigger={branchTrigger}
             repoRoot={repoRoot}
             sessionId={sessionId ?? undefined}
-            currentBranch={localBranch}
+            currentBranch={currentBranch}
             onRefresh={onRefresh}
           />
         ) : (
-          <span className="text-[11px] font-medium text-foreground/80">{localBranch || "—"}</span>
+          <span className="text-[11px] font-medium text-foreground/80">{currentBranch || "—"}</span>
         )}
 
         <div className="flex-1" />

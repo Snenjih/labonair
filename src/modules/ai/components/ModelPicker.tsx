@@ -250,6 +250,19 @@ function ModelRow({
           ) : (
             <span className="text-[9.5px] text-muted-foreground/30 italic">local</span>
           )}
+          {/* Non-blocking warning only — the agent still wires the full tool
+           *  set into every model regardless (agent.ts), this is purely
+           *  informational so pointing a custom/local/dynamic endpoint at a
+           *  model without confirmed function-calling doesn't fail silently
+           *  with no explanation. */}
+          {!model.tags?.includes("tools") && (
+            <span
+              className="shrink-0 rounded px-1 py-px text-[8.5px] uppercase tracking-wide text-warning/70 bg-warning/10"
+              title="Tool calling support is unconfirmed for this model — the AI's file/shell tools may not work."
+            >
+              no tools
+            </span>
+          )}
         </div>
 
         {/* Selected */}

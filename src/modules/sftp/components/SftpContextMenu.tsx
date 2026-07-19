@@ -78,9 +78,14 @@ export function SftpContextMenu({
       } else {
         await Promise.all([...selectedPaths].map((p) => invoke("fs_delete", { path: p })));
       }
-      onRefresh();
     } catch (e) {
       handleApiError(e, "Failed to delete files", "SFTP");
+    } finally {
+      // Always refresh, even on partial failure (e.g. permission-denied
+      // partway through a multi-select batch) — otherwise paths that were
+      // already deleted before the failure stay visible until a manual
+      // refresh.
+      onRefresh();
     }
   }
 
@@ -105,19 +110,20 @@ export function SftpContextMenu({
     if (count === 0 || !tabId) return;
     const dest = await dialogOpen({ directory: true, multiple: false, title: "Choose download folder" });
     if (!dest || typeof dest !== "string") return;
-    for (const remotePath of selectedPaths) {
-      const fileName = remotePath.split("/").pop() ?? "file";
-      const destPath = `${dest}/${fileName}`;
-      try {
-        await invoke("enqueue_transfer", {
+    const results = await Promise.allSettled(
+      [...selectedPaths].map((remotePath) => {
+        const fileName = remotePath.split("/").pop() ?? "file";
+        const destPath = `${dest}/${fileName}`;
+        return invoke("enqueue_transfer", {
           sessionId: tabId,
           srcPath: remotePath,
           destPath,
           direction: "download",
         });
-      } catch (e) {
-        handleApiError(e, "Failed to enqueue download", "SFTP");
-      }
+      }),
+    );
+    for (const r of results) {
+      if (r.status === "rejected") handleApiError(r.reason, "Failed to enqueue download", "SFTP");
     }
   }
 
@@ -126,20 +132,21 @@ export function SftpContextMenu({
     const selected = await dialogOpen({ multiple: true, directory: false, title: "Choose files to upload" });
     if (!selected) return;
     const paths = Array.isArray(selected) ? selected : [selected];
-    for (const localPath of paths) {
-      const fileName = localPath.split(/[\\/]/).pop() ?? "file";
-      const sep = currentPath.endsWith("/") ? "" : "/";
-      const destPath = `${currentPath}${sep}${fileName}`;
-      try {
-        await invoke("enqueue_transfer", {
+    const results = await Promise.allSettled(
+      paths.map((localPath) => {
+        const fileName = localPath.split(/[\\/]/).pop() ?? "file";
+        const sep = currentPath.endsWith("/") ? "" : "/";
+        const destPath = `${currentPath}${sep}${fileName}`;
+        return invoke("enqueue_transfer", {
           sessionId: tabId,
           srcPath: localPath,
           destPath,
           direction: "upload",
         });
-      } catch (e) {
-        handleApiError(e, "Failed to enqueue upload", "SFTP");
-      }
+      }),
+    );
+    for (const r of results) {
+      if (r.status === "rejected") handleApiError(r.reason, "Failed to enqueue upload", "SFTP");
     }
   }
 
