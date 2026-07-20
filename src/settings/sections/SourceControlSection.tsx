@@ -9,7 +9,10 @@ export function SourceControlSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      <SectionHeader title="Source Control" description="Git status polling for local and remote repositories." />
+      <SectionHeader
+        title="Source Control"
+        description="Git status polling for local and remote repositories."
+      />
 
       <SettingRow
         title="Refresh interval"
