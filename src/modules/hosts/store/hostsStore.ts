@@ -156,6 +156,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       ...(payload.credential_id !== undefined && { credentialId: payload.credential_id }),
       ...(payload.jump_host_id !== undefined && { jumpHostId: payload.jump_host_id }),
       ...(payload.notes !== undefined && { notes: payload.notes }),
+      ...(payload.icon !== undefined && { icon: payload.icon }),
     });
     set((s) => ({ hosts: [...s.hosts, host] }));
     return host;
@@ -183,6 +184,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       ...(payload.credential_id !== undefined && { credentialId: payload.credential_id }),
       ...(payload.jump_host_id !== undefined && { jumpHostId: payload.jump_host_id }),
       ...(payload.notes !== undefined && { notes: payload.notes }),
+      ...(payload.icon !== undefined && { icon: payload.icon }),
     });
     set((s) => ({
       hosts: s.hosts.map((h) => (h.id === host.id ? host : h)),

@@ -26,6 +26,7 @@ pub struct Host {
     pub credential_id: Option<String>,
     pub jump_host_id: Option<String>,
     pub notes: Option<String>,
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]

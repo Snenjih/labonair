@@ -34,6 +34,7 @@ import type { Group, Host } from "../types";
 import { useHostsStore } from "../store/hostsStore";
 import { useCredentialsStore } from "../store/credentialsStore";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import { HostAvatar } from "./HostAvatar";
 
 interface HostCardProps {
   host: Host;
@@ -57,14 +58,6 @@ function relativeTime(ms: number): string {
   if (hours > 0) return `${hours}h ago`;
   if (minutes > 0) return `${minutes}m ago`;
   return "just now";
-}
-
-function initials(name: string): string {
-  return name
-    .split(/[\s\-_]+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
 }
 
 export function HostCard({
@@ -205,19 +198,7 @@ export function HostCard({
               }}
               className="flex flex-1 items-start gap-3 p-3.5 text-left outline-none"
             >
-              <div className="relative flex size-10 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/40 text-sm font-semibold text-muted-foreground shadow-sm">
-                {host.pin_to_top ? <span className="text-[10px] text-primary">★</span> : null}
-                {initials(host.name) || "?"}
-                <span
-                  className={cn(
-                    "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-background",
-                    pingStatus === "online" &&
-                      "bg-success [box-shadow:0_0_6px_color-mix(in_oklch,var(--color-success)_70%,transparent)]",
-                    pingStatus === "offline" && "bg-destructive",
-                    (!pingStatus || pingStatus === "checking") && "bg-muted-foreground/40 animate-pulse",
-                  )}
-                />
-              </div>
+              <HostAvatar host={host} size="md" pingStatus={pingStatus} />
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-[13px] font-semibold tracking-tight text-foreground">

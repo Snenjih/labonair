@@ -98,6 +98,8 @@ pub fn initialize_db(
         // jump host support and free-text notes
         "ALTER TABLE hosts ADD COLUMN jump_host_id TEXT REFERENCES hosts(id) ON DELETE SET NULL",
         "ALTER TABLE hosts ADD COLUMN notes TEXT",
+        // host avatar icon (id into the frontend's static icon registry)
+        "ALTER TABLE hosts ADD COLUMN icon TEXT",
         // backfill keepalive defaults for hosts that were created before defaults existed
         "UPDATE hosts SET keep_alive_interval = 25 WHERE keep_alive_interval IS NULL",
         "UPDATE hosts SET keep_alive_tries = 3 WHERE keep_alive_tries IS NULL",
@@ -141,6 +143,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<Host> {
         credential_id: row.get(21)?,
         jump_host_id: row.get(22)?,
         notes: row.get(23)?,
+        icon: row.get(24)?,
     })
 }
 
@@ -149,7 +152,7 @@ const SELECT_HOSTS: &str = "SELECT id, name, host_address, port, username, auth_
     default_path_ssh, default_path_sftp, pin_to_top, sudo_password_set, \
     keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
     startup_snippet_id, startup_snippet_mode, credential_id, \
-    jump_host_id, notes FROM hosts";
+    jump_host_id, notes, icon FROM hosts";
 
 /// Duplicates a host row and replicates its stored password/sudo-password
 /// (if any) under the new host's id via the secrets store directly — the
@@ -178,15 +181,15 @@ pub async fn hosts_duplicate(
             "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
              private_key_path, group_id, tags, created_at, default_path_ssh, default_path_sftp, \
              pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
-             startup_snippet_id, startup_snippet_mode, credential_id, jump_host_id, notes) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23)",
+             startup_snippet_id, startup_snippet_mode, credential_id, jump_host_id, notes, icon) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)",
             rusqlite::params![
                 new_id, name, src.host_address, src.port, src.username, src.auth_method,
                 src.private_key_path, src.group_id, src.tags, created_at,
                 src.default_path_ssh, src.default_path_sftp, 0i64, src.sudo_password_set as i64,
                 src.keep_alive_interval, src.keep_alive_tries, 0i64, src.tunnels,
                 src.startup_snippet_id, src.startup_snippet_mode, src.credential_id,
-                src.jump_host_id, src.notes
+                src.jump_host_id, src.notes, src.icon
             ],
         )?;
     }
@@ -245,6 +248,7 @@ pub async fn hosts_create(
     credential_id: Option<String>,
     jump_host_id: Option<String>,
     notes: Option<String>,
+    icon: Option<String>,
 ) -> Result<Host, LabonairError> {
     let id = uuid::Uuid::new_v4().to_string();
     let created_at = now_millis();
@@ -255,19 +259,20 @@ pub async fn hosts_create(
     {
         let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
         let snippet_id: Option<&str> = startup_snippet_id.as_deref().filter(|s| !s.is_empty());
+        let icon_val: Option<&str> = icon.as_deref().filter(|s| !s.is_empty());
         conn.execute(
             "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
              private_key_path, group_id, tags, created_at, default_path_ssh, default_path_sftp, \
              pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
-             startup_snippet_id, startup_snippet_mode, credential_id, jump_host_id, notes) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23)",
+             startup_snippet_id, startup_snippet_mode, credential_id, jump_host_id, notes, icon) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)",
             rusqlite::params![
                 id, name, host_address, port, username, auth_method,
                 private_key_path, group_id, tags, created_at,
                 default_path_ssh, default_path_sftp, pin, sudo_set,
                 keep_alive_interval, keep_alive_tries, order, tunnels,
                 snippet_id, startup_snippet_mode, credential_id,
-                jump_host_id, notes
+                jump_host_id, notes, icon_val
             ],
         )?;
     }
@@ -318,6 +323,7 @@ pub async fn hosts_update(
     credential_id: Option<String>,
     jump_host_id: Option<String>,
     notes: Option<String>,
+    icon: Option<String>,
 ) -> Result<Host, LabonairError> {
     {
         let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
@@ -385,6 +391,11 @@ pub async fn hosts_update(
         }
         if notes.is_some() {
             conn.execute("UPDATE hosts SET notes=?1 WHERE id=?2", rusqlite::params![notes, id])?;
+        }
+        // icon: pass None to clear, Some("") also clears
+        if icon.is_some() {
+            let val: Option<String> = icon.filter(|s| !s.is_empty());
+            conn.execute("UPDATE hosts SET icon=?1 WHERE id=?2", rusqlite::params![val, id])?;
         }
     }
     if let Some(pw) = password {
