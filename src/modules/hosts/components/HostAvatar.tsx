@@ -46,9 +46,7 @@ export function HostAvatar({ host, size, pingStatus, className }: HostAvatarProp
         className,
       )}
     >
-      {host.pin_to_top && (
-        <span className={cn("absolute -top-1 -right-1 text-primary", cfg.star)}>★</span>
-      )}
+      {host.pin_to_top && <span className={cn("absolute -top-1 -right-1 text-primary", cfg.star)}>★</span>}
       {resolved ? <HostIconGlyph icon={resolved} size={cfg.glyph} /> : initials(host.name) || "?"}
       <span
         className={cn(
