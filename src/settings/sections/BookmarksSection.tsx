@@ -8,6 +8,7 @@ import {
   setBookmarksActionNewTerminal,
   setBookmarksEnabled,
   setBookmarksPrimaryClickBehavior,
+  setBookmarksShowBadge,
 } from "@/modules/settings/store";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -19,6 +20,7 @@ export function BookmarksSection() {
   const bookmarksActionCurrentSftp = usePreferencesStore((s) => s.bookmarksActionCurrentSftp);
   const bookmarksActionNewSftp = usePreferencesStore((s) => s.bookmarksActionNewSftp);
   const bookmarksPrimaryClickBehavior = usePreferencesStore((s) => s.bookmarksPrimaryClickBehavior);
+  const bookmarksShowBadge = usePreferencesStore((s) => s.bookmarksShowBadge);
 
   // Present, not hidden, when the master switch is off — communicates "this
   // is here, turn on Bookmarks to use it" rather than settings evaporating.
@@ -118,6 +120,17 @@ export function BookmarksSection() {
                 </SelectItem>
               </SelectContent>
             </Select>
+          </SettingRow>
+          <SettingRow
+            className={rowClassName}
+            title="Show bookmark count badge"
+            description="Display a small count badge on the titlebar bookmarks icon."
+          >
+            <Switch
+              checked={bookmarksShowBadge}
+              disabled={!bookmarksEnabled}
+              onCheckedChange={(v) => void setBookmarksShowBadge(v)}
+            />
           </SettingRow>
         </div>
       </div>

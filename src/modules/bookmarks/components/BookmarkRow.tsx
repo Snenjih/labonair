@@ -86,7 +86,7 @@ export function BookmarkRow({
               title={ACTION_LABEL[action]}
               onClick={() => onExecute(action)}
               className={cn(
-                "shrink-0 text-muted-foreground hover:text-foreground",
+                "shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground",
                 focusedColumn === col && "ring-1 ring-ring",
               )}
             >
@@ -100,7 +100,7 @@ export function BookmarkRow({
         size="icon-xs"
         title="Remove bookmark"
         onClick={onRemove}
-        className="shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive"
+        className="shrink-0 rounded-md text-muted-foreground opacity-0 hover:bg-accent hover:text-destructive group-hover:opacity-100"
       >
         <HugeiconsIcon icon={Cancel01Icon} size={12} />
       </Button>

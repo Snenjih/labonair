@@ -232,6 +232,7 @@ export type Preferences = {
   bookmarksActionCurrentSftp: boolean;
   bookmarksActionNewSftp: boolean;
   bookmarksPrimaryClickBehavior: "current" | "new";
+  bookmarksShowBadge: boolean;
 };
 
 const KEY_THEME = "theme";
@@ -389,6 +390,7 @@ const KEY_BOOKMARKS_ACTION_CURRENT_TERMINAL = "bookmarksActionCurrentTerminal";
 const KEY_BOOKMARKS_ACTION_CURRENT_SFTP = "bookmarksActionCurrentSftp";
 const KEY_BOOKMARKS_ACTION_NEW_SFTP = "bookmarksActionNewSftp";
 const KEY_BOOKMARKS_PRIMARY_CLICK = "bookmarksPrimaryClickBehavior";
+const KEY_BOOKMARKS_SHOW_BADGE = "bookmarksShowBadge";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -556,6 +558,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   bookmarksActionCurrentSftp: true,
   bookmarksActionNewSftp: true,
   bookmarksPrimaryClickBehavior: "current",
+  bookmarksShowBadge: true,
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -889,6 +892,7 @@ export async function loadPreferences(): Promise<Preferences> {
       const v = get<string>(KEY_BOOKMARKS_PRIMARY_CLICK);
       return v === "new" ? v : "current";
     })(),
+    bookmarksShowBadge: get<boolean>(KEY_BOOKMARKS_SHOW_BADGE) ?? DEFAULT_PREFERENCES.bookmarksShowBadge,
   };
 }
 
@@ -1653,6 +1657,11 @@ export async function setBookmarksPrimaryClickBehavior(value: "current" | "new")
   await (await getStore()).save();
 }
 
+export async function setBookmarksShowBadge(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BOOKMARKS_SHOW_BADGE, value);
+  await (await getStore()).save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -1810,6 +1819,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_BOOKMARKS_ACTION_CURRENT_SFTP]: "bookmarksActionCurrentSftp",
     [KEY_BOOKMARKS_ACTION_NEW_SFTP]: "bookmarksActionNewSftp",
     [KEY_BOOKMARKS_PRIMARY_CLICK]: "bookmarksPrimaryClickBehavior",
+    [KEY_BOOKMARKS_SHOW_BADGE]: "bookmarksShowBadge",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];

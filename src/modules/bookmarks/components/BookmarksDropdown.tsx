@@ -71,6 +71,7 @@ export function BookmarksDropdown({ sendCd }: Props) {
     "new-sftp": usePreferencesStore((s) => s.bookmarksActionNewSftp),
   };
   const primaryClickBehavior = usePreferencesStore((s) => s.bookmarksPrimaryClickBehavior);
+  const showBadge = usePreferencesStore((s) => s.bookmarksShowBadge);
 
   const result = filterBookmarksForContext(activeTab, bookmarks, hosts);
 
@@ -110,11 +111,14 @@ export function BookmarksDropdown({ sendCd }: Props) {
   }
   const totalShown = flatRows.length;
 
-  // Reset keyboard focus to the top row whenever the popover opens, or the
-  // row count changes while it's already open (e.g. the active tab changed).
+  // Keyboard focus starts cleared — the roving-focus outline should only
+  // appear once the user actually presses an arrow key, not just from
+  // opening the popover or interacting with it by mouse. It's cleared again
+  // on close, and whenever the row count changes while open (e.g. the
+  // active tab changed), so a stale position doesn't point past the end.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: totalShown isn't read in the body — it's the intentional re-run trigger for clearing a stale position when the row count changes
   useEffect(() => {
-    if (open) setFocusPos(totalShown > 0 ? { row: 0, col: 0 } : null);
-    else setFocusPos(null);
+    setFocusPos(null);
   }, [open, totalShown]);
 
   function execute(bm: PathBookmark, action: BookmarkActionKind) {
@@ -198,7 +202,7 @@ export function BookmarksDropdown({ sendCd }: Props) {
           title="Bookmarks"
         >
           <HugeiconsIcon icon={Bookmark02Icon} size={16} strokeWidth={1.75} />
-          {totalShown > 0 && (
+          {showBadge && totalShown > 0 && (
             <span
               className={cn(
                 "absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold",
@@ -210,7 +214,15 @@ export function BookmarksDropdown({ sendCd }: Props) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 max-h-96 overflow-y-auto p-1.5">
+      <PopoverContent
+        align="end"
+        className="w-80 max-h-96 overflow-y-auto p-1.5"
+        // Radix otherwise auto-focuses the first focusable button on open,
+        // which paints its native focus-visible ring immediately — we drive
+        // our own roving-focus highlight instead (only after an arrow key),
+        // so suppress the automatic one.
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         {totalShown === 0 ? (
           <div className="px-2 py-4 text-center text-xs text-muted-foreground">
             No bookmarks yet. Right-click a path in the breadcrumb, SFTP manager, or file explorer to add one.

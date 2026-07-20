@@ -460,6 +460,9 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "bookmarksPrimaryClickBehavior":
       void store.setBookmarksPrimaryClickBehavior(value as "current" | "new");
       break;
+    case "bookmarksShowBadge":
+      void store.setBookmarksShowBadge(value as boolean);
+      break;
   }
 }
 

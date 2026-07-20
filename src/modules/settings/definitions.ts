@@ -1113,6 +1113,13 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
       { value: "new", label: "New tab" },
     ],
   },
+  {
+    id: "bookmarksShowBadge",
+    label: "Show bookmark count badge",
+    description: "Display a small count badge on the titlebar bookmarks icon.",
+    category: "Bookmarks",
+    controlType: "Switch",
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [
