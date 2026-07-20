@@ -22,8 +22,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { handleApiError } from "@/lib/errors";
+import { bookmarkKey, usePathBookmarksStore } from "@/modules/bookmarks/store/pathBookmarksStore";
 import { useHostsStore } from "@/modules/hosts";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { ExplorerAuthPrompt } from "./components/ExplorerAuthPrompt";
 import { VirtualizedTreeList } from "./components/VirtualizedTreeList";
 import { buildTreeRows } from "./lib/buildTreeRows";
@@ -177,6 +179,22 @@ export function FileExplorer({
             onOpenRemotePreview(activeSessionId, path, explorerTarget.hostId, explorerTarget.source)
         : undefined
       : onOpenPreview;
+
+  const bookmarksEnabled = usePreferencesStore((s) => s.bookmarksEnabled);
+  const bookmarkHostId = explorerTarget.type === "remote" ? explorerTarget.hostId : undefined;
+  const bookmarks = usePathBookmarksStore((s) => s.bookmarks);
+  const addBookmark = usePathBookmarksStore((s) => s.addBookmark);
+  const removeByPath = usePathBookmarksStore((s) => s.removeByPath);
+  const isPathBookmarked = (path: string) => {
+    const key = bookmarkKey(bookmarkHostId, path);
+    return bookmarks.some((b) => bookmarkKey(b.hostId, b.path) === key);
+  };
+  const effectiveOnBookmarkPath = bookmarksEnabled
+    ? (path: string) => {
+        if (isPathBookmarked(path)) void removeByPath(bookmarkHostId, path);
+        else void addBookmark(bookmarkHostId, path);
+      }
+    : undefined;
 
   // Single flattening pass feeds both the virtualized render and keyboard
   // navigation — `flat` is the entry-only subset `treeRows` already implies
@@ -506,6 +524,8 @@ export function FileExplorer({
                 onOpenPreview={effectiveOnOpenPreview}
                 onRevealInTerminal={effectiveOnRevealInTerminal}
                 onAttachToAgent={effectiveOnAttachToAgent}
+                onBookmarkPath={effectiveOnBookmarkPath}
+                isBookmarked={isPathBookmarked}
                 selectedPath={selectedPath}
                 onSelectPath={setSelectedPath}
                 dropTargetPath={dropTargetPath}

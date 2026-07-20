@@ -1,23 +1,24 @@
+import { homeDir } from "@tauri-apps/api/path";
 import { useEffect, useState } from "react";
-import { getAllKeys, useChatStore, type ProviderKeys } from "@/modules/ai";
+import { handleApiError } from "@/lib/errors";
+import { runStoreMigration } from "@/lib/storeMigration";
+import { useLayoutEngine } from "@/lib/useLayoutEngine";
+import { useTerminalCursorBlinkInterval } from "@/lib/useTerminalCursorBlinkInterval";
+import { useThemeEngine } from "@/lib/useThemeEngine";
+import { getAllKeys, type ProviderKeys, useChatStore } from "@/modules/ai";
 import { useAgentsStore } from "@/modules/ai/store/agentsStore";
 import { useDirectivesStore } from "@/modules/ai/store/directivesStore";
 import { useProvidersStore } from "@/modules/ai/store/providersStore";
-import { useCommandSnippetsStore } from "@/modules/snippets";
+import { usePathBookmarksStore } from "@/modules/bookmarks/store/pathBookmarksStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { onKeysChanged } from "@/modules/settings/store";
-import { useKeybindsStore } from "@/modules/shortcuts";
+import { bootstrapSftpConnectionListener } from "@/modules/sftp/store/sftpStore";
 import {
   bootstrapTransferListeners,
   bootstrapTransferSettingsSync,
 } from "@/modules/sftp/store/transferStore";
-import { bootstrapSftpConnectionListener } from "@/modules/sftp/store/sftpStore";
-import { useThemeEngine } from "@/lib/useThemeEngine";
-import { useLayoutEngine } from "@/lib/useLayoutEngine";
-import { useTerminalCursorBlinkInterval } from "@/lib/useTerminalCursorBlinkInterval";
-import { handleApiError } from "@/lib/errors";
-import { runStoreMigration } from "@/lib/storeMigration";
-import { homeDir } from "@tauri-apps/api/path";
+import { useKeybindsStore } from "@/modules/shortcuts";
+import { useCommandSnippetsStore } from "@/modules/snippets";
 
 export interface AppBootstrapReturn {
   keysLoaded: boolean;
@@ -123,6 +124,7 @@ export function useAppBootstrap(): AppBootstrapReturn {
       void useAgentsStore.getState().hydrate();
       void useDirectivesStore.getState().hydrate();
       void useCommandSnippetsStore.getState().hydrate();
+      void usePathBookmarksStore.getState().hydrate();
     };
     if (typeof requestIdleCallback !== "undefined") {
       const id = requestIdleCallback(cb, { timeout: 2000 });

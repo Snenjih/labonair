@@ -1,21 +1,21 @@
-import { useMemo } from "react";
 import type React from "react";
+import { useMemo } from "react";
 import { useCommandStore } from "@/modules/command-palette";
+import type { EditorPaneHandle } from "@/modules/editor";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   DEFAULT_PREFERENCES,
-  setTerminalFontSize,
   setEditorFontSize,
   setSftpFontSize,
+  setTerminalFontSize,
   setZenModeShowHeader,
   setZenModeShowStatusbar,
 } from "@/modules/settings/store";
 import { useGlobalShortcuts } from "@/modules/shortcuts";
-import { useTabsStore, selectActiveTabKind } from "@/modules/tabs";
 import type { WorkspaceTab } from "@/modules/tabs";
+import { selectActiveTabKind, useTabsStore } from "@/modules/tabs";
 import { collectLeafIds } from "@/modules/tabs/types";
 import type { WorkspacePaneHandle } from "@/modules/terminal";
-import type { EditorPaneHandle } from "@/modules/editor";
 
 export interface UseShortcutHandlersOptions {
   openNewTab: () => void;
@@ -122,6 +122,13 @@ export function useShortcutHandlers(opts: UseShortcutHandlersOptions): void {
         if (kind === "workspace") void setTerminalFontSize(DEFAULT_PREFERENCES.terminalFontSize);
         else if (kind === "editor") void setEditorFontSize(DEFAULT_PREFERENCES.editorFontSize);
         else if (kind === "sftp") void setSftpFontSize(DEFAULT_PREFERENCES.sftpFontSize);
+      },
+      "bookmarks.open": () => {
+        if (!usePreferencesStore.getState().bookmarksEnabled) return;
+        // BookmarksDropdown listens for this to open the same popover the
+        // titlebar icon opens — see comment there for why a CustomEvent
+        // instead of a threaded `open` prop.
+        window.dispatchEvent(new CustomEvent("labonair:bookmarks-open"));
       },
     }),
     [

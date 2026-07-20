@@ -111,6 +111,10 @@ export type SftpTab = {
   hostId: string;
   remotePath?: string;
   localPath?: string;
+  /** Target path a bookmark's "open in new SFTP tab" action wants to land
+   *  on — consulted only by the connect effect's initial directory load, not
+   *  re-applied afterward (see `SftpPane.tsx`). */
+  initialRemotePath?: string;
 };
 
 export type QuickConnectParams = {

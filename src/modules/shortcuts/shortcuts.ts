@@ -28,9 +28,10 @@ export type ShortcutId =
   | "view.zenMode"
   | "view.zoomIn"
   | "view.zoomOut"
-  | "view.zoomReset";
+  | "view.zoomReset"
+  | "bookmarks.open";
 
-export type ShortcutGroup = "General" | "Tabs" | "Search" | "AI" | "View";
+export type ShortcutGroup = "General" | "Tabs" | "Search" | "AI" | "View" | "Bookmarks";
 
 export type Shortcut = {
   id: ShortcutId;
@@ -195,6 +196,13 @@ export const SHORTCUTS: Shortcut[] = [
     group: "View",
     match: (e) => isMod(e) && e.key === "0",
   },
+  {
+    id: "bookmarks.open",
+    label: "Open path bookmarks",
+    keys: ["⌘", "⇧", "O"],
+    group: "Bookmarks",
+    match: (e) => isMod(e) && e.shiftKey && e.key.toLowerCase() === "o",
+  },
 ];
 
-export const SHORTCUT_GROUPS: ShortcutGroup[] = ["General", "Tabs", "View", "Search", "AI"];
+export const SHORTCUT_GROUPS: ShortcutGroup[] = ["General", "Tabs", "View", "Search", "AI", "Bookmarks"];

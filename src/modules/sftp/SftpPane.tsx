@@ -63,7 +63,6 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
   const hosts = useHostsStore((s) => s.hosts);
   const host = hosts.find((h) => h.id === tab.hostId);
   const hostLabel = host?.name ?? tab.title;
-  const hostAddress = host?.host_address ?? "";
 
   const sftpFontSize = usePreferencesStore((s) => s.sftpFontSize);
   const sftpShowHiddenFiles = usePreferencesStore((s) => s.sftpShowHiddenFiles);
@@ -101,9 +100,10 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
 
   useEffect(() => {
     if (!isConnected) return;
-    initTab(tabId, host?.default_path_sftp ?? "/");
+    const initialPath = tab.initialRemotePath ?? host?.default_path_sftp ?? "/";
+    initTab(tabId, initialPath);
     loadLocalDir(tabId, "~");
-    loadRemoteDir(tabId, host?.default_path_sftp ?? "/");
+    loadRemoteDir(tabId, initialPath);
     return () => {
       destroyTab(tabId);
       invoke("sftp_disconnect", { sessionId: tabId }).catch((e) =>
@@ -667,7 +667,6 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
               onNavigate={(p) => loadLocalDir(tabId, p)}
               showHidden={sftpShowHiddenFiles}
               onToggleHidden={toggleSftpHiddenFiles}
-              bookmarkKey="local"
             />
             <div className="flex-1 min-h-0">
               <SftpContextMenu
@@ -676,7 +675,6 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                 side="local"
                 selectedPaths={tabState?.selectedLocalPaths ?? new Set()}
                 currentPath={localPath}
-                hostAddress={hostAddress}
                 files={displayedLocalFiles}
                 onRefresh={() => loadLocalDir(tabId, localPath)}
                 onStartRename={(path) => startRename(path, "local")}
@@ -747,7 +745,6 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
               onOpenTerminal={() => onOpenSshTerminal?.(tab.hostId, hostLabel, remotePath)}
               showHidden={sftpShowHiddenFiles}
               onToggleHidden={toggleSftpHiddenFiles}
-              bookmarkKey={hostAddress || undefined}
               onDeepSearch={handleDeepSearch}
               isSearching={isDeepSearching}
             />
@@ -808,7 +805,6 @@ export function SftpPane({ tab, onOpenSshTerminal, onOpenRemoteEditor, onPathsCh
                   side="remote"
                   selectedPaths={tabState?.selectedRemotePaths ?? new Set()}
                   currentPath={remotePath}
-                  hostAddress={hostAddress}
                   files={displayedRemoteFiles}
                   onRefresh={() => loadRemoteDir(tabId, remotePath)}
                   onStartRename={(path) => startRename(path, "remote")}

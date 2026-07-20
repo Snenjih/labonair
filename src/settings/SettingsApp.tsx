@@ -1,5 +1,6 @@
 import {
   AiScanIcon,
+  Bookmark02Icon,
   File01Icon,
   Folder01Icon,
   KeyboardIcon,
@@ -33,6 +34,7 @@ import { SettingRow } from "./components/SettingRow";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AiSection } from "./sections/AiSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
+import { BookmarksSection } from "./sections/BookmarksSection";
 import { CommandPaletteSection } from "./sections/CommandPaletteSection";
 import { EditorSection } from "./sections/EditorSection";
 import { FileManagerSection } from "./sections/FileManagerSection";
@@ -59,6 +61,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
   { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
+  { id: "bookmarks", category: "Bookmarks", label: "Bookmarks", icon: Bookmark02Icon },
 ];
 
 const VALID_TABS = SIDEBAR_ITEMS.map((s) => s.id);
@@ -205,6 +208,7 @@ export function SettingsApp() {
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
                 {active === "ai" && <AiSection />}
+                {active === "bookmarks" && <BookmarksSection />}
               </>
             )}
           </div>
@@ -437,6 +441,24 @@ function applySettingChange(id: PrefKey, value: unknown): void {
       break;
     case "aiWarnDestructiveCommands":
       void store.setAiWarnDestructiveCommands(value as boolean);
+      break;
+    case "bookmarksEnabled":
+      void store.setBookmarksEnabled(value as boolean);
+      break;
+    case "bookmarksActionNewTerminal":
+      void store.setBookmarksActionNewTerminal(value as boolean);
+      break;
+    case "bookmarksActionCurrentTerminal":
+      void store.setBookmarksActionCurrentTerminal(value as boolean);
+      break;
+    case "bookmarksActionCurrentSftp":
+      void store.setBookmarksActionCurrentSftp(value as boolean);
+      break;
+    case "bookmarksActionNewSftp":
+      void store.setBookmarksActionNewSftp(value as boolean);
+      break;
+    case "bookmarksPrimaryClickBehavior":
+      void store.setBookmarksPrimaryClickBehavior(value as "current" | "new");
       break;
   }
 }

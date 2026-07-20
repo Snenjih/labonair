@@ -1,23 +1,8 @@
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { ArrowUp01Icon, EyeIcon, Refresh01Icon, TerminalIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  Bookmark02Icon,
-  Cancel01Icon,
-  EyeIcon,
-  ArrowUp01Icon,
-  Refresh01Icon,
-  TerminalIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useState } from "react";
-import { useBookmarksStore } from "../store/bookmarksStore";
 import { parentPath } from "../utils";
 
 interface SftpToolbarProps {
@@ -28,8 +13,6 @@ interface SftpToolbarProps {
   onOpenTerminal?: () => void;
   showHidden?: boolean;
   onToggleHidden?: () => void;
-  // Bookmarks
-  bookmarkKey?: string; // "local" or host_address
   // Deep search (remote only)
   onDeepSearch?: (query: string) => void;
   isSearching?: boolean;
@@ -43,7 +26,6 @@ export function SftpToolbar({
   onOpenTerminal,
   showHidden = false,
   onToggleHidden,
-  bookmarkKey,
   onDeepSearch,
   isSearching = false,
 }: SftpToolbarProps) {
@@ -51,15 +33,6 @@ export function SftpToolbar({
   const [focused, setFocused] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [searchVisible, setSearchVisible] = useState(false);
-
-  const bookmarks = useBookmarksStore((s) => s.getBookmarks(bookmarkKey ?? "__none__"));
-  const removeBookmark = useBookmarksStore((s) => s.removeBookmark);
-  const hydrate = useBookmarksStore((s) => s.hydrate);
-  const hydrated = useBookmarksStore((s) => s.hydrated);
-
-  useEffect(() => {
-    if (!hydrated) void hydrate();
-  }, [hydrate, hydrated]);
 
   // Sync input when path changes externally (unless user is editing)
   if (!focused && inputValue !== path) {
@@ -173,61 +146,6 @@ export function SftpToolbar({
             <path d="M9 9l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
           </svg>
         </Button>
-      )}
-
-      {/* Bookmarks dropdown */}
-      {bookmarkKey && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              title="Bookmarks"
-              tabIndex={-1}
-              className={cn(
-                "shrink-0 transition-colors duration-75",
-                bookmarks.length > 0
-                  ? "text-foreground dark:text-primary hover:bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <HugeiconsIcon icon={Bookmark02Icon} size={13} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72 max-h-64 overflow-y-auto">
-            {bookmarks.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-muted-foreground">No bookmarks yet.</div>
-            ) : (
-              <>
-                {bookmarks.map((bm) => (
-                  <DropdownMenuItem
-                    key={bm}
-                    className="group flex items-center gap-1 pr-1"
-                    onClick={() => onNavigate(bm)}
-                  >
-                    <span className="flex-1 truncate text-xs font-mono">{bm}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void removeBookmark(bookmarkKey, bm);
-                      }}
-                      className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                      title="Remove bookmark"
-                    >
-                      <HugeiconsIcon icon={Cancel01Icon} size={12} />
-                    </Button>
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <div className="px-3 py-1 text-[10px] text-muted-foreground">
-                  Right-click a folder to add bookmarks
-                </div>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
       )}
 
       {/* Refresh */}

@@ -17,6 +17,8 @@ type Props = {
   onOpenPreview?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string, remote?: { sessionId: string; hostId: string }) => void;
+  onBookmarkPath?: (path: string) => void;
+  isBookmarked?: (path: string) => boolean;
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
   dropTargetPath: string | null;
@@ -41,6 +43,8 @@ export function VirtualizedTreeList({
   onOpenPreview,
   onRevealInTerminal,
   onAttachToAgent,
+  onBookmarkPath,
+  isBookmarked,
   selectedPath,
   onSelectPath,
   dropTargetPath,
@@ -94,6 +98,8 @@ export function VirtualizedTreeList({
                   onOpenPreview={onOpenPreview}
                   onRevealInTerminal={onRevealInTerminal}
                   onAttachToAgent={onAttachToAgent}
+                  onBookmarkPath={onBookmarkPath}
+                  isBookmarked={isBookmarked}
                   selectedPath={selectedPath}
                   onSelectPath={onSelectPath}
                   dropTargetPath={dropTargetPath}

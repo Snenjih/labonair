@@ -14,6 +14,7 @@ export type SettingsTab =
   | "ai"
   | "directives"
   | "security"
+  | "bookmarks"
   | "about";
 
 export async function openSettingsWindow(tab?: SettingsTab): Promise<void> {

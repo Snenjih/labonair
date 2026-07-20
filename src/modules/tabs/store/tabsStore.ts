@@ -69,7 +69,7 @@ export type TabsState = {
   closeTab: (id: number) => void;
   updateTab: (id: number, patch: TabPatch) => void;
   selectByIndex: (idx: number) => void;
-  newSftpTab: (hostId: string, title: string, activate?: boolean) => number;
+  newSftpTab: (hostId: string, title: string, activate?: boolean, initialRemotePath?: string) => number;
   updateSftpPaths: (tabId: number, remotePath: string, localPath: string) => void;
   openUntitledTab: () => Promise<number>;
   openRemoteEditorTab: (
@@ -521,10 +521,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     if (t) set({ activeId: t.id });
   },
 
-  newSftpTab: (hostId, title, activate = true) => {
+  newSftpTab: (hostId, title, activate = true, initialRemotePath) => {
     const id = get()._nextId;
     set((s) => ({
-      tabs: [...s.tabs, { id, kind: "sftp" as const, title, hostId }],
+      tabs: [...s.tabs, { id, kind: "sftp" as const, title, hostId, initialRemotePath }],
       activeId: activate ? id : s.activeId,
       _nextId: s._nextId + 1,
     }));

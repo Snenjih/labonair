@@ -34,6 +34,8 @@ type Props = {
   onOpenPreview?: (path: string) => void;
   onRevealInTerminal?: (path: string) => void;
   onAttachToAgent?: (path: string, remote?: { sessionId: string; hostId: string }) => void;
+  onBookmarkPath?: (path: string) => void;
+  isBookmarked?: (path: string) => boolean;
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
   dropTargetPath: string | null;
@@ -59,6 +61,8 @@ function FileTreeNodeImpl({
   onOpenPreview,
   onRevealInTerminal,
   onAttachToAgent,
+  onBookmarkPath,
+  isBookmarked,
   selectedPath,
   onSelectPath,
   dropTargetPath,
@@ -219,6 +223,11 @@ function FileTreeNodeImpl({
             Open in Terminal
           </ContextMenuItem>
         )}
+        {isDir && onBookmarkPath && (
+          <ContextMenuItem className={COMPACT_ITEM} onSelect={() => onBookmarkPath(path)}>
+            {isBookmarked?.(path) ? "Remove bookmark" : "Bookmark this path"}
+          </ContextMenuItem>
+        )}
         {tree.capabilities.supportsReveal && (
           <ContextMenuItem className={COMPACT_ITEM} onSelect={() => void revealInFinder(path)}>
             Reveal in Finder
@@ -232,6 +241,7 @@ function FileTreeNodeImpl({
         {(!isDir ||
           (canPreview && !!onOpenPreview) ||
           (isDir && !!onRevealInTerminal) ||
+          (isDir && !!onBookmarkPath) ||
           tree.capabilities.supportsReveal ||
           tree.capabilities.supportsChmod ||
           tree.capabilities.supportsChown) && <ContextMenuSeparator />}

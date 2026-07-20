@@ -249,6 +249,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onOpenThemes={onOpenThemes}
                 onNewGitGraph={onNewGitGraph}
                 onPanelToggle={handlePanelToggle}
+                sendCd={tabs.sendCd}
               />
             )}
 

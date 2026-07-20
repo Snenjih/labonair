@@ -20,7 +20,8 @@ import {
 } from "@/components/ui/context-menu";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { handleApiError } from "@/lib/errors";
-import { useBookmarksStore } from "../store/bookmarksStore";
+import { usePathBookmarksStore } from "@/modules/bookmarks/store/pathBookmarksStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { FileNode } from "../types";
 import { PropertiesDialog } from "./PropertiesDialog";
 
@@ -30,7 +31,6 @@ interface SftpContextMenuProps {
   side: "local" | "remote";
   selectedPaths: Set<string>;
   currentPath?: string;
-  hostAddress?: string;
   files?: FileNode[];
   onRefresh: () => void;
   onStartRename?: (path: string) => void;
@@ -51,7 +51,6 @@ export function SftpContextMenu({
   side,
   selectedPaths,
   currentPath,
-  hostAddress,
   files,
   onRefresh,
   onStartRename,
@@ -64,10 +63,17 @@ export function SftpContextMenu({
   const [chmodOpen, setChmodOpen] = useState(false);
   const [chmodValue, setChmodValue] = useState("755");
   const [propertiesFile, setPropertiesFile] = useState<FileNode | null>(null);
-  const addBookmark = useBookmarksStore((s) => s.addBookmark);
+  const addBookmark = usePathBookmarksStore((s) => s.addBookmark);
+  const removeByPath = usePathBookmarksStore((s) => s.removeByPath);
+  const bookmarksEnabled = usePreferencesStore((s) => s.bookmarksEnabled);
 
   const count = selectedPaths.size;
   const singlePath = count === 1 ? [...selectedPaths][0] : null;
+  const bookmarkHostId = side === "remote" ? hostId : undefined;
+  const bookmarkPath = singlePath ?? currentPath;
+  const isBookmarked = usePathBookmarksStore((s) =>
+    bookmarkPath ? s.isBookmarked(bookmarkHostId, bookmarkPath) : false,
+  );
   const singleFile = singlePath ? (files?.find((f) => f.path === singlePath) ?? null) : null;
 
   async function handleDelete() {
@@ -151,11 +157,9 @@ export function SftpContextMenu({
   }
 
   function handleBookmark() {
-    const path = singlePath ?? currentPath;
-    if (!path) return;
-    // Use || so an empty string also falls back to "remote" (not just null/undefined).
-    const key = side === "remote" ? hostAddress || "remote" : "local";
-    void addBookmark(key, path);
+    if (!bookmarkPath) return;
+    if (isBookmarked) void removeByPath(bookmarkHostId, bookmarkPath);
+    else void addBookmark(bookmarkHostId, bookmarkPath);
   }
 
   return (
@@ -190,7 +194,11 @@ export function SftpContextMenu({
           {side === "remote" && <ContextMenuSeparator />}
 
           {/* Bookmark current path or selected item */}
-          <ContextMenuItem onClick={handleBookmark}>Bookmark this path</ContextMenuItem>
+          {bookmarksEnabled && (
+            <ContextMenuItem onClick={handleBookmark}>
+              {isBookmarked ? "Remove bookmark" : "Bookmark this path"}
+            </ContextMenuItem>
+          )}
           <ContextMenuItem onClick={onRefresh}>Refresh</ContextMenuItem>
 
           {(count > 0 || (side === "remote" && count === 1)) && <ContextMenuSeparator />}

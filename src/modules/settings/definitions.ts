@@ -10,6 +10,7 @@ export type SettingCategory =
   | "Source Control"
   | "AI"
   | "Directives"
+  | "Bookmarks"
   | "About";
 
 export type ControlType = "Switch" | "Select" | "Input" | "NumberInput" | "Custom";
@@ -1061,6 +1062,57 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "AI",
     controlType: "NumberInput",
   },
+
+  // --- Bookmarks ---
+  {
+    id: "bookmarksEnabled",
+    label: "Enable path bookmarks",
+    description:
+      "Save frequently-used local or host folders and jump to them from the titlebar, breadcrumb, SFTP, and Explorer context menus.",
+    category: "Bookmarks",
+    controlType: "Switch",
+  },
+  {
+    id: "bookmarksActionNewTerminal",
+    label: "Open in new terminal",
+    description: "Show the action to open a bookmark in a brand-new terminal tab.",
+    category: "Bookmarks",
+    controlType: "Switch",
+  },
+  {
+    id: "bookmarksActionCurrentTerminal",
+    label: "Open in current terminal",
+    description: "Show the action to cd the currently focused terminal to a bookmark's path.",
+    category: "Bookmarks",
+    controlType: "Switch",
+  },
+  {
+    id: "bookmarksActionCurrentSftp",
+    label: "Open in current SFTP manager",
+    description: "Show the action to navigate the currently open SFTP tab to a bookmark's path.",
+    category: "Bookmarks",
+    controlType: "Switch",
+  },
+  {
+    id: "bookmarksActionNewSftp",
+    label: "Open in new SFTP tab",
+    description:
+      "Show the action to open a host bookmark in a brand-new SFTP tab. Never shown for local bookmarks.",
+    category: "Bookmarks",
+    controlType: "Switch",
+  },
+  {
+    id: "bookmarksPrimaryClickBehavior",
+    label: "Primary click opens",
+    description:
+      "What clicking a bookmark's path itself does — reuse the current tab/pane, or always open a new one.",
+    category: "Bookmarks",
+    controlType: "Select",
+    options: [
+      { value: "current", label: "Current tab/pane" },
+      { value: "new", label: "New tab" },
+    ],
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [
@@ -1073,5 +1125,6 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Source Control",
   "AI",
   "Directives",
+  "Bookmarks",
   "About",
 ];

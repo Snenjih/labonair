@@ -1,4 +1,14 @@
-import React from "react";
+import {
+  EyeIcon,
+  Key01Icon,
+  KeyboardIcon,
+  Menu01Icon,
+  Settings01Icon,
+  SidebarLeftIcon,
+  SidebarRightIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,23 +25,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
+import { BookmarksDropdown } from "@/modules/bookmarks";
+import { NotificationDropdown } from "@/modules/notifications/components/NotificationDropdown";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setSidebarPosition } from "@/modules/settings/store";
-import { TabBar } from "@/modules/tabs";
-import type { Tab } from "@/modules/tabs";
-import {
-  KeyboardIcon,
-  Settings01Icon,
-  SidebarLeftIcon,
-  SidebarRightIcon,
-  Menu01Icon,
-  EyeIcon,
-  Key01Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useRef } from "react";
-import { NotificationDropdown } from "@/modules/notifications/components/NotificationDropdown";
 import type { SidebarPanel } from "@/modules/statusbar";
+import type { Tab } from "@/modules/tabs";
+import { TabBar } from "@/modules/tabs";
 import { JumpHostDropdown } from "./components/JumpHostDropdown";
 import { TransferDropdown } from "./components/TransferDropdown";
 import { UpdaterButton } from "./components/UpdaterButton";
@@ -56,6 +56,7 @@ type Props = {
   onOpenThemes: () => void;
   onNewGitGraph?: () => void;
   onPanelToggle?: (panel: SidebarPanel) => void;
+  sendCd: (path: string) => void;
 };
 
 export const Header = React.memo(function Header({
@@ -78,11 +79,13 @@ export const Header = React.memo(function Header({
   onOpenThemes,
   onNewGitGraph,
   onPanelToggle,
+  sendCd,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const titlebarsIconsPosition = usePreferencesStore((s) => s.titlebarsIconsPosition);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
+  const bookmarksEnabled = usePreferencesStore((s) => s.bookmarksEnabled);
   const iconsOnLeft = titlebarsIconsPosition === "left";
 
   const actionIcons = (
@@ -91,6 +94,7 @@ export const Header = React.memo(function Header({
       <NotificationDropdown />
       <JumpHostDropdown onPanelToggle={onPanelToggle} />
       <TransferDropdown />
+      {bookmarksEnabled && <BookmarksDropdown sendCd={sendCd} />}
     </>
   );
 

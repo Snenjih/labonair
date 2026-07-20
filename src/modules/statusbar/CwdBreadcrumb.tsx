@@ -25,9 +25,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { AiAttachFileDetail } from "@/modules/ai/lib/composerContext";
+import { usePathBookmarksStore } from "@/modules/bookmarks/store/pathBookmarksStore";
 import type { FsProvider } from "@/modules/explorer/lib/fsProvider";
 import { createLocalFsProvider } from "@/modules/explorer/lib/providers/localFsProvider";
 import { createRemoteFsProvider } from "@/modules/explorer/lib/providers/remoteFsProvider";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Segment } from "./lib/pathUtils";
 import { relativePath, segmentsFromCwd } from "./lib/pathUtils";
 
@@ -182,6 +184,10 @@ type SegmentMenuProps = {
 function SegmentContextMenuContent({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: SegmentMenuProps) {
   const displayName = seg.isHome ? "Home" : seg.label;
   const rel = cwd ? relativePath(cwd, seg.fullPath) : seg.fullPath;
+  const bookmarksEnabled = usePreferencesStore((s) => s.bookmarksEnabled);
+  const isBookmarked = usePathBookmarksStore((s) => s.isBookmarked(remoteTarget?.hostId, seg.fullPath));
+  const addBookmark = usePathBookmarksStore((s) => s.addBookmark);
+  const removeByPath = usePathBookmarksStore((s) => s.removeByPath);
   return (
     <ContextMenuContent className="w-56">
       <ContextMenuLabel className="text-[11px]">{displayName}</ContextMenuLabel>
@@ -203,6 +209,21 @@ function SegmentContextMenuContent({ seg, cwd, remoteTarget, onCd, onCdInNewTab 
         <ContextMenuItem className="text-[12px]" onSelect={() => onCdInNewTab(seg.fullPath)}>
           Open in new terminal
         </ContextMenuItem>
+      )}
+      {bookmarksEnabled && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            className="text-[12px]"
+            onSelect={() =>
+              isBookmarked
+                ? void removeByPath(remoteTarget?.hostId, seg.fullPath)
+                : void addBookmark(remoteTarget?.hostId, seg.fullPath)
+            }
+          >
+            {isBookmarked ? "Remove bookmark" : "Bookmark this path"}
+          </ContextMenuItem>
+        </>
       )}
       <ContextMenuSeparator />
       <ContextMenuItem

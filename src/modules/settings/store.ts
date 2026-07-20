@@ -224,6 +224,14 @@ export type Preferences = {
   explorerIdleSessionTimeoutMin: number;
   explorerMaxIdleSessions: number;
   explorerMaxCachedRemoteScopes: number;
+
+  // --- Bookmarks ---
+  bookmarksEnabled: boolean;
+  bookmarksActionNewTerminal: boolean;
+  bookmarksActionCurrentTerminal: boolean;
+  bookmarksActionCurrentSftp: boolean;
+  bookmarksActionNewSftp: boolean;
+  bookmarksPrimaryClickBehavior: "current" | "new";
 };
 
 const KEY_THEME = "theme";
@@ -374,6 +382,13 @@ const KEY_STATUSBAR_SHOW_TABS_BUTTON = "statusBarShowTabsButton";
 const KEY_STATUSBAR_SHOW_CWD_BREADCRUMB = "statusBarShowCwdBreadcrumb";
 const KEY_STATUSBAR_SHOW_PREVIEW_URL = "statusBarShowPreviewUrl";
 const KEY_STATUSBAR_SHOW_AI_CONTROLS = "statusBarShowAiControls";
+
+const KEY_BOOKMARKS_ENABLED = "bookmarksEnabled";
+const KEY_BOOKMARKS_ACTION_NEW_TERMINAL = "bookmarksActionNewTerminal";
+const KEY_BOOKMARKS_ACTION_CURRENT_TERMINAL = "bookmarksActionCurrentTerminal";
+const KEY_BOOKMARKS_ACTION_CURRENT_SFTP = "bookmarksActionCurrentSftp";
+const KEY_BOOKMARKS_ACTION_NEW_SFTP = "bookmarksActionNewSftp";
+const KEY_BOOKMARKS_PRIMARY_CLICK = "bookmarksPrimaryClickBehavior";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -534,6 +549,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
   explorerIdleSessionTimeoutMin: 5,
   explorerMaxIdleSessions: 3,
   explorerMaxCachedRemoteScopes: 5,
+
+  bookmarksEnabled: true,
+  bookmarksActionNewTerminal: true,
+  bookmarksActionCurrentTerminal: true,
+  bookmarksActionCurrentSftp: true,
+  bookmarksActionNewSftp: true,
+  bookmarksPrimaryClickBehavior: "current",
 };
 
 let _storePromise: Promise<LazyStore> | null = null;
@@ -852,6 +874,21 @@ export async function loadPreferences(): Promise<Preferences> {
       get<boolean>(KEY_STATUSBAR_SHOW_PREVIEW_URL) ?? DEFAULT_PREFERENCES.statusBarShowPreviewUrl,
     statusBarShowAiControls:
       get<boolean>(KEY_STATUSBAR_SHOW_AI_CONTROLS) ?? DEFAULT_PREFERENCES.statusBarShowAiControls,
+
+    bookmarksEnabled: get<boolean>(KEY_BOOKMARKS_ENABLED) ?? DEFAULT_PREFERENCES.bookmarksEnabled,
+    bookmarksActionNewTerminal:
+      get<boolean>(KEY_BOOKMARKS_ACTION_NEW_TERMINAL) ?? DEFAULT_PREFERENCES.bookmarksActionNewTerminal,
+    bookmarksActionCurrentTerminal:
+      get<boolean>(KEY_BOOKMARKS_ACTION_CURRENT_TERMINAL) ??
+      DEFAULT_PREFERENCES.bookmarksActionCurrentTerminal,
+    bookmarksActionCurrentSftp:
+      get<boolean>(KEY_BOOKMARKS_ACTION_CURRENT_SFTP) ?? DEFAULT_PREFERENCES.bookmarksActionCurrentSftp,
+    bookmarksActionNewSftp:
+      get<boolean>(KEY_BOOKMARKS_ACTION_NEW_SFTP) ?? DEFAULT_PREFERENCES.bookmarksActionNewSftp,
+    bookmarksPrimaryClickBehavior: ((): "current" | "new" => {
+      const v = get<string>(KEY_BOOKMARKS_PRIMARY_CLICK);
+      return v === "new" ? v : "current";
+    })(),
   };
 }
 
@@ -1586,6 +1623,36 @@ export async function setStatusBarShowAiControls(value: boolean): Promise<void> 
   await (await getStore()).save();
 }
 
+export async function setBookmarksEnabled(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BOOKMARKS_ENABLED, value);
+  await (await getStore()).save();
+}
+
+export async function setBookmarksActionNewTerminal(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BOOKMARKS_ACTION_NEW_TERMINAL, value);
+  await (await getStore()).save();
+}
+
+export async function setBookmarksActionCurrentTerminal(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BOOKMARKS_ACTION_CURRENT_TERMINAL, value);
+  await (await getStore()).save();
+}
+
+export async function setBookmarksActionCurrentSftp(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BOOKMARKS_ACTION_CURRENT_SFTP, value);
+  await (await getStore()).save();
+}
+
+export async function setBookmarksActionNewSftp(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BOOKMARKS_ACTION_NEW_SFTP, value);
+  await (await getStore()).save();
+}
+
+export async function setBookmarksPrimaryClickBehavior(value: "current" | "new"): Promise<void> {
+  await (await getStore()).set(KEY_BOOKMARKS_PRIMARY_CLICK, value);
+  await (await getStore()).save();
+}
+
 export type PrefKey = keyof Preferences;
 
 /** Subscribe to changes from any window (settings → main). */
@@ -1737,6 +1804,12 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_STATUSBAR_SHOW_CWD_BREADCRUMB]: "statusBarShowCwdBreadcrumb",
     [KEY_STATUSBAR_SHOW_PREVIEW_URL]: "statusBarShowPreviewUrl",
     [KEY_STATUSBAR_SHOW_AI_CONTROLS]: "statusBarShowAiControls",
+    [KEY_BOOKMARKS_ENABLED]: "bookmarksEnabled",
+    [KEY_BOOKMARKS_ACTION_NEW_TERMINAL]: "bookmarksActionNewTerminal",
+    [KEY_BOOKMARKS_ACTION_CURRENT_TERMINAL]: "bookmarksActionCurrentTerminal",
+    [KEY_BOOKMARKS_ACTION_CURRENT_SFTP]: "bookmarksActionCurrentSftp",
+    [KEY_BOOKMARKS_ACTION_NEW_SFTP]: "bookmarksActionNewSftp",
+    [KEY_BOOKMARKS_PRIMARY_CLICK]: "bookmarksPrimaryClickBehavior",
   };
   return (await getStore()).onChange<unknown>((key, value) => {
     const mapped = map[key];
