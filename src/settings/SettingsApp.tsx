@@ -66,8 +66,8 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
-  { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
   { id: "bookmarks", category: "Bookmarks", label: "Bookmarks", icon: Bookmark02Icon },
+  { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
 ];
 
 const VALID_TABS = SIDEBAR_ITEMS.map((s) => s.id);
