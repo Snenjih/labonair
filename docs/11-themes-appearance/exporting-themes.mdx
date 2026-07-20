@@ -5,7 +5,7 @@ description: "How to export any installed Labonair theme as a .json file for sha
 
 # Exporting Themes
 
-Every theme installed in Labonair — including the built-in "Labonair Dark" default — can be exported to a `.json` file. This is useful for sharing themes with colleagues, backing up a customized theme, or using an existing theme as a starting point for a new one.
+Every theme installed in Labonair — including the built-in "Default" theme — can be exported to a `.json` file. This is useful for sharing themes with colleagues, backing up a customized theme, or using an existing theme as a starting point for a new one.
 
 ## Export Steps
 
@@ -17,11 +17,11 @@ Every theme installed in Labonair — including the built-in "Labonair Dark" def
 
 ## What Gets Exported
 
-The exported file is the complete theme JSON as stored internally by Labonair — it includes the `name`, `author` (if set), `type`, and the full `colors` map with all UI and terminal ANSI color keys. The exported file is immediately valid for re-import into Labonair or sharing with others.
+The exported file is the complete theme JSON as stored internally by Labonair — it includes the `name`, `author` (if set), and the full `variants` object with every variant's `colors` map (UI and terminal ANSI color keys). The exported file is immediately valid for re-import into Labonair or sharing with others.
 
 ## Exporting the Default Theme
 
-The built-in "Labonair Dark" theme can be exported exactly like any other theme. This is the recommended way to start building a custom theme — export the default, open it in a text editor, and modify the colors. See [Creating Custom Themes](./creating-custom-themes) for a full walkthrough.
+The built-in "Default" theme can be exported exactly like any other theme, and includes both its light and dark variants. This is the recommended way to start building a custom theme — export the default, open it in a text editor, and modify the colors. See [Creating Custom Themes](./creating-custom-themes) for a full walkthrough.
 
 ## Technical Details
 

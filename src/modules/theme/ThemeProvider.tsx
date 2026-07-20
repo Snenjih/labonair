@@ -5,7 +5,6 @@ import {
   setTheme as persistTheme,
   type ThemePref,
 } from "@/modules/settings/store";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 
 export type Theme = ThemePref;
 
@@ -76,14 +75,10 @@ export function ThemeProvider({ children, defaultTheme = "system" }: ThemeProvid
 
   const resolvedTheme: "dark" | "light" = theme === "system" ? (systemDark ? "dark" : "light") : theme;
 
-  useEffect(() => {
-    // If a custom JSON theme is active, it owns the dark/light class — don't fight it.
-    const currentAppTheme = usePreferencesStore.getState().appTheme;
-    if (currentAppTheme !== "default") return;
-    const root = document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(resolvedTheme);
-  }, [resolvedTheme]);
+  // DOM class + color application for the resolved mode is owned entirely by
+  // useThemeEngine() (src/lib/useThemeEngine.ts), which reacts to this same
+  // resolved mode via usePreferencesStore and applies whichever variant of
+  // the active theme (including the bundled "default") matches it.
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);

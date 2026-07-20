@@ -2,19 +2,48 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-/// A single JSON theme file.
+/// A single named color variant within a theme (e.g. "dark", "light", "frappe").
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThemeVariant {
+    /// "light" or "dark" — drives the root `.light`/`.dark` class when this
+    /// variant is the one resolved for the active color scheme.
+    pub mode: String,
+    #[serde(default)]
+    pub label: Option<String>,
+    pub colors: HashMap<String, String>,
+}
+
+/// A single JSON theme file. Must define at least one variant with
+/// `mode: "light"` and one with `mode: "dark"`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Theme {
     pub name: String,
     #[serde(default)]
     pub author: String,
-    #[serde(rename = "type", default = "default_type")]
-    pub theme_type: String,
-    pub colors: HashMap<String, String>,
+    #[serde(default)]
+    pub author_url: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub description: String,
+    pub variants: HashMap<String, ThemeVariant>,
 }
 
-fn default_type() -> String {
-    "dark".to_string()
+impl Theme {
+    fn validate(&self) -> Result<(), String> {
+        if self.variants.is_empty() {
+            return Err("'variants' must contain at least one entry".to_string());
+        }
+        let has_light = self.variants.values().any(|v| v.mode == "light");
+        let has_dark = self.variants.values().any(|v| v.mode == "dark");
+        if !has_light || !has_dark {
+            return Err(
+                "'variants' must include at least one entry with mode \"light\" and one with mode \"dark\""
+                    .to_string(),
+            );
+        }
+        Ok(())
+    }
 }
 
 /// Metadata returned to the frontend for the theme list.
@@ -24,15 +53,22 @@ pub struct ThemeMeta {
     pub id: String,
     pub name: String,
     pub author: String,
-    #[serde(rename = "type")]
-    pub theme_type: String,
-    /// The full theme including colors (used for live preview).
-    pub colors: HashMap<String, String>,
+    pub variants: HashMap<String, ThemeVariant>,
     /// Whether this theme is built-in (cannot be deleted).
     pub builtin: bool,
 }
 
-const DEFAULT_DARK_JSON: &str = include_str!("default-dark.json");
+fn meta_from_theme(id: String, theme: Theme, builtin: bool) -> ThemeMeta {
+    ThemeMeta {
+        id,
+        name: theme.name,
+        author: theme.author,
+        variants: theme.variants,
+        builtin,
+    }
+}
+
+const DEFAULT_JSON: &str = include_str!("default.json");
 
 fn themes_dir(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = crate::modules::fs::paths::config_dir().join("themes");
@@ -42,8 +78,16 @@ fn themes_dir(_app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(dir)
 }
 
+/// Return the bundled built-in "Labonair" default theme (both variants).
+#[tauri::command]
+pub async fn theme_get_default() -> Result<ThemeMeta, String> {
+    let theme: Theme = serde_json::from_str(DEFAULT_JSON)
+        .map_err(|e| format!("Failed to parse bundled default theme: {}", e))?;
+    Ok(meta_from_theme("default".to_string(), theme, true))
+}
+
 /// Return all available themes: only user `.json` files from the themes directory.
-/// The built-in "Default (System)" entry is hardcoded in ThemePicker.tsx.
+/// The built-in "Default" entry is served separately via `theme_get_default`.
 #[tauri::command]
 pub async fn themes_get_all(app: tauri::AppHandle) -> Result<Vec<ThemeMeta>, String> {
     let mut themes = Vec::new();
@@ -60,19 +104,15 @@ pub async fn themes_get_all(app: tauri::AppHandle) -> Result<Vec<ThemeMeta>, Str
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_string();
-        if id == "default-dark" {
+        if id == "default" {
             continue;
         }
         let raw = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
         match serde_json::from_str::<Theme>(&raw) {
-            Ok(t) => themes.push(ThemeMeta {
-                id,
-                name: t.name,
-                author: t.author,
-                theme_type: t.theme_type,
-                colors: t.colors,
-                builtin: false,
-            }),
+            Ok(t) => match t.validate() {
+                Ok(()) => themes.push(meta_from_theme(id, t, false)),
+                Err(e) => log::warn!("Skipping invalid theme {:?}: {}", path, e),
+            },
             Err(e) => log::warn!("Skipping invalid theme {:?}: {}", path, e),
         }
     }
@@ -88,6 +128,7 @@ pub async fn theme_import(
     let src = PathBuf::from(&source_path);
     let raw = std::fs::read_to_string(&src).map_err(|e| e.to_string())?;
     let theme: Theme = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    theme.validate()?;
 
     let id = src
         .file_stem()
@@ -98,14 +139,7 @@ pub async fn theme_import(
     let dest = themes_dir(&app)?.join(format!("{}.json", id));
     std::fs::write(&dest, &raw).map_err(|e| e.to_string())?;
 
-    Ok(ThemeMeta {
-        id,
-        name: theme.name,
-        author: theme.author,
-        theme_type: theme.theme_type,
-        colors: theme.colors,
-        builtin: false,
-    })
+    Ok(meta_from_theme(id, theme, false))
 }
 
 /// Export a theme (by id) to the given destination path.
@@ -115,8 +149,8 @@ pub async fn theme_export(
     id: String,
     dest_path: String,
 ) -> Result<(), String> {
-    let content = if id == "default-dark" {
-        DEFAULT_DARK_JSON.to_string()
+    let content = if id == "default" {
+        DEFAULT_JSON.to_string()
     } else {
         let src = themes_dir(&app)?.join(format!("{}.json", id));
         std::fs::read_to_string(&src).map_err(|e| e.to_string())?
@@ -128,7 +162,7 @@ pub async fn theme_export(
 /// Delete a user-created theme by id. Built-in themes cannot be deleted.
 #[tauri::command]
 pub async fn theme_delete(app: tauri::AppHandle, id: String) -> Result<(), String> {
-    if id == "default-dark" {
+    if id == "default" {
         return Err("Cannot delete the built-in default theme.".to_string());
     }
     let path = themes_dir(&app)?.join(format!("{}.json", id));
@@ -138,7 +172,7 @@ pub async fn theme_delete(app: tauri::AppHandle, id: String) -> Result<(), Strin
     Ok(())
 }
 
-/// Create a new theme file from the default dark theme values and return the ThemeMeta
+/// Create a new theme file from the default theme values and return the ThemeMeta
 /// plus the absolute path to the created file so the frontend can open it in the editor.
 #[tauri::command]
 pub async fn theme_create(app: tauri::AppHandle, name: String) -> Result<(ThemeMeta, String), String> {
@@ -154,7 +188,7 @@ pub async fn theme_create(app: tauri::AppHandle, name: String) -> Result<(ThemeM
         .join("-");
     let slug = if slug.is_empty() { "my-theme".to_string() } else { slug };
 
-    let mut theme: Theme = serde_json::from_str(DEFAULT_DARK_JSON)
+    let mut theme: Theme = serde_json::from_str(DEFAULT_JSON)
         .map_err(|e| format!("Failed to parse default theme: {}", e))?;
     theme.name = name.clone();
     theme.author = String::new();
@@ -166,14 +200,7 @@ pub async fn theme_create(app: tauri::AppHandle, name: String) -> Result<(ThemeM
     std::fs::write(&dest, &json).map_err(|e| e.to_string())?;
 
     let path_str = dest.to_string_lossy().to_string();
-    let meta = ThemeMeta {
-        id: slug,
-        name,
-        author: String::new(),
-        theme_type: theme.theme_type,
-        colors: theme.colors,
-        builtin: false,
-    };
+    let meta = meta_from_theme(slug, theme, false);
     Ok((meta, path_str))
 }
 
@@ -213,6 +240,7 @@ pub async fn theme_download(app: tauri::AppHandle, url: String) -> Result<ThemeM
 
     let theme: Theme = serde_json::from_str(&raw_json)
         .map_err(|e| format!("Invalid theme JSON: {}", e))?;
+    theme.validate()?;
 
     // Derive the ID from the URL filename stem so it always matches the community
     // index convention (index id == file stem == rawUrl file stem).
@@ -245,12 +273,5 @@ pub async fn theme_download(app: tauri::AppHandle, url: String) -> Result<ThemeM
     let dest = themes_dir(&app)?.join(format!("{}.json", id));
     std::fs::write(&dest, &raw_json).map_err(|e| e.to_string())?;
 
-    Ok(ThemeMeta {
-        id,
-        name: theme.name,
-        author: theme.author,
-        theme_type: theme.theme_type,
-        colors: theme.colors,
-        builtin: false,
-    })
+    Ok(meta_from_theme(id, theme, false))
 }

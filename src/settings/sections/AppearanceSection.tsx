@@ -1,4 +1,35 @@
+import {
+  Add01Icon,
+  Cancel01Icon,
+  CancelCircleIcon,
+  ComputerIcon,
+  Delete01Icon,
+  EyeIcon,
+  FolderOpenIcon,
+  Image01Icon,
+  Moon02Icon,
+  Sun03Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { useEffect, useState } from "react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { ThemePref } from "@/modules/settings/store";
 import {
   setAppCornerRadius,
   setAppDensity,
@@ -21,40 +52,9 @@ import {
   STATUSBAR_ITEM_SETTERS,
   type StatusBarItemDescriptor,
 } from "@/modules/statusbar/lib/statusBarItems";
-import type { ThemePref } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import {
-  Add01Icon,
-  Cancel01Icon,
-  CancelCircleIcon,
-  ComputerIcon,
-  Delete01Icon,
-  EyeIcon,
-  FolderOpenIcon,
-  Image01Icon,
-  Moon02Icon,
-  Sun03Icon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { useEffect, useState } from "react";
-import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { emit } from "@tauri-apps/api/event";
 
 const TITLEBAR_ICONS_DESCRIPTIONS: Record<"auto" | "left" | "right", string> = {
   auto: "Follows platform conventions — right side on macOS (traffic lights occupy the left) and on Windows (before the window controls).",
@@ -213,7 +213,7 @@ export function AppearanceSection() {
       <SectionHeader title="Appearance" description="Color theme, background, typography, and layout." />
 
       <div className="flex flex-col gap-2">
-        <Label>Color theme</Label>
+        <Label>Color scheme</Label>
         <div className="grid grid-cols-3 gap-2">
           {APPEARANCE.map((o) => (
             <button

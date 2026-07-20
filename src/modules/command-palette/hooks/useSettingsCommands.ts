@@ -1,36 +1,36 @@
-import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  Settings01Icon,
-  EyeIcon,
   ArrowUpDownIcon,
-  Refresh01Icon,
   CheckListIcon,
+  EyeIcon,
+  Refresh01Icon,
+  Settings01Icon,
 } from "@hugeicons/core-free-icons";
-import { createElement, useEffect, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { invoke } from "@tauri-apps/api/core";
+import { createElement, useEffect, useState } from "react";
+import type { ThemeMeta } from "@/lib/useThemeEngine";
+import { applyThemeColors, revertThemeColors } from "@/lib/useThemeEngine";
 import { toggleSftpHiddenFiles, usePreferencesStore } from "@/modules/settings/preferences";
 import {
+  EDITOR_THEME_LABELS,
+  EDITOR_THEMES,
   setTheme as persistTheme,
   setAppTheme,
-  setEditorWordWrap,
-  setTerminalCursorBlink,
-  setTerminalUseWebGL,
-  setTerminalShowPaneHeader,
-  setTerminalShowPaneFooter,
-  setVimMode,
-  setEditorAutoSave,
   setAutocompleteEnabled,
   setAutostart,
+  setEditorAutoSave,
   setEditorTheme,
+  setEditorWordWrap,
+  setTerminalCursorBlink,
+  setTerminalShowPaneFooter,
+  setTerminalShowPaneHeader,
+  setTerminalUseWebGL,
+  setVimMode,
   setZenModeShowHeader,
   setZenModeShowStatusbar,
-  EDITOR_THEMES,
-  EDITOR_THEME_LABELS,
   type ThemePref,
 } from "@/modules/settings/store";
 import type { CommandAction, CommandPage } from "../types";
-import { applyThemeColors, revertThemeColors } from "@/lib/useThemeEngine";
-import type { ThemeMeta } from "@/lib/useThemeEngine";
 
 function toggle(label: boolean | undefined): string {
   return label ? "ON" : "OFF";
@@ -44,6 +44,8 @@ export function useSettingsCommands(): {
 } {
   const appTheme = usePreferencesStore((s) => s.appTheme);
   const theme = usePreferencesStore((s) => s.theme);
+  const resolvedMode = usePreferencesStore((s) => s.resolvedMode);
+  const variantOverrides = usePreferencesStore((s) => s.themeVariantOverrides);
   const editorTheme = usePreferencesStore((s) => s.editorTheme);
 
   // Toggles — all reactive via store subscription
@@ -60,44 +62,36 @@ export function useSettingsCommands(): {
   const zenModeShowStatusbar = usePreferencesStore((s) => s.zenModeShowStatusbar);
 
   const [themes, setThemes] = useState<ThemeMeta[]>([]);
+  const [defaultTheme, setDefaultTheme] = useState<ThemeMeta | null>(null);
   useEffect(() => {
     invoke<ThemeMeta[]>("themes_get_all")
       .then(setThemes)
       .catch(() => setThemes([]));
+    invoke<ThemeMeta>("theme_get_default")
+      .then(setDefaultTheme)
+      .catch(() => setDefaultTheme(null));
   }, []);
+
+  const allThemes = defaultTheme ? [defaultTheme, ...themes] : themes;
 
   // ─── Theme pages ──────────────────────────────────────────────────────────
 
   function revertToSavedTheme() {
-    if (appTheme === "default") {
-      revertThemeColors();
-    } else {
-      const saved = themes.find((t) => t.id === appTheme);
-      if (saved) applyThemeColors(saved);
-    }
+    const saved = allThemes.find((t) => t.id === appTheme);
+    if (saved) applyThemeColors(saved, resolvedMode, variantOverrides[appTheme]?.[resolvedMode]);
+    else revertThemeColors();
   }
 
-  const themeActions: CommandAction[] = [
-    {
-      id: "theme.default",
-      title: "Default (CSS Variables)",
-      section: "App Themes",
-      rightLabel: appTheme === "default" ? "active" : undefined,
-      icon: createElement(HugeiconsIcon, { icon: Settings01Icon, strokeWidth: 2, className: "size-4" }),
-      onPreview: () => revertThemeColors(),
-      perform: () => void setAppTheme("default"),
-    },
-    ...themes.map((t) => ({
-      id: `theme.${t.id}`,
-      title: t.name,
-      subtitle: t.author,
-      section: t.type === "dark" ? "Dark Themes" : "Light Themes",
-      rightLabel: appTheme === t.id ? "active" : undefined,
-      icon: createElement(HugeiconsIcon, { icon: Settings01Icon, strokeWidth: 2, className: "size-4" }),
-      onPreview: () => applyThemeColors(t),
-      perform: () => void setAppTheme(t.id),
-    })),
-  ];
+  const themeActions: CommandAction[] = allThemes.map((t) => ({
+    id: `theme.${t.id}`,
+    title: t.name,
+    subtitle: t.author,
+    section: "App Themes",
+    rightLabel: appTheme === t.id ? "active" : undefined,
+    icon: createElement(HugeiconsIcon, { icon: Settings01Icon, strokeWidth: 2, className: "size-4" }),
+    onPreview: () => applyThemeColors(t, resolvedMode, variantOverrides[t.id]?.[resolvedMode]),
+    perform: () => void setAppTheme(t.id),
+  }));
 
   const appModeActions: CommandAction[] = (
     [

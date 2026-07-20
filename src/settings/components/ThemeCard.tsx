@@ -1,9 +1,3 @@
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import type { ThemeMeta } from "@/lib/useThemeEngine";
-import type { RemoteTheme } from "@/modules/settings/useThemeStore";
-import { useThemeStore } from "@/modules/settings/useThemeStore";
-import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   Delete02Icon,
   Download02Icon,
@@ -12,9 +6,13 @@ import {
   User03Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Button } from "@/components/ui/button";
+import { resolveVariant, type ThemeMeta, variantsForMode } from "@/lib/useThemeEngine";
+import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import type { RemoteTheme } from "@/modules/settings/useThemeStore";
+import { useThemeStore } from "@/modules/settings/useThemeStore";
 import { ThemeThumbnail } from "./ThemeThumbnail";
-import { setAppTheme } from "@/modules/settings/store";
-import { applyThemeColors, revertThemeColors } from "@/lib/useThemeEngine";
 
 type InstalledCardProps = {
   meta: ThemeMeta;
@@ -39,16 +37,22 @@ export function ThemeCard(props: ThemeCardProps) {
 
 function InstalledCard({ meta, isBuiltin }: { meta: ThemeMeta; isBuiltin?: boolean }) {
   const savedTheme = usePreferencesStore((s) => s.appTheme);
+  const resolvedMode = usePreferencesStore((s) => s.resolvedMode);
+  const variantOverrides = usePreferencesStore((s) => s.themeVariantOverrides);
   const { previewThemeId, previewTheme, cancelPreview, applyTheme, uninstallTheme } = useThemeStore();
 
   const isActive = savedTheme === meta.id;
   const isPreviewing = previewThemeId === meta.id;
 
+  const darkVariant = resolveVariant(meta, "dark", variantOverrides[meta.id]?.dark);
+  const lightVariant = resolveVariant(meta, "light", variantOverrides[meta.id]?.light);
+  const modeOptions = variantsForMode(meta, resolvedMode);
+
   const handlePreview = () => {
     if (isPreviewing) {
       cancelPreview();
     } else {
-      previewTheme(meta);
+      previewTheme(meta, variantOverrides[meta.id]?.[resolvedMode]);
     }
   };
 
@@ -65,10 +69,13 @@ function InstalledCard({ meta, isBuiltin }: { meta: ThemeMeta; isBuiltin?: boole
         <div className="absolute left-0 top-1/2 h-8 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
       )}
 
-      {/* Left: thumbnail + metadata */}
+      {/* Left: thumbnails + metadata */}
       <div className="flex min-w-0 items-center gap-3 pr-4">
-        <ThemeThumbnail colors={meta.colors} />
-        <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="flex shrink-0 items-center gap-1">
+          {darkVariant && <ThemeThumbnail colors={darkVariant[1].colors} />}
+          {lightVariant && <ThemeThumbnail colors={lightVariant[1].colors} />}
+        </div>
+        <div className="flex min-w-0 flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-semibold">{meta.name}</span>
             {isActive && (
@@ -86,6 +93,28 @@ function InstalledCard({ meta, isBuiltin }: { meta: ThemeMeta; isBuiltin?: boole
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <HugeiconsIcon icon={User03Icon} size={11} strokeWidth={1.5} />
               <span>{meta.author}</span>
+            </div>
+          )}
+          {modeOptions.length > 1 && (
+            <div className="mt-0.5 flex flex-wrap gap-1">
+              {modeOptions.map(([key, variant]) => {
+                const activeKey = variantOverrides[meta.id]?.[resolvedMode] ?? modeOptions[0][0];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => void applyTheme(meta.id, key)}
+                    className={cn(
+                      "rounded-full border px-2 py-0.5 text-[10px] transition-colors",
+                      activeKey === key
+                        ? "border-primary/40 bg-primary/10 text-primary"
+                        : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground",
+                    )}
+                  >
+                    {variant.label ?? key}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -137,22 +166,22 @@ function InstalledCard({ meta, isBuiltin }: { meta: ThemeMeta; isBuiltin?: boole
 }
 
 function CommunityCard({ remote, installedMeta }: { remote: RemoteTheme; installedMeta?: ThemeMeta }) {
-  const { installingIds, installTheme, uninstallTheme } = useThemeStore();
+  const { installingIds, installTheme, uninstallTheme, applyTheme } = useThemeStore();
   const savedTheme = usePreferencesStore((s) => s.appTheme);
 
   const isInstalling = installingIds.has(remote.id);
   const isActive = !!installedMeta && savedTheme === installedMeta.id;
+  const previewVariant =
+    installedMeta && (resolveVariant(installedMeta, "dark") ?? resolveVariant(installedMeta, "light"));
 
   const handleApply = async () => {
     if (!installedMeta) return;
-    await setAppTheme(installedMeta.id);
-    applyThemeColors(installedMeta);
+    await applyTheme(installedMeta.id);
   };
 
   const handleUninstall = async () => {
     if (!installedMeta) return;
     await uninstallTheme(installedMeta.id);
-    if (isActive) revertThemeColors();
   };
 
   return (
@@ -173,9 +202,9 @@ function CommunityCard({ remote, installedMeta }: { remote: RemoteTheme; install
 
       {/* Left: thumbnail (installed only) + metadata */}
       <div className="flex min-w-0 items-start gap-3 pr-4">
-        {installedMeta && (
+        {previewVariant && (
           <div className="mt-0.5 shrink-0">
-            <ThemeThumbnail colors={installedMeta.colors} />
+            <ThemeThumbnail colors={previewVariant[1].colors} />
           </div>
         )}
         <div className="flex min-w-0 flex-col gap-0.5">

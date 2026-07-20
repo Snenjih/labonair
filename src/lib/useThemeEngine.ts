@@ -5,14 +5,41 @@ import { setAppTheme } from "@/modules/settings/store";
 
 export type ThemeColors = Record<string, string>;
 
+export type ThemeMode = "light" | "dark";
+
+export type ThemeVariant = {
+  mode: ThemeMode | string;
+  label?: string;
+  colors: ThemeColors;
+};
+
 export type ThemeMeta = {
   id: string;
   name: string;
   author: string;
-  type: "dark" | "light" | string;
-  colors: ThemeColors;
+  variants: Record<string, ThemeVariant>;
   builtin: boolean;
 };
+
+/** Variant key + variant for the first entry matching `mode`, preferring
+ *  `preferredKey` if it exists and actually matches that mode. */
+export function resolveVariant(
+  meta: ThemeMeta,
+  mode: ThemeMode,
+  preferredKey?: string,
+): [string, ThemeVariant] | null {
+  if (preferredKey) {
+    const preferred = meta.variants[preferredKey];
+    if (preferred && preferred.mode === mode) return [preferredKey, preferred];
+  }
+  const entry = Object.entries(meta.variants).find(([, v]) => v.mode === mode);
+  return entry ?? null;
+}
+
+/** All variant keys sharing the given mode, e.g. Catppuccin's three dark variants. */
+export function variantsForMode(meta: ThemeMeta, mode: ThemeMode): [string, ThemeVariant][] {
+  return Object.entries(meta.variants).filter(([, v]) => v.mode === mode);
+}
 
 /** Maps JSON theme color keys to their CSS custom property names. */
 const COLOR_VAR_MAP: Record<string, string> = {
@@ -179,26 +206,33 @@ export function hexToHslCss(hex: string): string {
 }
 
 /**
- * Apply a loaded theme's colors to a DOM element (default: :root).
- * Also sets the `.dark` / `.light` root class based on the theme's type.
+ * Apply a theme's variant matching `mode` to a DOM element (default: :root).
+ * `preferredVariantKey` picks a specific variant within that mode (e.g. one
+ * of Catppuccin's three dark variants); falls back to the first match.
+ * Also sets the `.dark` / `.light` root class to `mode`.
  */
-export function applyThemeColors(meta: ThemeMeta, target: HTMLElement = document.documentElement): void {
+export function applyThemeColors(
+  meta: ThemeMeta,
+  mode: ThemeMode,
+  preferredVariantKey?: string,
+  target: HTMLElement = document.documentElement,
+): void {
+  const resolved = resolveVariant(meta, mode, preferredVariantKey);
   // Clear all previously injected vars first so no leftover values from a
   // prior theme bleed through when the new theme omits certain color keys.
   for (const cssVar of ALL_VARS) {
     target.style.removeProperty(cssVar);
   }
+  if (!resolved) return;
+  const [, variant] = resolved;
   for (const [key, cssVar] of Object.entries(COLOR_VAR_MAP)) {
-    const hex = meta.colors[key];
+    const hex = variant.colors[key];
     if (hex) {
       target.style.setProperty(cssVar, hexToHslCss(hex));
     }
   }
-  // Override dark/light class to match the JSON theme's declared type.
   target.classList.remove("dark", "light");
-  if (meta.type === "dark" || meta.type === "light") {
-    target.classList.add(meta.type);
-  }
+  target.classList.add(mode);
 }
 
 /**
@@ -213,6 +247,9 @@ export function revertThemeColors(target: HTMLElement = document.documentElement
 
 export async function loadThemeMeta(id: string): Promise<ThemeMeta | null> {
   try {
+    if (id === "default") {
+      return await invoke<ThemeMeta>("theme_get_default");
+    }
     const themes = await invoke<ThemeMeta[]>("themes_get_all");
     return themes.find((t) => t.id === id) ?? null;
   } catch {
@@ -221,28 +258,31 @@ export async function loadThemeMeta(id: string): Promise<ThemeMeta | null> {
 }
 
 /**
- * Boot-time hook.
- * - "default" → clears all injected vars, ThemeProvider's dark/light class takes over.
- * - Any other id → loads the JSON theme and injects its colors + sets the class.
- * Falls back to "default" if the theme cannot be loaded.
+ * Boot-time + reactive hook. Loads the active theme (including the bundled
+ * "default") and applies whichever variant matches the current resolved
+ * color-scheme mode, re-running whenever the theme, the mode, or a per-theme
+ * variant override changes. Falls back to "default" if the theme cannot be
+ * loaded (e.g. it was deleted from another window).
  */
 export function useThemeEngine(): void {
   const appTheme = usePreferencesStore((s) => s.appTheme);
+  const resolvedMode = usePreferencesStore((s) => s.resolvedMode);
+  const variantOverrides = usePreferencesStore((s) => s.themeVariantOverrides);
 
   useEffect(() => {
-    if (appTheme === "default") {
-      revertThemeColors();
-      return;
-    }
-
+    let alive = true;
     void loadThemeMeta(appTheme).then((meta) => {
+      if (!alive) return;
       if (meta) {
-        applyThemeColors(meta);
+        applyThemeColors(meta, resolvedMode, variantOverrides[appTheme]?.[resolvedMode]);
       } else {
         // Theme was deleted or cannot be found — fall back gracefully.
         revertThemeColors();
-        void setAppTheme("default");
+        if (appTheme !== "default") void setAppTheme("default");
       }
     });
-  }, [appTheme]);
+    return () => {
+      alive = false;
+    };
+  }, [appTheme, resolvedMode, variantOverrides]);
 }

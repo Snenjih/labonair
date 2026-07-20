@@ -20,8 +20,8 @@ Labonair validates the imported file before accepting it. The following conditio
 
 - The file must be valid JSON.
 - A `name` field (string) must be present.
-- A `type` field with the value `"dark"` or `"light"` must be present.
-- A `colors` object must be present and contain at least the required UI color keys.
+- A `variants` object must be present, containing at least one entry with `mode: "dark"` and one with `mode: "light"`.
+- Each variant must have a `colors` object.
 
 If validation fails, an error toast is shown with a description of what is missing. The file is not copied to the themes directory in this case.
 
@@ -30,7 +30,7 @@ If validation fails, an error toast is shown with a description of what is missi
 Successfully imported themes are copied to:
 
 ```
-~/.local/share/com.labonair.app/themes/
+~/.config/labonair/themes/
 ```
 
 You can also drop `.json` files directly into this directory — they will be picked up the next time Labonair launches or the Theme Picker is opened.

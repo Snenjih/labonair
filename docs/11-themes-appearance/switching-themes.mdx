@@ -5,15 +5,14 @@ description: "How to open the Theme Picker and change your active theme in Labon
 
 # Switching Themes
 
-Labonair provides two entry points to switch themes: the Settings window and the Command Palette. Both open the same Theme Picker overlay.
+Labonair provides two entry points to switch themes: the Settings window and the Command Palette.
 
 ## Opening the Theme Picker
 
 **Via Settings:**
 
 1. Press `Cmd+,` to open Settings.
-2. Navigate to **Appearance** in the left sidebar.
-3. Click the **Theme** button — this opens the Theme Picker overlay.
+2. Navigate to **Themes** in the left sidebar.
 
 **Via Command Palette:**
 
@@ -33,11 +32,11 @@ Hover over any theme in the list to instantly preview it. The application's CSS 
 
 Click any theme tile to permanently activate it. The selected theme is highlighted with a checkmark badge. The change takes effect immediately across the entire application:
 
-- The terminal updates its background and all 16 ANSI color slots.
+- The terminal updates its background and all ANSI color slots.
 - The editor refreshes its syntax token colors.
 - The app shell (sidebar, header, panels) repaints with the new palette.
 
-No restart is required.
+No restart is required. Which variant (light or dark) is shown is controlled separately by the **Color scheme** setting in Appearance — toggling it re-colors the currently active theme into its other-mode variant instead of switching themes. Themes with more than one variant for the same mode (theme families) show a small chip picker on their card to choose between them.
 
 ## Active Theme Indicator
 

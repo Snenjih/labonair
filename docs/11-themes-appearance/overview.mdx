@@ -5,35 +5,37 @@ description: "How Labonair's JSON-based theme engine works and what it controls.
 
 # Themes & Appearance Overview
 
-Labonair uses a fully JSON-based theme engine. Every color in the application — from the app shell and sidebar to terminal ANSI colors and editor syntax highlighting — is driven by a single `.json` theme file. There is no hardcoded CSS and no theme-specific stylesheet to maintain.
+Labonair uses a fully JSON-based theme engine. Every color in the application — from the app shell and sidebar to terminal ANSI colors and editor syntax highlighting — is driven by a single `.json` theme file, and every theme bundles both a light and a dark rendition. There is no hardcoded CSS and no theme-specific stylesheet to maintain.
 
 ## What Themes Control
 
-A Labonair theme is a flat JSON document that defines two categories of color tokens:
+A Labonair theme is a JSON document with a `variants` map, keyed by an arbitrary slug (`dark`, `light`, or more for larger families like Catppuccin), where each variant defines two categories of color tokens:
 
 - **UI shell colors** — background, foreground, card surfaces, popovers, primary accent, muted tones, borders, and destructive states. These map directly to CSS custom properties applied to `:root` and consumed by every component in the interface.
-- **Terminal ANSI colors** — the full 16-color palette (`terminal_black` through `terminal_bright_white`) used by xterm.js to render terminal output. Correct ANSI rendering requires all 16 keys to be present.
+- **Terminal ANSI colors** — the full 24-slot palette (standard, bright, and dim variants) used by xterm.js to render terminal output.
+
+The **Color scheme** setting (Settings → Appearance, or `Cmd+K` → mode commands) picks `light`, `dark`, or follows the OS — and that same choice determines which variant of the *currently active theme* is shown. Switching scheme doesn't switch themes; it switches which half of the active theme you're looking at.
 
 ## Built-in and User Themes
 
-Labonair ships with a default theme called **Labonair Dark**, which is embedded in the application binary and always available — it cannot be deleted. Additional themes can be installed by users and are stored in:
+Labonair ships with a default theme called **Default**, embedded in the application binary with both a dark and a light variant — it cannot be deleted. Additional themes can be installed by users and are stored in:
 
 ```
-~/.local/share/com.labonair.app/themes/
+~/.config/labonair/themes/
 ```
 
-All `.json` files placed in this directory are automatically picked up by the theme engine on next launch. The Theme Picker also offers an in-app Import flow that copies files to this location for you.
+All `.json` files placed in this directory are automatically picked up by the theme engine on next launch. The Theme Picker also offers an in-app Import flow that copies files to this location for you. A theme file is only recognized if it defines at least one `dark`-mode and one `light`-mode variant.
 
 ## Live Preview and Instant Switching
 
 Theme switching in Labonair is designed to be friction-free. Open the Theme Picker and hover over any theme to see a live preview — colors are applied instantly to the running app without any page reload or restart. Clicking a theme makes the selection permanent.
 
-The change propagates to every part of the UI simultaneously: the terminal recolors ANSI output, the editor updates its syntax tokens, and the app shell reflects the new palette — all in a single paint cycle.
+The change propagates to every part of the UI simultaneously: the terminal recolors ANSI output, the editor updates its syntax tokens, and the app shell reflects the new palette — all in a single paint cycle. This also applies to the Color scheme toggle: flipping it while a theme is active immediately swaps in that theme's other-mode variant.
 
 ## Shareable by Design
 
 Because themes are self-contained `.json` files with no external dependencies, they are trivially shareable. Export any installed theme to a file and send it to a colleague, post it in a team wiki, or submit it to the community `labonair-themes` repository on GitHub.
 
 :::tip
-The "Labonair Dark" default theme is a great starting point for creating your own. Export it from the Theme Picker and use it as a base — all required keys are already present.
+The "Default" theme is a great starting point for creating your own. Export it from the Theme Picker and use it as a base — both variants and all required keys are already present.
 :::

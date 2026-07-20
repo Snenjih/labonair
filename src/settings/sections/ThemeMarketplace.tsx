@@ -1,12 +1,3 @@
-import { handleApiError } from "@/lib/errors";
-import { Input } from "@/components/ui/input";
-import type { ThemeMeta } from "@/lib/useThemeEngine";
-import { useThemeStore } from "@/modules/settings/useThemeStore";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { open } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
-import { emit } from "@tauri-apps/api/event";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   Add01Icon,
   AlertCircleIcon,
@@ -17,21 +8,28 @@ import {
   Upload02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
+import { open } from "@tauri-apps/plugin-dialog";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
-import { ThemeCard } from "../components/ThemeCard";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { handleApiError } from "@/lib/errors";
+import type { ThemeMeta } from "@/lib/useThemeEngine";
+import { cn } from "@/lib/utils";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useThemeStore } from "@/modules/settings/useThemeStore";
+import { ThemeCard } from "../components/ThemeCard";
 
 type TabId = "installed" | "community";
 
-const DEFAULT_META: ThemeMeta = {
+const FALLBACK_DEFAULT_META: ThemeMeta = {
   id: "default",
-  name: "Default (System)",
-  author: "",
-  type: "dark",
-  colors: {},
+  name: "Default (Labonair)",
+  author: "Labonair",
+  variants: {},
   builtin: true,
 };
 
@@ -51,6 +49,7 @@ export function ThemeMarketplace() {
   const savedTheme = usePreferencesStore((s) => s.appTheme);
   const [tab, setTab] = useState<TabId>("installed");
   const [search, setSearch] = useState("");
+  const [defaultMeta, setDefaultMeta] = useState<ThemeMeta>(FALLBACK_DEFAULT_META);
   const savedThemeRef = useRef(savedTheme);
   savedThemeRef.current = savedTheme;
   const previewRef = useRef(previewThemeId);
@@ -64,6 +63,9 @@ export function ThemeMarketplace() {
   useEffect(() => {
     void fetchInstalled();
     void fetchCommunity();
+    void invoke<ThemeMeta>("theme_get_default")
+      .then(setDefaultMeta)
+      .catch(() => {});
   }, [fetchInstalled, fetchCommunity]);
 
   // Revert preview when leaving the Themes section
@@ -119,7 +121,7 @@ export function ThemeMarketplace() {
   const q = search.trim().toLowerCase();
 
   // Build the "installed" list: default + user themes
-  const allInstalled: ThemeMeta[] = [DEFAULT_META, ...installedThemes];
+  const allInstalled: ThemeMeta[] = [defaultMeta, ...installedThemes];
 
   // Build filtered lists per tab
   const filteredInstalled = allInstalled.filter(

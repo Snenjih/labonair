@@ -1,11 +1,11 @@
 ---
 title: "Theme JSON Format"
-description: "Full reference for the Labonair theme JSON schema including all required color keys."
+description: "Full reference for the Labonair theme JSON schema, including the variants structure and all color keys."
 ---
 
 # Theme JSON Format
 
-A Labonair theme is a single JSON file with three top-level fields and a flat `colors` map. All color values must be valid HEX strings (3- or 6-digit, with `#` prefix).
+A Labonair theme is a single JSON file with a few top-level metadata fields and a `variants` object. Each entry in `variants` is a self-contained color palette tagged with a `mode` (`"light"` or `"dark"`) — a theme file must define at least one variant of each mode. All color values must be valid HEX strings (3-, 6-, or 8-digit with alpha, `#` prefix).
 
 ## Full Schema
 
@@ -13,42 +13,31 @@ A Labonair theme is a single JSON file with three top-level fields and a flat `c
 {
   "name": "My Theme",
   "author": "Your Name",
-  "type": "dark",
-  "colors": {
-    "background": "#0f111a",
-    "foreground": "#e4e4e5",
-    "card": "#161824",
-    "card_foreground": "#e4e4e5",
-    "popover": "#161824",
-    "popover_foreground": "#e4e4e5",
-    "primary": "#6366f1",
-    "primary_foreground": "#ffffff",
-    "secondary": "#1e2030",
-    "secondary_foreground": "#e4e4e5",
-    "muted": "#1e2030",
-    "muted_foreground": "#6b7280",
-    "accent": "#1e2030",
-    "accent_foreground": "#e4e4e5",
-    "destructive": "#e06c75",
-    "border": "#2a2d3e",
-    "input": "#2a2d3e",
-    "ring": "#6366f1",
-    "terminal_black": "#1c1e2b",
-    "terminal_red": "#e06c75",
-    "terminal_green": "#98c379",
-    "terminal_yellow": "#e5c07b",
-    "terminal_blue": "#61afef",
-    "terminal_magenta": "#c678dd",
-    "terminal_cyan": "#56b6c2",
-    "terminal_white": "#abb2bf",
-    "terminal_bright_black": "#5c6370",
-    "terminal_bright_red": "#e06c75",
-    "terminal_bright_green": "#98c379",
-    "terminal_bright_yellow": "#e5c07b",
-    "terminal_bright_blue": "#61afef",
-    "terminal_bright_magenta": "#c678dd",
-    "terminal_bright_cyan": "#56b6c2",
-    "terminal_bright_white": "#ffffff"
+  "variants": {
+    "dark": {
+      "mode": "dark",
+      "label": "Dark",
+      "colors": {
+        "background": "#0f111a",
+        "foreground": "#e4e4e5",
+        "primary": "#6366f1",
+        "border": "#2a2d3e",
+        "terminal.ansi.black": "#1c1e2b",
+        "terminal.ansi.red": "#e06c75"
+      }
+    },
+    "light": {
+      "mode": "light",
+      "label": "Light",
+      "colors": {
+        "background": "#faf9f5",
+        "foreground": "#1e2130",
+        "primary": "#6366f1",
+        "border": "#e2e4ee",
+        "terminal.ansi.black": "#1e2130",
+        "terminal.ansi.red": "#dc4c5c"
+      }
+    }
   }
 }
 ```
@@ -59,9 +48,22 @@ A Labonair theme is a single JSON file with three top-level fields and a flat `c
 |---|---|---|---|
 | `name` | string | Yes | Display name shown in the Theme Picker |
 | `author` | string | No | Attribution shown in the Theme Picker |
-| `type` | `"dark"` or `"light"` | Yes | Sets the OS titlebar color scheme |
+| `authorUrl` | string | No | Link shown next to the author name |
+| `version` | string | No | Free-form version string |
+| `description` | string | No | Short description shown in the marketplace |
+| `variants` | object | Yes | Map of variant key → variant definition (see below) |
 
-The `type` field tells macOS whether to render the native window titlebar in dark or light mode. Use `"dark"` for themes with a dark background and `"light"` for themes with a light background.
+## Variant Object
+
+Each key in `variants` is an arbitrary slug (`dark`, `light`, `frappe`, `macchiato`, …) — the key itself has no meaning beyond being a stable identifier; what matters is each variant's `mode` field.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `mode` | `"light"` or `"dark"` | Yes | Which color scheme this variant renders under |
+| `label` | string | No | Display label for the variant picker (defaults to the key, capitalized) |
+| `colors` | object | Yes | Flat map of color keys → HEX values (see below) |
+
+A theme file is only valid if `variants` contains **at least one entry with `mode: "dark"` and at least one with `mode: "light"`**. Themes with more than two variants — e.g. a family like Catppuccin with three `"dark"`-mode variants (Frappé, Macchiato, Mocha) plus one `"light"`-mode variant (Latte) — are supported: Labonair shows a small variant picker whenever more than one variant shares the currently active mode.
 
 ## UI Color Keys
 
@@ -77,22 +79,31 @@ These tokens map to CSS custom properties on `:root` and drive the entire app sh
 | `secondary` / `secondary_foreground` | Secondary surfaces |
 | `muted` / `muted_foreground` | Subdued backgrounds and placeholder text |
 | `accent` / `accent_foreground` | Hover states, subtle highlights |
-| `destructive` | Delete and error states |
+| `destructive` / `destructive_foreground` | Delete and error states |
 | `border` | Dividers and component borders |
 | `input` | Input field background |
 | `ring` | Focus ring color |
+| `sidebar.background`, `toolbar.background`, `title_bar.background`, `status_bar.background` | Named surface areas |
+| `border.variant`, `border.focused`, `border.selected`, `border.transparent`, `border.disabled` | Border state variants |
+| `modified`, `error`, `warning`, `info`, `hint`, `success` | Semantic status colors |
+| `cursor`, `selection` | Text cursor and selection highlight |
+| `sidebar-foreground`, `sidebar-primary`, `sidebar-primary-foreground`, `sidebar-accent`, `sidebar-accent-foreground`, `sidebar-border`, `sidebar-ring` | Sidebar component colors |
 
-## Terminal ANSI Color Keys
+All keys above are optional per variant — Labonair falls back to `globals.css` defaults for anything missing.
 
-All 16 `terminal_*` keys are required. They map directly to xterm.js's color slots:
+## Terminal Color Keys
 
-- `terminal_black` through `terminal_white` — the standard 8 ANSI colors (indices 0–7)
-- `terminal_bright_black` through `terminal_bright_white` — the bright variants (indices 8–15)
+| Key | Purpose |
+|---|---|
+| `terminal.background`, `terminal.foreground`, `terminal.bright_foreground`, `terminal.dim_foreground` | Terminal surface colors |
+| `terminal.ansi.background`, `terminal.ansi.black` … `terminal.ansi.white` | The 8 standard ANSI colors |
+| `terminal.ansi.bright_black` … `terminal.ansi.bright_white` | The 8 bright ANSI variants |
+| `terminal.ansi.dim_black` … `terminal.ansi.dim_white` | The 8 dim ANSI variants |
 
-:::warning
-Omitting any `terminal_*` key causes xterm.js to fall back to its built-in defaults for that slot, breaking color consistency with the rest of your theme. Always include all 16 keys.
+:::tip
+Omitting a `terminal.ansi.*` key falls back to the built-in default for that slot. For best results, define all of them per variant.
 :::
 
 :::tip
-All color values must be 6-digit HEX strings prefixed with `#`. Short 3-digit hex and named CSS colors are not supported by the theme engine.
+Legacy underscore-notation terminal keys (`terminal_black`, `terminal_bright_red`, …) are still accepted for backward compatibility, but new themes should use the dot-notation keys shown above.
 :::

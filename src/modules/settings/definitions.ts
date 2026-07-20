@@ -272,14 +272,16 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "appTheme",
     label: "Color theme",
-    description: "Choose or import a JSON color theme for the application.",
+    description:
+      "Choose or import a JSON color theme for the application. Each theme bundles both a light and a dark variant.",
     category: "Appearance",
     controlType: "Custom",
   },
   {
     id: "theme",
     label: "Color scheme",
-    description: "Switch between light, dark, or system-default appearance.",
+    description:
+      "Switch between light, dark, or system-default appearance. This also selects which variant of the active color theme is shown.",
     category: "Appearance",
     controlType: "Select",
     options: [

@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import { applyThemeColors, revertThemeColors, type ThemeMeta } from "@/lib/useThemeEngine";
-import { setAppTheme } from "./store";
 import { usePreferencesStore } from "./preferences";
+import { setAppTheme, setThemeVariantOverride } from "./store";
 
 export type RemoteTheme = {
   id: string;
@@ -11,21 +11,19 @@ export type RemoteTheme = {
   description: string;
   author: string;
   authorUrl: string;
-  type: "dark" | "light" | string;
   rawUrl: string;
 };
 
 /** Fallback mock data used when the remote index cannot be fetched. */
 const MOCK_COMMUNITY_THEMES: RemoteTheme[] = [
   {
-    id: "catppuccin-mocha",
-    name: "Catppuccin Mocha",
+    id: "catppuccin",
+    name: "Catppuccin",
     version: "1.0.0",
-    description: "Soothing pastel theme for Labonair",
+    description: "Soothing pastel theme for Labonair — Latte, Frappé, Macchiato, Mocha",
     author: "Catppuccin",
     authorUrl: "https://github.com/catppuccin",
-    type: "dark",
-    rawUrl: "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/themes/catppuccin-mocha.json",
+    rawUrl: "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/themes/catppuccin.json",
   },
   {
     id: "nord",
@@ -34,7 +32,6 @@ const MOCK_COMMUNITY_THEMES: RemoteTheme[] = [
     description: "An arctic, north-bluish color palette",
     author: "arcticicestudio",
     authorUrl: "https://github.com/arcticicestudio",
-    type: "dark",
     rawUrl: "https://raw.githubusercontent.com/Snenjih/labonair-themes/main/themes/nord.json",
   },
 ];
@@ -54,8 +51,8 @@ type ThemeStore = {
   fetchCommunity: () => Promise<void>;
   installTheme: (remote: RemoteTheme) => Promise<void>;
   uninstallTheme: (id: string) => Promise<void>;
-  applyTheme: (id: string) => Promise<void>;
-  previewTheme: (meta: ThemeMeta | null) => void;
+  applyTheme: (id: string, variantKey?: string) => Promise<void>;
+  previewTheme: (meta: ThemeMeta | null, variantKey?: string) => void;
   cancelPreview: () => void;
   createTheme: (name: string) => Promise<string>;
 };
@@ -118,35 +115,36 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
     await invoke("theme_delete", { id });
     if (savedTheme === id) {
       await setAppTheme("default");
-      revertThemeColors();
+      const { resolvedMode } = usePreferencesStore.getState();
+      const meta = await loadDefaultMeta();
+      if (meta) applyThemeColors(meta, resolvedMode);
+      else revertThemeColors();
     }
     await get().fetchInstalled();
   },
 
-  applyTheme: async (id: string) => {
+  applyTheme: async (id: string, variantKey?: string) => {
     await setAppTheme(id);
+    const { resolvedMode } = usePreferencesStore.getState();
+    if (variantKey) await setThemeVariantOverride(id, resolvedMode, variantKey);
     if (id === "default") {
-      revertThemeColors();
+      const meta = await loadDefaultMeta();
+      if (meta) applyThemeColors(meta, resolvedMode, variantKey);
+      else revertThemeColors();
     } else {
       const meta = get().installedThemes.find((t) => t.id === id);
-      if (meta) applyThemeColors(meta);
+      if (meta) applyThemeColors(meta, resolvedMode, variantKey);
     }
     set({ previewThemeId: null });
   },
 
-  previewTheme: (meta: ThemeMeta | null) => {
+  previewTheme: (meta: ThemeMeta | null, variantKey?: string) => {
+    const { resolvedMode } = usePreferencesStore.getState();
     if (meta) {
-      applyThemeColors(meta);
+      applyThemeColors(meta, resolvedMode, variantKey);
       set({ previewThemeId: meta.id });
     } else {
-      const savedTheme = usePreferencesStore.getState().appTheme;
-      if (savedTheme === "default") {
-        revertThemeColors();
-      } else {
-        const saved = get().installedThemes.find((t) => t.id === savedTheme);
-        if (saved) applyThemeColors(saved);
-        else revertThemeColors();
-      }
+      void revertToSaved();
       set({ previewThemeId: null });
     }
   },
@@ -159,16 +157,32 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
   },
 
   cancelPreview: () => {
-    const savedTheme = usePreferencesStore.getState().appTheme;
-    const { previewThemeId, installedThemes } = get();
-    if (previewThemeId === null) return;
-    if (savedTheme === "default") {
-      revertThemeColors();
-    } else {
-      const saved = installedThemes.find((t) => t.id === savedTheme);
-      if (saved) applyThemeColors(saved);
-      else revertThemeColors();
-    }
+    if (get().previewThemeId === null) return;
+    void revertToSaved();
     set({ previewThemeId: null });
   },
 }));
+
+async function loadDefaultMeta(): Promise<ThemeMeta | null> {
+  try {
+    return await invoke<ThemeMeta>("theme_get_default");
+  } catch {
+    return null;
+  }
+}
+
+/** Re-apply the persisted (non-preview) theme — used to revert a hover preview. */
+async function revertToSaved(): Promise<void> {
+  const { appTheme, resolvedMode, themeVariantOverrides } = usePreferencesStore.getState();
+  const variantKey = themeVariantOverrides[appTheme]?.[resolvedMode];
+  if (appTheme === "default") {
+    const meta = await loadDefaultMeta();
+    if (meta) applyThemeColors(meta, resolvedMode, variantKey);
+    else revertThemeColors();
+    return;
+  }
+  const themes = await invoke<ThemeMeta[]>("themes_get_all").catch(() => [] as ThemeMeta[]);
+  const saved = themes.find((t) => t.id === appTheme);
+  if (saved) applyThemeColors(saved, resolvedMode, variantKey);
+  else revertThemeColors();
+}

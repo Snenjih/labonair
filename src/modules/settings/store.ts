@@ -70,6 +70,9 @@ export type Preferences = {
 
   // --- App Appearance ---
   appTheme: string;
+  /** Per-theme preferred variant key for each mode, e.g. { catppuccin: { light: "latte", dark: "macchiato" } }.
+   *  Only populated when a theme offers more than one variant for a given mode. */
+  themeVariantOverrides: Record<string, Partial<Record<"light" | "dark", string>>>;
   appFontFamily: string;
   appFontSize: number;
   appLineHeight: number;
@@ -261,6 +264,7 @@ const KEY_SCROLLBACK_MAX_SIZE_MB = "scrollbackMaxSizeMb";
 const KEY_SCROLLBACK_RETENTION_DAYS = "scrollbackRetentionDays";
 
 const KEY_APP_THEME = "appTheme";
+const KEY_THEME_VARIANT_OVERRIDES = "themeVariantOverrides";
 const KEY_APP_FONT_FAMILY = "appFontFamily";
 const KEY_APP_FONT_SIZE = "appFontSize";
 const KEY_APP_LINE_HEIGHT = "appLineHeight";
@@ -420,6 +424,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   scrollbackRetentionDays: 0,
 
   appTheme: "default",
+  themeVariantOverrides: {},
   appFontFamily: "system-ui",
   appFontSize: 13,
   appLineHeight: 1.5,
@@ -612,6 +617,9 @@ export async function loadPreferences(): Promise<Preferences> {
       get<number>(KEY_SCROLLBACK_RETENTION_DAYS) ?? DEFAULT_PREFERENCES.scrollbackRetentionDays,
 
     appTheme: get<string>(KEY_APP_THEME) ?? DEFAULT_PREFERENCES.appTheme,
+    themeVariantOverrides:
+      get<Preferences["themeVariantOverrides"]>(KEY_THEME_VARIANT_OVERRIDES) ??
+      DEFAULT_PREFERENCES.themeVariantOverrides,
     appFontFamily: get<string>(KEY_APP_FONT_FAMILY) ?? DEFAULT_PREFERENCES.appFontFamily,
     appFontSize: get<number>(KEY_APP_FONT_SIZE) ?? DEFAULT_PREFERENCES.appFontSize,
     appLineHeight: get<number>(KEY_APP_LINE_HEIGHT) ?? DEFAULT_PREFERENCES.appLineHeight,
@@ -1020,6 +1028,18 @@ export async function setScrollbackRetentionDays(value: number): Promise<void> {
 export async function setAppTheme(value: string): Promise<void> {
   await (await getStore()).set(KEY_APP_THEME, value);
   await (await getStore()).save();
+}
+
+export async function setThemeVariantOverride(
+  themeId: string,
+  mode: "light" | "dark",
+  variantKey: string,
+): Promise<void> {
+  const store = await getStore();
+  const current = (await store.get<Preferences["themeVariantOverrides"]>(KEY_THEME_VARIANT_OVERRIDES)) ?? {};
+  const next = { ...current, [themeId]: { ...current[themeId], [mode]: variantKey } };
+  await store.set(KEY_THEME_VARIANT_OVERRIDES, next);
+  await store.save();
 }
 
 export async function setAppFontFamily(value: string): Promise<void> {
@@ -1694,6 +1714,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SCROLLBACK_RETENTION_DAYS]: "scrollbackRetentionDays",
 
     [KEY_APP_THEME]: "appTheme",
+    [KEY_THEME_VARIANT_OVERRIDES]: "themeVariantOverrides",
     [KEY_APP_FONT_FAMILY]: "appFontFamily",
     [KEY_APP_FONT_SIZE]: "appFontSize",
     [KEY_APP_LINE_HEIGHT]: "appLineHeight",

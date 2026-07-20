@@ -5,10 +5,16 @@ import {
   onPreferencesChange,
   type Preferences,
   setSftpShowHiddenFiles,
+  type ThemePref,
 } from "./store";
 
 type State = Preferences & {
   hydrated: boolean;
+  /** Derived from `theme` + the OS `prefers-color-scheme` media query — the
+   *  single source of truth both ThemeProvider and the JSON theme engine
+   *  read from, so a color-scheme change always propagates to whichever
+   *  variant of the active JSON theme should be shown. */
+  resolvedMode: "dark" | "light";
   /** Subscribe & hydrate. Idempotent — safe to call from multiple windows. */
   init: () => Promise<void>;
 };
@@ -18,18 +24,38 @@ type State = Preferences & {
 const _earlyPrefsP: Promise<Preferences | null> = loadPreferences().catch(() => null);
 
 let initialized = false;
+let systemDark =
+  typeof window === "undefined" ? true : window.matchMedia("(prefers-color-scheme: dark)").matches;
 
-export const usePreferencesStore = create<State>((set) => ({
+function resolveMode(theme: ThemePref): "dark" | "light" {
+  return theme === "system" ? (systemDark ? "dark" : "light") : theme;
+}
+
+export const usePreferencesStore = create<State>((set, get) => ({
   ...DEFAULT_PREFERENCES,
   hydrated: false,
+  resolvedMode: resolveMode(DEFAULT_PREFERENCES.theme),
   init: async () => {
     if (initialized) return;
     initialized = true;
     const prefs = await _earlyPrefsP;
-    set({ ...(prefs ?? DEFAULT_PREFERENCES), hydrated: true });
+    const applied = prefs ?? DEFAULT_PREFERENCES;
+    set({ ...applied, hydrated: true, resolvedMode: resolveMode(applied.theme) });
+
     void onPreferencesChange((key, value) => {
       set({ [key]: value } as Partial<State>);
+      if (key === "theme") {
+        set({ resolvedMode: resolveMode(value as ThemePref) });
+      }
     });
+
+    if (typeof window !== "undefined") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      mq.addEventListener("change", (e) => {
+        systemDark = e.matches;
+        set({ resolvedMode: resolveMode(get().theme) });
+      });
+    }
   },
 }));
 
