@@ -4,7 +4,14 @@ import { SHAPE_ICONS } from "./shapeIcons";
 import { SYMBOL_ICONS } from "./symbolIcons";
 import type { HostIconDef } from "./types";
 
-export type { HostIconCategory, HostIconDef, HugeiconHostIcon, SvgElementSpec, SvgHostIcon } from "./types";
+export type {
+  ComponentHostIcon,
+  HostIconCategory,
+  HostIconDef,
+  HugeiconHostIcon,
+  SvgElementSpec,
+  SvgHostIcon,
+} from "./types";
 
 export const HOST_ICON_CATEGORIES = [
   { id: "os", label: "Operating Systems", icons: OS_ICONS },

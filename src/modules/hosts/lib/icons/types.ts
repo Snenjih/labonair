@@ -1,4 +1,5 @@
 import type { IconSvgElement } from "@hugeicons/react";
+import type { ComponentType } from "react";
 
 export type HostIconCategory = "os" | "shape" | "symbol" | "number";
 
@@ -28,4 +29,16 @@ export interface HugeiconHostIcon extends HostIconBase {
   icon: IconSvgElement;
 }
 
-export type HostIconDef = SvgHostIcon | HugeiconHostIcon;
+/**
+ * Escape hatch for marks too structurally complex for SvgElementSpec (masks,
+ * <use>, rotated groups) — currently just the Labonair app mark. Component
+ * renders the *inside* of the <svg> (defs/paths/etc), not the <svg> tag
+ * itself; HostIconGlyph supplies that with the given viewBox.
+ */
+export interface ComponentHostIcon extends HostIconBase {
+  kind: "component";
+  viewBox: string;
+  Component: ComponentType;
+}
+
+export type HostIconDef = SvgHostIcon | HugeiconHostIcon | ComponentHostIcon;

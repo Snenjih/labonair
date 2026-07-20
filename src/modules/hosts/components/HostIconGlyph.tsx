@@ -43,6 +43,14 @@ export function HostIconGlyph({ icon, size = 16, className }: HostIconGlyphProps
   if (icon.kind === "hugeicon") {
     return <HugeiconsIcon icon={icon.icon} size={size} strokeWidth={1.75} className={className} />;
   }
+  if (icon.kind === "component") {
+    const { Component } = icon;
+    return (
+      <svg width={size} height={size} viewBox={icon.viewBox} aria-hidden="true" className={className}>
+        <Component />
+      </svg>
+    );
+  }
   return (
     <svg
       width={size}
