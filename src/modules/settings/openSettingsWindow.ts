@@ -7,7 +7,7 @@ export type SettingsTab =
   | "terminal"
   | "file-manager"
   | "editor"
-  | "connections"
+  | "remote-connections"
   | "source-control"
   | "command-palette"
   | "shortcuts"

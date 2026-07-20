@@ -61,7 +61,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "themes", category: null, label: "Themes", icon: PaintBrush01Icon },
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "file-manager", category: "File Manager", label: "File Manager", icon: Folder01Icon },
-  { id: "connections", category: "Connections", label: "Connections", icon: PlugSocketIcon },
+  { id: "remote-connections", category: "Connections", label: "Connections", icon: PlugSocketIcon },
   { id: "source-control", category: "Source Control", label: "Source Control", icon: GitBranchIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
@@ -208,7 +208,7 @@ export function SettingsApp() {
                 {active === "themes" && <ThemeMarketplace />}
                 {active === "terminal" && <TerminalSection />}
                 {active === "file-manager" && <FileManagerSection />}
-                {active === "connections" && <ConnectionsSection />}
+                {active === "remote-connections" && <ConnectionsSection />}
                 {active === "source-control" && <SourceControlSection />}
                 {active === "editor" && <EditorSection />}
                 {active === "command-palette" && <CommandPaletteSection />}
