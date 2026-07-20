@@ -3,9 +3,11 @@ import {
   Bookmark02Icon,
   File01Icon,
   Folder01Icon,
+  GitBranchIcon,
   KeyboardIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
+  PlugSocketIcon,
   Search01Icon,
   Settings01Icon,
   SourceCodeIcon,
@@ -36,11 +38,13 @@ import { AiSection } from "./sections/AiSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
 import { BookmarksSection } from "./sections/BookmarksSection";
 import { CommandPaletteSection } from "./sections/CommandPaletteSection";
+import { ConnectionsSection } from "./sections/ConnectionsSection";
 import { EditorSection } from "./sections/EditorSection";
 import { FileManagerSection } from "./sections/FileManagerSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { KeyboardShortcutsSection } from "./sections/KeyboardShortcutsSection";
 import { ModelsSection } from "./sections/ModelsSection";
+import { SourceControlSection } from "./sections/SourceControlSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemeMarketplace } from "./sections/ThemeMarketplace";
 
@@ -57,11 +61,13 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "themes", category: null, label: "Themes", icon: PaintBrush01Icon },
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "file-manager", category: "File Manager", label: "File Manager", icon: Folder01Icon },
+  { id: "remote-connections", category: "Connections", label: "Connections", icon: PlugSocketIcon },
+  { id: "source-control", category: "Source Control", label: "Source Control", icon: GitBranchIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
-  { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
   { id: "bookmarks", category: "Bookmarks", label: "Bookmarks", icon: Bookmark02Icon },
+  { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
 ];
 
 const VALID_TABS = SIDEBAR_ITEMS.map((s) => s.id);
@@ -202,6 +208,8 @@ export function SettingsApp() {
                 {active === "themes" && <ThemeMarketplace />}
                 {active === "terminal" && <TerminalSection />}
                 {active === "file-manager" && <FileManagerSection />}
+                {active === "remote-connections" && <ConnectionsSection />}
+                {active === "source-control" && <SourceControlSection />}
                 {active === "editor" && <EditorSection />}
                 {active === "command-palette" && <CommandPaletteSection />}
                 {active === "shortcuts" && <KeyboardShortcutsSection />}

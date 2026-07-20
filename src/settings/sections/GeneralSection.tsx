@@ -9,7 +9,6 @@ import {
   setCheckForUpdates,
   setCredentialEncryption,
   setDefaultStartupTab,
-  setHostPingInterval,
   setRestoreWindowState,
   setSessionRestore,
   setSessionScrollbackLines,
@@ -46,15 +45,6 @@ const PLATFORM_LABEL: Record<string, string> = {
   android: "Android",
   freebsd: "FreeBSD",
 };
-
-const PING_INTERVAL_OPTIONS: { value: string; label: string }[] = [
-  { value: "10", label: "Every 10 seconds" },
-  { value: "30", label: "Every 30 seconds" },
-  { value: "60", label: "Every minute" },
-  { value: "120", label: "Every 2 minutes" },
-  { value: "300", label: "Every 5 minutes" },
-  { value: "0", label: "Never" },
-];
 
 const LINKS: {
   icon: typeof AlertDiamondIcon;
@@ -97,7 +87,6 @@ export function GeneralSection() {
   const checkForUpdates = usePreferencesStore((s) => s.checkForUpdates);
   const defaultStartupTab = usePreferencesStore((s) => s.defaultStartupTab);
   const startupTerminalCount = usePreferencesStore((s) => s.startupTerminalCount);
-  const hostPingInterval = usePreferencesStore((s) => s.hostPingInterval);
   const credentialEncryption = usePreferencesStore((s) => s.credentialEncryption);
   const reduceMotion = usePreferencesStore((s) => s.reduceMotion);
   const newTabInheritsCwd = usePreferencesStore((s) => s.newTabInheritsCwd);
@@ -330,7 +319,7 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Scrollback</Label>
+        <Label>Session Restore: Scrollback Persistence</Label>
         <SettingRow
           title="Max scrollback size (MB)"
           description="Largest per-session scrollback buffer saved to disk (1–50 MB)."
@@ -360,27 +349,6 @@ export function GeneralSection() {
               <SelectItem value="30">30 days</SelectItem>
               <SelectItem value="90">90 days</SelectItem>
               <SelectItem value="365">1 year</SelectItem>
-            </SelectContent>
-          </Select>
-        </SettingRow>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>Host Manager</Label>
-        <SettingRow
-          title="Ping interval"
-          description="How often to check whether each host is reachable. Set to Never to disable availability checks."
-        >
-          <Select value={String(hostPingInterval)} onValueChange={(v) => void setHostPingInterval(Number(v))}>
-            <SelectTrigger className="h-7 w-44 text-[11.5px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PING_INTERVAL_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value} className="text-[11.5px]">
-                  {o.label}
-                </SelectItem>
-              ))}
             </SelectContent>
           </Select>
         </SettingRow>

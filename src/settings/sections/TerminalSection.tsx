@@ -4,10 +4,6 @@ import { Switch } from "@/components/ui/switch";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
-  setSshAutoReconnect,
-  setSshAutoReconnectDelay,
-  setSshAutoReconnectMaxAttempts,
-  setSshConnectTimeoutSecs,
   setTerminalBell,
   setTerminalBlocksAutoCollapseOnAltScreen,
   setTerminalBlocksEnabled,
@@ -66,10 +62,6 @@ export function TerminalSection() {
   const terminalFastScrollModifier = usePreferencesStore((s) => s.terminalFastScrollModifier);
   const terminalShell = usePreferencesStore((s) => s.terminalShell);
   const terminalDefaultPath = usePreferencesStore((s) => s.terminalDefaultPath);
-  const sshAutoReconnect = usePreferencesStore((s) => s.sshAutoReconnect);
-  const sshAutoReconnectDelay = usePreferencesStore((s) => s.sshAutoReconnectDelay);
-  const sshAutoReconnectMaxAttempts = usePreferencesStore((s) => s.sshAutoReconnectMaxAttempts);
-  const sshConnectTimeoutSecs = usePreferencesStore((s) => s.sshConnectTimeoutSecs);
 
   return (
     <div className="flex flex-col gap-6">
@@ -368,56 +360,6 @@ export function TerminalSection() {
             className="h-7 w-52 font-mono text-[11.5px]"
           />
         </SettingRow>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>SSH</Label>
-        <SettingRow
-          title="Connect timeout (s)"
-          description="How long to wait for the initial TCP connection before giving up (3–60 s)."
-        >
-          <NumInput
-            value={sshConnectTimeoutSecs}
-            min={3}
-            max={60}
-            step={1}
-            onChange={(v) => void setSshConnectTimeoutSecs(v)}
-          />
-        </SettingRow>
-        <SettingRow
-          title="Auto-reconnect SSH sessions"
-          description="Automatically retry when an SSH connection is lost unexpectedly."
-        >
-          <Switch checked={sshAutoReconnect} onCheckedChange={(v) => void setSshAutoReconnect(v)} />
-        </SettingRow>
-        {sshAutoReconnect && (
-          <>
-            <SettingRow
-              title="Reconnect delay (s)"
-              description="Seconds to wait before the first reconnect attempt (1–30)."
-            >
-              <NumInput
-                value={sshAutoReconnectDelay}
-                min={1}
-                max={30}
-                step={1}
-                onChange={(v) => void setSshAutoReconnectDelay(v)}
-              />
-            </SettingRow>
-            <SettingRow
-              title="Max reconnect attempts"
-              description="Give up after this many failed attempts (1–10)."
-            >
-              <NumInput
-                value={sshAutoReconnectMaxAttempts}
-                min={1}
-                max={10}
-                step={1}
-                onChange={(v) => void setSshAutoReconnectMaxAttempts(v)}
-              />
-            </SettingRow>
-          </>
-        )}
       </div>
 
       <div className="flex flex-col gap-2">
