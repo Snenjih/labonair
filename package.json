@@ -117,26 +117,26 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.16",
+    "@biomejs/biome": "^2.5.4",
     "@size-limit/file": "^12.1.0",
     "@tauri-apps/cli": "^2",
     "@types/node": "^25.6.0",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/coverage-v8": "^4.1.10",
     "babel-plugin-react-compiler": "^1.0.0",
     "jsdom": "^29.1.1",
-    "knip": "^6.15.0",
+    "knip": "^6.27.0",
     "react-compiler-healthcheck": "^1.0.0",
     "react-scan": "^0.5.7",
     "rollup-plugin-visualizer": "^7.0.1",
-    "shadcn": "^4.3.1",
+    "shadcn": "^4.13.1",
     "size-limit": "^12.1.0",
     "typescript": "~5.8.3",
     "vite": "^7.3.5",
     "vite-plugin-inspect": "^11.4.1",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.10"
   },
   "packageManager": "pnpm@11.1.3"
 }
