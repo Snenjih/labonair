@@ -7,6 +7,7 @@ export type SettingCategory =
   | "Editor"
   | "Command Palette"
   | "File Manager"
+  | "Connections"
   | "Source Control"
   | "AI"
   | "Directives"
@@ -507,28 +508,28 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "sshAutoReconnect",
     label: "Auto-reconnect SSH sessions",
     description: "Automatically retry when an SSH connection is lost unexpectedly.",
-    category: "Terminal",
+    category: "Connections",
     controlType: "Switch",
   },
   {
     id: "sshAutoReconnectDelay",
     label: "Reconnect delay (s)",
     description: "Seconds to wait before the first reconnect attempt (1–30).",
-    category: "Terminal",
+    category: "Connections",
     controlType: "NumberInput",
   },
   {
     id: "sshAutoReconnectMaxAttempts",
     label: "Max reconnect attempts",
     description: "Give up after this many failed attempts (1–10).",
-    category: "Terminal",
+    category: "Connections",
     controlType: "NumberInput",
   },
   {
     id: "sshConnectTimeoutSecs",
     label: "Connect timeout (s)",
     description: "How long to wait for the initial TCP connection before giving up (3–60 s).",
-    category: "Terminal",
+    category: "Connections",
     controlType: "NumberInput",
   },
   {
@@ -884,7 +885,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Explorer: Remote refresh interval",
     description:
       "How often the sidebar file tree re-polls an SSH host's expanded folders for changes (SFTP has no live watch).",
-    category: "File Manager",
+    category: "Connections",
     controlType: "Select",
     options: [
       { value: "10", label: "Every 10 seconds" },
@@ -899,7 +900,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Explorer: Auto-reconnect remote sessions",
     description:
       "Automatically retry the sidebar's SSH browsing connection when it drops unexpectedly, using the SSH reconnect delay/attempts below.",
-    category: "File Manager",
+    category: "Connections",
     controlType: "Switch",
   },
   {
@@ -907,7 +908,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Explorer: Idle session timeout (min)",
     description:
       "Disconnect a background SSH browsing session after it has had no active viewer for this many minutes (1–30).",
-    category: "File Manager",
+    category: "Connections",
     controlType: "NumberInput",
   },
   {
@@ -915,7 +916,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Explorer: Max cached remote sessions",
     description:
       "How many idle SSH browsing connections the sidebar keeps warm before disconnecting the oldest (1–10).",
-    category: "File Manager",
+    category: "Connections",
     controlType: "NumberInput",
   },
   {
@@ -923,7 +924,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Explorer: Max cached remote folders",
     description:
       "How many recently-viewed SSH host directory trees the sidebar keeps in memory for instant tab-switching (1–20). Higher uses more memory; lower re-fetches more often. Hosts with a currently open tab are always kept regardless of this number.",
-    category: "File Manager",
+    category: "Connections",
     controlType: "NumberInput",
   },
   {
@@ -931,7 +932,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Ping interval",
     description:
       "How often to check whether each host is reachable. Set to Never to disable availability checks.",
-    category: "General",
+    category: "Connections",
     controlType: "Select",
     options: [
       { value: "10", label: "Every 10 seconds" },
@@ -1129,6 +1130,7 @@ export const SETTING_CATEGORIES: SettingCategory[] = [
   "Editor",
   "Command Palette",
   "File Manager",
+  "Connections",
   "Source Control",
   "AI",
   "Directives",

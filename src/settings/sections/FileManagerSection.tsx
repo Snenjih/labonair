@@ -9,18 +9,12 @@ import {
   setSftpColumnModified,
   setSftpColumnPermissions,
   setSftpColumnType,
-  setExplorerRemotePollInterval,
-  setExplorerAutoReconnect,
-  setExplorerIdleSessionTimeoutMin,
-  setExplorerMaxIdleSessions,
-  setExplorerMaxCachedRemoteScopes,
   setSftpRemoteEditShowTransfers,
   setSftpMaxRemoteFileSizeMb,
   setSftpMaxConcurrentTransfers,
   setSftpDefaultConflictResolution,
   setSftpChunkSizeKb,
   setSftpOnFolderFileError,
-  setGitStatusPollIntervalMs,
 } from "@/modules/settings/store";
 import { NumInput } from "../components/NumInput";
 import { SectionHeader } from "../components/SectionHeader";
@@ -36,12 +30,6 @@ export function FileManagerSection() {
   const sftpColumnPermissions = usePreferencesStore((s) => s.sftpColumnPermissions);
   const sftpColumnType = usePreferencesStore((s) => s.sftpColumnType);
 
-  const explorerRemotePollInterval = usePreferencesStore((s) => s.explorerRemotePollInterval);
-  const explorerAutoReconnect = usePreferencesStore((s) => s.explorerAutoReconnect);
-  const explorerIdleSessionTimeoutMin = usePreferencesStore((s) => s.explorerIdleSessionTimeoutMin);
-  const explorerMaxIdleSessions = usePreferencesStore((s) => s.explorerMaxIdleSessions);
-  const explorerMaxCachedRemoteScopes = usePreferencesStore((s) => s.explorerMaxCachedRemoteScopes);
-
   const sftpRemoteEditShowTransfers = usePreferencesStore((s) => s.sftpRemoteEditShowTransfers);
   const sftpMaxRemoteFileSizeMb = usePreferencesStore((s) => s.sftpMaxRemoteFileSizeMb);
 
@@ -50,13 +38,11 @@ export function FileManagerSection() {
   const sftpChunkSizeKb = usePreferencesStore((s) => s.sftpChunkSizeKb);
   const sftpOnFolderFileError = usePreferencesStore((s) => s.sftpOnFolderFileError);
 
-  const gitStatusPollIntervalMs = usePreferencesStore((s) => s.gitStatusPollIntervalMs);
-
   return (
     <div className="flex flex-col gap-6">
       <SectionHeader
         title="File Manager"
-        description="File browsing, remote sessions, and transfer settings for SFTP and the sidebar explorer."
+        description="File browsing, columns, and transfer settings for SFTP and the sidebar explorer."
       />
 
       <div className="flex flex-col gap-2">
@@ -112,87 +98,6 @@ export function FileManagerSection() {
             description="Display the file type / extension column in the file list."
           >
             <Switch checked={sftpColumnType} onCheckedChange={(v) => void setSftpColumnType(v)} />
-          </SettingRow>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>Remote Sessions</Label>
-        <div className="flex flex-col gap-2">
-          <SettingRow
-            title="Explorer: Remote refresh interval"
-            description="How often the sidebar file tree re-polls an SSH host's expanded folders for changes (SFTP has no live watch)."
-          >
-            <Select
-              value={String(explorerRemotePollInterval)}
-              onValueChange={(v) => void setExplorerRemotePollInterval(Number(v))}
-            >
-              <SelectTrigger className="h-7 w-36 text-[11.5px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="10" className="text-[11.5px]">
-                  Every 10 seconds
-                </SelectItem>
-                <SelectItem value="20" className="text-[11.5px]">
-                  Every 20 seconds
-                </SelectItem>
-                <SelectItem value="30" className="text-[11.5px]">
-                  Every 30 seconds
-                </SelectItem>
-                <SelectItem value="60" className="text-[11.5px]">
-                  Every minute
-                </SelectItem>
-                <SelectItem value="0" className="text-[11.5px]">
-                  Never
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </SettingRow>
-          <SettingRow
-            title="Explorer: Auto-reconnect remote sessions"
-            description="Automatically retry the sidebar's SSH browsing connection when it drops unexpectedly, using the SSH reconnect delay/attempts in Terminal settings."
-          >
-            <Switch
-              checked={explorerAutoReconnect}
-              onCheckedChange={(v) => void setExplorerAutoReconnect(v)}
-            />
-          </SettingRow>
-          <SettingRow
-            title="Explorer: Idle session timeout (min)"
-            description="Disconnect a background SSH browsing session after it has had no active viewer for this many minutes (1–30)."
-          >
-            <NumInput
-              value={explorerIdleSessionTimeoutMin}
-              min={1}
-              max={30}
-              step={1}
-              onChange={(v) => void setExplorerIdleSessionTimeoutMin(v)}
-            />
-          </SettingRow>
-          <SettingRow
-            title="Explorer: Max cached remote sessions"
-            description="How many idle SSH browsing connections the sidebar keeps warm before disconnecting the oldest (1–10)."
-          >
-            <NumInput
-              value={explorerMaxIdleSessions}
-              min={1}
-              max={10}
-              step={1}
-              onChange={(v) => void setExplorerMaxIdleSessions(v)}
-            />
-          </SettingRow>
-          <SettingRow
-            title="Explorer: Max cached remote folders"
-            description="How many recently-viewed SSH host directory trees the sidebar keeps in memory for instant tab-switching (1–20). Hosts with a currently open tab are always kept regardless of this number."
-          >
-            <NumInput
-              value={explorerMaxCachedRemoteScopes}
-              min={1}
-              max={20}
-              step={1}
-              onChange={(v) => void setExplorerMaxCachedRemoteScopes(v)}
-            />
           </SettingRow>
         </div>
       </div>
@@ -300,22 +205,6 @@ export function FileManagerSection() {
             </Select>
           </SettingRow>
         </div>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>Source Control</Label>
-        <SettingRow
-          title="Refresh interval"
-          description="How often Source Control polls for status changes (in ms). Repositories on a remote SSH host automatically use a longer effective interval — each check is a network round-trip over the same session the file tree uses, so a longer interval reduces load without a second setting to manage."
-        >
-          <NumInput
-            value={gitStatusPollIntervalMs}
-            min={2000}
-            max={30000}
-            step={500}
-            onChange={(v) => void setGitStatusPollIntervalMs(v)}
-          />
-        </SettingRow>
       </div>
     </div>
   );

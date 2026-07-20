@@ -1,0 +1,220 @@
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import {
+  setExplorerAutoReconnect,
+  setExplorerIdleSessionTimeoutMin,
+  setExplorerMaxCachedRemoteScopes,
+  setExplorerMaxIdleSessions,
+  setExplorerRemotePollInterval,
+  setHostPingInterval,
+  setSshAutoReconnect,
+  setSshAutoReconnectDelay,
+  setSshAutoReconnectMaxAttempts,
+  setSshConnectTimeoutSecs,
+} from "@/modules/settings/store";
+import { NumInput } from "../components/NumInput";
+import { SectionHeader } from "../components/SectionHeader";
+import { SettingRow } from "../components/SettingRow";
+
+const PING_INTERVAL_OPTIONS: { value: string; label: string }[] = [
+  { value: "10", label: "Every 10 seconds" },
+  { value: "30", label: "Every 30 seconds" },
+  { value: "60", label: "Every minute" },
+  { value: "120", label: "Every 2 minutes" },
+  { value: "300", label: "Every 5 minutes" },
+  { value: "0", label: "Never" },
+];
+
+function SubSectionTitle({ children }: { children: React.ReactNode }) {
+  return <h3 className="text-sm font-semibold tracking-tight text-foreground">{children}</h3>;
+}
+
+function SectionDivider() {
+  return <div className="border-t border-border/40" />;
+}
+
+export function ConnectionsSection() {
+  const hostPingInterval = usePreferencesStore((s) => s.hostPingInterval);
+
+  const sshAutoReconnect = usePreferencesStore((s) => s.sshAutoReconnect);
+  const sshAutoReconnectDelay = usePreferencesStore((s) => s.sshAutoReconnectDelay);
+  const sshAutoReconnectMaxAttempts = usePreferencesStore((s) => s.sshAutoReconnectMaxAttempts);
+  const sshConnectTimeoutSecs = usePreferencesStore((s) => s.sshConnectTimeoutSecs);
+
+  const explorerRemotePollInterval = usePreferencesStore((s) => s.explorerRemotePollInterval);
+  const explorerAutoReconnect = usePreferencesStore((s) => s.explorerAutoReconnect);
+  const explorerIdleSessionTimeoutMin = usePreferencesStore((s) => s.explorerIdleSessionTimeoutMin);
+  const explorerMaxIdleSessions = usePreferencesStore((s) => s.explorerMaxIdleSessions);
+  const explorerMaxCachedRemoteScopes = usePreferencesStore((s) => s.explorerMaxCachedRemoteScopes);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <SectionHeader
+        title="Connections"
+        description="How Labonair manages remote hosts — availability checks, SSH terminal sessions, and the sidebar's remote file browsing sessions."
+      />
+
+      {/* Host Availability */}
+      <div className="flex flex-col gap-4">
+        <SubSectionTitle>Host Availability</SubSectionTitle>
+        <SettingRow
+          title="Ping interval"
+          description="How often to check whether each host is reachable. Set to Never to disable availability checks."
+        >
+          <Select value={String(hostPingInterval)} onValueChange={(v) => void setHostPingInterval(Number(v))}>
+            <SelectTrigger className="h-7 w-44 text-[11.5px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PING_INTERVAL_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value} className="text-[11.5px]">
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+      </div>
+
+      <SectionDivider />
+
+      {/* SSH Terminal Sessions */}
+      <div className="flex flex-col gap-4">
+        <SubSectionTitle>SSH Terminal Sessions</SubSectionTitle>
+        <div className="flex flex-col gap-2">
+          <SettingRow
+            title="Connect timeout (s)"
+            description="How long to wait for the initial TCP connection before giving up (3–60 s)."
+          >
+            <NumInput
+              value={sshConnectTimeoutSecs}
+              min={3}
+              max={60}
+              step={1}
+              onChange={(v) => void setSshConnectTimeoutSecs(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Auto-reconnect SSH sessions"
+            description="Automatically retry when an SSH connection is lost unexpectedly."
+          >
+            <Switch checked={sshAutoReconnect} onCheckedChange={(v) => void setSshAutoReconnect(v)} />
+          </SettingRow>
+          {sshAutoReconnect && (
+            <>
+              <SettingRow
+                title="Reconnect delay (s)"
+                description="Seconds to wait before the first reconnect attempt (1–30)."
+              >
+                <NumInput
+                  value={sshAutoReconnectDelay}
+                  min={1}
+                  max={30}
+                  step={1}
+                  onChange={(v) => void setSshAutoReconnectDelay(v)}
+                />
+              </SettingRow>
+              <SettingRow
+                title="Max reconnect attempts"
+                description="Give up after this many failed attempts (1–10)."
+              >
+                <NumInput
+                  value={sshAutoReconnectMaxAttempts}
+                  min={1}
+                  max={10}
+                  step={1}
+                  onChange={(v) => void setSshAutoReconnectMaxAttempts(v)}
+                />
+              </SettingRow>
+            </>
+          )}
+        </div>
+      </div>
+
+      <SectionDivider />
+
+      {/* Remote File Browsing (Explorer/SFTP) */}
+      <div className="flex flex-col gap-4">
+        <SubSectionTitle>Remote File Browsing (Explorer/SFTP)</SubSectionTitle>
+        <div className="flex flex-col gap-2">
+          <SettingRow
+            title="Explorer: Remote refresh interval"
+            description="How often the sidebar file tree re-polls an SSH host's expanded folders for changes (SFTP has no live watch)."
+          >
+            <Select
+              value={String(explorerRemotePollInterval)}
+              onValueChange={(v) => void setExplorerRemotePollInterval(Number(v))}
+            >
+              <SelectTrigger className="h-7 w-36 text-[11.5px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10" className="text-[11.5px]">
+                  Every 10 seconds
+                </SelectItem>
+                <SelectItem value="20" className="text-[11.5px]">
+                  Every 20 seconds
+                </SelectItem>
+                <SelectItem value="30" className="text-[11.5px]">
+                  Every 30 seconds
+                </SelectItem>
+                <SelectItem value="60" className="text-[11.5px]">
+                  Every minute
+                </SelectItem>
+                <SelectItem value="0" className="text-[11.5px]">
+                  Never
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingRow>
+          <SettingRow
+            title="Explorer: Auto-reconnect remote sessions"
+            description="Automatically retry the sidebar's SSH browsing connection when it drops unexpectedly, using the SSH reconnect delay/attempts above."
+          >
+            <Switch
+              checked={explorerAutoReconnect}
+              onCheckedChange={(v) => void setExplorerAutoReconnect(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Explorer: Idle session timeout (min)"
+            description="Disconnect a background SSH browsing session after it has had no active viewer for this many minutes (1–30)."
+          >
+            <NumInput
+              value={explorerIdleSessionTimeoutMin}
+              min={1}
+              max={30}
+              step={1}
+              onChange={(v) => void setExplorerIdleSessionTimeoutMin(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Explorer: Max cached remote sessions"
+            description="How many idle SSH browsing connections the sidebar keeps warm before disconnecting the oldest (1–10)."
+          >
+            <NumInput
+              value={explorerMaxIdleSessions}
+              min={1}
+              max={10}
+              step={1}
+              onChange={(v) => void setExplorerMaxIdleSessions(v)}
+            />
+          </SettingRow>
+          <SettingRow
+            title="Explorer: Max cached remote folders"
+            description="How many recently-viewed SSH host directory trees the sidebar keeps in memory for instant tab-switching (1–20). Hosts with a currently open tab are always kept regardless of this number."
+          >
+            <NumInput
+              value={explorerMaxCachedRemoteScopes}
+              min={1}
+              max={20}
+              step={1}
+              onChange={(v) => void setExplorerMaxCachedRemoteScopes(v)}
+            />
+          </SettingRow>
+        </div>
+      </div>
+    </div>
+  );
+}
