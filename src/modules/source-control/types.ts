@@ -94,6 +94,8 @@ export interface WorkspaceGitState {
   submodules: SubmoduleStatus[];
 }
 
+export type FileListViewMode = "list" | "tree";
+
 export type SelectionMode =
   | { type: "file"; path: string; staged: boolean }
   | { type: "section"; section: "staged" | "unstaged" | "untracked" }

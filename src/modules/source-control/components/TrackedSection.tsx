@@ -1,12 +1,14 @@
-import { ArrowDown01Icon, ArrowRight01Icon, MinusSignIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { git } from "../lib/gitInvoke";
+import { sortFileStatuses } from "../lib/fileTree";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import type { FileStatus } from "../types";
 import { FileChangeItem } from "./FileChangeItem";
+import { FileTreeList } from "./FileTreeList";
 
 interface TrackedSectionProps {
   staged: FileStatus[];
@@ -18,12 +20,18 @@ export function TrackedSection({ staged, unstaged, onRefresh }: TrackedSectionPr
   const [collapsed, setCollapsed] = useState(false);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
   const sessionId = useSourceControlStore((s) => s.sessionId);
+  const fileListViewMode = useSourceControlStore((s) => s.fileListViewMode);
+  const sortByPath = useSourceControlStore((s) => s.sortByPath);
 
   const totalCount = staged.length + unstaged.length;
   if (totalCount === 0) return null;
 
-  async function handleStageAll(e: React.MouseEvent) {
-    e.stopPropagation();
+  const sortedStaged = sortFileStatuses(staged, sortByPath);
+  const sortedUnstaged = sortFileStatuses(unstaged, sortByPath);
+  const checkedState: boolean | "indeterminate" =
+    unstaged.length === 0 && staged.length > 0 ? true : staged.length === 0 ? false : "indeterminate";
+
+  async function handleStageAll() {
     if (!repoRoot) return;
     try {
       await git.stageAll(repoRoot, sessionId ?? undefined);
@@ -35,8 +43,7 @@ export function TrackedSection({ staged, unstaged, onRefresh }: TrackedSectionPr
     }
   }
 
-  async function handleUnstageAll(e: React.MouseEvent) {
-    e.stopPropagation();
+  async function handleUnstageAll() {
     if (!repoRoot) return;
     try {
       await git.unstageAll(repoRoot, sessionId ?? undefined);
@@ -72,54 +79,47 @@ export function TrackedSection({ staged, unstaged, onRefresh }: TrackedSectionPr
           <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">{totalCount}</span>
         </button>
 
-        {/* Stage all / Unstage all */}
-        <div className="flex items-center gap-0.5 opacity-0 group-hover/hdr:opacity-100 transition-opacity">
-          {staged.length > 0 && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-4 shrink-0"
-              title="Unstage All"
-              onClick={handleUnstageAll}
-            >
-              <HugeiconsIcon icon={MinusSignIcon} size={9} strokeWidth={2} />
-            </Button>
-          )}
-          {unstaged.length > 0 && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-4 shrink-0"
-              title="Stage All"
-              onClick={handleStageAll}
-            >
-              <HugeiconsIcon icon={PlusSignIcon} size={9} strokeWidth={2} />
-            </Button>
-          )}
-        </div>
+        {/* Stage all / Unstage all — tri-state: checked = all staged,
+         *  indeterminate = mixed, unchecked = none staged. */}
+        <Checkbox
+          checked={checkedState}
+          onClick={(e) => e.stopPropagation()}
+          onCheckedChange={(checked) => {
+            if (checked) void handleStageAll();
+            else void handleUnstageAll();
+          }}
+          className="shrink-0 opacity-0 transition-opacity group-hover/hdr:opacity-100"
+          title={checkedState === true ? "Unstage All" : "Stage All"}
+        />
       </div>
 
       {/* Files: staged first, then unstaged */}
-      {!collapsed && (
-        <div className="px-1 pb-0.5">
-          {staged.map((file) => (
-            <FileChangeItem
-              key={`staged:${file.path}:${file.indexStatus}`}
-              file={file}
-              section="staged"
-              onRefresh={onRefresh}
-            />
-          ))}
-          {unstaged.map((file) => (
-            <FileChangeItem
-              key={`unstaged:${file.path}:${file.worktreeStatus}`}
-              file={file}
-              section="unstaged"
-              onRefresh={onRefresh}
-            />
-          ))}
-        </div>
-      )}
+      {!collapsed &&
+        (fileListViewMode === "tree" ? (
+          <div className="px-1 pb-0.5">
+            <FileTreeList files={sortedStaged} section="staged" onRefresh={onRefresh} />
+            <FileTreeList files={sortedUnstaged} section="unstaged" onRefresh={onRefresh} />
+          </div>
+        ) : (
+          <div className="px-1 pb-0.5">
+            {sortedStaged.map((file) => (
+              <FileChangeItem
+                key={`staged:${file.path}:${file.indexStatus}`}
+                file={file}
+                section="staged"
+                onRefresh={onRefresh}
+              />
+            ))}
+            {sortedUnstaged.map((file) => (
+              <FileChangeItem
+                key={`unstaged:${file.path}:${file.worktreeStatus}`}
+                file={file}
+                section="unstaged"
+                onRefresh={onRefresh}
+              />
+            ))}
+          </div>
+        ))}
     </div>
   );
 }

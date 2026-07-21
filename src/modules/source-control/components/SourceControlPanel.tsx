@@ -6,7 +6,9 @@ import { useGitStatus } from "../lib/useGitStatus";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import { BranchBar } from "./BranchBar";
 import { CommitForm } from "./CommitForm";
+import { DiffViewer } from "./DiffViewer";
 import { NoRepoState } from "./NoRepoState";
+import { SourceControlActionBar } from "./SourceControlActionBar";
 import { TrackedSection } from "./TrackedSection";
 import { UntrackedSection } from "./UntrackedSection";
 
@@ -32,7 +34,6 @@ export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPane
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
   const sessionId = useSourceControlStore((s) => s.sessionId);
   const status = useSourceControlStore((s) => s.status);
-  const diffStats = useSourceControlStore((s) => s.diffStats);
   const submodules = useSourceControlStore((s) => s.submodules);
   const error = useSourceControlStore((s) => s.error);
 
@@ -49,15 +50,6 @@ export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPane
     void useSourceControlStore.getState().hydrateRecentMessages();
   }, []);
 
-  const stagedCount = status?.staged.length ?? 0;
-  const unstagedCount = status?.unstaged.length ?? 0;
-  const untrackedCount = status?.untracked.length ?? 0;
-  const trackedCount = stagedCount + unstagedCount;
-  const totalChanges = trackedCount + untrackedCount;
-
-  const totalAdded = diffStats.reduce((sum, s) => sum + s.added, 0);
-  const totalRemoved = diffStats.reduce((sum, s) => sum + s.removed, 0);
-
   if (!isRepo) {
     return (
       <NoRepoState
@@ -72,27 +64,9 @@ export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPane
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <BranchBar onRefresh={refresh} />
+      <SourceControlActionBar onRefresh={refresh} />
 
-      {/* Header: change count + aggregate diff stats */}
-      <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/50 px-3">
-        <span className="text-[11px] text-muted-foreground/60">
-          {totalChanges > 0 ? (
-            <>
-              <span className="font-semibold text-foreground/80">{totalChanges}</span> Change
-              {totalChanges !== 1 ? "s" : ""}
-            </>
-          ) : (
-            "No changes"
-          )}
-        </span>
-        {(totalAdded > 0 || totalRemoved > 0) && (
-          <span className="flex items-center gap-1.5 text-[10px] tabular-nums">
-            {totalAdded > 0 && <span className="font-semibold text-success">+{totalAdded}</span>}
-            {totalRemoved > 0 && <span className="font-semibold text-error">−{totalRemoved}</span>}
-          </span>
-        )}
-      </div>
+      <DiffViewer />
 
       {status?.hasConflicts && (
         <div className="mx-3 my-1 rounded border border-warning/30 bg-warning/10 px-2 py-1 text-[10px] text-warning">
@@ -129,7 +103,8 @@ export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPane
         </div>
       </ScrollArea>
 
-      {/* Commit form pinned at bottom */}
+      {/* Branch + commit form pinned at bottom */}
+      <BranchBar onRefresh={refresh} />
       {repoRoot && <CommitForm repoRoot={repoRoot} onRefresh={refresh} onOpenGitGraph={onOpenGitGraph} />}
     </div>
   );

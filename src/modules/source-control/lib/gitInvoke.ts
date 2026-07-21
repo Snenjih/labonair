@@ -59,6 +59,10 @@ export const git = {
     invoke<void>("git_unstage_all", { path, sessionId: sessionId ?? null }),
   discardFile: (path: string, file: string, sessionId?: string) =>
     invoke<void>("git_discard_file", { path, file, sessionId: sessionId ?? null }),
+  discardAll: (path: string, sessionId?: string) =>
+    invoke<void>("git_discard_all", { path, sessionId: sessionId ?? null }),
+  cleanUntracked: (path: string, sessionId?: string) =>
+    invoke<void>("git_clean_untracked", { path, sessionId: sessionId ?? null }),
   commit: (path: string, message: string, amend: boolean, sessionId?: string) =>
     invoke<CommitResult>("git_commit", { path, message, amend, sessionId: sessionId ?? null }),
   push: (path: string, remote?: string, branch?: string, sessionId?: string) =>
