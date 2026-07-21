@@ -1,12 +1,14 @@
-import { ArrowDown01Icon, ArrowRight01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { git } from "../lib/gitInvoke";
+import { sortFileStatuses } from "../lib/fileTree";
 import { useSourceControlStore } from "../store/sourceControlStore";
 import type { FileStatus } from "../types";
 import { FileChangeItem } from "./FileChangeItem";
+import { FileTreeList } from "./FileTreeList";
 
 interface UntrackedSectionProps {
   files: FileStatus[];
@@ -17,11 +19,14 @@ export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
   const repoRoot = useSourceControlStore((s) => s.repoRoot);
   const sessionId = useSourceControlStore((s) => s.sessionId);
+  const fileListViewMode = useSourceControlStore((s) => s.fileListViewMode);
+  const sortByPath = useSourceControlStore((s) => s.sortByPath);
 
   if (files.length === 0) return null;
 
-  async function handleStageAll(e: React.MouseEvent) {
-    e.stopPropagation();
+  const sortedFiles = sortFileStatuses(files, sortByPath);
+
+  async function handleStageAll() {
     if (!repoRoot) return;
     try {
       await git.stageAll(repoRoot, sessionId ?? undefined);
@@ -56,29 +61,32 @@ export function UntrackedSection({ files, onRefresh }: UntrackedSectionProps) {
           <span className="font-mono text-[9px] tabular-nums text-muted-foreground/30">{files.length}</span>
         </button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="ml-auto size-4 shrink-0 opacity-0 transition-opacity group-hover/hdr:opacity-100"
+        <Checkbox
+          checked={false}
+          onClick={(e) => e.stopPropagation()}
+          onCheckedChange={() => void handleStageAll()}
+          className="ml-auto shrink-0 opacity-0 transition-opacity group-hover/hdr:opacity-100"
           title="Stage All Untracked"
-          onClick={handleStageAll}
-        >
-          <HugeiconsIcon icon={PlusSignIcon} size={9} strokeWidth={2} />
-        </Button>
+        />
       </div>
 
-      {!collapsed && (
-        <div className="px-1 pb-0.5">
-          {files.map((file) => (
-            <FileChangeItem
-              key={`untracked:${file.path}`}
-              file={file}
-              section="untracked"
-              onRefresh={onRefresh}
-            />
-          ))}
-        </div>
-      )}
+      {!collapsed &&
+        (fileListViewMode === "tree" ? (
+          <div className="px-1 pb-0.5">
+            <FileTreeList files={sortedFiles} section="untracked" onRefresh={onRefresh} />
+          </div>
+        ) : (
+          <div className="px-1 pb-0.5">
+            {sortedFiles.map((file) => (
+              <FileChangeItem
+                key={`untracked:${file.path}`}
+                file={file}
+                section="untracked"
+                onRefresh={onRefresh}
+              />
+            ))}
+          </div>
+        ))}
     </div>
   );
 }

@@ -1,6 +1,14 @@
 import { load } from "@tauri-apps/plugin-store";
 import { create } from "zustand";
-import type { Branch, FileDiffStat, GitStatus, SelectionMode, StashEntry, SubmoduleStatus } from "../types";
+import type {
+  Branch,
+  FileDiffStat,
+  FileListViewMode,
+  GitStatus,
+  SelectionMode,
+  StashEntry,
+  SubmoduleStatus,
+} from "../types";
 
 const STORE_FILE = "labonair-git.json";
 const STORE_KEY = "recentMessages";
@@ -27,6 +35,10 @@ export interface SourceControlState {
   commitMessage: string;
   diffViewMode: "unified" | "split";
   ignoreWhitespace: boolean;
+
+  // file list display
+  fileListViewMode: FileListViewMode;
+  sortByPath: boolean;
 
   // branch
   branchList: Branch[];
@@ -69,6 +81,8 @@ export interface SourceControlState {
   setCommitMessage: (msg: string) => void;
   setDiffViewMode: (mode: "unified" | "split") => void;
   setIgnoreWhitespace: (v: boolean) => void;
+  setFileListViewMode: (mode: FileListViewMode) => void;
+  setSortByPath: (v: boolean) => void;
 
   // branch actions
   setBranchList: (branches: Branch[]) => void;
@@ -104,6 +118,9 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   diffViewMode: "unified",
   ignoreWhitespace: false,
 
+  fileListViewMode: "list",
+  sortByPath: true,
+
   branchList: [],
   isBranchLoading: false,
   currentBranch: "",
@@ -137,6 +154,8 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   setCommitMessage: (commitMessage) => set({ commitMessage }),
   setDiffViewMode: (diffViewMode) => set({ diffViewMode }),
   setIgnoreWhitespace: (ignoreWhitespace) => set({ ignoreWhitespace }),
+  setFileListViewMode: (fileListViewMode) => set({ fileListViewMode }),
+  setSortByPath: (sortByPath) => set({ sortByPath }),
 
   setBranchList: (branchList) => set({ branchList }),
   setIsBranchLoading: (isBranchLoading) => set({ isBranchLoading }),

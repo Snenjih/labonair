@@ -36,6 +36,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
   const operationInProgress = useSourceControlStore((s) => s.operationInProgress);
   const setOperationInProgress = useSourceControlStore((s) => s.setOperationInProgress);
   const currentBranch = useSourceControlStore((s) => s.currentBranch);
+  const branchList = useSourceControlStore((s) => s.branchList);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,10 +50,18 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
   const cherryPickInProgress = status?.cherryPickInProgress ?? false;
   const inProgress = mergeInProgress || rebaseInProgress || cherryPickInProgress;
 
-  const repoName = repoRoot ? (repoRoot.split("/").pop() ?? repoRoot) : "—";
+  // No upstream on the current branch means there's nothing to push/pull
+  // against yet — the split button proactively labels itself "Publish" for
+  // that case instead of waiting for a push to fail first (see
+  // handleSetUpstream below, which does the actual `--set-upstream` push).
+  const hasUpstream = branchList.some((b) => b.name === currentBranch && !b.isRemote && b.upstream !== null);
 
   async function handlePush() {
     if (!repoRoot || operationInProgress) return;
+    if (!hasUpstream) {
+      await handleSetUpstream();
+      return;
+    }
     setOperationInProgress("push");
     setError(null);
     setShowSetUpstreamPrompt(false);
@@ -189,15 +198,13 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     <div className="border-b border-border/60">
       {/* Main top bar */}
       <div className="flex h-9 items-center gap-0 px-2.5">
-        {/* Left: git icon · repo / branch */}
+        {/* Left: git icon · branch */}
         <HugeiconsIcon
           icon={GitBranchIcon}
           size={12}
           strokeWidth={2}
           className="mr-1.5 shrink-0 text-muted-foreground"
         />
-        <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{repoName}</span>
-        <span className="mx-1 shrink-0 text-[11px] text-muted-foreground/30">/</span>
 
         {repoRoot ? (
           <BranchDropdown
@@ -237,7 +244,7 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
                 <HugeiconsIcon icon={ArrowUp01Icon} size={10} strokeWidth={2.5} />
               )}
               {ahead > 0 && <span className="tabular-nums">{ahead}</span>}
-              Push
+              {hasUpstream ? "Push" : "Publish"}
             </button>
 
             <div className="w-px self-stretch bg-border/50" />
@@ -253,6 +260,10 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuItem onClick={() => setDropdownOpen(true)} className="text-xs">
+                  Switch Branch
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => void handleFetch()} className="text-xs">
                   Fetch
                 </DropdownMenuItem>

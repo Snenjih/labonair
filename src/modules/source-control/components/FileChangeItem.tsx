@@ -1,5 +1,3 @@
-import { MinusSignIcon, PlusSignIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useState } from "react";
 import {
   AlertDialog,
@@ -11,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -202,28 +201,17 @@ export function FileChangeItem({ file, section, onRefresh }: FileChangeItemProps
               </span>
             )}
 
-            {/* Stage / Unstage button — always visible */}
-            <div className="flex shrink-0 items-center">
-              {section === "staged" ? (
-                <button
-                  type="button"
-                  className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-foreground/6"
-                  onClick={(e) => void handleUnstage(e)}
-                  title="Unstage"
-                >
-                  <HugeiconsIcon icon={MinusSignIcon} size={10} strokeWidth={2} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-foreground/6"
-                  onClick={(e) => void handleStage(e)}
-                  title="Stage"
-                >
-                  <HugeiconsIcon icon={PlusSignIcon} size={10} strokeWidth={2} />
-                </button>
-              )}
-            </div>
+            {/* Stage / Unstage checkbox — always visible */}
+            <Checkbox
+              checked={isStaged}
+              onClick={(e) => e.stopPropagation()}
+              onCheckedChange={(checked) => {
+                if (checked) void handleStage();
+                else void handleUnstage();
+              }}
+              className="shrink-0"
+              title={isStaged ? "Unstage" : "Stage"}
+            />
           </div>
         </ContextMenuTrigger>
 

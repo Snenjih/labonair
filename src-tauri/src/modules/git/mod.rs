@@ -766,6 +766,33 @@ pub async fn git_discard_file(
     executor.run(&["restore", "--", &file]).await.map(|_| ())
 }
 
+/// Discards all tracked changes (staged and unstaged) back to `HEAD`. Never
+/// touches untracked files — see `git_clean_untracked` for those.
+#[tauri::command]
+pub async fn git_discard_all(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SshState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["checkout", "HEAD", "--", "."]).await.map(|_| ())
+}
+
+/// Deletes all untracked files and directories (`git clean -fd`). Respects
+/// `.gitignore` — ignored files are left alone, same as the untracked list
+/// the frontend shows.
+#[tauri::command]
+pub async fn git_clean_untracked(
+    path: String,
+    session_id: Option<String>,
+    sftp_state: tauri::State<'_, SshState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let executor = resolve_executor(path, session_id, sftp_state.inner().clone(), app);
+    executor.run(&["clean", "-fd"]).await.map(|_| ())
+}
+
 /// Creates a commit with the given message. Supports `--amend`.
 #[tauri::command]
 pub async fn git_commit(
