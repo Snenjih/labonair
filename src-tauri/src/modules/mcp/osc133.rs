@@ -40,10 +40,15 @@ impl Perform for Performer {
 }
 
 /// Streaming OSC-133 boundary + plain-text capture for a command injected by
-/// the MCP bridge (`modules::mcp`). Feeds raw PTY chunks (already
-/// UTF-8-repaired by `ssh/pty.rs`'s `flush_carry`) through a `vte` parser so
-/// cursor-movement/color escape sequences never pollute the captured text,
-/// while an OSC 133 `D` marker signals the command has finished.
+/// the MCP bridge (`modules::mcp`). Feeds raw PTY chunks through a `vte`
+/// parser so cursor-movement/color escape sequences never pollute the
+/// captured text, while an OSC 133 `D` marker signals the command has
+/// finished. Takes raw bytes rather than `&str` — `vte::Parser::advance`
+/// decodes UTF-8 itself and correctly buffers a multi-byte sequence split
+/// across two `feed()` calls, so this works equally well against SSH's
+/// already-UTF-8-repaired chunks (`ssh/pty.rs`'s `flush_carry`) and local
+/// PTY's raw, unrepaired bytes (`pty/session.rs`) — no separate repair step
+/// needed for either caller.
 pub struct Osc133Capture {
     parser: Parser,
     performer: Performer,
@@ -57,8 +62,8 @@ impl Osc133Capture {
         }
     }
 
-    pub fn feed(&mut self, chunk: &str) {
-        self.parser.advance(&mut self.performer, chunk.as_bytes());
+    pub fn feed(&mut self, chunk: &[u8]) {
+        self.parser.advance(&mut self.performer, chunk);
     }
 
     /// `Some(exit_code)` once an OSC 133 `D` marker has been seen — the outer
@@ -86,7 +91,7 @@ mod tests {
     #[test]
     fn detects_exit_code_and_strips_escapes() {
         let mut cap = Osc133Capture::new();
-        cap.feed("\x1b]133;C\x1b\\echo hi\r\nhi\r\n\x1b]133;D;0\x1b\\");
+        cap.feed(b"\x1b]133;C\x1b\\echo hi\r\nhi\r\n\x1b]133;D;0\x1b\\");
         assert_eq!(cap.finished(), Some(Some(0)));
         assert_eq!(cap.clean_output(), "echo hi\r\nhi\r\n");
     }
@@ -94,21 +99,21 @@ mod tests {
     #[test]
     fn bare_d_marks_finished_with_unknown_code() {
         let mut cap = Osc133Capture::new();
-        cap.feed("\x1b]133;D\x1b\\");
+        cap.feed(b"\x1b]133;D\x1b\\");
         assert_eq!(cap.finished(), Some(None));
     }
 
     #[test]
     fn not_finished_without_d_marker() {
         let mut cap = Osc133Capture::new();
-        cap.feed("still running\r\n");
+        cap.feed(b"still running\r\n");
         assert_eq!(cap.finished(), None);
     }
 
     #[test]
     fn strips_cursor_and_color_csi_sequences() {
         let mut cap = Osc133Capture::new();
-        cap.feed("\x1b[31mred\x1b[0m text\x1b]133;D;1\x1b\\");
+        cap.feed(b"\x1b[31mred\x1b[0m text\x1b]133;D;1\x1b\\");
         assert_eq!(cap.clean_output(), "red text");
         assert_eq!(cap.finished(), Some(Some(1)));
     }
@@ -116,9 +121,21 @@ mod tests {
     #[test]
     fn handles_chunked_feed_across_marker_boundary() {
         let mut cap = Osc133Capture::new();
-        cap.feed("output\x1b]133");
-        cap.feed(";D;42\x1b\\");
+        cap.feed(b"output\x1b]133");
+        cap.feed(b";D;42\x1b\\");
         assert_eq!(cap.clean_output(), "output");
         assert_eq!(cap.finished(), Some(Some(42)));
+    }
+
+    #[test]
+    fn handles_raw_bytes_split_mid_utf8_sequence() {
+        // "é" = 0xC3 0xA9 — split across two feed() calls, exactly the
+        // scenario local PTY's unrepaired raw-byte tap can produce.
+        let mut cap = Osc133Capture::new();
+        cap.feed(&[0xC3]);
+        cap.feed(&[0xA9]);
+        cap.feed(b"\x1b]133;D;0\x1b\\");
+        assert_eq!(cap.clean_output(), "é");
+        assert_eq!(cap.finished(), Some(Some(0)));
     }
 }

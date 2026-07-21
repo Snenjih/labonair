@@ -25,6 +25,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
+import { getLocalPtyId } from "@/modules/terminal/lib/terminalSessionRegistry";
 import { setAgentAccessGrant, useAgentAccessStore } from "./store/agentAccessStore";
 import { selectRenderStableTabs, useTabsStore } from "./store/tabsStore";
 import { TabIconFor, labelFor, pluralLabelFor, NewTabDropdownItems } from "./lib/tabUtils";
@@ -70,6 +72,7 @@ export function TabBar({
   const reorderTabs = useTabsStore((s) => s.reorderTabs);
   const agentAccessEntries = useAgentAccessStore((s) => s.entries);
   const agentBridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
+  const hosts = useHostsStore((s) => s.hosts);
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -277,7 +280,12 @@ export function TabBar({
                   if (t.kind === "workspace") {
                     const activeSession = t.sessions[t.activePaneId];
                     const isSsh = activeSession?.kind === "ssh";
+                    const isLocal = activeSession?.kind === "local";
                     const isGranted = Boolean(agentAccessEntries[t.id]);
+                    const sessionHost = isSsh
+                      ? hosts.find((h) => h.id === activeSession?.hostId)
+                      : undefined;
+                    const hostBlocked = isSsh && sessionHost?.block_agent_access === true;
                     return (
                       <SortableTabWrapper key={t.id} id={t.id} disabled={false}>
                         <ContextMenu>
@@ -290,13 +298,24 @@ export function TabBar({
                               <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.75} />
                               <span className="flex-1">Rename</span>
                             </ContextMenuItem>
-                            {isSsh && activeSession && agentBridgeEnabled && (
+                            {(isSsh || isLocal) && activeSession && agentBridgeEnabled && (
                               <>
                                 <ContextMenuSeparator />
                                 <ContextMenuCheckboxItem
                                   checked={isGranted}
+                                  disabled={hostBlocked}
+                                  title={hostBlocked ? "This host has AI agent access blocked in its settings" : undefined}
                                   onCheckedChange={(checked) =>
-                                    void setAgentAccessGrant(t.id, activeSession.id, checked, labelFor(t))
+                                    void setAgentAccessGrant(
+                                      t.id,
+                                      activeSession.id,
+                                      checked,
+                                      labelFor(t),
+                                      isSsh ? "ssh" : "local",
+                                      isSsh
+                                        ? { hostId: activeSession.hostId }
+                                        : { localPtyId: getLocalPtyId(activeSession.id) },
+                                    )
                                   }
                                 >
                                   Grant AI Agent Access

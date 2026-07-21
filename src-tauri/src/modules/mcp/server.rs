@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use rmcp::{
@@ -20,13 +21,13 @@ use crate::modules::secrets::SecretsState;
 use crate::modules::ssh::SshState;
 
 use super::osc133::Osc133Capture;
-use super::{McpState, TabOpResult};
+use super::{McpState, SessionGrant, SessionKind, TabOpResult, host_blocks_agent_access};
 
-/// Writes `data` into the live interactive PTY of `session_id`, byte-for-byte
-/// the same code path `ssh::pty::ssh_pty_write` uses — the command lands
-/// visibly in the terminal pane the user is watching, indistinguishable from
-/// the user typing it themselves.
-async fn write_to_session(app: &tauri::AppHandle, session_id: &str, data: String) -> Result<(), String> {
+/// Writes `data` into the live interactive PTY of an SSH `session_id`,
+/// byte-for-byte the same code path `ssh::pty::ssh_pty_write` uses — the
+/// command lands visibly in the terminal pane the user is watching,
+/// indistinguishable from the user typing it themselves.
+async fn write_to_ssh_session(app: &tauri::AppHandle, session_id: &str, data: String) -> Result<(), String> {
     let state = app.state::<SshState>();
     let session = crate::get_session_arc!(state, session_id);
     let write_half = {
@@ -35,6 +36,19 @@ async fn write_to_session(app: &tauri::AppHandle, session_id: &str, data: String
     }
     .ok_or_else(|| "no pty channel open".to_string())?;
     write_half.data_bytes(data).await.map_err(|e| e.to_string())
+}
+
+/// Writes to either an SSH or local PTY session, based on the grant's kind —
+/// the single dispatch point every action tool funnels through.
+async fn write_to_grant(app: &tauri::AppHandle, grant: &SessionGrant, data: String) -> Result<(), String> {
+    match grant.kind {
+        SessionKind::Ssh => write_to_ssh_session(app, &grant.session_id, data).await,
+        SessionKind::Local => {
+            let pty_id = grant.local_pty_id.ok_or_else(|| "grant missing local pty id".to_string())?;
+            let state = app.state::<crate::modules::pty::PtyState>();
+            crate::modules::pty::write_raw(&state, pty_id, &data)
+        }
+    }
 }
 
 /// Mirrors the host → credential → stored-secret resolution `ssh_connect`
@@ -87,6 +101,33 @@ async fn require_non_interactive_auth(app: &tauri::AppHandle, host_id: &str) -> 
     Ok(())
 }
 
+/// Re-checks a grant's live authorization at the moment a tool actually
+/// executes — not just at grant time. Two things can make a previously-valid
+/// grant stale without it ever being explicitly revoked: the bridge grant
+/// itself (already handled by the caller via `grant_for_session`, which only
+/// returns `granted: true` entries) and, for SSH grants, the host's "Block AI
+/// Agent Access" flag being toggled on *after* the tab was granted.
+fn ensure_grant_still_authorized(app: &tauri::AppHandle, grant: &SessionGrant) -> Result<(), String> {
+    if let Some(host_id) = &grant.host_id {
+        if host_blocks_agent_access(app, host_id)? {
+            return Err("this host now has AI agent access blocked in its settings".to_string());
+        }
+    }
+    Ok(())
+}
+
+/// Emits the optional activity notification event — a no-op from Rust's
+/// perspective either way (the frontend decides, based on the
+/// `mcpNotifyOnActivity` preference, whether to actually surface a
+/// notification; see `useMcpTabBridge.ts`). Only called for the four
+/// *action* tools (not `list_sessions`/`read_output`, which are passive).
+fn emit_activity(app: &tauri::AppHandle, grant: &SessionGrant, action: &str, detail: String) {
+    let _ = app.emit(
+        "mcp_activity",
+        serde_json::json!({ "label": grant.label, "action": action, "detail": detail }),
+    );
+}
+
 #[derive(Deserialize, JsonSchema)]
 struct EmptyParams {}
 
@@ -95,6 +136,7 @@ struct SessionInfo {
     tab_id: String,
     session_id: String,
     label: String,
+    kind: SessionKind,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -106,9 +148,10 @@ struct ListSessionsResult {
 struct RunCommandParams {
     session_id: String,
     command: String,
-    /// Defaults to 30000 (30s). If the command hasn't finished by then,
-    /// returns whatever output has been captured so far with
-    /// `still_running: true` instead of blocking indefinitely.
+    /// Defaults to 30000 (30s), capped by the app's configured maximum
+    /// (Settings → Connections → AI Agent Bridge). If the command hasn't
+    /// finished by then, returns whatever output has been captured so far
+    /// with `still_running: true` instead of blocking indefinitely.
     timeout_ms: Option<u64>,
 }
 
@@ -171,7 +214,7 @@ impl LabonairMcpServer {
 #[tool_router]
 impl LabonairMcpServer {
     #[tool(
-        description = "List SSH terminal tabs in the Labonair app that the user has explicitly granted this agent access to. Only tabs with agent access enabled appear here — if a tab you need isn't listed, ask the user to enable agent access for it, then call this again. The list always reflects the current grant state."
+        description = "List terminal tabs (SSH or local) in the Labonair app that the user has explicitly granted this agent access to. Only tabs with agent access enabled appear here — if a tab you need isn't listed, ask the user to enable agent access for it, then call this again. The list always reflects the current grant state."
     )]
     async fn list_sessions(&self, _params: Parameters<EmptyParams>) -> Result<Json<ListSessionsResult>, String> {
         let map = self.mcp_state.grants.lock().map_err(|e| e.to_string())?;
@@ -182,31 +225,47 @@ impl LabonairMcpServer {
                 tab_id: g.tab_id.clone(),
                 session_id: g.session_id.clone(),
                 label: g.label.clone(),
+                kind: g.kind,
             })
             .collect();
         Ok(Json(ListSessionsResult { sessions }))
     }
 
     #[tool(
-        description = "Run a shell command in a Labonair SSH terminal tab the user has granted agent access to. The command is typed and executed visibly in the real terminal pane the user is watching — exactly as if they had typed it themselves, not a hidden background shell. Returns captured output and exit code once the shell prompt returns, or partial output with still_running=true if it exceeds timeout_ms (e.g. a long-running process, or one waiting for interactive input — use send_keys to interact with it, or read_output to check on it later)."
+        description = "Run a shell command in a terminal tab (SSH or local) the user has granted agent access to. The command is typed and executed visibly in the real terminal pane the user is watching — exactly as if they had typed it themselves, not a hidden background shell. Returns captured output and exit code once the shell prompt returns, or partial output with still_running=true if it exceeds timeout_ms (e.g. a long-running process, or one waiting for interactive input — use send_keys to interact with it, or read_output to check on it later)."
     )]
     async fn run_command(&self, Parameters(params): Parameters<RunCommandParams>) -> Result<Json<RunCommandResult>, String> {
-        self.mcp_state
+        let grant = self
+            .mcp_state
             .grant_for_session(&params.session_id)
             .ok_or_else(|| "session not granted — call list_sessions to see currently granted tabs".to_string())?;
+        ensure_grant_still_authorized(&self.app, &grant)?;
 
         let lock = self.mcp_state.lock_for(&params.session_id);
         let _guard = lock.lock().await;
+        self.mcp_state.touch(&grant.tab_id);
 
-        let ssh_state = self.app.state::<SshState>();
-        let session = crate::get_session_arc!(ssh_state, &params.session_id);
-        let mut rx = session.agent_tap.subscribe();
-        drop(session);
+        let mut ssh_rx = None;
+        let mut local_rx = None;
+        match grant.kind {
+            SessionKind::Ssh => {
+                let ssh_state = self.app.state::<SshState>();
+                let session = crate::get_session_arc!(ssh_state, &params.session_id);
+                ssh_rx = Some(session.agent_tap.subscribe());
+            }
+            SessionKind::Local => {
+                let pty_id = grant.local_pty_id.ok_or_else(|| "grant missing local pty id".to_string())?;
+                let pty_state = self.app.state::<crate::modules::pty::PtyState>();
+                local_rx = Some(crate::modules::pty::subscribe_agent_tap(&pty_state, pty_id)?);
+            }
+        }
 
-        write_to_session(&self.app, &params.session_id, format!("{}\n", params.command)).await?;
+        write_to_grant(&self.app, &grant, format!("{}\n", params.command)).await?;
+        emit_activity(&self.app, &grant, "run_command", params.command.clone());
 
-        let timeout = Duration::from_millis(params.timeout_ms.unwrap_or(30_000));
-        let deadline = std::time::Instant::now() + timeout;
+        let requested = params.timeout_ms.unwrap_or(30_000);
+        let capped = requested.min(self.mcp_state.max_command_timeout_ms());
+        let deadline = std::time::Instant::now() + Duration::from_millis(capped);
         let mut capture = Osc133Capture::new();
 
         loop {
@@ -218,7 +277,16 @@ impl LabonairMcpServer {
                     still_running: true,
                 }));
             }
-            match tokio::time::timeout(remaining, rx.recv()).await {
+            let recv = async {
+                if let Some(rx) = ssh_rx.as_mut() {
+                    rx.recv().await.map(|s| s.into_bytes())
+                } else if let Some(rx) = local_rx.as_mut() {
+                    rx.recv().await
+                } else {
+                    unreachable!("exactly one of ssh_rx/local_rx is always set")
+                }
+            };
+            match tokio::time::timeout(remaining, recv).await {
                 Ok(Ok(chunk)) => {
                     capture.feed(&chunk);
                     if let Some(code) = capture.finished() {
@@ -246,17 +314,30 @@ impl LabonairMcpServer {
     }
 
     #[tool(
-        description = "Peek at live output from a granted SSH tab without running anything — useful for checking progress of a long-running command started via run_command (still_running=true). Waits up to wait_ms (default 1000) for new output to arrive. This is a live peek, not scrollback history: it never includes output produced before this call."
+        description = "Peek at live output from a granted tab (SSH or local) without running anything — useful for checking progress of a long-running command started via run_command (still_running=true). Waits up to wait_ms (default 1000) for new output to arrive. This is a live peek, not scrollback history: it never includes output produced before this call."
     )]
     async fn read_output(&self, Parameters(params): Parameters<ReadOutputParams>) -> Result<Json<ReadOutputResult>, String> {
-        self.mcp_state
+        let grant = self
+            .mcp_state
             .grant_for_session(&params.session_id)
             .ok_or_else(|| "session not granted — call list_sessions to see currently granted tabs".to_string())?;
+        ensure_grant_still_authorized(&self.app, &grant)?;
+        self.mcp_state.touch(&grant.tab_id);
 
-        let ssh_state = self.app.state::<SshState>();
-        let session = crate::get_session_arc!(ssh_state, &params.session_id);
-        let mut rx = session.agent_tap.subscribe();
-        drop(session);
+        let mut ssh_rx = None;
+        let mut local_rx = None;
+        match grant.kind {
+            SessionKind::Ssh => {
+                let ssh_state = self.app.state::<SshState>();
+                let session = crate::get_session_arc!(ssh_state, &params.session_id);
+                ssh_rx = Some(session.agent_tap.subscribe());
+            }
+            SessionKind::Local => {
+                let pty_id = grant.local_pty_id.ok_or_else(|| "grant missing local pty id".to_string())?;
+                let pty_state = self.app.state::<crate::modules::pty::PtyState>();
+                local_rx = Some(crate::modules::pty::subscribe_agent_tap(&pty_state, pty_id)?);
+            }
+        }
 
         let deadline = std::time::Instant::now() + Duration::from_millis(params.wait_ms.unwrap_or(1000));
         let mut capture = Osc133Capture::new();
@@ -265,7 +346,16 @@ impl LabonairMcpServer {
             if remaining.is_zero() {
                 break;
             }
-            match tokio::time::timeout(remaining, rx.recv()).await {
+            let recv = async {
+                if let Some(rx) = ssh_rx.as_mut() {
+                    rx.recv().await.map(|s| s.into_bytes())
+                } else if let Some(rx) = local_rx.as_mut() {
+                    rx.recv().await
+                } else {
+                    unreachable!("exactly one of ssh_rx/local_rx is always set")
+                }
+            };
+            match tokio::time::timeout(remaining, recv).await {
                 Ok(Ok(chunk)) => capture.feed(&chunk),
                 _ => break,
             }
@@ -274,20 +364,27 @@ impl LabonairMcpServer {
     }
 
     #[tool(
-        description = "Send raw keystrokes to a granted SSH tab without waiting for a command-finished marker — use for interactive prompts (sudo password, y/n confirmations) or control characters (e.g. \"\\u0003\" for Ctrl+C to interrupt a stuck command started via run_command)."
+        description = "Send raw keystrokes to a granted tab (SSH or local) without waiting for a command-finished marker — use for interactive prompts (sudo password, y/n confirmations) or control characters (e.g. \"\\u0003\" for Ctrl+C to interrupt a stuck command started via run_command)."
     )]
     async fn send_keys(&self, Parameters(params): Parameters<SendKeysParams>) -> Result<String, String> {
-        self.mcp_state
+        let grant = self
+            .mcp_state
             .grant_for_session(&params.session_id)
             .ok_or_else(|| "session not granted — call list_sessions to see currently granted tabs".to_string())?;
-        write_to_session(&self.app, &params.session_id, params.data).await?;
+        ensure_grant_still_authorized(&self.app, &grant)?;
+        self.mcp_state.touch(&grant.tab_id);
+        write_to_grant(&self.app, &grant, params.data.clone()).await?;
+        emit_activity(&self.app, &grant, "send_keys", params.data);
         Ok("sent".to_string())
     }
 
     #[tool(
-        description = "Open a new SSH terminal tab to a saved Labonair host, visible in the app, and automatically grant this agent access to it. Only works for hosts with a fully stored, non-interactive password or key (no 2FA/passphrase prompt) — otherwise returns an error asking the user to connect manually first."
+        description = "Open a new SSH terminal tab to a saved Labonair host, visible in the app, and automatically grant this agent access to it. Only works for hosts with a fully stored, non-interactive password or key (no 2FA/passphrase prompt), and hosts that don't have AI agent access blocked in their settings — otherwise returns an error."
     )]
     async fn open_tab(&self, Parameters(params): Parameters<OpenTabParams>) -> Result<Json<OpenTabResult>, String> {
+        if host_blocks_agent_access(&self.app, &params.host_id)? {
+            return Err("this host has AI agent access blocked in its settings".to_string());
+        }
         require_non_interactive_auth(&self.app, &params.host_id).await?;
 
         let request_id = uuid::Uuid::new_v4().to_string();
@@ -312,14 +409,21 @@ impl LabonairMcpServer {
         }
         let tab_id = result.tab_id.ok_or("missing tab_id in response")?;
         let session_id = result.session_id.ok_or("missing session_id in response")?;
+        emit_activity(
+            &self.app,
+            &SessionGrant { tab_id: tab_id.clone(), label: format!("host {}", params.host_id), ..Default::default() },
+            "open_tab",
+            params.host_id,
+        );
         Ok(Json(OpenTabResult { tab_id, session_id }))
     }
 
     #[tool(
-        description = "Close an existing SSH terminal tab by session_id. Closes immediately without prompting the user for any unsaved-changes confirmation — only use this on tabs you are sure are safe to close."
+        description = "Close an existing terminal tab (SSH or local) by session_id. Closes immediately without prompting the user for any unsaved-changes confirmation — only use this on tabs you are sure are safe to close."
     )]
     async fn close_tab(&self, Parameters(params): Parameters<CloseTabParams>) -> Result<String, String> {
-        self.mcp_state
+        let grant = self
+            .mcp_state
             .grant_for_session(&params.session_id)
             .ok_or_else(|| "session not granted — call list_sessions to see currently granted tabs".to_string())?;
 
@@ -343,6 +447,7 @@ impl LabonairMcpServer {
         if !result.ok {
             return Err(result.error.unwrap_or_else(|| "failed to close tab".to_string()));
         }
+        emit_activity(&self.app, &grant, "close_tab", grant.label.clone());
         Ok("closed".to_string())
     }
 }
@@ -357,8 +462,11 @@ impl ServerHandler for LabonairMcpServer {
 /// Starts (or restarts) the MCP Streamable-HTTP server bound to
 /// `127.0.0.1:<mcp_state.port>`, guarded by a bearer-token check on every
 /// request. Idempotent — always stops any previously running instance first,
-/// so re-enabling the bridge or regenerating the token never leaves a stale
-/// listener behind.
+/// so re-enabling the bridge, changing the port, or regenerating the token
+/// never leaves a stale listener behind. If the bind itself fails (e.g. the
+/// port is already in use by something else), flips `McpState.enabled` back
+/// to `false` and emits `mcp_server_error` — previously this silently left
+/// `enabled` stuck `true` with no listener actually running.
 pub fn ensure_started(app: tauri::AppHandle, mcp_state: McpState, token: String) {
     stop(&mcp_state);
 
@@ -368,7 +476,7 @@ pub fn ensure_started(app: tauri::AppHandle, mcp_state: McpState, token: String)
         *slot = Some(ct.clone());
     }
 
-    let port = mcp_state.port;
+    let port = mcp_state.port.load(Ordering::Relaxed);
     let token = Arc::new(token);
 
     tauri::async_runtime::spawn(async move {
@@ -408,6 +516,11 @@ pub fn ensure_started(app: tauri::AppHandle, mcp_state: McpState, token: String)
             Ok(l) => l,
             Err(e) => {
                 log::error!("mcp: failed to bind 127.0.0.1:{port}: {e}");
+                mcp_state.enabled.store(false, Ordering::Relaxed);
+                let _ = app.emit(
+                    "mcp_server_error",
+                    serde_json::json!({ "message": format!("Failed to start on port {port}: {e}") }),
+                );
                 return;
             }
         };

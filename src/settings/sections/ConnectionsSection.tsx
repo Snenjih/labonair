@@ -2,8 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { handleApiError } from "@/lib/errors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { applyMcpBridgeEnabled, type McpStatus, useAgentAccessStore } from "@/modules/tabs";
+import {
+  applyMcpAutoRevokeMinutes,
+  applyMcpBridgeEnabled,
+  applyMcpMaxCommandTimeoutSecs,
+  applyMcpPort,
+  type McpStatus,
+  useAgentAccessStore,
+} from "@/modules/tabs";
 import {
   setExplorerAutoReconnect,
   setExplorerIdleSessionTimeoutMin,
@@ -11,6 +19,7 @@ import {
   setExplorerMaxIdleSessions,
   setExplorerRemotePollInterval,
   setHostPingInterval,
+  setMcpNotifyOnActivity,
   setSshAutoReconnect,
   setSshAutoReconnectDelay,
   setSshAutoReconnectMaxAttempts,
@@ -46,6 +55,9 @@ function SectionDivider() {
  *  and token are Rust-side-only detail this section fetches for itself. */
 function AgentBridgeSection() {
   const bridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
+  const maxCommandTimeoutSecs = usePreferencesStore((s) => s.mcpMaxCommandTimeoutSecs);
+  const autoRevokeMinutes = usePreferencesStore((s) => s.mcpAutoRevokeMinutes);
+  const notifyOnActivity = usePreferencesStore((s) => s.mcpNotifyOnActivity);
   const [port, setPort] = useState<number | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -57,7 +69,7 @@ function AgentBridgeSection() {
         setPort(status.port);
         setToken(status.token);
       })
-      .catch(() => {});
+      .catch((e) => handleApiError(e, "Failed to load AI Agent Bridge status", "MCP"));
   }, []);
 
   const setupCommand =
@@ -66,22 +78,44 @@ function AgentBridgeSection() {
       : null;
 
   const handleToggle = async (enabled: boolean) => {
-    const status = await applyMcpBridgeEnabled(enabled);
-    setPort(status.port);
-    setToken(status.token);
+    try {
+      const status = await applyMcpBridgeEnabled(enabled);
+      setPort(status.port);
+      setToken(status.token);
+    } catch (e) {
+      handleApiError(e, "Failed to enable/disable AI Agent Bridge", "MCP");
+    }
+  };
+
+  const handlePortChange = async (value: number) => {
+    try {
+      const status = await applyMcpPort(value);
+      setPort(status.port);
+      setToken(status.token);
+    } catch (e) {
+      handleApiError(e, "Failed to change AI Agent Bridge port", "MCP");
+    }
   };
 
   const handleRegenerate = async () => {
-    const status = await invoke<McpStatus>("mcp_regenerate_token");
-    setPort(status.port);
-    setToken(status.token);
+    try {
+      const status = await invoke<McpStatus>("mcp_regenerate_token");
+      setPort(status.port);
+      setToken(status.token);
+    } catch (e) {
+      handleApiError(e, "Failed to regenerate AI Agent Bridge token", "MCP");
+    }
   };
 
   const handleCopy = async () => {
     if (!setupCommand) return;
-    await navigator.clipboard.writeText(setupCommand);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(setupCommand);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      handleApiError(e, "Failed to copy setup command", "MCP");
+    }
   };
 
   return (
@@ -90,10 +124,56 @@ function AgentBridgeSection() {
       <div className="flex flex-col gap-2">
         <SettingRow
           title="Enable agent bridge"
-          description="Lets an external agent you run locally (e.g. the claude CLI) list and run commands in SSH tabs you explicitly grant it access to — visibly, in the real terminal pane. Off by default; each tab must also be individually granted via its context menu. Turning this off immediately revokes every granted tab."
+          description="Lets an external agent you run locally (e.g. the claude CLI) list and run commands in SSH or local tabs you explicitly grant it access to — visibly, in the real terminal pane. Off by default; each tab must also be individually granted via its context menu. Turning this off immediately revokes every granted tab."
         >
           <Switch checked={bridgeEnabled} onCheckedChange={(v) => void handleToggle(v)} />
         </SettingRow>
+        {bridgeEnabled && (
+          <>
+            <SettingRow title="Port" description="Local port the bridge listens on (1024–65535).">
+              <NumInput
+                value={port ?? 47823}
+                min={1024}
+                max={65535}
+                step={1}
+                onChange={(v) => void handlePortChange(v)}
+              />
+            </SettingRow>
+            <SettingRow
+              title="Max command timeout (s)"
+              description="Upper bound on how long a single agent-run command may block before returning still_running, regardless of what the agent requests."
+            >
+              <NumInput
+                value={maxCommandTimeoutSecs}
+                min={5}
+                max={3600}
+                step={5}
+                onChange={(v) => void applyMcpMaxCommandTimeoutSecs(v).catch((e) => handleApiError(e, "Failed to change max command timeout", "MCP"))}
+              />
+            </SettingRow>
+            <SettingRow
+              title="Auto-revoke after inactivity (min)"
+              description="Automatically revoke a granted tab after this many minutes of no agent activity. 0 disables auto-revoke."
+            >
+              <NumInput
+                value={autoRevokeMinutes}
+                min={0}
+                max={1440}
+                step={5}
+                onChange={(v) => void applyMcpAutoRevokeMinutes(v).catch((e) => handleApiError(e, "Failed to change auto-revoke timeout", "MCP"))}
+              />
+            </SettingRow>
+            <SettingRow
+              title="Notify on agent activity"
+              description="Show a notification every time the agent runs a command, sends keys, or opens/closes a tab — separate from error notifications, which are always on."
+            >
+              <Switch
+                checked={notifyOnActivity}
+                onCheckedChange={(v) => void setMcpNotifyOnActivity(v)}
+              />
+            </SettingRow>
+          </>
+        )}
         {bridgeEnabled && setupCommand && (
           <SettingRow
             title="Setup command"

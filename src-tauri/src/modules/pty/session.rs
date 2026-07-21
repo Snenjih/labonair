@@ -38,6 +38,15 @@ pub struct Session {
     /// Shell's own PID, used by `pty_has_foreground_job` to compare against
     /// the tty's foreground process group leader (see mod.rs).
     pub shell_pid: u32,
+    /// Secondary, best-effort fan-out of every raw (pre-base64) output chunk
+    /// — read by the MCP bridge (`modules::mcp`) the same way
+    /// `ssh::RushSession::agent_tap` is, so `run_command`/`read_output` can
+    /// capture a local terminal's output without disturbing the visible
+    /// pane's own `Channel<PtyEvent>`. Raw bytes (not a repaired `String`
+    /// like SSH's tap) since `Osc133Capture::feed` takes `&[u8]` directly —
+    /// no UTF-8 repair needed here, `vte::Parser` handles split multi-byte
+    /// sequences across calls itself.
+    pub agent_tap: tokio::sync::broadcast::Sender<Vec<u8>>,
 }
 
 impl Drop for Session {
@@ -83,6 +92,7 @@ pub fn spawn(
         writer: Mutex::new(writer),
         killer: Mutex::new(killer),
         shell_pid,
+        agent_tap: tokio::sync::broadcast::channel(256).0,
     });
 
     let pending: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::with_capacity(READ_BUF)));
@@ -127,6 +137,7 @@ pub fn spawn(
     let on_event_flush = on_event.clone();
     let pending_f = pending.clone();
     let done_f = done.clone();
+    let agent_tap_f = session.agent_tap.clone();
     thread::Builder::new()
         .name("labonair-pty-flusher".into())
         .spawn(move || {
@@ -148,6 +159,7 @@ pub fn spawn(
                     std::mem::take(&mut *g)
                 };
                 had_data = true;
+                let _ = agent_tap_f.send(chunk.clone());
                 // NOTE on base64: Tauri v2 `Channel<T>` serializes via JSON;
                 // `Vec<u8>` would become a JSON int array (~3× worse than base64).
                 // A raw-bytes path via `InvokeResponseBody::Raw` exists but the
@@ -168,6 +180,7 @@ pub fn spawn(
     let on_event_exit = on_event;
     let pending_e = pending;
     let done_e = done;
+    let agent_tap_e = session.agent_tap.clone();
     thread::Builder::new()
         .name("labonair-pty-waiter".into())
         .spawn(move || {
@@ -185,6 +198,7 @@ pub fn spawn(
             }
             let tail = std::mem::take(&mut *pending_e.lock().unwrap());
             if !tail.is_empty() {
+                let _ = agent_tap_e.send(tail.clone());
                 if let Err(e) = on_event_exit.send(PtyEvent::Data {
                     data: B64.encode(&tail),
                 }) {

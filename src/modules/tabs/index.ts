@@ -33,6 +33,9 @@ export {
   useAgentAccessStore,
   setAgentAccessGrant,
   applyMcpBridgeEnabled,
+  applyMcpPort,
+  applyMcpMaxCommandTimeoutSecs,
+  applyMcpAutoRevokeMinutes,
   type AgentAccessEntry,
   type McpStatus,
 } from "./store/agentAccessStore";
