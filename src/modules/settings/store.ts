@@ -168,6 +168,7 @@ export type Preferences = {
   hostPingInterval: number;
   hmLayout: "grid" | "list";
   hmSort: "last_connected" | "a_z" | "z_a";
+  hmCardScale: number;
 
   // --- AI ---
   aiEnabled: boolean;
@@ -357,6 +358,7 @@ const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
 const KEY_HOST_PING_INTERVAL = "hostPingInterval";
 const KEY_HM_LAYOUT = "hmLayout";
 const KEY_HM_SORT = "hmSort";
+const KEY_HM_CARD_SCALE = "hmCardScale";
 const KEY_AI_ENABLED = "aiEnabled";
 const KEY_AI_MAX_AGENT_STEPS = "aiMaxAgentSteps";
 const KEY_AI_TERMINAL_CONTEXT_LINES = "aiTerminalContextLines";
@@ -522,6 +524,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   hostPingInterval: 60,
   hmLayout: "grid",
   hmSort: "last_connected",
+  hmCardScale: 100,
 
   aiEnabled: true,
   aiMaxAgentSteps: 24,
@@ -808,6 +811,7 @@ export async function loadPreferences(): Promise<Preferences> {
     hostPingInterval: get<number>(KEY_HOST_PING_INTERVAL) ?? DEFAULT_PREFERENCES.hostPingInterval,
     hmLayout: get<"grid" | "list">(KEY_HM_LAYOUT) ?? DEFAULT_PREFERENCES.hmLayout,
     hmSort: get<"last_connected" | "a_z" | "z_a">(KEY_HM_SORT) ?? DEFAULT_PREFERENCES.hmSort,
+    hmCardScale: get<number>(KEY_HM_CARD_SCALE) ?? DEFAULT_PREFERENCES.hmCardScale,
 
     aiEnabled: get<boolean>(KEY_AI_ENABLED) ?? DEFAULT_PREFERENCES.aiEnabled,
     aiMaxAgentSteps: get<number>(KEY_AI_MAX_AGENT_STEPS) ?? DEFAULT_PREFERENCES.aiMaxAgentSteps,
@@ -1508,6 +1512,11 @@ export async function setHmSort(value: "last_connected" | "a_z" | "z_a"): Promis
   await (await getStore()).save();
 }
 
+export async function setHmCardScale(value: number): Promise<void> {
+  await (await getStore()).set(KEY_HM_CARD_SCALE, value);
+  await (await getStore()).save();
+}
+
 export async function setAiEnabled(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_AI_ENABLED, value);
   await (await getStore()).save();
@@ -1848,6 +1857,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_HOST_PING_INTERVAL]: "hostPingInterval",
     [KEY_HM_LAYOUT]: "hmLayout",
     [KEY_HM_SORT]: "hmSort",
+    [KEY_HM_CARD_SCALE]: "hmCardScale",
     [KEY_AI_ENABLED]: "aiEnabled",
     [KEY_AI_MAX_AGENT_STEPS]: "aiMaxAgentSteps",
     [KEY_AI_TERMINAL_CONTEXT_LINES]: "aiTerminalContextLines",

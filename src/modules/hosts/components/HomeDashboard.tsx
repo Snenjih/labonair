@@ -162,6 +162,7 @@ interface SortableHostCardProps {
   pingStatus?: "online" | "offline" | "checking";
   layoutMode: LayoutMode;
   dndDisabled: boolean;
+  cardScale: number;
 }
 
 function SortableHostCard({
@@ -176,6 +177,7 @@ function SortableHostCard({
   pingStatus,
   layoutMode,
   dndDisabled,
+  cardScale,
 }: SortableHostCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: host.id,
@@ -213,6 +215,7 @@ function SortableHostCard({
           newSshTab={newSshTab}
           newSftpTab={newSftpTab}
           pingStatus={pingStatus}
+          cardScale={cardScale}
         />
       )}
     </div>
@@ -274,6 +277,7 @@ export function HomeDashboard({
 
   const layoutMode = usePreferencesStore((s) => s.hmLayout);
   const sortMode = usePreferencesStore((s) => s.hmSort);
+  const cardScale = usePreferencesStore((s) => s.hmCardScale) / 100;
   const setLayoutMode = (m: LayoutMode) => void setHmLayout(m);
   const setSortMode = (m: SortMode) => void setHmSort(m);
 
@@ -803,7 +807,12 @@ export function HomeDashboard({
                     ))}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+                  <div
+                    className="grid gap-4"
+                    style={{
+                      gridTemplateColumns: `repeat(auto-fill, minmax(${260 * cardScale}px, 1fr))`,
+                    }}
+                  >
                     {[...Array(3)].map((_, i) => (
                       <SkeletonCard key={i} />
                     ))}
@@ -837,12 +846,18 @@ export function HomeDashboard({
                               pingStatus={hostStatuses[host.id]}
                               layoutMode={layoutMode}
                               dndDisabled={dndDisabled}
+                              cardScale={cardScale}
                             />
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
+                      <div
+                        className="grid gap-4"
+                        style={{
+                          gridTemplateColumns: `repeat(auto-fill, minmax(${260 * cardScale}px, 1fr))`,
+                        }}
+                      >
                         {sortedHosts.map((host) => (
                           <SortableHostCard
                             key={host.id}
@@ -857,6 +872,7 @@ export function HomeDashboard({
                             pingStatus={hostStatuses[host.id]}
                             layoutMode={layoutMode}
                             dndDisabled={dndDisabled}
+                            cardScale={cardScale}
                           />
                         ))}
                       </div>

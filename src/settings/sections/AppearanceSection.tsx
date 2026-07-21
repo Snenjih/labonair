@@ -41,6 +41,7 @@ import {
   setBackgroundOpacity,
   setBackgroundTintColor,
   setBackgroundTintOpacity,
+  setHmCardScale,
   setSidebarPosition,
   setTabsLocation,
   setTitlebarsIconsPosition,
@@ -97,6 +98,7 @@ export function AppearanceSection() {
   const backgroundTintOpacity = usePreferencesStore((s) => s.backgroundTintOpacity);
   const appCornerRadius = usePreferencesStore((s) => s.appCornerRadius);
   const appDensity = usePreferencesStore((s) => s.appDensity);
+  const hmCardScale = usePreferencesStore((s) => s.hmCardScale);
 
   const addNotification = useNotificationStore((s) => s.addNotification);
 
@@ -480,6 +482,16 @@ export function AppearanceSection() {
             step={1}
             suffix="px"
             onChange={(v) => void setAppCornerRadius(v)}
+          />
+          <SliderControl
+            label="Host card size"
+            description="Scale of the host cards shown in the Host Manager grid"
+            value={hmCardScale}
+            min={85}
+            max={150}
+            step={5}
+            suffix="%"
+            onChange={(v) => void setHmCardScale(v)}
           />
         </div>
       </div>
