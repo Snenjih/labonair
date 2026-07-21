@@ -54,6 +54,10 @@ thiserror = "1"
 flate2 = "1"
 notify = "6"
 notify-debouncer-mini = "0.4"
+rmcp = { version = "2.2.0", features = ["server", "macros", "transport-streamable-http-server"] }
+axum = "0.8"
+vte = "0.15"
+schemars = "1"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"

@@ -1098,6 +1098,7 @@ async fn ssh_connect_async(
         sftp: tokio::sync::OnceCell::new(),
         shutdown: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         disconnect_reason,
+        agent_tap: tokio::sync::broadcast::channel(256).0,
     });
     {
         let mut map = state.0.lock().map_err(|e| e.to_string())?;

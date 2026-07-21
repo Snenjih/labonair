@@ -10,7 +10,13 @@ import { setScrollbackLive, useSessionLifecycle } from "@/modules/session";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useShortcutHandlers } from "@/modules/shortcuts";
 import { useSidebar } from "@/modules/statusbar";
-import { selectActiveTabKind, useTabManagement, useTabsStore, useWorkspaceCwd } from "@/modules/tabs";
+import {
+  selectActiveTabKind,
+  useMcpTabBridge,
+  useTabManagement,
+  useTabsStore,
+  useWorkspaceCwd,
+} from "@/modules/tabs";
 import { usePreviewDetection } from "@/modules/terminal";
 import { useUpdater } from "@/modules/updater";
 
@@ -80,6 +86,8 @@ export default function App() {
   useEffect(() => {
     setScrollbackLive({ getAllTerminalRefs: () => tabs.refs.terminalRefs.current });
   }, [tabs.refs.terminalRefs]);
+
+  useMcpTabBridge();
 
   const ai = useAiLiveBridge({
     terminalRefs: tabs.refs.terminalRefs,

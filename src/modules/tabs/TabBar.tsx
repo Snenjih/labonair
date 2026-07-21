@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
@@ -24,6 +25,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { setAgentAccessGrant, useAgentAccessStore } from "./store/agentAccessStore";
 import { selectRenderStableTabs, useTabsStore } from "./store/tabsStore";
 import { TabIconFor, labelFor, pluralLabelFor, NewTabDropdownItems } from "./lib/tabUtils";
 import type { Tab } from "./types";
@@ -66,6 +68,7 @@ export function TabBar({
   const tabs = useTabsStore(useShallow(selectRenderStableTabs));
   const activeId = useTabsStore((s) => s.activeId);
   const reorderTabs = useTabsStore((s) => s.reorderTabs);
+  const agentAccessEntries = useAgentAccessStore((s) => s.entries);
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -271,6 +274,9 @@ export function TabBar({
                   // Workspace tabs get a rename-focused context menu.
                   // All other types keep the original menu (duplicate, close others, close all).
                   if (t.kind === "workspace") {
+                    const activeSession = t.sessions[t.activePaneId];
+                    const isSsh = activeSession?.kind === "ssh";
+                    const isGranted = Boolean(agentAccessEntries[t.id]);
                     return (
                       <SortableTabWrapper key={t.id} id={t.id} disabled={false}>
                         <ContextMenu>
@@ -283,6 +289,19 @@ export function TabBar({
                               <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.75} />
                               <span className="flex-1">Rename</span>
                             </ContextMenuItem>
+                            {isSsh && activeSession && (
+                              <>
+                                <ContextMenuSeparator />
+                                <ContextMenuCheckboxItem
+                                  checked={isGranted}
+                                  onCheckedChange={(checked) =>
+                                    void setAgentAccessGrant(t.id, activeSession.id, checked, labelFor(t))
+                                  }
+                                >
+                                  Grant AI Agent Access
+                                </ContextMenuCheckboxItem>
+                              </>
+                            )}
                             {tabs.length > 1 && (
                               <>
                                 <ContextMenuSeparator />

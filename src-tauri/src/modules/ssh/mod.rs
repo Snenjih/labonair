@@ -48,6 +48,14 @@ pub struct RushSession {
     /// slot the PTY reader loop could only ever report a generic fallback
     /// string instead of the actual cause.
     pub disconnect_reason: Arc<Mutex<Option<String>>>,
+    /// Secondary, best-effort fan-out of every PTY output chunk the reader
+    /// task in `ssh/pty.rs` sees — read by the MCP bridge (`modules::mcp`) to
+    /// capture a command's output/exit code (via the OSC 133 markers already
+    /// emitted by the shell-integration bootstrap) without disturbing the
+    /// single-consumer `Channel<SshPtyEvent>` the visible terminal pane owns.
+    /// `send` on a broadcast channel with no active receivers simply returns
+    /// an error that callers ignore — this is a tap, not a required sink.
+    pub agent_tap: tokio::sync::broadcast::Sender<String>,
 }
 
 /// Clones the `Arc<RushSession>` out of the `SshState` map and releases the

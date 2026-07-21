@@ -190,6 +190,7 @@ async fn sftp_connect_inner(
                 sftp: tokio::sync::OnceCell::new(),
                 shutdown: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                 disconnect_reason: Arc::new(std::sync::Mutex::new(None)),
+                agent_tap: tokio::sync::broadcast::channel(256).0,
             });
             {
                 let mut map = state.0.lock().map_err(|e| e.to_string())?;

@@ -17,7 +17,7 @@ import { reconnectExplorerSessionForHost } from "@/modules/explorer/lib/useLazyE
 import { useConnectionStatusStore, useHostsStore } from "@/modules/hosts";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import type { TerminalSessionData } from "@/modules/tabs";
+import { setAgentAccessGrant, useAgentAccessStore, type TerminalSessionData } from "@/modules/tabs";
 import { useTheme } from "@/modules/theme";
 import { dropPaths } from "./lib/drop-paths";
 import { safeCursorPos } from "./lib/osc-handlers";
@@ -474,6 +474,11 @@ export const SshTerminalPane = forwardRef<TerminalPaneHandle, Props>(function Ss
           // session — nothing else tells it the network is back. Quick-
           // connect sessions have no saved host, so nothing to notify.
           if (session.hostId) reconnectExplorerSessionForHost(session.hostId);
+          // Re-push this tab's MCP agent-access grant under the (possibly
+          // unchanged) session_id — a grant is keyed by tabId precisely so a
+          // reconnect never silently revokes it, see agentAccessStore's docs.
+          const grant = useAgentAccessStore.getState().entries[tabId];
+          if (grant) void setAgentAccessGrant(tabId, sessionId, true, grant.label);
         }),
       ]);
       if (disposed) {

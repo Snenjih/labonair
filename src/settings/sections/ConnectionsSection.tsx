@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -32,6 +34,90 @@ function SubSectionTitle({ children }: { children: React.ReactNode }) {
 
 function SectionDivider() {
   return <div className="border-t border-border/40" />;
+}
+
+interface McpStatus {
+  enabled: boolean;
+  port: number;
+  token: string | null;
+}
+
+/** Settings for the local MCP bridge (`src-tauri/src/modules/mcp/`) that lets
+ *  an external agent (e.g. a locally installed `claude` CLI) drive SSH tabs
+ *  the user has explicitly granted access to via the tab context menu /
+ *  header badge — see `agentAccessStore.ts`. State lives in Rust
+ *  (`McpState`), not the usual `usePreferencesStore`, since it also owns a
+ *  live network listener and a secret token. */
+function AgentBridgeSection() {
+  const [status, setStatus] = useState<McpStatus | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    invoke<McpStatus>("mcp_get_status").then(setStatus).catch(() => {});
+  }, []);
+
+  const setupCommand =
+    status?.token && status.enabled
+      ? `claude mcp add --transport http labonair http://127.0.0.1:${status.port}/mcp --header "Authorization: Bearer ${status.token}" --scope user`
+      : null;
+
+  const handleToggle = async (enabled: boolean) => {
+    const next = await invoke<McpStatus>("mcp_set_enabled", { enabled });
+    setStatus(next);
+  };
+
+  const handleRegenerate = async () => {
+    const next = await invoke<McpStatus>("mcp_regenerate_token");
+    setStatus(next);
+  };
+
+  const handleCopy = async () => {
+    if (!setupCommand) return;
+    await navigator.clipboard.writeText(setupCommand);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SubSectionTitle>AI Agent Bridge (MCP)</SubSectionTitle>
+      <div className="flex flex-col gap-2">
+        <SettingRow
+          title="Enable agent bridge"
+          description="Lets an external agent you run locally (e.g. the claude CLI) list and run commands in SSH tabs you explicitly grant it access to — visibly, in the real terminal pane. Off by default; each tab must also be individually granted via its context menu."
+        >
+          <Switch checked={status?.enabled ?? false} onCheckedChange={(v) => void handleToggle(v)} />
+        </SettingRow>
+        {status?.enabled && setupCommand && (
+          <SettingRow
+            title="Setup command"
+            description="Run this once in your terminal to connect your local claude CLI to this bridge. Regenerating the token invalidates any previously configured setup."
+          >
+            <div className="flex flex-col gap-1.5 w-full">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground">claude mcp add …</span>
+                <button onClick={() => void handleCopy()} className="text-[11px] text-primary hover:underline">
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+              <textarea
+                readOnly
+                value={setupCommand}
+                rows={2}
+                className="w-full rounded-md border border-input bg-muted px-3 py-2 text-[11px] font-mono text-muted-foreground resize-none"
+              />
+              <button
+                onClick={() => void handleRegenerate()}
+                className="self-start text-[11px] text-muted-foreground hover:text-destructive hover:underline"
+              >
+                Regenerate token
+              </button>
+            </div>
+          </SettingRow>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function ConnectionsSection() {
@@ -215,6 +301,10 @@ export function ConnectionsSection() {
           </SettingRow>
         </div>
       </div>
+
+      <SectionDivider />
+
+      <AgentBridgeSection />
     </div>
   );
 }

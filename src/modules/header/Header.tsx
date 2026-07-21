@@ -32,6 +32,7 @@ import { setSidebarPosition } from "@/modules/settings/store";
 import type { SidebarPanel } from "@/modules/statusbar";
 import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
+import { AgentAccessBadge } from "./components/AgentAccessBadge";
 import { JumpHostDropdown } from "./components/JumpHostDropdown";
 import { TransferDropdown } from "./components/TransferDropdown";
 import { UpdaterButton } from "./components/UpdaterButton";
@@ -93,6 +94,7 @@ export const Header = React.memo(function Header({
       <UpdaterButton />
       <NotificationDropdown />
       <JumpHostDropdown onPanelToggle={onPanelToggle} />
+      <AgentAccessBadge />
       <TransferDropdown />
       {bookmarksEnabled && <BookmarksDropdown sendCd={sendCd} />}
     </>
