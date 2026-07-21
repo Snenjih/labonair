@@ -1,6 +1,31 @@
 # Handshake — Session State
 
-## Last Session: 2026-07-21 (MCP Bridge — external local agents drive granted SSH tabs)
+## Last Session: 2026-07-21 (Host Manager — host card size setting)
+
+### What Was Done
+Small, self-contained feature on `main` (user asked to commit directly, no PR): a "Host card size" slider in Settings → Appearance → Interface, letting the user uniformly scale the Host Manager's grid cards (85%–150%, default 100%, step 5%). Only the grid view is affected — list view (`HostListItem.tsx`) is deliberately untouched, per user's choice when asked.
+
+- New preference `hmCardScale` (`src/modules/settings/store.ts`, wired the same way as the existing `hmLayout`: `KEY_HM_CARD_SCALE` const, `DEFAULT_PREFERENCES` entry, loader, `setHmCardScale`, key-name map entry — `preferences.ts`'s Zustand wrapper is fully generic so it needed no changes).
+- Slider added to `src/settings/sections/AppearanceSection.tsx`'s existing `SliderControl`/"Interface" block, next to Corner Radius.
+- **Why prop-drilling instead of a pure CSS-variable/`calc()` approach**: `HostCard.tsx` and `HostIconGlyph.tsx` size several icons via raw SVG `width`/`height` *attributes* (JS numbers), not CSS — a CSS custom property can't reach those. So the scale factor is read once in `HomeDashboard.tsx` (`usePreferencesStore((s) => s.hmCardScale) / 100`) and threaded down as a `cardScale` prop through `SortableHostCard` → `HostCard` → `HostAvatar`, with each component computing scaled inline `style` values (`px * cardScale`) instead of the original hardcoded Tailwind arbitrary-value classes.
+- `HostAvatar.tsx` gained an optional `scale` prop (default unset = unchanged behavior) so the scaling **only** applies inside Host Manager cards, not other places `HostAvatar` is reused elsewhere in the app (explicit user requirement).
+- Grid track width also scales: `HomeDashboard.tsx`'s two host-grid containers (skeleton + real list, NOT the separate Credentials grid at the old line ~908 — left untouched) switched from a static Tailwind `grid-cols-[repeat(auto-fill,minmax(260px,1fr))]` class to an inline `gridTemplateColumns` computed from `260 * cardScale`.
+
+### Verification done
+`pnpm exec tsc --noEmit` (clean) · `pnpm exec biome check`/`format` on the 5 touched files (only pre-existing, unrelated findings — e.g. an import-order nit in `HostCard.tsx` that predates this change; formatter auto-fixed line-wrap in the new inline styles). **Not done**: no live UI test — no browser tool was available in-session (`claude-in-chrome` not connected) and the full Tauri app needs a Rust backend for real host data, so the dev server alone wouldn't exercise the real Host Manager grid meaningfully.
+
+### Current State
+Committed directly to `main` at `b0c9bea` (user explicitly asked to skip the branch/PR workflow this time — just "commit when done").
+
+### What's Next
+- A manual `pnpm tauri dev` pass to visually confirm the slider and grid scaling, especially at the extremes (85% and 150%) and after an app restart (persistence round-trip).
+
+### Blockers
+- None.
+
+---
+
+## Previous Session: 2026-07-21 (MCP Bridge — external local agents drive granted SSH tabs)
 
 ### What Was Done
 User wants their locally-installed Claude Code CLI (or any MCP-capable agent) to be able to drive an already-open SSH tab in the app — run commands visibly in the real pane the user is watching, read output, open/close tabs — via one MCP server added once to Claude Code, not per-tab. Used plan mode: 2 parallel Explore agents mapped the existing AI-tool/terminal architecture and the russh SSH/PTY session lifecycle, confirmed via direct file reads (OSC133 shell-integration scripts, `tabsStore.ts`, `ssh/client.rs`/`pty.rs`, `secrets.rs`, settings/statusbar patterns). User picked: **external MCP bridge** (not extending the in-app BYOK assistant) + **per-tab opt-in consent** (default off). A second round added tab-lifecycle tools (open/close) and asked for edge cases; plan updated and approved. Plan saved at `~/.claude/plans/schau-dir-den-n-tigen-deep-lake.md`.
