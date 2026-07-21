@@ -27,6 +27,11 @@ pub struct Host {
     pub jump_host_id: Option<String>,
     pub notes: Option<String>,
     pub icon: Option<String>,
+    /// Prevents this host's SSH tabs from ever being granted or used via the
+    /// AI Agent Bridge (`modules::mcp`), even if the bridge is enabled
+    /// elsewhere — checked both at grant time and live at every tool
+    /// execution (see `mcp::host_blocks_agent_access`).
+    pub block_agent_access: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]

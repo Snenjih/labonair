@@ -32,6 +32,12 @@ import { usePreferencesStore, usePreferencesStore as usePrefs } from "@/modules/
 import type { PrefKey } from "@/modules/settings/store";
 import * as store from "@/modules/settings/store";
 import { useKeybindsStore } from "@/modules/shortcuts";
+import {
+  applyMcpAutoRevokeMinutes,
+  applyMcpBridgeEnabled,
+  applyMcpMaxCommandTimeoutSecs,
+  applyMcpPort,
+} from "@/modules/tabs";
 import { SettingRow } from "./components/SettingRow";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AiSection } from "./sections/AiSection";
@@ -305,6 +311,21 @@ function applySettingChange(id: PrefKey, value: unknown): void {
       break;
     case "sshAutoReconnectMaxAttempts":
       void store.setSshAutoReconnectMaxAttempts(Number(value));
+      break;
+    case "mcpBridgeEnabled":
+      void applyMcpBridgeEnabled(value as boolean);
+      break;
+    case "mcpBridgePort":
+      void applyMcpPort(Number(value));
+      break;
+    case "mcpMaxCommandTimeoutSecs":
+      void applyMcpMaxCommandTimeoutSecs(Number(value));
+      break;
+    case "mcpAutoRevokeMinutes":
+      void applyMcpAutoRevokeMinutes(Number(value));
+      break;
+    case "mcpNotifyOnActivity":
+      void store.setMcpNotifyOnActivity(value as boolean);
       break;
     case "explorerShowHiddenByDefault":
       void store.setExplorerShowHiddenByDefault(value as boolean);

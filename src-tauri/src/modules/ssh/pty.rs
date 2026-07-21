@@ -125,6 +125,7 @@ pub async fn open_shell_channel(
         session.shutdown.clone(),
         session.disconnect_reason.clone(),
         on_event,
+        session.agent_tap.clone(),
     );
 
     Ok(())
@@ -141,6 +142,7 @@ pub async fn open_shell_channel(
 /// otherwise idle). The timer branch is disabled via the `if
 /// !pending_output.is_empty()` guard, so an idle session with nothing
 /// buffered just blocks on `read_half.wait()` with zero polling overhead.
+#[allow(clippy::too_many_arguments)]
 fn spawn_reader(
     mut read_half: russh::ChannelReadHalf,
     app: tauri::AppHandle,
@@ -149,6 +151,7 @@ fn spawn_reader(
     shutdown: Arc<AtomicBool>,
     disconnect_reason_slot: Arc<Mutex<Option<String>>>,
     on_event: Channel<SshPtyEvent>,
+    agent_tap: tokio::sync::broadcast::Sender<String>,
 ) {
     tokio::spawn(async move {
         // Carry buffer for incomplete multi-byte UTF-8 sequences. When a read ends
@@ -227,6 +230,7 @@ fn spawn_reader(
                     || last_flush.elapsed() >= SSH_BATCH_MS;
                 if should_flush {
                     let chunk = std::mem::take(&mut pending_output);
+                    let _ = agent_tap.send(chunk.clone());
                     if !send_ssh_output(&on_event, chunk) {
                         break 'reader; // frontend unmounted/closed the channel — not a real disconnect
                     }
@@ -239,6 +243,7 @@ fn spawn_reader(
         // bytes are lost when the connection closes mid-stream. If the channel is
         // already closed this is a harmless no-op (ignored return value).
         if !pending_output.is_empty() {
+            let _ = agent_tap.send(pending_output.clone());
             send_ssh_output(&on_event, pending_output);
         }
 

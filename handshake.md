@@ -1,6 +1,61 @@
 # Handshake — Session State
 
-## Last Session: 2026-07-18 (Full App Review + 12-Workstream Fix Pass + Independent Review)
+## Last Session: 2026-07-21 (MCP Bridge — external local agents drive granted SSH tabs)
+
+### What Was Done
+User wants their locally-installed Claude Code CLI (or any MCP-capable agent) to be able to drive an already-open SSH tab in the app — run commands visibly in the real pane the user is watching, read output, open/close tabs — via one MCP server added once to Claude Code, not per-tab. Used plan mode: 2 parallel Explore agents mapped the existing AI-tool/terminal architecture and the russh SSH/PTY session lifecycle, confirmed via direct file reads (OSC133 shell-integration scripts, `tabsStore.ts`, `ssh/client.rs`/`pty.rs`, `secrets.rs`, settings/statusbar patterns). User picked: **external MCP bridge** (not extending the in-app BYOK assistant) + **per-tab opt-in consent** (default off). A second round added tab-lifecycle tools (open/close) and asked for edge cases; plan updated and approved. Plan saved at `~/.claude/plans/schau-dir-den-n-tigen-deep-lake.md`.
+
+Implemented on branch `mcp-additions` (accidentally created+checked-out by an Explore agent mid-research that ran an unauthorized `git checkout -b`; harmless since it was empty/identical to `main` at the time, and a reasonable branch name for this work anyway, so kept as-is rather than reverted).
+
+**Rust (`src-tauri/src/modules/mcp/`, new module):**
+- `server.rs` — `LabonairMcpServer` via the `rmcp` crate (official Rust MCP SDK, v2.2.0) exposing 6 tools over **Streamable HTTP** (`axum` + `rmcp`'s `StreamableHttpService`, bearer-token-gated via an `axum::middleware::from_fn` layer, bound to `127.0.0.1:47823` only): `list_sessions`, `run_command`, `read_output`, `send_keys`, `open_tab`, `close_tab`.
+- `osc133.rs` — a `vte`-based (the alacritty-project ANSI/VTE parser crate) streaming parser (`Osc133Capture`) that strips CSI/color escapes from captured output and detects the OSC 133 `D;<exit_code>` marker the existing shell-integration bootstrap (`ssh/shell_integration.rs`, `pty/scripts/{zshrc.zsh,bashrc.bash}`) already emits — this is how `run_command` knows a command finished and what its exit code was. 5 unit tests (chunk-boundary-split marker, bare-D, CSI-stripping, etc.).
+- **Output-capture tap**: `RushSession` (`ssh/mod.rs`) gained a `agent_tap: broadcast::Sender<String>` field, fed alongside the existing per-session `Channel<SshPtyEvent>` in `pty.rs`'s `spawn_reader` — lets `run_command`/`read_output` subscribe to the *same* bytes the visible xterm pane renders, without touching the single-consumer UI channel. Both `RushSession` construction sites (`ssh/client.rs`, `sftp/connection.rs`) updated for the new field.
+- **Tab lifecycle bridge**: `open_tab`/`close_tab` can't touch frontend Zustand state directly, so they emit `mcp_open_tab_request`/`mcp_close_tab_request` events and await a `tokio::oneshot` — exactly the same request/response shape as the existing `TrustState`/`wait_for_trust` host-key-confirmation flow, just reused for a new purpose. `open_tab` also mirrors `ssh_connect`'s credential-resolution logic to refuse hosts that would need an interactive passphrase/2FA prompt nobody could answer.
+- Grants (`McpState.grants`) are keyed by **`tab_id`**, not `session_id` — a tab's underlying SSH session can rebind on reconnect while the tab persists (per existing CLAUDE.md note), so `session_established` re-pushes the grant under the same `tab_id`.
+- New Tauri commands: `mcp_get_status`, `mcp_set_enabled`, `mcp_regenerate_token`, `mcp_set_session_grant`, `mcp_tab_op_response`. Bearer token generated on first enable, stored via the existing `secrets.rs` store (never SQLite), not a new `keyring`-crate dependency (this codebase's "keyring" is actually its own AES-GCM file-backed store).
+- New Cargo deps: `rmcp` (features: server, macros, transport-streamable-http-server), `axum`, `vte`, `schemars` (schemars needed as a *direct* dependency even though re-exported via `rmcp::schemars` — its derive macro emits `::schemars::…` paths that require the real crate name resolvable, not just a re-export path).
+
+**Frontend:**
+- `src/modules/tabs/store/agentAccessStore.ts` — new small Zustand store (mirrors `useConnectionStatusStore`'s pattern) + `setAgentAccessGrant()` helper that pushes to Rust and mirrors locally.
+- `TabBar.tsx` — new "Grant AI Agent Access" `ContextMenuCheckboxItem` on SSH-backed workspace tabs.
+- `src/modules/header/components/AgentAccessBadge.tsx` — new header badge (mirrors `JumpHostDropdown`'s popover/pill layout) listing granted tabs with per-tab revoke, hidden entirely when nothing's granted.
+- `src/modules/tabs/lib/useMcpTabBridge.ts` — mounted once in `App.tsx` (alongside `useAiLiveBridge`), listens for the Rust-emitted tab-lifecycle request events and drives the real `useTabsStore` actions (`newSshTab`/`closeTab`), auto-granting agent-opened tabs.
+- `tabsStore.ts`'s `closeTab` now also revokes any MCP grant for the closed tab (both locally and via Rust) so `list_sessions` never points at a dead tab.
+- `settings/sections/ConnectionsSection.tsx` — new "AI Agent Bridge (MCP)" subsection: enable toggle, generated setup command (`claude mcp add --transport http …`) with copy button, regenerate-token button. State lives in Rust (`McpState`), fetched via `mcp_get_status` on mount — not the usual `usePreferencesStore`, since it also owns a live network listener + secret.
+
+### Verification done
+`cargo check`/`cargo clippy` (clean, 0 warnings) · `cargo build` (full debug build, links cleanly) · `cargo test --lib modules::mcp::` (5/5 new OSC133 tests pass) · `pnpm exec tsc --noEmit` (clean) · `pnpm lint` (0 new warnings — the 345 pre-existing warnings are all in untouched files) · `pnpm test:run` (406/406 tests pass; the 12 "failed" test *files* are a pre-existing `window.matchMedia is not a function` jsdom-setup gap, confirmed identical via `git stash` on a clean tree before this session's changes).
+
+**Not done / needs manual testing** — launching the actual GUI (`pnpm tauri dev`) was blocked by the sandbox's auto-mode classifier (a long-running interactive process), so none of the following has been live-tested yet:
+- The Settings toggle/copy-button/badge/context-menu-item actually rendering and working in the real app.
+- A real `claude mcp add --transport http …` connection from an actual local Claude Code CLI, followed by `list_sessions`/`run_command`/`read_output`/`send_keys`/`open_tab`/`close_tab` against a real SSH host.
+- Whether `run_command`'s OSC133 exit-code capture actually fires correctly end-to-end over a live SSH session (only unit-tested against synthetic byte streams, not a real shell).
+
+Committed `f529f77` (initial bridge), then a same-day settings/UX rework `c0accb1` (global enable toggle now actually revokes+hides everything when off, persisted `mcpBridgeEnabled`, README + `docs/10-ai-assistant/mcp-agent-bridge.mdx`).
+
+### Follow-up (same day, plan-mode round 2 — commit `dc052ed`)
+User asked for 4 more things after live-testing the toggle: settings (port/max-timeout/auto-revoke), a per-host block-list, notifications (2 separate mechanisms), and full local-terminal parity. Re-entered plan mode (2 more Explore agents: local PTY architecture, hosts schema + inspector UI), plan overwritten (not a continuation) at the same plan file path, approved, implemented:
+
+- **Settings**: `McpState.port`/`max_command_timeout_ms`/`auto_revoke_minutes` are now runtime-mutable atomics with their own commands (`mcp_set_port` restarts the listener live if enabled; `mcp_set_max_command_timeout_secs` clamps `run_command`'s requested timeout; `mcp_set_auto_revoke_minutes` feeds a new background sweep task, `spawn_auto_revoke_sweeper`, spawned once in `lib.rs`'s `.setup()`). All three (plus `enabled`) get pushed from persisted preferences to Rust on every change via `useMcpTabBridge.ts` — McpState has zero persistence of its own, so this push is load-bearing, not decorative.
+- **Per-host block-list**: `Host.block_agent_access` (new SQLite column, `hosts/db.rs`'s idempotent migration array), toggle in `HostFormPanel.tsx`'s SSH tab ("Agent Access" section). Enforced 3 places: `mcp_set_session_grant` (refuse the grant), live at every `run_command`/`send_keys`/`read_output`/`open_tab` call (`ensure_grant_still_authorized` re-queries the DB, doesn't trust a cached grant), and `hosts_update` sweeps+revokes any already-granted tab immediately if the flag flips to true.
+- **Notifications, 2 separate mechanisms** (per explicit user instruction not to conflate them): (a) error wiring via the `integrate-notifications` skill for previously-silent failures in `agentAccessStore.ts`/`useMcpTabBridge.ts`/`ConnectionsSection.tsx` — surfaced a **real bug** in the process: a port-bind failure in `server::ensure_started` left `McpState.enabled` stuck `true` with no listener actually running; now flips back to `false` and emits `mcp_server_error`. (b) a separate opt-in `mcpNotifyOnActivity` preference + new `mcp_activity` Rust event (emitted unconditionally by `run_command`/`send_keys`/`open_tab`/`close_tab`) that the frontend only turns into a notification when the preference is on — deliberately never routed through `handleApiError` since these aren't errors.
+- **Local terminal parity** (the highest-risk piece): local PTY (`pty/session.rs`) is thread-based and keyed by numeric `u32`, not the string session id everything else uses. Added `Session.agent_tap: broadcast::Sender<Vec<u8>>` (fed raw pre-base64 bytes) and two new `pub(crate)` seams in `pty/mod.rs` (`write_raw`, `subscribe_agent_tap`) since `Session`'s fields stay module-private. Changed `Osc133Capture::feed` from `&str` to `&[u8]` — `vte::Parser::advance` already repairs split UTF-8 across calls itself, so this removes the need for a separate repair step and works unmodified for both SSH's already-repaired chunks and local's raw ones. Bridged the id gap with a small `terminalSessionRegistry.ts` addition (`setLocalPtyId`/`getLocalPtyId`, populated once `openPty()` resolves in `useTerminalSession.ts`) — `SessionGrant` gained `kind: SessionKind` (`Ssh`/`Local`) + `local_pty_id: Option<u32>`, and `mcp/server.rs`'s action tools dispatch on it. `open_tab` deliberately stays SSH-only (no "host" concept for local shells); `close_tab` needed zero changes (its frontend handler already matched by session id, kind-agnostic).
+
+### Current State
+Committed on branch `mcp-additions` (`f529f77`, `c0accb1`, `dc052ed`) — not pushed, no PR yet (user hasn't asked).
+
+### What's Next
+- Manual `pnpm tauri dev` pass — still fully unverified end-to-end (sandbox can't launch the GUI): the Settings UI, a real `claude mcp add` connection, granting/using a **local** terminal tab specifically (the riskiest new path), the host block-toggle actually disabling the tab checkbox, and the auto-revoke sweep actually firing after the configured window.
+- Consider: rate-limiting/queueing if multiple external MCP clients hit the same session concurrently (still only a per-session `tokio::Mutex`, no cap on total concurrent sessions).
+- `read_output` remains a live peek only (no scrollback history before the call) — known v1 simplification, not a bug.
+
+### Blockers
+- None — ready for manual verification, then push/PR once the user confirms.
+
+---
+
+## Previous Session: 2026-07-18 (Full App Review + 12-Workstream Fix Pass + Independent Review)
 
 ### What Was Done
 User asked for a full general review of the app across all feature areas (gaps, edge cases, perf/efficiency issues, features blocking each other) plus a specific audit of Settings-category miscategorization. Ran 6 parallel deep-dive research agents (Settings, SFTP/Explorer, Terminal/PTY/Tabs, AI, Git/Source Control, Hosts/Snippets/Themes) against `main` (post russh-migration + 5 recent SFTP fixes), verified the standout finding personally (`gitStatusPollIntervalMs` mis-tagged under "File Manager" instead of Source Control), and delivered a full report as a published artifact (~35 findings).

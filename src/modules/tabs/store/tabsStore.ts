@@ -6,6 +6,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useTransferStore } from "@/modules/sftp/store/transferStore";
 import { useCommandSnippetsStore } from "@/modules/snippets/store/commandSnippetsStore";
 import { labelFor } from "../lib/tabUtils";
+import { setAgentAccessGrant, useAgentAccessStore } from "./agentAccessStore";
 import {
   type AiDiffStatus,
   basename,
@@ -481,6 +482,10 @@ export const useTabsStore = create<TabsState>((set, get) => ({
     const newActiveId = id === activeId ? next[Math.max(0, idx - 1)].id : activeId;
     set({ tabs: next, activeId: newActiveId });
     tabIdentityCache.delete(id);
+    // A closed tab can no longer honor an MCP agent-access grant — revoke it
+    // both locally and on the Rust side so list_sessions/the header badge
+    // don't keep showing a tab that no longer exists.
+    if (useAgentAccessStore.getState().entries[id]) void setAgentAccessGrant(id, "", false, "");
   },
 
   updateTab: (id, patch) => {

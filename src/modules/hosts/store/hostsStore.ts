@@ -157,6 +157,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       ...(payload.jump_host_id !== undefined && { jumpHostId: payload.jump_host_id }),
       ...(payload.notes !== undefined && { notes: payload.notes }),
       ...(payload.icon !== undefined && { icon: payload.icon }),
+      blockAgentAccess: payload.block_agent_access ?? false,
     });
     set((s) => ({ hosts: [...s.hosts, host] }));
     return host;
@@ -185,6 +186,7 @@ export const useHostsStore = create<HostsState>((set, get) => ({
       ...(payload.jump_host_id !== undefined && { jumpHostId: payload.jump_host_id }),
       ...(payload.notes !== undefined && { notes: payload.notes }),
       ...(payload.icon !== undefined && { icon: payload.icon }),
+      ...(payload.block_agent_access !== undefined && { blockAgentAccess: payload.block_agent_access }),
     });
     set((s) => ({
       hosts: s.hosts.map((h) => (h.id === host.id ? host : h)),

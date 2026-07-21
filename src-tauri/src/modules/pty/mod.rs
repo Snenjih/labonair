@@ -133,6 +133,34 @@ pub fn pty_has_foreground_job(state: tauri::State<PtyState>, id: u32) -> Result<
     Ok(matches!(leader, Some(pid) if pid > 0 && pid as u32 != session.shell_pid))
 }
 
+/// Writes raw bytes into a local PTY by numeric id, byte-for-byte the same
+/// code path `pty_write` uses — called by the MCP bridge (`modules::mcp`),
+/// which only ever sees `PtyState` through `tauri::AppHandle::state()`, never
+/// as a Tauri-command invocation, so this can't just reuse `pty_write`
+/// directly (that's a `#[tauri::command]`, not a plain callable fn taking a
+/// bare `&PtyState`). `Session`'s fields stay private to this module either
+/// way — this and `subscribe_agent_tap` are the only two seams exposed.
+pub(crate) fn write_raw(state: &PtyState, id: u32, data: &str) -> Result<(), String> {
+    let session = state.sessions.read().unwrap().get(&id).cloned().ok_or_else(|| "no session".to_string())?;
+    // Bind to a local so the MutexGuard temporary drops before `session` —
+    // see rustc note on tail-expression temporary drop order (same fix as
+    // `pty_write` above).
+    let result = session.writer.lock().unwrap().write_all(data.as_bytes()).map_err(|e| e.to_string());
+    result
+}
+
+/// Subscribes to a local PTY session's raw-output tap (see
+/// `Session::agent_tap`) — used by the MCP bridge's `run_command`/
+/// `read_output` to capture a local terminal's output without touching the
+/// visible pane's own `Channel<PtyEvent>`.
+pub(crate) fn subscribe_agent_tap(
+    state: &PtyState,
+    id: u32,
+) -> Result<tokio::sync::broadcast::Receiver<Vec<u8>>, String> {
+    let session = state.sessions.read().unwrap().get(&id).cloned().ok_or_else(|| "no session".to_string())?;
+    Ok(session.agent_tap.subscribe())
+}
+
 #[tauri::command]
 pub fn pty_close(state: tauri::State<PtyState>, id: u32) -> Result<(), String> {
     let session = state.sessions.write().unwrap().remove(&id);

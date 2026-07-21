@@ -220,6 +220,13 @@ export type Preferences = {
   sshAutoReconnectMaxAttempts: number;
   sshConnectTimeoutSecs: number;
 
+  // --- AI Agent Bridge (MCP) ---
+  mcpBridgeEnabled: boolean;
+  mcpBridgePort: number;
+  mcpMaxCommandTimeoutSecs: number;
+  mcpAutoRevokeMinutes: number;
+  mcpNotifyOnActivity: boolean;
+
   // --- Explorer (sidebar remote browsing) ---
   explorerShowHiddenByDefault: boolean;
   explorerRemotePollInterval: number;
@@ -374,6 +381,11 @@ const KEY_SSH_AUTO_RECONNECT = "sshAutoReconnect";
 const KEY_SSH_AUTO_RECONNECT_DELAY = "sshAutoReconnectDelay";
 const KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS = "sshAutoReconnectMaxAttempts";
 const KEY_SSH_CONNECT_TIMEOUT_SECS = "sshConnectTimeoutSecs";
+const KEY_MCP_BRIDGE_ENABLED = "mcpBridgeEnabled";
+const KEY_MCP_BRIDGE_PORT = "mcpBridgePort";
+const KEY_MCP_MAX_COMMAND_TIMEOUT_SECS = "mcpMaxCommandTimeoutSecs";
+const KEY_MCP_AUTO_REVOKE_MINUTES = "mcpAutoRevokeMinutes";
+const KEY_MCP_NOTIFY_ON_ACTIVITY = "mcpNotifyOnActivity";
 const KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT = "explorerShowHiddenByDefault";
 const KEY_EXPLORER_REMOTE_POLL_INTERVAL = "explorerRemotePollInterval";
 const KEY_EXPLORER_AUTO_RECONNECT = "explorerAutoReconnect";
@@ -549,6 +561,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sshAutoReconnectDelay: 5,
   sshAutoReconnectMaxAttempts: 3,
   sshConnectTimeoutSecs: 10,
+
+  mcpBridgeEnabled: false,
+  mcpBridgePort: 47823,
+  mcpMaxCommandTimeoutSecs: 300,
+  mcpAutoRevokeMinutes: 0,
+  mcpNotifyOnActivity: false,
 
   explorerShowHiddenByDefault: false,
   explorerRemotePollInterval: 20,
@@ -842,6 +860,14 @@ export async function loadPreferences(): Promise<Preferences> {
       60,
       Math.max(3, get<number>(KEY_SSH_CONNECT_TIMEOUT_SECS) ?? DEFAULT_PREFERENCES.sshConnectTimeoutSecs),
     ),
+
+    mcpBridgeEnabled: get<boolean>(KEY_MCP_BRIDGE_ENABLED) ?? DEFAULT_PREFERENCES.mcpBridgeEnabled,
+    mcpBridgePort: get<number>(KEY_MCP_BRIDGE_PORT) ?? DEFAULT_PREFERENCES.mcpBridgePort,
+    mcpMaxCommandTimeoutSecs:
+      get<number>(KEY_MCP_MAX_COMMAND_TIMEOUT_SECS) ?? DEFAULT_PREFERENCES.mcpMaxCommandTimeoutSecs,
+    mcpAutoRevokeMinutes:
+      get<number>(KEY_MCP_AUTO_REVOKE_MINUTES) ?? DEFAULT_PREFERENCES.mcpAutoRevokeMinutes,
+    mcpNotifyOnActivity: get<boolean>(KEY_MCP_NOTIFY_ON_ACTIVITY) ?? DEFAULT_PREFERENCES.mcpNotifyOnActivity,
 
     explorerShowHiddenByDefault:
       get<boolean>(KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT) ?? DEFAULT_PREFERENCES.explorerShowHiddenByDefault,
@@ -1221,6 +1247,31 @@ export async function setSshAutoReconnectDelay(value: number): Promise<void> {
 
 export async function setSshAutoReconnectMaxAttempts(value: number): Promise<void> {
   await (await getStore()).set(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS, value);
+  await (await getStore()).save();
+}
+
+export async function setMcpBridgeEnabled(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_MCP_BRIDGE_ENABLED, value);
+  await (await getStore()).save();
+}
+
+export async function setMcpBridgePort(value: number): Promise<void> {
+  await (await getStore()).set(KEY_MCP_BRIDGE_PORT, value);
+  await (await getStore()).save();
+}
+
+export async function setMcpMaxCommandTimeoutSecs(value: number): Promise<void> {
+  await (await getStore()).set(KEY_MCP_MAX_COMMAND_TIMEOUT_SECS, value);
+  await (await getStore()).save();
+}
+
+export async function setMcpAutoRevokeMinutes(value: number): Promise<void> {
+  await (await getStore()).set(KEY_MCP_AUTO_REVOKE_MINUTES, value);
+  await (await getStore()).save();
+}
+
+export async function setMcpNotifyOnActivity(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_MCP_NOTIFY_ON_ACTIVITY, value);
   await (await getStore()).save();
 }
 
@@ -1821,6 +1872,11 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SSH_AUTO_RECONNECT_DELAY]: "sshAutoReconnectDelay",
     [KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS]: "sshAutoReconnectMaxAttempts",
     [KEY_SSH_CONNECT_TIMEOUT_SECS]: "sshConnectTimeoutSecs",
+    [KEY_MCP_BRIDGE_ENABLED]: "mcpBridgeEnabled",
+    [KEY_MCP_BRIDGE_PORT]: "mcpBridgePort",
+    [KEY_MCP_MAX_COMMAND_TIMEOUT_SECS]: "mcpMaxCommandTimeoutSecs",
+    [KEY_MCP_AUTO_REVOKE_MINUTES]: "mcpAutoRevokeMinutes",
+    [KEY_MCP_NOTIFY_ON_ACTIVITY]: "mcpNotifyOnActivity",
     [KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT]: "explorerShowHiddenByDefault",
     [KEY_EXPLORER_REMOTE_POLL_INTERVAL]: "explorerRemotePollInterval",
     [KEY_EXPLORER_AUTO_RECONNECT]: "explorerAutoReconnect",

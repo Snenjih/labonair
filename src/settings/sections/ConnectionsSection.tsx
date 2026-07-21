@@ -1,6 +1,17 @@
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { handleApiError } from "@/lib/errors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import {
+  applyMcpAutoRevokeMinutes,
+  applyMcpBridgeEnabled,
+  applyMcpMaxCommandTimeoutSecs,
+  applyMcpPort,
+  type McpStatus,
+  useAgentAccessStore,
+} from "@/modules/tabs";
 import {
   setExplorerAutoReconnect,
   setExplorerIdleSessionTimeoutMin,
@@ -8,6 +19,7 @@ import {
   setExplorerMaxIdleSessions,
   setExplorerRemotePollInterval,
   setHostPingInterval,
+  setMcpNotifyOnActivity,
   setSshAutoReconnect,
   setSshAutoReconnectDelay,
   setSshAutoReconnectMaxAttempts,
@@ -32,6 +44,174 @@ function SubSectionTitle({ children }: { children: React.ReactNode }) {
 
 function SectionDivider() {
   return <div className="border-t border-border/40" />;
+}
+
+/** Settings for the local MCP bridge (`src-tauri/src/modules/mcp/`) that lets
+ *  an external agent (e.g. a locally installed `claude` CLI) drive SSH tabs
+ *  the user has explicitly granted access to via the tab context menu /
+ *  header badge — see `agentAccessStore.ts`. The enabled flag is shared
+ *  process-wide via `useAgentAccessStore.bridgeEnabled` (so the tab context
+ *  menu and header badge react to it too, not just this settings page); port
+ *  and token are Rust-side-only detail this section fetches for itself. */
+function AgentBridgeSection() {
+  const bridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
+  const maxCommandTimeoutSecs = usePreferencesStore((s) => s.mcpMaxCommandTimeoutSecs);
+  const autoRevokeMinutes = usePreferencesStore((s) => s.mcpAutoRevokeMinutes);
+  const notifyOnActivity = usePreferencesStore((s) => s.mcpNotifyOnActivity);
+  const [port, setPort] = useState<number | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    invoke<McpStatus>("mcp_get_status")
+      .then((status) => {
+        useAgentAccessStore.getState().setBridgeEnabledLocal(status.enabled);
+        setPort(status.port);
+        setToken(status.token);
+      })
+      .catch((e) => handleApiError(e, "Failed to load AI Agent Bridge status", "MCP"));
+  }, []);
+
+  const setupCommand =
+    token && bridgeEnabled && port
+      ? `claude mcp add --transport http labonair http://127.0.0.1:${port}/mcp --header "Authorization: Bearer ${token}" --scope user`
+      : null;
+
+  const handleToggle = async (enabled: boolean) => {
+    try {
+      const status = await applyMcpBridgeEnabled(enabled);
+      setPort(status.port);
+      setToken(status.token);
+    } catch (e) {
+      handleApiError(e, "Failed to enable/disable AI Agent Bridge", "MCP");
+    }
+  };
+
+  const handlePortChange = async (value: number) => {
+    try {
+      const status = await applyMcpPort(value);
+      setPort(status.port);
+      setToken(status.token);
+    } catch (e) {
+      handleApiError(e, "Failed to change AI Agent Bridge port", "MCP");
+    }
+  };
+
+  const handleRegenerate = async () => {
+    try {
+      const status = await invoke<McpStatus>("mcp_regenerate_token");
+      setPort(status.port);
+      setToken(status.token);
+    } catch (e) {
+      handleApiError(e, "Failed to regenerate AI Agent Bridge token", "MCP");
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!setupCommand) return;
+    try {
+      await navigator.clipboard.writeText(setupCommand);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      handleApiError(e, "Failed to copy setup command", "MCP");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SubSectionTitle>AI Agent Bridge (MCP)</SubSectionTitle>
+      <div className="flex flex-col gap-2">
+        <SettingRow
+          title="Enable agent bridge"
+          description="Lets an external agent you run locally (e.g. the claude CLI) list and run commands in SSH or local tabs you explicitly grant it access to — visibly, in the real terminal pane. Off by default; each tab must also be individually granted via its context menu. Turning this off immediately revokes every granted tab."
+        >
+          <Switch checked={bridgeEnabled} onCheckedChange={(v) => void handleToggle(v)} />
+        </SettingRow>
+        {bridgeEnabled && (
+          <>
+            <SettingRow title="Port" description="Local port the bridge listens on (1024–65535).">
+              <NumInput
+                value={port ?? 47823}
+                min={1024}
+                max={65535}
+                step={1}
+                onChange={(v) => void handlePortChange(v)}
+              />
+            </SettingRow>
+            <SettingRow
+              title="Max command timeout (s)"
+              description="Upper bound on how long a single agent-run command may block before returning still_running, regardless of what the agent requests."
+            >
+              <NumInput
+                value={maxCommandTimeoutSecs}
+                min={5}
+                max={3600}
+                step={5}
+                onChange={(v) =>
+                  void applyMcpMaxCommandTimeoutSecs(v).catch((e) =>
+                    handleApiError(e, "Failed to change max command timeout", "MCP"),
+                  )
+                }
+              />
+            </SettingRow>
+            <SettingRow
+              title="Auto-revoke after inactivity (min)"
+              description="Automatically revoke a granted tab after this many minutes of no agent activity. 0 disables auto-revoke."
+            >
+              <NumInput
+                value={autoRevokeMinutes}
+                min={0}
+                max={1440}
+                step={5}
+                onChange={(v) =>
+                  void applyMcpAutoRevokeMinutes(v).catch((e) =>
+                    handleApiError(e, "Failed to change auto-revoke timeout", "MCP"),
+                  )
+                }
+              />
+            </SettingRow>
+            <SettingRow
+              title="Notify on agent activity"
+              description="Show a notification every time the agent runs a command, sends keys, or opens/closes a tab — separate from error notifications, which are always on."
+            >
+              <Switch checked={notifyOnActivity} onCheckedChange={(v) => void setMcpNotifyOnActivity(v)} />
+            </SettingRow>
+          </>
+        )}
+        {bridgeEnabled && setupCommand && (
+          <SettingRow
+            title="Setup command"
+            description="Run this once in your terminal to connect your local claude CLI to this bridge. Regenerating the token invalidates any previously configured setup."
+          >
+            <div className="flex flex-col gap-1.5 w-full">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground">claude mcp add …</span>
+                <button
+                  onClick={() => void handleCopy()}
+                  className="text-[11px] text-primary hover:underline"
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+              <textarea
+                readOnly
+                value={setupCommand}
+                rows={2}
+                className="w-full rounded-md border border-input bg-muted px-3 py-2 text-[11px] font-mono text-muted-foreground resize-none"
+              />
+              <button
+                onClick={() => void handleRegenerate()}
+                className="self-start text-[11px] text-muted-foreground hover:text-destructive hover:underline"
+              >
+                Regenerate token
+              </button>
+            </div>
+          </SettingRow>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function ConnectionsSection() {
@@ -215,6 +395,10 @@ export function ConnectionsSection() {
           </SettingRow>
         </div>
       </div>
+
+      <SectionDivider />
+
+      <AgentBridgeSection />
     </div>
   );
 }

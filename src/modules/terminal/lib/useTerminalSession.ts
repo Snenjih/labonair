@@ -15,6 +15,7 @@ import {
   serialize as registrySerialize,
   setContainer,
   setFocused,
+  setLocalPtyId,
   setShellExited,
   setVisible,
   write as registryWrite,
@@ -140,6 +141,7 @@ export function useTerminalSession({
         return;
       }
       ptyRef.current = pty;
+      setLocalPtyId(sessionId, pty.id);
       if (pendingInputRef.current) {
         void pty.write(pendingInputRef.current);
         pendingInputRef.current = "";

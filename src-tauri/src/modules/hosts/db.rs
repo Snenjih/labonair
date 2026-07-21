@@ -1,3 +1,5 @@
+use tauri::{Emitter, Manager};
+
 use super::{Group, Host, HostsDb, ReorderItem};
 use crate::modules::errors::LabonairError;
 use crate::modules::secrets::{delete_password, get_password, store_password, SecretsState};
@@ -103,6 +105,8 @@ pub fn initialize_db(
         // backfill keepalive defaults for hosts that were created before defaults existed
         "UPDATE hosts SET keep_alive_interval = 25 WHERE keep_alive_interval IS NULL",
         "UPDATE hosts SET keep_alive_tries = 3 WHERE keep_alive_tries IS NULL",
+        // AI Agent Bridge (MCP) per-host block flag
+        "ALTER TABLE hosts ADD COLUMN block_agent_access INTEGER NOT NULL DEFAULT 0",
     ] {
         let _ = conn.execute_batch(sql);
     }
@@ -144,6 +148,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<Host> {
         jump_host_id: row.get(22)?,
         notes: row.get(23)?,
         icon: row.get(24)?,
+        block_agent_access: row.get::<_, i64>(25).map(|v| v != 0).unwrap_or(false),
     })
 }
 
@@ -152,7 +157,7 @@ const SELECT_HOSTS: &str = "SELECT id, name, host_address, port, username, auth_
     default_path_ssh, default_path_sftp, pin_to_top, sudo_password_set, \
     keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
     startup_snippet_id, startup_snippet_mode, credential_id, \
-    jump_host_id, notes, icon FROM hosts";
+    jump_host_id, notes, icon, block_agent_access FROM hosts";
 
 /// Duplicates a host row and replicates its stored password/sudo-password
 /// (if any) under the new host's id via the secrets store directly — the
@@ -181,15 +186,16 @@ pub async fn hosts_duplicate(
             "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
              private_key_path, group_id, tags, created_at, default_path_ssh, default_path_sftp, \
              pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
-             startup_snippet_id, startup_snippet_mode, credential_id, jump_host_id, notes, icon) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)",
+             startup_snippet_id, startup_snippet_mode, credential_id, jump_host_id, notes, icon, \
+             block_agent_access) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)",
             rusqlite::params![
                 new_id, name, src.host_address, src.port, src.username, src.auth_method,
                 src.private_key_path, src.group_id, src.tags, created_at,
                 src.default_path_ssh, src.default_path_sftp, 0i64, src.sudo_password_set as i64,
                 src.keep_alive_interval, src.keep_alive_tries, 0i64, src.tunnels,
                 src.startup_snippet_id, src.startup_snippet_mode, src.credential_id,
-                src.jump_host_id, src.notes, src.icon
+                src.jump_host_id, src.notes, src.icon, src.block_agent_access as i64
             ],
         )?;
     }
@@ -249,12 +255,14 @@ pub async fn hosts_create(
     jump_host_id: Option<String>,
     notes: Option<String>,
     icon: Option<String>,
+    block_agent_access: Option<bool>,
 ) -> Result<Host, LabonairError> {
     let id = uuid::Uuid::new_v4().to_string();
     let created_at = now_millis();
     let pin = pin_to_top.unwrap_or(false) as i64;
     let order = sort_order.unwrap_or(0);
     let sudo_set = sudo_password.is_some() as i64;
+    let blocked = block_agent_access.unwrap_or(false) as i64;
 
     {
         let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
@@ -264,15 +272,16 @@ pub async fn hosts_create(
             "INSERT INTO hosts (id, name, host_address, port, username, auth_method, \
              private_key_path, group_id, tags, created_at, default_path_ssh, default_path_sftp, \
              pin_to_top, sudo_password_set, keep_alive_interval, keep_alive_tries, sort_order, tunnels, \
-             startup_snippet_id, startup_snippet_mode, credential_id, jump_host_id, notes, icon) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)",
+             startup_snippet_id, startup_snippet_mode, credential_id, jump_host_id, notes, icon, \
+             block_agent_access) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24,?25)",
             rusqlite::params![
                 id, name, host_address, port, username, auth_method,
                 private_key_path, group_id, tags, created_at,
                 default_path_ssh, default_path_sftp, pin, sudo_set,
                 keep_alive_interval, keep_alive_tries, order, tunnels,
                 snippet_id, startup_snippet_mode, credential_id,
-                jump_host_id, notes, icon_val
+                jump_host_id, notes, icon_val, blocked
             ],
         )?;
     }
@@ -324,6 +333,7 @@ pub async fn hosts_update(
     jump_host_id: Option<String>,
     notes: Option<String>,
     icon: Option<String>,
+    block_agent_access: Option<bool>,
 ) -> Result<Host, LabonairError> {
     {
         let conn = db.0.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
@@ -396,6 +406,34 @@ pub async fn hosts_update(
         if icon.is_some() {
             let val: Option<String> = icon.filter(|s| !s.is_empty());
             conn.execute("UPDATE hosts SET icon=?1 WHERE id=?2", rusqlite::params![val, id])?;
+        }
+        if let Some(v) = block_agent_access {
+            let blocked = v as i64;
+            conn.execute("UPDATE hosts SET block_agent_access=?1 WHERE id=?2", rusqlite::params![blocked, id])?;
+        }
+    }
+    // Toggling this on must actually revoke any tab already granted for this
+    // host, not just prevent future grants — mirrors the same
+    // "disabling must revoke" rule applied to the bridge's global toggle.
+    if block_agent_access == Some(true) {
+        let mcp_state = app.state::<crate::modules::mcp::McpState>();
+        let expired: Vec<String> = {
+            let grants = mcp_state.grants.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+            grants
+                .values()
+                .filter(|g| g.host_id.as_deref() == Some(id.as_str()))
+                .map(|g| g.tab_id.clone())
+                .collect()
+        };
+        if !expired.is_empty() {
+            let mut grants = mcp_state.grants.lock().map_err(|e| LabonairError::Internal(e.to_string()))?;
+            for tab_id in &expired {
+                grants.remove(tab_id);
+            }
+            drop(grants);
+            for tab_id in expired {
+                let _ = app.emit("mcp_grant_expired", serde_json::json!({ "tab_id": tab_id }));
+            }
         }
     }
     if let Some(pw) = password {

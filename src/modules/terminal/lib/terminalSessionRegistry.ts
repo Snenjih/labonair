@@ -62,6 +62,22 @@ export type RegisterOptions = {
   isRemote?: boolean;
 };
 
+/** Populated after `openPty()` resolves (`useTerminalSession.ts`) via
+ *  `setLocalPtyId` — the numeric id `pty_write`/`pty_has_foreground_job`
+ *  actually key on, unknown at `registerSession` time since the pty spawn is
+ *  async. Read by the MCP bridge's grant flow (`TabBar.tsx`) so a local
+ *  tab's grant can carry the Rust-side numeric id alongside its string
+ *  session id — see `src-tauri/src/modules/mcp/mod.rs`'s `SessionGrant`. */
+const localPtyIds = new Map<string, number>();
+
+export function setLocalPtyId(sessionId: string, id: number): void {
+  localPtyIds.set(sessionId, id);
+}
+
+export function getLocalPtyId(sessionId: string): number | undefined {
+  return localPtyIds.get(sessionId);
+}
+
 type SessionRecord = {
   bridge: SessionBridge;
   callbacks: SessionCallbacks;
@@ -846,6 +862,7 @@ export function disposeSession(sessionId: string): void {
   sessions.delete(sessionId);
   blockSubscribers.delete(sessionId);
   integrationSubscribers.delete(sessionId);
+  localPtyIds.delete(sessionId);
   composerFocusHandlers.delete(sessionId);
 }
 

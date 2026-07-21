@@ -69,6 +69,7 @@ interface FormState {
   jump_host_id: string;
   notes: string;
   icon: string | null;
+  block_agent_access: boolean;
 }
 
 function hostToForm(host: Host): FormState {
@@ -92,6 +93,7 @@ function hostToForm(host: Host): FormState {
     jump_host_id: host.jump_host_id ?? "",
     notes: host.notes ?? "",
     icon: host.icon ?? null,
+    block_agent_access: host.block_agent_access,
   };
 }
 
@@ -115,6 +117,7 @@ const DEFAULT_FORM: FormState = {
   jump_host_id: "",
   notes: "",
   icon: null,
+  block_agent_access: false,
 };
 
 function parseTunnels(raw?: string): TunnelConfig[] {
@@ -166,6 +169,7 @@ function buildUpdatePayload(
   payload.jump_host_id = form.jump_host_id || null;
   payload.notes = form.notes || null;
   payload.icon = form.icon || "";
+  payload.block_agent_access = form.block_agent_access;
   return payload as unknown as UpdateHostPayload;
 }
 
@@ -341,6 +345,7 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
         username: form.username.trim(),
         auth_method: form.auth_method,
         pin_to_top: form.pin_to_top,
+        block_agent_access: form.block_agent_access,
       };
       if (form.private_key_path) payload.private_key_path = form.private_key_path;
       if (form.group_id) payload.group_id = form.group_id;
@@ -773,6 +778,31 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
               <p className="text-[11px] text-muted-foreground/70">
                 Automatically fills sudo password prompts. Stored in macOS Keychain.
               </p>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Agent Access</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-foreground">Block AI Agent Access</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Prevents this host's SSH tabs from ever being granted or used via the AI Agent Bridge, even
+                  if enabled elsewhere.
+                </p>
+              </div>
+              <button
+                onClick={() => setForm((d) => ({ ...d, block_agent_access: !d.block_agent_access }))}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                  form.block_agent_access ? "bg-primary" : "bg-muted"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-primary-foreground shadow transition-transform ${
+                    form.block_agent_access ? "translate-x-4" : "translate-x-0"
+                  }`}
+                />
+              </button>
             </div>
           </section>
 

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
+  ContextMenuCheckboxItem,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
@@ -24,6 +25,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { useHostsStore } from "@/modules/hosts/store/hostsStore";
+import { getLocalPtyId } from "@/modules/terminal/lib/terminalSessionRegistry";
+import { setAgentAccessGrant, useAgentAccessStore } from "./store/agentAccessStore";
 import { selectRenderStableTabs, useTabsStore } from "./store/tabsStore";
 import { TabIconFor, labelFor, pluralLabelFor, NewTabDropdownItems } from "./lib/tabUtils";
 import type { Tab } from "./types";
@@ -66,6 +70,9 @@ export function TabBar({
   const tabs = useTabsStore(useShallow(selectRenderStableTabs));
   const activeId = useTabsStore((s) => s.activeId);
   const reorderTabs = useTabsStore((s) => s.reorderTabs);
+  const agentAccessEntries = useAgentAccessStore((s) => s.entries);
+  const agentBridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
+  const hosts = useHostsStore((s) => s.hosts);
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -271,6 +278,12 @@ export function TabBar({
                   // Workspace tabs get a rename-focused context menu.
                   // All other types keep the original menu (duplicate, close others, close all).
                   if (t.kind === "workspace") {
+                    const activeSession = t.sessions[t.activePaneId];
+                    const isSsh = activeSession?.kind === "ssh";
+                    const isLocal = activeSession?.kind === "local";
+                    const isGranted = Boolean(agentAccessEntries[t.id]);
+                    const sessionHost = isSsh ? hosts.find((h) => h.id === activeSession?.hostId) : undefined;
+                    const hostBlocked = isSsh && sessionHost?.block_agent_access === true;
                     return (
                       <SortableTabWrapper key={t.id} id={t.id} disabled={false}>
                         <ContextMenu>
@@ -283,6 +296,34 @@ export function TabBar({
                               <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.75} />
                               <span className="flex-1">Rename</span>
                             </ContextMenuItem>
+                            {(isSsh || isLocal) && activeSession && agentBridgeEnabled && (
+                              <>
+                                <ContextMenuSeparator />
+                                <ContextMenuCheckboxItem
+                                  checked={isGranted}
+                                  disabled={hostBlocked}
+                                  title={
+                                    hostBlocked
+                                      ? "This host has AI agent access blocked in its settings"
+                                      : undefined
+                                  }
+                                  onCheckedChange={(checked) =>
+                                    void setAgentAccessGrant(
+                                      t.id,
+                                      activeSession.id,
+                                      checked,
+                                      labelFor(t),
+                                      isSsh ? "ssh" : "local",
+                                      isSsh
+                                        ? { hostId: activeSession.hostId }
+                                        : { localPtyId: getLocalPtyId(activeSession.id) },
+                                    )
+                                  }
+                                >
+                                  Grant AI Agent Access
+                                </ContextMenuCheckboxItem>
+                              </>
+                            )}
                             {tabs.length > 1 && (
                               <>
                                 <ContextMenuSeparator />
