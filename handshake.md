@@ -32,16 +32,26 @@ Implemented on branch `mcp-additions` (accidentally created+checked-out by an Ex
 - A real `claude mcp add --transport http …` connection from an actual local Claude Code CLI, followed by `list_sessions`/`run_command`/`read_output`/`send_keys`/`open_tab`/`close_tab` against a real SSH host.
 - Whether `run_command`'s OSC133 exit-code capture actually fires correctly end-to-end over a live SSH session (only unit-tested against synthetic byte streams, not a real shell).
 
+Committed `f529f77` (initial bridge), then a same-day settings/UX rework `c0accb1` (global enable toggle now actually revokes+hides everything when off, persisted `mcpBridgeEnabled`, README + `docs/10-ai-assistant/mcp-agent-bridge.mdx`).
+
+### Follow-up (same day, plan-mode round 2 — commit `dc052ed`)
+User asked for 4 more things after live-testing the toggle: settings (port/max-timeout/auto-revoke), a per-host block-list, notifications (2 separate mechanisms), and full local-terminal parity. Re-entered plan mode (2 more Explore agents: local PTY architecture, hosts schema + inspector UI), plan overwritten (not a continuation) at the same plan file path, approved, implemented:
+
+- **Settings**: `McpState.port`/`max_command_timeout_ms`/`auto_revoke_minutes` are now runtime-mutable atomics with their own commands (`mcp_set_port` restarts the listener live if enabled; `mcp_set_max_command_timeout_secs` clamps `run_command`'s requested timeout; `mcp_set_auto_revoke_minutes` feeds a new background sweep task, `spawn_auto_revoke_sweeper`, spawned once in `lib.rs`'s `.setup()`). All three (plus `enabled`) get pushed from persisted preferences to Rust on every change via `useMcpTabBridge.ts` — McpState has zero persistence of its own, so this push is load-bearing, not decorative.
+- **Per-host block-list**: `Host.block_agent_access` (new SQLite column, `hosts/db.rs`'s idempotent migration array), toggle in `HostFormPanel.tsx`'s SSH tab ("Agent Access" section). Enforced 3 places: `mcp_set_session_grant` (refuse the grant), live at every `run_command`/`send_keys`/`read_output`/`open_tab` call (`ensure_grant_still_authorized` re-queries the DB, doesn't trust a cached grant), and `hosts_update` sweeps+revokes any already-granted tab immediately if the flag flips to true.
+- **Notifications, 2 separate mechanisms** (per explicit user instruction not to conflate them): (a) error wiring via the `integrate-notifications` skill for previously-silent failures in `agentAccessStore.ts`/`useMcpTabBridge.ts`/`ConnectionsSection.tsx` — surfaced a **real bug** in the process: a port-bind failure in `server::ensure_started` left `McpState.enabled` stuck `true` with no listener actually running; now flips back to `false` and emits `mcp_server_error`. (b) a separate opt-in `mcpNotifyOnActivity` preference + new `mcp_activity` Rust event (emitted unconditionally by `run_command`/`send_keys`/`open_tab`/`close_tab`) that the frontend only turns into a notification when the preference is on — deliberately never routed through `handleApiError` since these aren't errors.
+- **Local terminal parity** (the highest-risk piece): local PTY (`pty/session.rs`) is thread-based and keyed by numeric `u32`, not the string session id everything else uses. Added `Session.agent_tap: broadcast::Sender<Vec<u8>>` (fed raw pre-base64 bytes) and two new `pub(crate)` seams in `pty/mod.rs` (`write_raw`, `subscribe_agent_tap`) since `Session`'s fields stay module-private. Changed `Osc133Capture::feed` from `&str` to `&[u8]` — `vte::Parser::advance` already repairs split UTF-8 across calls itself, so this removes the need for a separate repair step and works unmodified for both SSH's already-repaired chunks and local's raw ones. Bridged the id gap with a small `terminalSessionRegistry.ts` addition (`setLocalPtyId`/`getLocalPtyId`, populated once `openPty()` resolves in `useTerminalSession.ts`) — `SessionGrant` gained `kind: SessionKind` (`Ssh`/`Local`) + `local_pty_id: Option<u32>`, and `mcp/server.rs`'s action tools dispatch on it. `open_tab` deliberately stays SSH-only (no "host" concept for local shells); `close_tab` needed zero changes (its frontend handler already matched by session id, kind-agnostic).
+
 ### Current State
-Uncommitted changes on branch `mcp-additions` (not yet committed/pushed — user has not asked for a commit/PR yet).
+Committed on branch `mcp-additions` (`f529f77`, `c0accb1`, `dc052ed`) — not pushed, no PR yet (user hasn't asked).
 
 ### What's Next
-- Manual `pnpm tauri dev` pass covering the checklist above.
-- Consider: rate-limiting/queueing if multiple external MCP clients hit the same session concurrently (currently only a per-session `tokio::Mutex` serializes `run_command`, no cap on total concurrent sessions).
-- `read_output` is a live peek only (no scrollback history before the call) — documented as a known v1 simplification, not a bug.
+- Manual `pnpm tauri dev` pass — still fully unverified end-to-end (sandbox can't launch the GUI): the Settings UI, a real `claude mcp add` connection, granting/using a **local** terminal tab specifically (the riskiest new path), the host block-toggle actually disabling the tab checkbox, and the auto-revoke sweep actually firing after the configured window.
+- Consider: rate-limiting/queueing if multiple external MCP clients hit the same session concurrently (still only a per-session `tokio::Mutex`, no cap on total concurrent sessions).
+- `read_output` remains a live peek only (no scrollback history before the call) — known v1 simplification, not a bug.
 
 ### Blockers
-- None — ready for manual verification, then commit/PR once the user confirms.
+- None — ready for manual verification, then push/PR once the user confirms.
 
 ---
 
