@@ -99,7 +99,9 @@ pub async fn mcp_get_status(
 /// Enables or disables the MCP bridge. Enabling generates a bearer token on
 /// first use (persisted via the app's own secrets store, not SQLite — same
 /// rule the rest of the app follows for credentials) and starts the
-/// Streamable-HTTP listener; disabling stops it. Idempotent either way.
+/// Streamable-HTTP listener; disabling stops it **and revokes every
+/// currently-granted tab** — a disabled bridge must expose zero sessions,
+/// not just refuse new connections. Idempotent either way.
 #[tauri::command]
 pub async fn mcp_set_enabled(
     enabled: bool,
@@ -123,6 +125,7 @@ pub async fn mcp_set_enabled(
     } else {
         state.enabled.store(false, Ordering::Relaxed);
         server::stop(state.inner());
+        state.grants.lock().map_err(|e| e.to_string())?.clear();
         Ok(McpStatus { enabled: false, port: state.port, token: None })
     }
 }

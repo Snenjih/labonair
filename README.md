@@ -65,6 +65,12 @@ Labonair is a macOS-native remote workspace built on Tauri 2 + Rust and React 19
 - `LABONAIR.md` for project-level AI memory and configuration
 - Tasks, search, file read/write/edit tools with in-app approval flow for mutating actions
 
+**AI Agent Bridge (MCP)**
+- Local MCP (Model Context Protocol) server lets an external agent you already run locally (e.g. the `claude` CLI, using your own subscription) drive a granted SSH tab — visibly, in the real terminal pane
+- Per-tab opt-in consent (off by default) via the tab context menu; a header badge lists/revokes currently granted tabs at a glance
+- Tools: list granted sessions, run a command and get back its output/exit code, peek at live output, send raw keystrokes, open/close SSH tabs to saved hosts
+- One-time setup command generated in Settings → Connections; disabling the bridge instantly revokes every grant
+
 **Snippets**
 - Reusable command snippets with typed variables, runnable locally or over an SSH session
 - Per-host picker, run log/output drawer, drag-and-drop reorder

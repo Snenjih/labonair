@@ -535,6 +535,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     controlType: "NumberInput",
   },
   {
+    id: "mcpBridgeEnabled",
+    label: "Enable agent bridge",
+    description:
+      "Lets an external agent you run locally (e.g. the claude CLI) list and run commands in SSH tabs you explicitly grant it access to.",
+    category: "Connections",
+    controlType: "Switch",
+  },
+  {
     id: "terminalShowPaneHeader",
     label: "Show pane headers",
     description: "Display a header bar above each terminal pane in split-pane workspaces.",

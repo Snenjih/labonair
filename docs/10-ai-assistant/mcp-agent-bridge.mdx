@@ -1,0 +1,81 @@
+---
+title: "AI Agent Bridge (MCP)"
+description: "Connect your local AI agent (via MCP) to Labonair — grant it access to specific SSH tabs and watch it execute commands live in your terminal."
+---
+
+# AI Agent Bridge (MCP)
+
+The AI Agent Bridge lets you connect an external AI agent (such as your local `claude` CLI, running outside Labonair) to Labonair via the Model Context Protocol (MCP). Once connected and granted explicit permission, the agent can drive SSH terminal tabs you own — executing commands, reading output, and opening new sessions — all visibly in the pane you're watching, as if you had typed them yourself.
+
+This is useful when you want an AI agent to help with infrastructure tasks, script writing, or debugging on remote servers, but you want to see and validate every step it takes in real time, rather than delegating to a hidden background process.
+
+## Setting It Up
+
+### Step 1: Enable the Bridge in Settings
+
+Open **Settings → Connections** and find the **AI Agent Bridge (MCP)** section. Toggle **Enable agent bridge** on. The bridge is disabled by default and generates no network traffic until you explicitly enable it.
+
+### Step 2: Register with Your AI Agent
+
+Once enabled, Labonair displays a setup command ready to copy:
+
+```
+claude mcp add --transport http labonair http://127.0.0.1:47823/mcp \
+  --header "Authorization: Bearer <token>" --scope user
+```
+
+Open a terminal *outside* Labonair (on your local machine) and paste this command. This registers Labonair as an MCP server with your local `claude` CLI (or any other MCP-capable agent). You only need to run this once per machine.
+
+After this, your external agent is connected to the bridge, but has access to **no tabs yet**. Per-tab access is granted separately.
+
+## Granting Access to a Tab
+
+### Step 1: Right-Click an SSH Tab
+
+In Labonair, right-click any SSH terminal tab (this option only appears on tabs backed by SSH). A context menu appears with the option **Grant AI Agent Access**.
+
+### Step 2: Check the Box
+
+Check **Grant AI Agent Access**. The tab is now visible to your connected external agent. A small badge appears in the app header (next to the existing "Jump Host Connections" badge) showing how many tabs you've granted, with a popover to list them.
+
+To revoke access from a tab, right-click it again and uncheck the box.
+
+## What the Agent Can Do
+
+Once a tab is granted, the connected external agent can:
+
+- **List granted tabs** — see which SSH sessions it has access to
+- **Run commands** — execute a command in a tab, wait for output and exit code, see the result
+- **Read live output** — check on a long-running command without running anything new
+- **Send keystrokes** — type raw input, useful for sudo passwords or Ctrl+C interrupts
+- **Open new SSH tabs** — connect to any of your saved hosts (those with a fully-stored password or key; hosts requiring 2FA or passphrase prompts cannot be auto-opened)
+- **Close tabs** — cleanly close a tab when the agent is done with it
+
+Every action is visible in the real terminal pane — the agent does not run commands in a hidden background process.
+
+## Turning It Off
+
+Disable the bridge at any time by toggling **Enable agent bridge** off in **Settings → Connections**. This immediately:
+
+- Revokes access from all currently-granted tabs
+- Hides the header badge
+- Removes the **Grant AI Agent Access** option from all tab context menus
+
+Re-enabling the bridge later will not automatically restore previous grants — you'll need to grant access again on a per-tab basis.
+
+## Security Model
+
+The security model is intentionally **full trust once granted** — once you grant a tab, the agent can run any command in it, just as if you had typed it yourself. There is no extra command blocklist or filtering inside Labonair for this path.
+
+The two safety nets are:
+
+1. **Per-tab opt-in** — Nothing is accessible until you explicitly grant it. An agent with no granted tabs can see nothing in Labonair.
+2. **Agent-side approval** — Your external AI agent (e.g., Claude Code) typically has its own tool-approval system. It will often ask you to confirm before running a command, giving you a second chance to review the action.
+
+:::warning
+Granting AI Agent Access to a tab is equivalent to giving the agent your SSH privileges for that session. Only grant access to tabs you trust the agent to operate in. If you grant access and then ask the agent to run sensitive operations (like credential rotation or data deletion), make sure you review each step — the agent's commands are visible in the terminal, but they execute as quickly as any human-typed command would.
+:::
+
+:::tip
+If you want to see what the agent is planning before it runs commands, most MCP agents show you the command in their own approval interface before Labonair executes it. This gives you two layers of visibility: the agent's own preview, and then the live terminal output as it runs.
+:::

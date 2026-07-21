@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { applyMcpBridgeEnabled, type McpStatus, useAgentAccessStore } from "@/modules/tabs";
 import {
   setExplorerAutoReconnect,
   setExplorerIdleSessionTimeoutMin,
@@ -36,39 +37,44 @@ function SectionDivider() {
   return <div className="border-t border-border/40" />;
 }
 
-interface McpStatus {
-  enabled: boolean;
-  port: number;
-  token: string | null;
-}
-
 /** Settings for the local MCP bridge (`src-tauri/src/modules/mcp/`) that lets
  *  an external agent (e.g. a locally installed `claude` CLI) drive SSH tabs
  *  the user has explicitly granted access to via the tab context menu /
- *  header badge — see `agentAccessStore.ts`. State lives in Rust
- *  (`McpState`), not the usual `usePreferencesStore`, since it also owns a
- *  live network listener and a secret token. */
+ *  header badge — see `agentAccessStore.ts`. The enabled flag is shared
+ *  process-wide via `useAgentAccessStore.bridgeEnabled` (so the tab context
+ *  menu and header badge react to it too, not just this settings page); port
+ *  and token are Rust-side-only detail this section fetches for itself. */
 function AgentBridgeSection() {
-  const [status, setStatus] = useState<McpStatus | null>(null);
+  const bridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
+  const [port, setPort] = useState<number | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    invoke<McpStatus>("mcp_get_status").then(setStatus).catch(() => {});
+    invoke<McpStatus>("mcp_get_status")
+      .then((status) => {
+        useAgentAccessStore.getState().setBridgeEnabledLocal(status.enabled);
+        setPort(status.port);
+        setToken(status.token);
+      })
+      .catch(() => {});
   }, []);
 
   const setupCommand =
-    status?.token && status.enabled
-      ? `claude mcp add --transport http labonair http://127.0.0.1:${status.port}/mcp --header "Authorization: Bearer ${status.token}" --scope user`
+    token && bridgeEnabled && port
+      ? `claude mcp add --transport http labonair http://127.0.0.1:${port}/mcp --header "Authorization: Bearer ${token}" --scope user`
       : null;
 
   const handleToggle = async (enabled: boolean) => {
-    const next = await invoke<McpStatus>("mcp_set_enabled", { enabled });
-    setStatus(next);
+    const status = await applyMcpBridgeEnabled(enabled);
+    setPort(status.port);
+    setToken(status.token);
   };
 
   const handleRegenerate = async () => {
-    const next = await invoke<McpStatus>("mcp_regenerate_token");
-    setStatus(next);
+    const status = await invoke<McpStatus>("mcp_regenerate_token");
+    setPort(status.port);
+    setToken(status.token);
   };
 
   const handleCopy = async () => {
@@ -84,11 +90,11 @@ function AgentBridgeSection() {
       <div className="flex flex-col gap-2">
         <SettingRow
           title="Enable agent bridge"
-          description="Lets an external agent you run locally (e.g. the claude CLI) list and run commands in SSH tabs you explicitly grant it access to — visibly, in the real terminal pane. Off by default; each tab must also be individually granted via its context menu."
+          description="Lets an external agent you run locally (e.g. the claude CLI) list and run commands in SSH tabs you explicitly grant it access to — visibly, in the real terminal pane. Off by default; each tab must also be individually granted via its context menu. Turning this off immediately revokes every granted tab."
         >
-          <Switch checked={status?.enabled ?? false} onCheckedChange={(v) => void handleToggle(v)} />
+          <Switch checked={bridgeEnabled} onCheckedChange={(v) => void handleToggle(v)} />
         </SettingRow>
-        {status?.enabled && setupCommand && (
+        {bridgeEnabled && setupCommand && (
           <SettingRow
             title="Setup command"
             description="Run this once in your terminal to connect your local claude CLI to this bridge. Regenerating the token invalidates any previously configured setup."

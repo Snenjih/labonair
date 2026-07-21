@@ -69,6 +69,7 @@ export function TabBar({
   const activeId = useTabsStore((s) => s.activeId);
   const reorderTabs = useTabsStore((s) => s.reorderTabs);
   const agentAccessEntries = useAgentAccessStore((s) => s.entries);
+  const agentBridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -289,7 +290,7 @@ export function TabBar({
                               <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.75} />
                               <span className="flex-1">Rename</span>
                             </ContextMenuItem>
-                            {isSsh && activeSession && (
+                            {isSsh && activeSession && agentBridgeEnabled && (
                               <>
                                 <ContextMenuSeparator />
                                 <ContextMenuCheckboxItem

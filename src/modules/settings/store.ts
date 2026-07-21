@@ -220,6 +220,9 @@ export type Preferences = {
   sshAutoReconnectMaxAttempts: number;
   sshConnectTimeoutSecs: number;
 
+  // --- AI Agent Bridge (MCP) ---
+  mcpBridgeEnabled: boolean;
+
   // --- Explorer (sidebar remote browsing) ---
   explorerShowHiddenByDefault: boolean;
   explorerRemotePollInterval: number;
@@ -374,6 +377,7 @@ const KEY_SSH_AUTO_RECONNECT = "sshAutoReconnect";
 const KEY_SSH_AUTO_RECONNECT_DELAY = "sshAutoReconnectDelay";
 const KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS = "sshAutoReconnectMaxAttempts";
 const KEY_SSH_CONNECT_TIMEOUT_SECS = "sshConnectTimeoutSecs";
+const KEY_MCP_BRIDGE_ENABLED = "mcpBridgeEnabled";
 const KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT = "explorerShowHiddenByDefault";
 const KEY_EXPLORER_REMOTE_POLL_INTERVAL = "explorerRemotePollInterval";
 const KEY_EXPLORER_AUTO_RECONNECT = "explorerAutoReconnect";
@@ -549,6 +553,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sshAutoReconnectDelay: 5,
   sshAutoReconnectMaxAttempts: 3,
   sshConnectTimeoutSecs: 10,
+
+  mcpBridgeEnabled: false,
 
   explorerShowHiddenByDefault: false,
   explorerRemotePollInterval: 20,
@@ -842,6 +848,8 @@ export async function loadPreferences(): Promise<Preferences> {
       60,
       Math.max(3, get<number>(KEY_SSH_CONNECT_TIMEOUT_SECS) ?? DEFAULT_PREFERENCES.sshConnectTimeoutSecs),
     ),
+
+    mcpBridgeEnabled: get<boolean>(KEY_MCP_BRIDGE_ENABLED) ?? DEFAULT_PREFERENCES.mcpBridgeEnabled,
 
     explorerShowHiddenByDefault:
       get<boolean>(KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT) ?? DEFAULT_PREFERENCES.explorerShowHiddenByDefault,
@@ -1221,6 +1229,11 @@ export async function setSshAutoReconnectDelay(value: number): Promise<void> {
 
 export async function setSshAutoReconnectMaxAttempts(value: number): Promise<void> {
   await (await getStore()).set(KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS, value);
+  await (await getStore()).save();
+}
+
+export async function setMcpBridgeEnabled(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_MCP_BRIDGE_ENABLED, value);
   await (await getStore()).save();
 }
 
@@ -1821,6 +1834,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SSH_AUTO_RECONNECT_DELAY]: "sshAutoReconnectDelay",
     [KEY_SSH_AUTO_RECONNECT_MAX_ATTEMPTS]: "sshAutoReconnectMaxAttempts",
     [KEY_SSH_CONNECT_TIMEOUT_SECS]: "sshConnectTimeoutSecs",
+    [KEY_MCP_BRIDGE_ENABLED]: "mcpBridgeEnabled",
     [KEY_EXPLORER_SHOW_HIDDEN_BY_DEFAULT]: "explorerShowHiddenByDefault",
     [KEY_EXPLORER_REMOTE_POLL_INTERVAL]: "explorerRemotePollInterval",
     [KEY_EXPLORER_AUTO_RECONNECT]: "explorerAutoReconnect",

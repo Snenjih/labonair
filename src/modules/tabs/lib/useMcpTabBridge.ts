@@ -2,7 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect } from "react";
 import { useHostsStore } from "@/modules/hosts/store/hostsStore";
-import { setAgentAccessGrant } from "../store/agentAccessStore";
+import { usePreferencesStore } from "@/modules/settings/preferences";
+import { setAgentAccessGrant, type McpStatus, useAgentAccessStore } from "../store/agentAccessStore";
 import { useTabsStore } from "../store/tabsStore";
 import type { WorkspaceTab } from "../types";
 
@@ -26,6 +27,29 @@ function respond(requestId: string, result: TabOpResult): void {
  *  server's `open_tab`/`close_tab` tools to the actual tab store, since those
  *  tools have no direct way to reach into frontend state. */
 export function useMcpTabBridge(): void {
+  // The Rust `McpState` always boots disabled (it has no persistence of its
+  // own) — mirror the persisted preference here on every change, not just
+  // once at boot. Settings runs in its own webview with its own
+  // `useAgentAccessStore` instance, so `applyMcpBridgeEnabled` toggling the
+  // bridge there only ever updates *that* window's local `bridgeEnabled`
+  // flag — it never reaches this (main) window, which is what the tab
+  // context menu's "Grant AI Agent Access" item and the header badge
+  // actually read. This effect is what keeps this window's local flag (and
+  // therefore that menu item) in sync, driven by
+  // `usePreferencesStore.mcpBridgeEnabled`, which IS correctly synced
+  // cross-window (see `onPreferencesChange` in `settings/store.ts`).
+  // Re-invoking `mcp_set_enabled` here is harmless even when this window's
+  // state was already correct — it's idempotent on the Rust side.
+  const hydrated = usePreferencesStore((s) => s.hydrated);
+  const persistedEnabled = usePreferencesStore((s) => s.mcpBridgeEnabled);
+  useEffect(() => {
+    if (!hydrated) return;
+    void invoke<McpStatus>("mcp_set_enabled", { enabled: persistedEnabled }).then((status) => {
+      useAgentAccessStore.getState().setBridgeEnabledLocal(status.enabled);
+      if (!status.enabled) useAgentAccessStore.getState().clearAllLocal();
+    });
+  }, [hydrated, persistedEnabled]);
+
   useEffect(() => {
     let disposed = false;
     const cleanups: (() => void)[] = [];

@@ -29,4 +29,10 @@ export {
   selectActiveTabKind,
   selectActivePaneId,
 } from "./store/tabsStore";
-export { useAgentAccessStore, setAgentAccessGrant, type AgentAccessEntry } from "./store/agentAccessStore";
+export {
+  useAgentAccessStore,
+  setAgentAccessGrant,
+  applyMcpBridgeEnabled,
+  type AgentAccessEntry,
+  type McpStatus,
+} from "./store/agentAccessStore";

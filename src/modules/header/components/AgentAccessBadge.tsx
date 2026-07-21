@@ -11,9 +11,10 @@ import { setAgentAccessGrant, useAgentAccessStore, useTabsStore } from "@/module
  *  a glance, mirroring `JumpHostDropdown`'s layout. Hidden entirely when
  *  nothing is granted, same as that component. */
 export function AgentAccessBadge() {
+  const bridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
   const entries = useAgentAccessStore((s) => s.entries);
   const list = Object.values(entries);
-  if (list.length === 0) return null;
+  if (!bridgeEnabled || list.length === 0) return null;
 
   return (
     <Popover>
