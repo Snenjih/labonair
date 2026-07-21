@@ -83,7 +83,11 @@ export async function setAgentAccessGrant(
     });
     useAgentAccessStore.getState().setLocal(tabId, granted ? { tabId, sessionId, label } : null);
   } catch (e) {
-    handleApiError(e, granted ? "Failed to grant AI agent access" : "Failed to revoke AI agent access", "MCP");
+    handleApiError(
+      e,
+      granted ? "Failed to grant AI agent access" : "Failed to revoke AI agent access",
+      "MCP",
+    );
   }
 }
 

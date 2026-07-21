@@ -865,7 +865,8 @@ export async function loadPreferences(): Promise<Preferences> {
     mcpBridgePort: get<number>(KEY_MCP_BRIDGE_PORT) ?? DEFAULT_PREFERENCES.mcpBridgePort,
     mcpMaxCommandTimeoutSecs:
       get<number>(KEY_MCP_MAX_COMMAND_TIMEOUT_SECS) ?? DEFAULT_PREFERENCES.mcpMaxCommandTimeoutSecs,
-    mcpAutoRevokeMinutes: get<number>(KEY_MCP_AUTO_REVOKE_MINUTES) ?? DEFAULT_PREFERENCES.mcpAutoRevokeMinutes,
+    mcpAutoRevokeMinutes:
+      get<number>(KEY_MCP_AUTO_REVOKE_MINUTES) ?? DEFAULT_PREFERENCES.mcpAutoRevokeMinutes,
     mcpNotifyOnActivity: get<boolean>(KEY_MCP_NOTIFY_ON_ACTIVITY) ?? DEFAULT_PREFERENCES.mcpNotifyOnActivity,
 
     explorerShowHiddenByDefault:

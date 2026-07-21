@@ -282,9 +282,7 @@ export function TabBar({
                     const isSsh = activeSession?.kind === "ssh";
                     const isLocal = activeSession?.kind === "local";
                     const isGranted = Boolean(agentAccessEntries[t.id]);
-                    const sessionHost = isSsh
-                      ? hosts.find((h) => h.id === activeSession?.hostId)
-                      : undefined;
+                    const sessionHost = isSsh ? hosts.find((h) => h.id === activeSession?.hostId) : undefined;
                     const hostBlocked = isSsh && sessionHost?.block_agent_access === true;
                     return (
                       <SortableTabWrapper key={t.id} id={t.id} disabled={false}>
@@ -304,7 +302,11 @@ export function TabBar({
                                 <ContextMenuCheckboxItem
                                   checked={isGranted}
                                   disabled={hostBlocked}
-                                  title={hostBlocked ? "This host has AI agent access blocked in its settings" : undefined}
+                                  title={
+                                    hostBlocked
+                                      ? "This host has AI agent access blocked in its settings"
+                                      : undefined
+                                  }
                                   onCheckedChange={(checked) =>
                                     void setAgentAccessGrant(
                                       t.id,

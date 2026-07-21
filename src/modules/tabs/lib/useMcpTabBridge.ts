@@ -108,14 +108,17 @@ export function useMcpTabBridge(): void {
             // Auto-grant: the agent explicitly asked to open this tab for its
             // own use, so it starts out already accessible — the user can
             // revoke it any time via the same toggle/badge as any other tab.
-            void setAgentAccessGrant(tabId, sessionId, true, host.name, "ssh", { hostId: host.id }).then(() => {
-              respond(payload.request_id, { ok: true, session_id: sessionId, tab_id: String(tabId) });
-            });
+            void setAgentAccessGrant(tabId, sessionId, true, host.name, "ssh", { hostId: host.id }).then(
+              () => {
+                respond(payload.request_id, { ok: true, session_id: sessionId, tab_id: String(tabId) });
+              },
+            );
           }),
           listen<{ request_id: string; session_id: string }>("mcp_close_tab_request", ({ payload }) => {
             const tabs = useTabsStore.getState().tabs;
             const tab = tabs.find(
-              (t) => t.kind === "workspace" && Object.values(t.sessions).some((s) => s.id === payload.session_id),
+              (t) =>
+                t.kind === "workspace" && Object.values(t.sessions).some((s) => s.id === payload.session_id),
             );
             if (!tab) {
               respond(payload.request_id, { ok: false, error: "no tab found for that session_id" });

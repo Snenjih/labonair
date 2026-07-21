@@ -787,8 +787,8 @@ export function HostFormPanel({ hostId, onClose, newSshTab, newSftpTab, onNaviga
               <div>
                 <p className="text-xs font-medium text-foreground">Block AI Agent Access</p>
                 <p className="text-[11px] text-muted-foreground">
-                  Prevents this host's SSH tabs from ever being granted or used via the AI Agent Bridge,
-                  even if enabled elsewhere.
+                  Prevents this host's SSH tabs from ever being granted or used via the AI Agent Bridge, even
+                  if enabled elsewhere.
                 </p>
               </div>
               <button

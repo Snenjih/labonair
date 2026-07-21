@@ -148,7 +148,11 @@ function AgentBridgeSection() {
                 min={5}
                 max={3600}
                 step={5}
-                onChange={(v) => void applyMcpMaxCommandTimeoutSecs(v).catch((e) => handleApiError(e, "Failed to change max command timeout", "MCP"))}
+                onChange={(v) =>
+                  void applyMcpMaxCommandTimeoutSecs(v).catch((e) =>
+                    handleApiError(e, "Failed to change max command timeout", "MCP"),
+                  )
+                }
               />
             </SettingRow>
             <SettingRow
@@ -160,17 +164,18 @@ function AgentBridgeSection() {
                 min={0}
                 max={1440}
                 step={5}
-                onChange={(v) => void applyMcpAutoRevokeMinutes(v).catch((e) => handleApiError(e, "Failed to change auto-revoke timeout", "MCP"))}
+                onChange={(v) =>
+                  void applyMcpAutoRevokeMinutes(v).catch((e) =>
+                    handleApiError(e, "Failed to change auto-revoke timeout", "MCP"),
+                  )
+                }
               />
             </SettingRow>
             <SettingRow
               title="Notify on agent activity"
               description="Show a notification every time the agent runs a command, sends keys, or opens/closes a tab — separate from error notifications, which are always on."
             >
-              <Switch
-                checked={notifyOnActivity}
-                onCheckedChange={(v) => void setMcpNotifyOnActivity(v)}
-              />
+              <Switch checked={notifyOnActivity} onCheckedChange={(v) => void setMcpNotifyOnActivity(v)} />
             </SettingRow>
           </>
         )}
@@ -182,7 +187,10 @@ function AgentBridgeSection() {
             <div className="flex flex-col gap-1.5 w-full">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-muted-foreground">claude mcp add …</span>
-                <button onClick={() => void handleCopy()} className="text-[11px] text-primary hover:underline">
+                <button
+                  onClick={() => void handleCopy()}
+                  className="text-[11px] text-primary hover:underline"
+                >
                   {copied ? "Copied!" : "Copy"}
                 </button>
               </div>

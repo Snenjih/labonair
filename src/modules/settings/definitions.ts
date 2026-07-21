@@ -552,21 +552,24 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   {
     id: "mcpMaxCommandTimeoutSecs",
     label: "Agent bridge max command timeout (s)",
-    description: "Upper bound on how long a single agent-run command may block before returning still_running.",
+    description:
+      "Upper bound on how long a single agent-run command may block before returning still_running.",
     category: "Connections",
     controlType: "NumberInput",
   },
   {
     id: "mcpAutoRevokeMinutes",
     label: "Agent bridge auto-revoke (min)",
-    description: "Automatically revoke a granted tab after this many minutes of no agent activity. 0 disables auto-revoke.",
+    description:
+      "Automatically revoke a granted tab after this many minutes of no agent activity. 0 disables auto-revoke.",
     category: "Connections",
     controlType: "NumberInput",
   },
   {
     id: "mcpNotifyOnActivity",
     label: "Notify on agent activity",
-    description: "Show a notification every time the AI Agent Bridge runs a command, sends keys, or opens/closes a tab.",
+    description:
+      "Show a notification every time the AI Agent Bridge runs a command, sends keys, or opens/closes a tab.",
     category: "Connections",
     controlType: "Switch",
   },
