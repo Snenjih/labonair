@@ -1,14 +1,12 @@
 import {
   AiScanIcon,
-  Bookmark02Icon,
   File01Icon,
   Folder01Icon,
-  GitBranchIcon,
+  GridViewIcon,
   KeyboardIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
   PlugSocketIcon,
-  Search01Icon,
   Settings01Icon,
   SourceCodeIcon,
   TerminalIcon,
@@ -42,17 +40,15 @@ import { SettingRow } from "./components/SettingRow";
 import { AgentsSection } from "./sections/AgentsSection";
 import { AiSection } from "./sections/AiSection";
 import { AppearanceSection } from "./sections/AppearanceSection";
-import { BookmarksSection } from "./sections/BookmarksSection";
-import { CommandPaletteSection } from "./sections/CommandPaletteSection";
 import { ConnectionsSection } from "./sections/ConnectionsSection";
 import { EditorSection } from "./sections/EditorSection";
 import { FileManagerSection } from "./sections/FileManagerSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { KeyboardShortcutsSection } from "./sections/KeyboardShortcutsSection";
 import { ModelsSection } from "./sections/ModelsSection";
-import { SourceControlSection } from "./sections/SourceControlSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemeMarketplace } from "./sections/ThemeMarketplace";
+import { WorkspaceSection } from "./sections/WorkspaceSection";
 
 type SidebarItem = {
   id: SettingsTab;
@@ -66,13 +62,11 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "appearance", category: "Appearance", label: "Appearance", icon: PaintBoardIcon },
   { id: "themes", category: null, label: "Themes", icon: PaintBrush01Icon },
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
+  { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
   { id: "file-manager", category: "File Manager", label: "File Manager", icon: Folder01Icon },
   { id: "remote-connections", category: "Connections", label: "Connections", icon: PlugSocketIcon },
-  { id: "source-control", category: "Source Control", label: "Source Control", icon: GitBranchIcon },
-  { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
-  { id: "command-palette", category: "Command Palette", label: "Command Palette", icon: Search01Icon },
+  { id: "workspace", category: null, label: "Workspace", icon: GridViewIcon },
   { id: "shortcuts", category: null, label: "Shortcuts", icon: KeyboardIcon },
-  { id: "bookmarks", category: "Bookmarks", label: "Bookmarks", icon: Bookmark02Icon },
   { id: "ai", category: "AI", label: "AI", icon: AiScanIcon },
 ];
 
@@ -83,6 +77,7 @@ function readInitialTab(): SettingsTab {
   const url = new URL(window.location.href);
   const t = url.searchParams.get("tab");
   if (t === "models" || t === "agents" || t === "connections" || t === "directives") return "ai";
+  if (t === "bookmarks" || t === "command-palette" || t === "source-control") return "workspace";
   if (t && (VALID_TABS as string[]).includes(t)) return t as SettingsTab;
   return "general";
 }
@@ -105,6 +100,10 @@ export function SettingsApp() {
     const apply = (detail: string) => {
       if (detail === "models" || detail === "agents" || detail === "connections" || detail === "directives") {
         setActive("ai");
+        return;
+      }
+      if (detail === "bookmarks" || detail === "command-palette" || detail === "source-control") {
+        setActive("workspace");
         return;
       }
       if ((VALID_TABS as string[]).includes(detail)) {
@@ -213,16 +212,14 @@ export function SettingsApp() {
                 {active === "appearance" && <AppearanceSection />}
                 {active === "themes" && <ThemeMarketplace />}
                 {active === "terminal" && <TerminalSection />}
+                {active === "editor" && <EditorSection />}
                 {active === "file-manager" && <FileManagerSection />}
                 {active === "remote-connections" && <ConnectionsSection />}
-                {active === "source-control" && <SourceControlSection />}
-                {active === "editor" && <EditorSection />}
-                {active === "command-palette" && <CommandPaletteSection />}
+                {active === "workspace" && <WorkspaceSection />}
                 {active === "shortcuts" && <KeyboardShortcutsSection />}
+                {active === "ai" && <AiSection />}
                 {active === "models" && <ModelsSection />}
                 {active === "agents" && <AgentsSection />}
-                {active === "ai" && <AiSection />}
-                {active === "bookmarks" && <BookmarksSection />}
               </>
             )}
           </div>

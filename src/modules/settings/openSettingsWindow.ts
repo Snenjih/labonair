@@ -8,15 +8,13 @@ export type SettingsTab =
   | "file-manager"
   | "editor"
   | "remote-connections"
-  | "source-control"
-  | "command-palette"
+  | "workspace"
   | "shortcuts"
   | "models"
   | "agents"
   | "ai"
   | "directives"
   | "security"
-  | "bookmarks"
   | "about";
 
 export async function openSettingsWindow(tab?: SettingsTab): Promise<void> {
