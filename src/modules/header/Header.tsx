@@ -15,11 +15,15 @@ import { cn } from "@/lib/utils";
 import { useChatStore } from "@/modules/ai";
 import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
 import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
+import { useJumpHostGroups } from "@/modules/header/components/JumpHostDropdown";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTransferStore } from "@/modules/sftp/store/transferStore";
 import type { SidebarPanel } from "@/modules/statusbar";
 import { buildBarBucket } from "@/modules/statusbar/lib/renderBarItem";
 import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
+import { useAgentAccessStore } from "@/modules/tabs/store/agentAccessStore";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { WorkspaceTab } from "@/modules/tabs/types";
 
@@ -43,6 +47,10 @@ type Props = {
   onOpenThemes: () => void;
   onNewGitGraph?: () => void;
   onPanelToggle?: (panel: SidebarPanel, side?: "left" | "right") => void;
+  /** Active panel in each dual-dock slot — drives the panel switcher button
+   *  highlight, mirrors StatusBar.tsx's identical props. */
+  leftActivePanel: SidebarPanel;
+  rightActivePanel: SidebarPanel;
   sendCd: (path: string) => void;
   /** Threaded down so titlebar-repositioned info/AI items (breadcrumb,
    *  cursor position, preview chip, AI cluster) render identically to how
@@ -76,6 +84,8 @@ export const Header = React.memo(function Header({
   onOpenThemes,
   onNewGitGraph,
   onPanelToggle,
+  leftActivePanel,
+  rightActivePanel,
   sendCd,
   home,
   onCd,
@@ -88,14 +98,41 @@ export const Header = React.memo(function Header({
   const rootRef = useRef<HTMLDivElement>(null);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
   const bookmarksEnabled = usePreferencesStore((s) => s.bookmarksEnabled);
+  const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
   const placements = usePreferencesStore((s) => s.barItemPlacements);
   const panelOpen = useChatStore((s) => s.panelOpen);
   const openAiPanel = useChatStore((s) => s.openPanel);
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
-  const cursorLine = useEditorCursorStore((s) => s.line);
-  const cursorCol = useEditorCursorStore((s) => s.col);
+
+  // These four badges each self-hide (return null) when empty and "Always
+  // show badges" is off — precomputed here (not inside renderBarItem's
+  // per-id switch, which runs in a loop and can't call hooks) so
+  // buildBarBucket's divider logic can tell a badge is about to render
+  // nothing and skip placing a divider next to it.
+  const hasNotifications = useNotificationStore((s) => s.notifications.length > 0);
+  const hasTransferJobs = useTransferStore((s) => s.jobs.length > 0);
+  const bridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
+  const hasAgentAccessEntries = useAgentAccessStore((s) => Object.keys(s.entries).length > 0);
+  const jumpHostGroups = useJumpHostGroups();
+  const notificationsVisible = badgesAlwaysVisible || hasNotifications;
+  const transfersVisible = badgesAlwaysVisible || hasTransferJobs;
+  const agentAccessVisible = bridgeEnabled && (badgesAlwaysVisible || hasAgentAccessEntries);
+  const jumpHostsVisible = badgesAlwaysVisible || jumpHostGroups.length > 0;
+
+  // cwd/cursor/filePath only feed cwdBreadcrumb/cursorPosition — gating
+  // their selectors' *return value* (not the hook call, which must stay
+  // unconditional) on whether those items actually live in the titlebar
+  // keeps Header from re-rendering on every keystroke/cursor-move for the
+  // majority of users, who have them in the statusbar by default.
+  const showBreadcrumbInTitlebar = placements.cwdBreadcrumb.bar === "titlebar";
+  const showCursorInTitlebar = placements.cursorPosition.bar === "titlebar";
+  const needsActiveTabInfo = showBreadcrumbInTitlebar || showCursorInTitlebar;
+
+  const cursorLine = useEditorCursorStore((s) => (showCursorInTitlebar ? s.line : null));
+  const cursorCol = useEditorCursorStore((s) => (showCursorInTitlebar ? s.col : null));
 
   const cwd = useTabsStore((s) => {
+    if (!showBreadcrumbInTitlebar) return null;
     const tab = s.tabs.find((t) => t.id === s.activeId);
     if (tab?.kind !== "workspace") return null;
     const wt = tab as WorkspaceTab;
@@ -105,6 +142,7 @@ export const Header = React.memo(function Header({
     return null;
   });
   const sshHostId = useTabsStore((s) => {
+    if (!showBreadcrumbInTitlebar) return null;
     const tab = s.tabs.find((t) => t.id === s.activeId);
     if (tab?.kind !== "workspace") return null;
     const wt = tab as WorkspaceTab;
@@ -115,6 +153,7 @@ export const Header = React.memo(function Header({
   const remoteTarget =
     sshHostId && lazySession ? { hostId: sshHostId, sessionId: lazySession.sessionId } : null;
   const filePath = useTabsStore((s) => {
+    if (!needsActiveTabInfo) return null;
     const tab = s.tabs.find((t) => t.id === s.activeId);
     if (tab?.kind !== "editor") return null;
     const et = tab as { isUntitled: boolean; path: string };
@@ -124,8 +163,14 @@ export const Header = React.memo(function Header({
   const ctx = {
     placements,
     onPanelToggle,
+    leftActivePanel,
+    rightActivePanel,
     tabsLocation,
     bookmarksEnabled,
+    notificationsVisible,
+    jumpHostsVisible,
+    agentAccessVisible,
+    transfersVisible,
     sendCd,
     home,
     cwd,

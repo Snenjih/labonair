@@ -15,6 +15,9 @@ export interface BarItemContextMenuProps {
   /** Extra controls rendered below the bar/side choices, above "Hide" — e.g.
    *  AI's Panel/Mini surface-mode radio group. */
   extra?: (placement: BarItemPlacement) => ReactNode;
+  /** Defaults to "w-44" — widen for items whose `extra` content needs more
+   *  room (e.g. CwdBreadcrumb's migrated path actions). */
+  className?: string;
 }
 
 /**
@@ -24,12 +27,12 @@ export interface BarItemContextMenuProps {
  * group — then, if the item contributes any, a divider + its own extra
  * controls, then a final divider + "Hide".
  */
-export function BarItemContextMenu({ itemId, extra }: BarItemContextMenuProps) {
+export function BarItemContextMenu({ itemId, extra, className }: BarItemContextMenuProps) {
   const placement = usePreferencesStore((s) => s.barItemPlacements[itemId]);
   if (!placement) return null;
 
   return (
-    <ContextMenuContent className="w-44">
+    <ContextMenuContent className={className ?? "w-44"}>
       <ContextMenuRadioGroup
         value={placement.side}
         onValueChange={(v) => void setBarItemPlacement(itemId, { side: v as BarSide })}

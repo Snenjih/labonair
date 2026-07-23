@@ -19,7 +19,7 @@ import { buildHostGroups, type HostGroup } from "../lib/jumpHostGroups";
 
 type PillStatus = "connecting" | "connected" | "error" | "auth_required";
 
-function useJumpHostGroups(): HostGroup[] {
+export function useJumpHostGroups(): HostGroup[] {
   const connections = useConnectionStatusStore((s) => s.connections);
   const lazySessions = useLazySessionStore((s) => s.sessions);
   const hosts = useHostsStore((s) => s.hosts);
@@ -173,10 +173,11 @@ export function JumpHostDropdown({ onPanelToggle }: { onPanelToggle?: (panel: Si
   const groups = useJumpHostGroups();
   const placement = usePreferencesStore((s) => s.barItemPlacements.jumpHosts);
   const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
+  if (!placement) return null;
+  if (!badgesAlwaysVisible && groups.length === 0) return null;
+
   const { side: popoverSide, align } = getPopoverPlacement(placement.bar, placement.side);
   const compact = placement.bar === "statusbar";
-
-  if (!badgesAlwaysVisible && groups.length === 0) return null;
 
   const hasError = groups.some((g) => g.hasError);
 

@@ -53,6 +53,7 @@ export function useGitStatus(target: ExplorerTarget) {
   const setCurrentBranch = useSourceControlStore((s) => s.setCurrentBranch);
   const setTags = useSourceControlStore((s) => s.setTags);
   const setPollError = useSourceControlStore((s) => s.setPollError);
+  const setDiffError = useSourceControlStore((s) => s.setDiffError);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
@@ -234,11 +235,13 @@ export function useGitStatus(target: ExplorerTarget) {
   useEffect(() => {
     if (!selectionMode || !repoRoot) {
       setDiffContent(null);
+      setDiffError(null);
       return;
     }
 
     let cancelled = false;
     setIsDiffLoading(true);
+    setDiffError(null);
 
     async function loadDiff() {
       try {
@@ -282,11 +285,12 @@ export function useGitStatus(target: ExplorerTarget) {
 
         if (!cancelled) {
           setDiffContent(content);
+          setDiffError(null);
         }
       } catch (e) {
         if (!cancelled) {
           setDiffContent(null);
-          setPollError(String(e));
+          setDiffError(String(e));
         }
       } finally {
         if (!cancelled) {
@@ -300,7 +304,7 @@ export function useGitStatus(target: ExplorerTarget) {
     return () => {
       cancelled = true;
     };
-  }, [selectionMode, repoRoot, sessionId, ignoreWhitespace, setDiffContent, setIsDiffLoading, setPollError]);
+  }, [selectionMode, repoRoot, sessionId, ignoreWhitespace, setDiffContent, setIsDiffLoading, setDiffError]);
 
   return { refresh: () => void doRefresh() };
 }

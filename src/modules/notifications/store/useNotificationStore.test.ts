@@ -93,6 +93,16 @@ describe("addNotification", () => {
     expect(useNotificationStore.getState().notifications).toHaveLength(2);
   });
 
+  it("spam guard: does not block different titles with the same message+type", () => {
+    const now = 1000000;
+    vi.spyOn(Date, "now").mockReturnValue(now);
+
+    useNotificationStore.getState().addNotification({ ...baseNotif, title: "Push Failed" });
+    useNotificationStore.getState().addNotification({ ...baseNotif, title: "Stash Apply Failed" });
+
+    expect(useNotificationStore.getState().notifications).toHaveLength(2);
+  });
+
   it("limits to 100 notifications", () => {
     for (let i = 0; i < 105; i++) {
       useNotificationStore.getState().addNotification({ ...baseNotif, message: `msg-${i}` });

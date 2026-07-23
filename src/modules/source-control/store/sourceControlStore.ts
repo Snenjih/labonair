@@ -30,12 +30,17 @@ export interface SourceControlState {
   diffContent: string | null;
   isDiffLoading: boolean;
   isStatusLoading: boolean;
-  operationInProgress: "commit" | "push" | "pull" | "fetch" | "abort" | "continue" | null;
+  operationInProgress: "commit" | "push" | "pull" | "fetch" | "abort" | "continue" | "stash" | null;
   /** Set only by `useGitStatus`'s background poll on failure — action
    *  handlers (commit, push, ...) surface their own failures via the
    *  notification store instead, so this exclusively reflects "the most
    *  recent status poll tick failed," not any specific user action. */
   pollError: string | null;
+  /** Set by `useGitStatus`'s diff-load effect (file/section/commit
+   *  selection) on failure — kept separate from `pollError` so a failed
+   *  diff fetch for one selection isn't misreported as a repo-wide/session
+   *  connectivity failure. */
+  diffError: string | null;
   commitMessage: string;
   diffViewMode: "unified" | "split";
   ignoreWhitespace: boolean;
@@ -81,6 +86,7 @@ export interface SourceControlState {
   setIsDiffLoading: (loading: boolean) => void;
   setOperationInProgress: (op: SourceControlState["operationInProgress"]) => void;
   setPollError: (error: string | null) => void;
+  setDiffError: (error: string | null) => void;
   setCommitMessage: (msg: string) => void;
   setDiffViewMode: (mode: "unified" | "split") => void;
   setIgnoreWhitespace: (v: boolean) => void;
@@ -116,6 +122,7 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   isStatusLoading: false,
   operationInProgress: null,
   pollError: null,
+  diffError: null,
   commitMessage: "",
   diffViewMode: "unified",
   ignoreWhitespace: false,
@@ -147,11 +154,12 @@ export const useSourceControlStore = create<SourceControlState>()((set) => ({
   selectAll: () => set({ selectionMode: { type: "all" } }),
   selectCommitDiff: (hash, repositoryPath, sessionId) =>
     set({ selectionMode: { type: "commit", hash, repositoryPath, sessionId } }),
-  clearSelectedFile: () => set({ selectionMode: null, diffContent: null }),
+  clearSelectedFile: () => set({ selectionMode: null, diffContent: null, diffError: null }),
   setDiffContent: (diffContent) => set({ diffContent }),
   setIsDiffLoading: (isDiffLoading) => set({ isDiffLoading }),
   setOperationInProgress: (operationInProgress) => set({ operationInProgress }),
   setPollError: (pollError) => set({ pollError }),
+  setDiffError: (diffError) => set({ diffError }),
   setCommitMessage: (commitMessage) => set({ commitMessage }),
   setDiffViewMode: (diffViewMode) => set({ diffViewMode }),
   setIgnoreWhitespace: (ignoreWhitespace) => set({ ignoreWhitespace }),

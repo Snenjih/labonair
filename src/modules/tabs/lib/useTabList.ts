@@ -38,9 +38,9 @@ export function useTabList(): UseTabListReturn {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
-      reorderTabs(Number(active.id), Number(over.id));
+      const reorder = resolveDragReorder(event);
+      if (!reorder) return;
+      reorderTabs(reorder.from, reorder.to);
     },
     [reorderTabs],
   );
@@ -56,7 +56,7 @@ export function useTabList(): UseTabListReturn {
   useEffect(() => {
     seenRef.current = new Set(tabs.map((t) => t.id));
   }, [tabs]);
-  const isNewTab = useCallback((id: number) => !firstRender && !seen.has(id), [firstRender, seen]);
+  const isNewTab = useCallback((id: number) => computeIsNewTab(firstRender, seen, id), [firstRender, seen]);
 
   // Clear editing state if the tab being renamed is closed externally.
   useEffect(() => {
@@ -73,6 +73,21 @@ export function useTabList(): UseTabListReturn {
  *  longer exists (e.g. closed via a different affordance mid-rename). */
 export function isEditingStale(tabs: Tab[], editingId: number | null): boolean {
   return editingId !== null && !tabs.some((t) => t.id === editingId);
+}
+
+/** Pure — maps a dnd-kit drag-end event to a reorder instruction, or `null`
+ *  if it was a no-op (dropped outside any droppable, or dropped on itself). */
+export function resolveDragReorder(event: DragEndEvent): { from: number; to: number } | null {
+  const { active, over } = event;
+  if (!over || active.id === over.id) return null;
+  return { from: Number(active.id), to: Number(over.id) };
+}
+
+/** Pure — whether `id` should play the tab-enter animation: never on the
+ *  very first render (so restored tabs don't animate), and never for a tab
+ *  already present in `seenIds`. */
+export function computeIsNewTab(firstRender: boolean, seenIds: ReadonlySet<number>, id: number): boolean {
+  return !firstRender && !seenIds.has(id);
 }
 
 /** Pure — middle-click (button 1) closes a tab, except the last remaining

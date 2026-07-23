@@ -20,6 +20,7 @@ export function AgentAccessBadge() {
   const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
   const list = Object.values(entries);
   if (!bridgeEnabled) return null;
+  if (!placement) return null;
   if (!badgesAlwaysVisible && list.length === 0) return null;
 
   const { side, align } = getPopoverPlacement(placement.bar, placement.side);

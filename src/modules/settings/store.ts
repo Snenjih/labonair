@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { getStoragePaths } from "@/lib/paths";
@@ -1549,18 +1550,16 @@ export async function setBarItemPlacements(value: Record<BarItemId, BarItemPlace
 }
 
 /** Merge-updates a single item's placement (used by the right-click position
- *  menu and the Layout & Panels settings rows) without clobbering the rest. */
+ *  menu and the Layout & Panels settings rows) without clobbering the rest.
+ *  Delegates the read-merge-write to a Rust command guarded by a
+ *  process-wide mutex — the main window and the separate Settings window
+ *  are independent JS runtimes that can call this concurrently, so the
+ *  merge has to happen somewhere both share, not here. */
 export async function setBarItemPlacement(
   itemId: BarItemId,
   patch: Partial<BarItemPlacement>,
 ): Promise<void> {
-  const store = await getStore();
-  const current =
-    (await store.get<Preferences["barItemPlacements"]>(KEY_BAR_ITEM_PLACEMENTS)) ??
-    DEFAULT_PREFERENCES.barItemPlacements;
-  const next = { ...current, [itemId]: { ...current[itemId], ...patch, itemId } };
-  await store.set(KEY_BAR_ITEM_PLACEMENTS, next);
-  await store.save();
+  await invoke("settings_set_bar_item_placement", { itemId, patch });
 }
 
 export async function setBarLayoutMigrated(value: boolean): Promise<void> {

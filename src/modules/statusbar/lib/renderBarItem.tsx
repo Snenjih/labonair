@@ -43,11 +43,17 @@ export interface RenderBarItemCtx {
   placements: Record<BarItemId, BarItemPlacement>;
   // panels
   onPanelToggle?: (panel: SidebarPanel, side?: BarSide) => void;
-  leftActivePanel?: SidebarPanel;
-  rightActivePanel?: SidebarPanel;
+  leftActivePanel: SidebarPanel;
+  rightActivePanel: SidebarPanel;
   tabsLocation: "titlebar" | "sidebar";
-  // badges
+  // badges — required so a caller of `buildBarBucket` can't silently omit
+  // one and leave a divider stranded next to a badge that self-hides at
+  // runtime (see `notificationsVisible` etc.).
   bookmarksEnabled: boolean;
+  notificationsVisible: boolean;
+  jumpHostsVisible: boolean;
+  agentAccessVisible: boolean;
+  transfersVisible: boolean;
   sendCd: (path: string) => void;
   // info
   home: string | null;
@@ -56,8 +62,8 @@ export interface RenderBarItemCtx {
   remoteTarget: BreadcrumbRemoteTarget | null;
   onCd: (path: string) => void;
   onCdInNewTab?: (path: string) => void;
-  cursorLine: number;
-  cursorCol: number;
+  cursorLine: number | null;
+  cursorCol: number | null;
   detectedPreviewUrl?: string | null;
   onOpenPreview?: () => void;
   // ai
@@ -124,13 +130,13 @@ function renderBarItem(id: BarItemId, ctx: RenderBarItemCtx): ReactNode {
     case "updater":
       return <UpdaterButton />;
     case "notifications":
-      return <NotificationDropdown />;
+      return ctx.notificationsVisible ? <NotificationDropdown /> : null;
     case "jumpHosts":
-      return <JumpHostDropdown onPanelToggle={ctx.onPanelToggle} />;
+      return ctx.jumpHostsVisible ? <JumpHostDropdown onPanelToggle={ctx.onPanelToggle} /> : null;
     case "agentAccess":
-      return <AgentAccessBadge />;
+      return ctx.agentAccessVisible ? <AgentAccessBadge /> : null;
     case "transfers":
-      return <TransferDropdown />;
+      return ctx.transfersVisible ? <TransferDropdown /> : null;
     case "bookmarks":
       return ctx.bookmarksEnabled ? <BookmarksDropdown sendCd={ctx.sendCd} /> : null;
 

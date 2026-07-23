@@ -32,10 +32,15 @@ function pushNotification(
   notif: Omit<AppNotification, "id" | "timestamp">,
 ): void {
   const { notifications } = get();
-  // Spam guard: ignore if newest notification has same message+type within 2s
+  // Spam guard: ignore if newest notification has same title+message+type
+  // within 2s. `title` must be part of the key — otherwise two *different*
+  // actions failing with the same underlying error text (e.g. a shared dead
+  // SSH session) within the window would silently drop one of them, even
+  // though they're unrelated failures the user needs to see both of.
   const newest = notifications[0];
   if (
     newest &&
+    newest.title === notif.title &&
     newest.message === notif.message &&
     newest.type === notif.type &&
     Date.now() - newest.timestamp < 2000

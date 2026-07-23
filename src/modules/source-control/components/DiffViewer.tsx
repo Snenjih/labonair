@@ -146,6 +146,7 @@ export function DiffViewer() {
   const status = useSourceControlStore((s) => s.status);
   const selectionMode = useSourceControlStore((s) => s.selectionMode);
   const diffContent = useSourceControlStore((s) => s.diffContent);
+  const diffError = useSourceControlStore((s) => s.diffError);
   const isDiffLoading = useSourceControlStore((s) => s.isDiffLoading);
   const diffViewMode = useSourceControlStore((s) => s.diffViewMode);
   const ignoreWhitespace = useSourceControlStore((s) => s.ignoreWhitespace);
@@ -320,6 +321,19 @@ export function DiffViewer() {
   }
 
   if (!selectionMode) return null;
+
+  // Scoped to this selection's diff fetch — kept separate from the
+  // repo-wide `pollError` banner so a failed fetch for one file/section
+  // doesn't get misreported as a background-poll/connectivity failure.
+  if (diffError) {
+    return (
+      <div className="border-t border-border/60">
+        <div className="mx-3 my-1 rounded border border-error/30 bg-error/10 px-2 py-1 text-[10px] text-error">
+          Failed to load diff: {diffError}
+        </div>
+      </div>
+    );
+  }
 
   // Only collapse the whole viewer to "Binary file changed" when every file
   // in the selection is binary — a mixed multi-file diff falls through to

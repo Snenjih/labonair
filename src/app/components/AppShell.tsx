@@ -242,6 +242,8 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onOpenThemes={onOpenThemes}
                 onNewGitGraph={onNewGitGraph}
                 onPanelToggle={handlePanelToggle}
+                leftActivePanel={sidebar.left.activePanel}
+                rightActivePanel={sidebar.right.activePanel}
                 sendCd={tabs.sendCd}
                 home={ctrl.home}
                 onCd={tabs.sendCd}

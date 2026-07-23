@@ -2,7 +2,11 @@ import React from "react";
 import { useChatStore } from "@/modules/ai";
 import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
 import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
+import { useJumpHostGroups } from "@/modules/header/components/JumpHostDropdown";
+import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
 import { usePreferencesStore } from "@/modules/settings/preferences";
+import { useTransferStore } from "@/modules/sftp/store/transferStore";
+import { useAgentAccessStore } from "@/modules/tabs/store/agentAccessStore";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import type { WorkspaceTab } from "@/modules/tabs/types";
 import { buildBarBucket } from "./lib/renderBarItem";
@@ -42,9 +46,22 @@ export const StatusBar = React.memo(function StatusBar({
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
   const bookmarksEnabled = usePreferencesStore((s) => s.bookmarksEnabled);
+  const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
   const placements = usePreferencesStore((s) => s.barItemPlacements);
   const cursorLine = useEditorCursorStore((s) => s.line);
   const cursorCol = useEditorCursorStore((s) => s.col);
+
+  // See Header.tsx's identical block for why this is precomputed here
+  // rather than inside renderBarItem's per-id switch.
+  const hasNotifications = useNotificationStore((s) => s.notifications.length > 0);
+  const hasTransferJobs = useTransferStore((s) => s.jobs.length > 0);
+  const bridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
+  const hasAgentAccessEntries = useAgentAccessStore((s) => Object.keys(s.entries).length > 0);
+  const jumpHostGroups = useJumpHostGroups();
+  const notificationsVisible = badgesAlwaysVisible || hasNotifications;
+  const transfersVisible = badgesAlwaysVisible || hasTransferJobs;
+  const agentAccessVisible = bridgeEnabled && (badgesAlwaysVisible || hasAgentAccessEntries);
+  const jumpHostsVisible = badgesAlwaysVisible || jumpHostGroups.length > 0;
 
   const cwd = useTabsStore((s) => {
     const tab = s.tabs.find((t) => t.id === s.activeId);
@@ -79,10 +96,14 @@ export const StatusBar = React.memo(function StatusBar({
   const ctx = {
     placements,
     onPanelToggle,
-    leftActivePanel,
-    rightActivePanel,
+    leftActivePanel: leftActivePanel ?? null,
+    rightActivePanel: rightActivePanel ?? null,
     tabsLocation,
     bookmarksEnabled,
+    notificationsVisible,
+    jumpHostsVisible,
+    agentAccessVisible,
+    transfersVisible,
     sendCd: onCd,
     home,
     cwd,

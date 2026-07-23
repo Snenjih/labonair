@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/breadcrumb";
 import {
   ContextMenu,
-  ContextMenuContent,
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
@@ -70,27 +69,7 @@ function basename(path: string): string {
   return i === -1 ? path : path.slice(i + 1);
 }
 
-/**
- * Outer wrapper adding a container-level right-click menu (reposition/hide,
- * via the shared bar-item registry) around the breadcrumb. Right-clicking a
- * specific segment still hits that segment's own inner context menu first
- * (path actions below) — this outer one only catches clicks on the
- * breadcrumb's empty padding/gaps, not already claimed by a segment.
- */
-export function CwdBreadcrumb(props: Props) {
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div className="contents">
-          <CwdBreadcrumbInner {...props} />
-        </div>
-      </ContextMenuTrigger>
-      <BarItemContextMenu itemId="cwdBreadcrumb" />
-    </ContextMenu>
-  );
-}
-
-function CwdBreadcrumbInner({ cwd, filePath, home, remoteTarget, onCd, onCdInNewTab }: Props) {
+export function CwdBreadcrumb({ cwd, filePath, home, remoteTarget, onCd, onCdInNewTab }: Props) {
   // File mode: dir segments navigate; filename is the terminal leaf.
   if (filePath) {
     const dir = dirname(filePath);
@@ -139,7 +118,14 @@ function CwdBreadcrumbInner({ cwd, filePath, home, remoteTarget, onCd, onCdInNew
   }
 
   if (!cwd) {
-    return <span className="text-xs text-muted-foreground/70">no directory</span>;
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <span className="text-xs text-muted-foreground/70">no directory</span>
+        </ContextMenuTrigger>
+        <BarItemContextMenu itemId="cwdBreadcrumb" />
+      </ContextMenu>
+    );
   }
 
   const segments = segmentsFromCwd(cwd, home);
@@ -202,7 +188,11 @@ type SegmentMenuProps = {
   onCdInNewTab?: (path: string) => void;
 };
 
-function SegmentContextMenuContent({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: SegmentMenuProps) {
+/** Migrated into `BarItemContextMenu`'s `extra` slot (see `CwdBreadcrumb`'s
+ *  three trigger sites below) so a segment right-click opens exactly one
+ *  menu instead of this content's own `ContextMenu` racing the bar-item
+ *  reposition/hide menu that used to wrap the whole breadcrumb. */
+function SegmentExtraActions({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: SegmentMenuProps) {
   const displayName = seg.isHome ? "Home" : seg.label;
   const rel = cwd ? relativePath(cwd, seg.fullPath) : seg.fullPath;
   const bookmarksEnabled = usePreferencesStore((s) => s.bookmarksEnabled);
@@ -210,7 +200,7 @@ function SegmentContextMenuContent({ seg, cwd, remoteTarget, onCd, onCdInNewTab 
   const addBookmark = usePathBookmarksStore((s) => s.addBookmark);
   const removeByPath = usePathBookmarksStore((s) => s.removeByPath);
   return (
-    <ContextMenuContent className="w-56">
+    <>
       <ContextMenuLabel className="text-[11px]">{displayName}</ContextMenuLabel>
       <ContextMenuSeparator />
       <ContextMenuItem
@@ -260,7 +250,7 @@ function SegmentContextMenuContent({ seg, cwd, remoteTarget, onCd, onCdInNewTab 
       >
         Reference in AI chat
       </ContextMenuItem>
-    </ContextMenuContent>
+    </>
   );
 }
 
@@ -285,12 +275,18 @@ function SegmentWithContextMenu({ seg, cwd, remoteTarget, onCd, onCdInNewTab }: 
             </BreadcrumbLink>
           </BreadcrumbItem>
         </ContextMenuTrigger>
-        <SegmentContextMenuContent
-          seg={seg}
-          cwd={cwd}
-          remoteTarget={remoteTarget}
-          onCd={onCd}
-          onCdInNewTab={onCdInNewTab}
+        <BarItemContextMenu
+          itemId="cwdBreadcrumb"
+          className="w-56"
+          extra={() => (
+            <SegmentExtraActions
+              seg={seg}
+              cwd={cwd}
+              remoteTarget={remoteTarget}
+              onCd={onCd}
+              onCdInNewTab={onCdInNewTab}
+            />
+          )}
         />
       </ContextMenu>
       <BreadcrumbSeparator className="[&>svg]:size-3" />
@@ -311,12 +307,18 @@ function CurrentSegmentWithContextMenu({ seg, cwd, remoteTarget, onCd, onCdInNew
           />
         </span>
       </ContextMenuTrigger>
-      <SegmentContextMenuContent
-        seg={seg}
-        cwd={cwd}
-        remoteTarget={remoteTarget}
-        onCd={onCd}
-        onCdInNewTab={onCdInNewTab}
+      <BarItemContextMenu
+        itemId="cwdBreadcrumb"
+        className="w-56"
+        extra={() => (
+          <SegmentExtraActions
+            seg={seg}
+            cwd={cwd}
+            remoteTarget={remoteTarget}
+            onCd={onCd}
+            onCdInNewTab={onCdInNewTab}
+          />
+        )}
       />
     </ContextMenu>
   );
@@ -430,12 +432,18 @@ function CollapsedSegments({
                     <span className="truncate">{s.isHome ? "Home" : s.label}</span>
                   </DropdownMenuItem>
                 </ContextMenuTrigger>
-                <SegmentContextMenuContent
-                  seg={s}
-                  cwd={cwd}
-                  remoteTarget={remoteTarget}
-                  onCd={onCd}
-                  onCdInNewTab={onCdInNewTab}
+                <BarItemContextMenu
+                  itemId="cwdBreadcrumb"
+                  className="w-56"
+                  extra={() => (
+                    <SegmentExtraActions
+                      seg={s}
+                      cwd={cwd}
+                      remoteTarget={remoteTarget}
+                      onCd={onCd}
+                      onCdInNewTab={onCdInNewTab}
+                    />
+                  )}
                 />
               </ContextMenu>
             ))}

@@ -92,6 +92,15 @@ export const PANEL_ITEM_TO_PANEL: Record<
   tabsPanel: "tabs",
 };
 
+/** Reverse of `PANEL_ITEM_TO_PANEL` — looks up a panel's own `BarItemId` so
+ *  its per-item registered `side` can be resolved without every caller of
+ *  `useSidebar`'s `openPanel`/`handlePanelToggle` needing to know it. */
+export const PANEL_TO_ITEM_ID: Partial<
+  Record<Exclude<SidebarPanel, null>, keyof typeof PANEL_ITEM_TO_PANEL>
+> = Object.fromEntries(
+  Object.entries(PANEL_ITEM_TO_PANEL).map(([itemId, panel]) => [panel, itemId]),
+) as Partial<Record<Exclude<SidebarPanel, null>, keyof typeof PANEL_ITEM_TO_PANEL>>;
+
 function make(
   itemId: BarItemId,
   bar: BarId,

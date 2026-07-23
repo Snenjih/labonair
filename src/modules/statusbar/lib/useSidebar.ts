@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PanelImperativeHandle } from "react-resizable-panels";
+import { PANEL_TO_ITEM_ID } from "@/modules/settings/lib/barItems";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setSidebarActivePanel,
@@ -149,6 +150,7 @@ export function useSidebar(): SidebarReturn {
   const prefsHydrated = usePreferencesStore((s) => s.hydrated);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
   const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
+  const placements = usePreferencesStore((s) => s.barItemPlacements);
   const primaryStoredOpen = usePreferencesStore((s) => s.sidebarOpen);
   const primaryStoredPanel = usePreferencesStore((s) => s.sidebarActivePanel);
   const secondaryStoredOpen = usePreferencesStore((s) => s.sidebarRightOpen);
@@ -182,18 +184,33 @@ export function useSidebar(): SidebarReturn {
 
   const slotForSide = useCallback((side: SidebarSide) => (side === "left" ? left : right), [left, right]);
 
+  // Falls back through: explicit `side` argument (an actual button click,
+  // which already knows its own placement) → the panel's own registered
+  // side in the bar-item registry → the legacy global `sidebarPosition`.
+  // Without the middle step, callers that don't know their own placement
+  // (command palette, JumpHostDropdown's explorer fallback) would silently
+  // ignore a panel's per-item side and always open on `sidebarPosition`.
+  const resolveSide = useCallback(
+    (panel: SidebarPanel, side?: SidebarSide): SidebarSide => {
+      if (side) return side;
+      const itemId = panel ? PANEL_TO_ITEM_ID[panel] : undefined;
+      return (itemId && placements[itemId]?.side) || sidebarPosition;
+    },
+    [placements, sidebarPosition],
+  );
+
   const handlePanelToggle = useCallback(
     (panel: SidebarPanel, side?: SidebarSide) => {
-      slotForSide(side ?? sidebarPosition).toggle(panel);
+      slotForSide(resolveSide(panel, side)).toggle(panel);
     },
-    [slotForSide, sidebarPosition],
+    [slotForSide, resolveSide],
   );
 
   const openPanel = useCallback(
     (panel: SidebarPanel, side?: SidebarSide) => {
-      slotForSide(side ?? sidebarPosition).move(panel);
+      slotForSide(resolveSide(panel, side)).move(panel);
     },
-    [slotForSide, sidebarPosition],
+    [slotForSide, resolveSide],
   );
 
   const movePanel = useCallback(

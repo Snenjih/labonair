@@ -41,10 +41,14 @@ interface StashEntryRowProps {
 }
 
 function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowProps) {
+  const operationInProgress = useSourceControlStore((s) => s.operationInProgress);
+  const setOperationInProgress = useSourceControlStore((s) => s.setOperationInProgress);
   const [actionLoading, setActionLoading] = useState<"apply" | "pop" | "drop" | null>(null);
   const [showDropConfirm, setShowDropConfirm] = useState(false);
 
   async function handleApply() {
+    if (operationInProgress) return;
+    setOperationInProgress("stash");
     setActionLoading("apply");
     try {
       await git.stashApply(repoRoot, entry.hash, sessionId);
@@ -59,10 +63,13 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
       });
     } finally {
       setActionLoading(null);
+      setOperationInProgress(null);
     }
   }
 
   async function handlePop() {
+    if (operationInProgress) return;
+    setOperationInProgress("stash");
     setActionLoading("pop");
     try {
       await git.stashPop(repoRoot, entry.hash, sessionId);
@@ -77,10 +84,13 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
       });
     } finally {
       setActionLoading(null);
+      setOperationInProgress(null);
     }
   }
 
   async function handleDrop() {
+    if (operationInProgress) return;
+    setOperationInProgress("stash");
     setActionLoading("drop");
     try {
       await git.stashDrop(repoRoot, entry.hash, sessionId);
@@ -92,11 +102,13 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
         .addActionResultNotification({ type: "error", title: "Stash Drop Failed", message: String(e) });
     } finally {
       setActionLoading(null);
+      setOperationInProgress(null);
     }
   }
 
   const displayMessage = entry.message.trim() || "WIP";
   const isLoading = actionLoading !== null;
+  const disabled = operationInProgress !== null;
 
   return (
     <>
@@ -131,7 +143,7 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
             type="button"
             className="flex h-4 w-4 items-center justify-center rounded text-[9px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={() => void handleApply()}
-            disabled={isLoading}
+            disabled={disabled}
             title="Apply (keep stash)"
           >
             {actionLoading === "apply" ? (
@@ -146,7 +158,7 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
             type="button"
             className="flex h-4 w-4 items-center justify-center rounded text-[9px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={() => void handlePop()}
-            disabled={isLoading}
+            disabled={disabled}
             title="Pop (apply and drop)"
           >
             {actionLoading === "pop" ? (
@@ -161,7 +173,7 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
             type="button"
             className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-red-500/20 hover:text-red-500"
             onClick={() => setShowDropConfirm(true)}
-            disabled={isLoading}
+            disabled={disabled}
             title="Drop stash"
           >
             {actionLoading === "drop" ? (
@@ -207,13 +219,18 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
 
 export function StashPanel({ repoRoot, sessionId, onRefresh }: StashPanelProps) {
   const stashEntries = useSourceControlStore((s) => s.stashEntries);
+  const operationInProgress = useSourceControlStore((s) => s.operationInProgress);
+  const setOperationInProgress = useSourceControlStore((s) => s.setOperationInProgress);
 
   const [collapsed, setCollapsed] = useState(false);
   const [showStashForm, setShowStashForm] = useState(false);
   const [stashMessage, setStashMessage] = useState("");
   const [isStashing, setIsStashing] = useState(false);
+  const disabled = operationInProgress !== null;
 
   async function doStash() {
+    if (operationInProgress) return;
+    setOperationInProgress("stash");
     setIsStashing(true);
     try {
       await git.stashPush(repoRoot, stashMessage.trim() || undefined, undefined, sessionId);
@@ -226,6 +243,7 @@ export function StashPanel({ repoRoot, sessionId, onRefresh }: StashPanelProps) 
         .addActionResultNotification({ type: "error", title: "Stash Failed", message: String(e) });
     } finally {
       setIsStashing(false);
+      setOperationInProgress(null);
     }
   }
 
@@ -259,6 +277,7 @@ export function StashPanel({ repoRoot, sessionId, onRefresh }: StashPanelProps) 
           size="icon"
           className="ml-0.5 size-4 opacity-0 transition-opacity group-hover/hdr:opacity-100"
           title="New Stash"
+          disabled={disabled}
           onClick={handleNewStashClick}
         >
           <HugeiconsIcon icon={PlusSignIcon} size={9} strokeWidth={2} />
@@ -284,7 +303,7 @@ export function StashPanel({ repoRoot, sessionId, onRefresh }: StashPanelProps) 
               size="sm"
               className="h-6 flex-1 text-xs"
               onClick={() => void doStash()}
-              disabled={isStashing}
+              disabled={disabled}
             >
               {isStashing ? <Spinner className="size-3" /> : "Stash"}
             </Button>
