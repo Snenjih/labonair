@@ -52,7 +52,7 @@ export function useGitStatus(target: ExplorerTarget) {
   const setIsBranchLoading = useSourceControlStore((s) => s.setIsBranchLoading);
   const setCurrentBranch = useSourceControlStore((s) => s.setCurrentBranch);
   const setTags = useSourceControlStore((s) => s.setTags);
-  const setError = useSourceControlStore((s) => s.setError);
+  const setPollError = useSourceControlStore((s) => s.setPollError);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isMountedRef = useRef(true);
@@ -100,7 +100,7 @@ export function useGitStatus(target: ExplorerTarget) {
       // unless this request is already stale, in which case the newer
       // request's own result (success or failure) is what should be shown.
       if (!isStale()) {
-        setError(String(e));
+        setPollError(String(e));
         setRepoInfo(false, null);
       }
       isRefreshingRef.current = false;
@@ -123,7 +123,7 @@ export function useGitStatus(target: ExplorerTarget) {
       root = await git.getRepoRoot(rootPath, targetSessionId);
     } catch (e) {
       if (!isStale()) {
-        setError(String(e));
+        setPollError(String(e));
         setRepoInfo(false, null);
       }
       isRefreshingRef.current = false;
@@ -137,7 +137,7 @@ export function useGitStatus(target: ExplorerTarget) {
 
     // Check if repo root changed and clear stale diff selection
     const prevRoot = useSourceControlStore.getState().repoRoot;
-    setError(null);
+    setPollError(null);
     setRepoInfo(true, root);
     if (prevRoot !== null && prevRoot !== root) {
       useSourceControlStore.getState().clearSelectedFile();
@@ -160,7 +160,7 @@ export function useGitStatus(target: ExplorerTarget) {
       setDiffStats(state.diffStats);
       setSubmodules(state.submodules);
     } catch (e) {
-      if (!isStale()) setError(String(e));
+      if (!isStale()) setPollError(String(e));
     } finally {
       if (!isStale()) {
         setIsStatusLoading(false);
@@ -184,7 +184,7 @@ export function useGitStatus(target: ExplorerTarget) {
     setTags,
     setDiffStats,
     setSubmodules,
-    setError,
+    setPollError,
   ]);
 
   const effectiveIntervalMs = effectivePollIntervalMs(pollIntervalMs, target);
@@ -286,7 +286,7 @@ export function useGitStatus(target: ExplorerTarget) {
       } catch (e) {
         if (!cancelled) {
           setDiffContent(null);
-          setError(String(e));
+          setPollError(String(e));
         }
       } finally {
         if (!cancelled) {
@@ -300,7 +300,7 @@ export function useGitStatus(target: ExplorerTarget) {
     return () => {
       cancelled = true;
     };
-  }, [selectionMode, repoRoot, sessionId, ignoreWhitespace, setDiffContent, setIsDiffLoading, setError]);
+  }, [selectionMode, repoRoot, sessionId, ignoreWhitespace, setDiffContent, setIsDiffLoading, setPollError]);
 
   return { refresh: () => void doRefresh() };
 }

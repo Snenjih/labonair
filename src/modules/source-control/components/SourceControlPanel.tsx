@@ -35,7 +35,7 @@ export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPane
   const sessionId = useSourceControlStore((s) => s.sessionId);
   const status = useSourceControlStore((s) => s.status);
   const submodules = useSourceControlStore((s) => s.submodules);
-  const error = useSourceControlStore((s) => s.error);
+  const pollError = useSourceControlStore((s) => s.pollError);
 
   // Uninitialized submodules (empty gitlink directory) never produce a
   // `git status` entry at all — the only way to see them is `git submodule
@@ -56,7 +56,7 @@ export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPane
         rootPath={rootPath}
         sessionId={sessionId ?? undefined}
         onRefresh={refresh}
-        errorMessage={error ?? undefined}
+        errorMessage={pollError ?? undefined}
         onReconnect={lazySession?.reconnect}
       />
     );
@@ -78,9 +78,9 @@ export function SourceControlPanel({ target, onOpenGitGraph }: SourceControlPane
        *  poll tick failed (e.g. the SSH session dropped mid-refresh) — shown
        *  inline instead of tearing down to NoRepoState, since the repo
        *  itself hasn't gone anywhere. Self-clears on the next successful poll. */}
-      {error && (
+      {pollError && (
         <div className="mx-3 my-1 rounded border border-error/30 bg-error/10 px-2 py-1 text-[10px] text-error">
-          {error}
+          {pollError}
         </div>
       )}
 

@@ -139,3 +139,28 @@ describe("notifyOnErrors gating", () => {
     expect(useNotificationStore.getState().notifications).toHaveLength(1);
   });
 });
+
+describe("addActionResultNotification", () => {
+  it("bypasses the notifyOnErrors gate for error-type action results", () => {
+    usePreferencesStore.setState({ notifyOnErrors: false });
+    useNotificationStore.getState().addActionResultNotification({ ...baseNotif, type: "error" });
+    expect(useNotificationStore.getState().notifications).toHaveLength(1);
+  });
+
+  it("still applies the spam guard", () => {
+    const now = 1000000;
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    usePreferencesStore.setState({ notifyOnErrors: false });
+    useNotificationStore.getState().addActionResultNotification({ ...baseNotif, type: "error" });
+    useNotificationStore.getState().addActionResultNotification({ ...baseNotif, type: "error" });
+    expect(useNotificationStore.getState().notifications).toHaveLength(1);
+  });
+
+  it("does not affect the regular notifyOnErrors-gated addNotification path", () => {
+    usePreferencesStore.setState({ notifyOnErrors: false });
+    useNotificationStore.getState().addActionResultNotification({ ...baseNotif, type: "error" });
+    useNotificationStore.getState().addNotification({ ...baseNotif, type: "error", message: "Other" });
+    expect(useNotificationStore.getState().notifications).toHaveLength(1);
+    expect(useNotificationStore.getState().notifications[0].message).toBe("Hello");
+  });
+});

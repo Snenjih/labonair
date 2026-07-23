@@ -39,7 +39,6 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
   const branchList = useSourceControlStore((s) => s.branchList);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showForcePushConfirm, setShowForcePushConfirm] = useState(false);
   const [showSetUpstreamPrompt, setShowSetUpstreamPrompt] = useState(false);
 
@@ -63,22 +62,20 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
       return;
     }
     setOperationInProgress("push");
-    setError(null);
     setShowSetUpstreamPrompt(false);
     try {
       await git.push(repoRoot, undefined, undefined, sessionId ?? undefined);
       onRefresh();
-      useNotificationStore.getState().addNotification({
+      useNotificationStore.getState().addActionResultNotification({
         type: "success",
         title: "Pushed",
         message: currentBranch ? `${currentBranch} pushed to remote` : "Pushed to remote",
       });
     } catch (e) {
       const errMsg = String(e);
-      setError(errMsg);
       useNotificationStore
         .getState()
-        .addNotification({ type: "error", title: "Push Failed", message: errMsg });
+        .addActionResultNotification({ type: "error", title: "Push Failed", message: errMsg });
       if (
         errMsg.includes("no upstream") ||
         errMsg.includes("no tracking") ||
@@ -95,18 +92,18 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
   async function handlePull() {
     if (!repoRoot || operationInProgress) return;
     setOperationInProgress("pull");
-    setError(null);
     try {
       await git.pull(repoRoot, sessionId ?? undefined);
       onRefresh();
-      useNotificationStore
-        .getState()
-        .addNotification({ type: "success", title: "Pulled", message: "Branch updated from remote" });
+      useNotificationStore.getState().addActionResultNotification({
+        type: "success",
+        title: "Pulled",
+        message: "Branch updated from remote",
+      });
     } catch (e) {
-      setError(String(e));
       useNotificationStore
         .getState()
-        .addNotification({ type: "error", title: "Pull Failed", message: String(e) });
+        .addActionResultNotification({ type: "error", title: "Pull Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -115,18 +112,16 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
   async function handleFetch() {
     if (!repoRoot || operationInProgress) return;
     setOperationInProgress("fetch");
-    setError(null);
     try {
       await git.fetch(repoRoot, sessionId ?? undefined);
       onRefresh();
       useNotificationStore
         .getState()
-        .addNotification({ type: "info", title: "Fetched", message: "Fetched all remotes" });
+        .addActionResultNotification({ type: "info", title: "Fetched", message: "Fetched all remotes" });
     } catch (e) {
-      setError(String(e));
       useNotificationStore
         .getState()
-        .addNotification({ type: "error", title: "Fetch Failed", message: String(e) });
+        .addActionResultNotification({ type: "error", title: "Fetch Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -136,20 +131,18 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
     setShowForcePushConfirm(false);
     if (!repoRoot || operationInProgress) return;
     setOperationInProgress("push");
-    setError(null);
     try {
       await git.pushForceWithLease(repoRoot, undefined, undefined, sessionId ?? undefined);
       onRefresh();
-      useNotificationStore.getState().addNotification({
+      useNotificationStore.getState().addActionResultNotification({
         type: "success",
         title: "Force Pushed",
         message: currentBranch ? `${currentBranch} force-pushed to remote` : "Force-pushed to remote",
       });
     } catch (e) {
-      setError(String(e));
       useNotificationStore
         .getState()
-        .addNotification({ type: "error", title: "Force Push Failed", message: String(e) });
+        .addActionResultNotification({ type: "error", title: "Force Push Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -158,21 +151,19 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
   async function handleSetUpstream() {
     if (!repoRoot || !currentBranch || operationInProgress) return;
     setOperationInProgress("push");
-    setError(null);
     setShowSetUpstreamPrompt(false);
     try {
       await git.pushSetUpstream(repoRoot, "origin", currentBranch, sessionId ?? undefined);
       onRefresh();
-      useNotificationStore.getState().addNotification({
+      useNotificationStore.getState().addActionResultNotification({
         type: "success",
         title: "Pushed & Upstream Set",
         message: currentBranch ? `${currentBranch} pushed with upstream set` : "Upstream set and pushed",
       });
     } catch (e) {
-      setError(String(e));
       useNotificationStore
         .getState()
-        .addNotification({ type: "error", title: "Push Failed", message: String(e) });
+        .addActionResultNotification({ type: "error", title: "Push Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -309,20 +300,6 @@ export function BranchBar({ onRefresh }: BranchBarProps) {
           {mergeInProgress && "Merge in progress — resolve conflicts, then commit or Abort"}
           {rebaseInProgress && "Rebase in progress — resolve conflicts, then continue or Abort"}
           {cherryPickInProgress && "Cherry-pick in progress"}
-        </div>
-      )}
-
-      {/* Remote op error */}
-      {error && (
-        <div className="flex items-start gap-2 border-t border-error/20 bg-error/10 px-2.5 py-1.5">
-          <p className="flex-1 text-[10px] text-error">{error}</p>
-          <button
-            type="button"
-            onClick={() => setError(null)}
-            className="mt-0.5 shrink-0 text-error/60 hover:text-error"
-          >
-            <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2} />
-          </button>
         </div>
       )}
 

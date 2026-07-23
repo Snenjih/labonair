@@ -40,8 +40,6 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
   const status = useSourceControlStore((s) => s.status);
   const operationInProgress = useSourceControlStore((s) => s.operationInProgress);
   const setOperationInProgress = useSourceControlStore((s) => s.setOperationInProgress);
-  const error = useSourceControlStore((s) => s.error);
-  const setError = useSourceControlStore((s) => s.setError);
   const currentBranch = useSourceControlStore((s) => s.currentBranch);
   const addRecentMessage = useSourceControlStore((s) => s.addRecentMessage);
 
@@ -81,20 +79,20 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
   async function handleCommit() {
     if (!canCommit) return;
     setOperationInProgress("commit");
-    setError(null);
     try {
       await git.commit(repoRoot, commitMessage, false, sessionId ?? undefined);
       addRecentMessage(commitMessage);
       setCommitMessage("");
       onRefresh();
-      useNotificationStore
-        .getState()
-        .addNotification({ type: "success", title: "Committed", message: commitMessage.trim().slice(0, 80) });
+      useNotificationStore.getState().addActionResultNotification({
+        type: "success",
+        title: "Committed",
+        message: commitMessage.trim().slice(0, 80),
+      });
     } catch (e) {
-      setError(String(e));
       useNotificationStore
         .getState()
-        .addNotification({ type: "error", title: "Commit Failed", message: String(e) });
+        .addActionResultNotification({ type: "error", title: "Commit Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -103,7 +101,6 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
   async function handleAmend() {
     if (!commitMessage.trim() || operationInProgress) return;
     setOperationInProgress("commit");
-    setError(null);
     try {
       await git.commit(repoRoot, commitMessage, true, sessionId ?? undefined);
       addRecentMessage(commitMessage);
@@ -111,12 +108,11 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
       onRefresh();
       useNotificationStore
         .getState()
-        .addNotification({ type: "success", title: "Amended", message: "Last commit amended" });
+        .addActionResultNotification({ type: "success", title: "Amended", message: "Last commit amended" });
     } catch (e) {
-      setError(String(e));
       useNotificationStore
         .getState()
-        .addNotification({ type: "error", title: "Amend Failed", message: String(e) });
+        .addActionResultNotification({ type: "error", title: "Amend Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -125,12 +121,13 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
   async function handleAbort() {
     if (operationInProgress) return;
     setOperationInProgress("abort");
-    setError(null);
     try {
       await git.abort(repoRoot, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
-      setError(String(e));
+      useNotificationStore
+        .getState()
+        .addActionResultNotification({ type: "error", title: "Abort Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -139,12 +136,13 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
   async function handleContinue() {
     if (operationInProgress) return;
     setOperationInProgress("continue");
-    setError(null);
     try {
       await git.continue(repoRoot, sessionId ?? undefined);
       onRefresh();
     } catch (e) {
-      setError(String(e));
+      useNotificationStore
+        .getState()
+        .addActionResultNotification({ type: "error", title: "Continue Failed", message: String(e) });
     } finally {
       setOperationInProgress(null);
     }
@@ -214,7 +212,11 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
                 const msg = await generateAiMessage();
                 if (msg) setCommitMessage(msg);
               } catch (e) {
-                setError(String(e));
+                useNotificationStore.getState().addActionResultNotification({
+                  type: "error",
+                  title: "AI Commit Message Failed",
+                  message: String(e),
+                });
               }
             }}
             className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground hover:bg-foreground/6 disabled:cursor-not-allowed disabled:opacity-40"
@@ -298,20 +300,6 @@ export function CommitForm({ repoRoot, onRefresh, onOpenGitGraph }: CommitFormPr
           </div>
         </div>
       </div>
-
-      {/* Commit error */}
-      {error && (
-        <div className="mx-2.5 mb-1.5 flex items-start gap-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5">
-          <p className="flex-1 text-[10px] text-red-400">{error}</p>
-          <button
-            type="button"
-            onClick={() => setError(null)}
-            className="mt-0.5 shrink-0 text-red-400/60 hover:text-red-400"
-          >
-            <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2} />
-          </button>
-        </div>
-      )}
 
       {/* Last commit bar */}
       <div className="flex h-9 items-center gap-1.5 border-t border-border/40 px-2.5">

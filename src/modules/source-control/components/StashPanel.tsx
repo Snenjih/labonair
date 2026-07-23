@@ -1,7 +1,6 @@
 import {
   ArrowDown01Icon,
   ArrowRight01Icon,
-  Cancel01Icon,
   Delete01Icon,
   GitBranchIcon,
   PlusSignIcon,
@@ -42,31 +41,22 @@ interface StashEntryRowProps {
 }
 
 function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowProps) {
-  const setError = useSourceControlStore((s) => s.setStashError);
   const [actionLoading, setActionLoading] = useState<"apply" | "pop" | "drop" | null>(null);
   const [showDropConfirm, setShowDropConfirm] = useState(false);
 
   async function handleApply() {
     setActionLoading("apply");
-    setError(null);
     try {
       await git.stashApply(repoRoot, entry.hash, sessionId);
       onRefresh();
     } catch (e) {
       const msg = String(e);
-      if (msg.includes("conflict") || msg.includes("CONFLICT")) {
-        setError("Conflicts after stash apply — resolve before proceeding");
-        useNotificationStore.getState().addNotification({
-          type: "error",
-          title: "Stash Apply Failed",
-          message: "Conflicts after stash apply — resolve before proceeding",
-        });
-      } else {
-        setError(msg);
-        useNotificationStore
-          .getState()
-          .addNotification({ type: "error", title: "Stash Apply Failed", message: msg });
-      }
+      const isConflict = msg.includes("conflict") || msg.includes("CONFLICT");
+      useNotificationStore.getState().addActionResultNotification({
+        type: "error",
+        title: "Stash Apply Failed",
+        message: isConflict ? "Conflicts after stash apply — resolve before proceeding" : msg,
+      });
     } finally {
       setActionLoading(null);
     }
@@ -74,25 +64,17 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
 
   async function handlePop() {
     setActionLoading("pop");
-    setError(null);
     try {
       await git.stashPop(repoRoot, entry.hash, sessionId);
       onRefresh();
     } catch (e) {
       const msg = String(e);
-      if (msg.includes("conflict") || msg.includes("CONFLICT")) {
-        setError("Conflicts after stash apply — resolve before proceeding");
-        useNotificationStore.getState().addNotification({
-          type: "error",
-          title: "Stash Pop Failed",
-          message: "Conflicts after stash apply — resolve before proceeding",
-        });
-      } else {
-        setError(msg);
-        useNotificationStore
-          .getState()
-          .addNotification({ type: "error", title: "Stash Pop Failed", message: msg });
-      }
+      const isConflict = msg.includes("conflict") || msg.includes("CONFLICT");
+      useNotificationStore.getState().addActionResultNotification({
+        type: "error",
+        title: "Stash Pop Failed",
+        message: isConflict ? "Conflicts after stash apply — resolve before proceeding" : msg,
+      });
     } finally {
       setActionLoading(null);
     }
@@ -100,16 +82,14 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
 
   async function handleDrop() {
     setActionLoading("drop");
-    setError(null);
     try {
       await git.stashDrop(repoRoot, entry.hash, sessionId);
       setShowDropConfirm(false);
       onRefresh();
     } catch (e) {
-      setError(String(e));
       useNotificationStore
         .getState()
-        .addNotification({ type: "error", title: "Stash Drop Failed", message: String(e) });
+        .addActionResultNotification({ type: "error", title: "Stash Drop Failed", message: String(e) });
     } finally {
       setActionLoading(null);
     }
@@ -227,8 +207,6 @@ function StashEntryRow({ entry, repoRoot, sessionId, onRefresh }: StashEntryRowP
 
 export function StashPanel({ repoRoot, sessionId, onRefresh }: StashPanelProps) {
   const stashEntries = useSourceControlStore((s) => s.stashEntries);
-  const stashError = useSourceControlStore((s) => s.stashError);
-  const setStashError = useSourceControlStore((s) => s.setStashError);
 
   const [collapsed, setCollapsed] = useState(false);
   const [showStashForm, setShowStashForm] = useState(false);
@@ -237,17 +215,15 @@ export function StashPanel({ repoRoot, sessionId, onRefresh }: StashPanelProps) 
 
   async function doStash() {
     setIsStashing(true);
-    setStashError(null);
     try {
       await git.stashPush(repoRoot, stashMessage.trim() || undefined, undefined, sessionId);
       setStashMessage("");
       setShowStashForm(false);
       onRefresh();
     } catch (e) {
-      setStashError(String(e));
       useNotificationStore
         .getState()
-        .addNotification({ type: "error", title: "Stash Failed", message: String(e) });
+        .addActionResultNotification({ type: "error", title: "Stash Failed", message: String(e) });
     } finally {
       setIsStashing(false);
     }
@@ -288,20 +264,6 @@ export function StashPanel({ repoRoot, sessionId, onRefresh }: StashPanelProps) 
           <HugeiconsIcon icon={PlusSignIcon} size={9} strokeWidth={2} />
         </Button>
       </div>
-
-      {/* Stash error banner */}
-      {stashError && (
-        <div className="mx-2 mb-1 flex items-start gap-1.5 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5">
-          <p className="flex-1 text-[10px] text-red-400">{stashError}</p>
-          <button
-            type="button"
-            onClick={() => setStashError(null)}
-            className="mt-0.5 shrink-0 text-red-400/60 hover:text-red-400"
-          >
-            <HugeiconsIcon icon={Cancel01Icon} size={9} strokeWidth={2} />
-          </button>
-        </div>
-      )}
 
       {/* Inline new stash form */}
       {showStashForm && !collapsed && (
