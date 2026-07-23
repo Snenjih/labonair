@@ -20,7 +20,7 @@ export interface ToggleResult {
  */
 const COLLAPSED_THRESHOLD_PCT = 1;
 
-function isCollapsed(sizePct: number): boolean {
+export function isCollapsed(sizePct: number): boolean {
   return sizePct < COLLAPSED_THRESHOLD_PCT;
 }
 

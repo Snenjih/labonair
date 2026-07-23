@@ -168,6 +168,10 @@ export type Preferences = {
   // Dual-dock: independent second sidebar slot on the opposite screen side.
   sidebarRightOpen: boolean;
   sidebarRightActivePanel: "explorer" | "snippets" | "source-control" | "tabs";
+  // Persisted panel width in px, per slot. Must stay within SidebarContent's
+  // minSize/maxSize (130/450) — see the clamp in loadPreferences().
+  sidebarWidth: number;
+  sidebarRightWidth: number;
 
   // --- Bar Item Registry (per-item titlebar/statusbar/sidebar positioning) ---
   barItemPlacements: Record<BarItemId, BarItemPlacement>;
@@ -372,6 +376,8 @@ const KEY_SIDEBAR_OPEN = "sidebarOpen";
 const KEY_SIDEBAR_ACTIVE_PANEL = "sidebarActivePanel";
 const KEY_SIDEBAR_RIGHT_OPEN = "sidebarRightOpen";
 const KEY_SIDEBAR_RIGHT_ACTIVE_PANEL = "sidebarRightActivePanel";
+const KEY_SIDEBAR_WIDTH = "sidebarWidth";
+const KEY_SIDEBAR_RIGHT_WIDTH = "sidebarRightWidth";
 const KEY_BAR_ITEM_PLACEMENTS = "barItemPlacements";
 const KEY_BAR_LAYOUT_MIGRATED = "barLayoutMigrated";
 const KEY_BADGES_ALWAYS_VISIBLE = "badgesAlwaysVisible";
@@ -543,6 +549,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sidebarActivePanel: "explorer",
   sidebarRightOpen: false,
   sidebarRightActivePanel: "explorer",
+  sidebarWidth: 225,
+  sidebarRightWidth: 225,
   barItemPlacements: DEFAULT_BAR_ITEM_PLACEMENTS,
   barLayoutMigrated: false,
   badgesAlwaysVisible: true,
@@ -844,6 +852,16 @@ export async function loadPreferences(): Promise<Preferences> {
         ? (raw as "explorer" | "snippets" | "source-control" | "tabs")
         : DEFAULT_PREFERENCES.sidebarRightActivePanel;
     })(),
+    // Bounds mirror SidebarContent's minSize="130px"/maxSize="450px" — keep
+    // these two literals in sync if those constraints ever change.
+    sidebarWidth: Math.min(
+      450,
+      Math.max(130, get<number>(KEY_SIDEBAR_WIDTH) ?? DEFAULT_PREFERENCES.sidebarWidth),
+    ),
+    sidebarRightWidth: Math.min(
+      450,
+      Math.max(130, get<number>(KEY_SIDEBAR_RIGHT_WIDTH) ?? DEFAULT_PREFERENCES.sidebarRightWidth),
+    ),
     barItemPlacements:
       get<Preferences["barItemPlacements"]>(KEY_BAR_ITEM_PLACEMENTS) ?? DEFAULT_PREFERENCES.barItemPlacements,
     barLayoutMigrated: get<boolean>(KEY_BAR_LAYOUT_MIGRATED) ?? DEFAULT_PREFERENCES.barLayoutMigrated,
@@ -1544,6 +1562,16 @@ export async function setSidebarRightActivePanel(
   await (await getStore()).save();
 }
 
+export async function setSidebarWidth(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_WIDTH, value);
+  await (await getStore()).save();
+}
+
+export async function setSidebarRightWidth(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_RIGHT_WIDTH, value);
+  await (await getStore()).save();
+}
+
 export async function setBarItemPlacements(value: Record<BarItemId, BarItemPlacement>): Promise<void> {
   await (await getStore()).set(KEY_BAR_ITEM_PLACEMENTS, value);
   await (await getStore()).save();
@@ -1939,6 +1967,8 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SIDEBAR_ACTIVE_PANEL]: "sidebarActivePanel",
     [KEY_SIDEBAR_RIGHT_OPEN]: "sidebarRightOpen",
     [KEY_SIDEBAR_RIGHT_ACTIVE_PANEL]: "sidebarRightActivePanel",
+    [KEY_SIDEBAR_WIDTH]: "sidebarWidth",
+    [KEY_SIDEBAR_RIGHT_WIDTH]: "sidebarRightWidth",
     [KEY_BAR_ITEM_PLACEMENTS]: "barItemPlacements",
     [KEY_BAR_LAYOUT_MIGRATED]: "barLayoutMigrated",
     [KEY_BADGES_ALWAYS_VISIBLE]: "badgesAlwaysVisible",

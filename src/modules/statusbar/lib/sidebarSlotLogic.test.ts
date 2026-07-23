@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveResize, resolveToggle } from "./sidebarSlotLogic";
+import { isCollapsed, resolveResize, resolveToggle } from "./sidebarSlotLogic";
 
 describe("resolveToggle", () => {
   it("collapses when clicking the already-active, expanded panel", () => {
@@ -55,5 +55,23 @@ describe("resolveResize", () => {
 
   it("still treats 1% and above as a genuine open", () => {
     expect(resolveResize(1, null, "explorer")).toEqual({ nextPanel: "explorer" });
+  });
+});
+
+describe("isCollapsed", () => {
+  it("treats 0% as collapsed", () => {
+    expect(isCollapsed(0)).toBe(true);
+  });
+
+  it("treats a sub-1% noise reading as collapsed", () => {
+    expect(isCollapsed(0.5)).toBe(true);
+  });
+
+  it("treats exactly 1% as not collapsed", () => {
+    expect(isCollapsed(1)).toBe(false);
+  });
+
+  it("treats a genuine open size as not collapsed", () => {
+    expect(isCollapsed(20)).toBe(false);
   });
 });

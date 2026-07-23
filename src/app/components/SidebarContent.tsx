@@ -15,7 +15,8 @@ export interface SidebarContentProps {
   side: "left" | "right";
   sidebarRef: React.RefObject<PanelImperativeHandle | null>;
   activePanel: SidebarPanel;
-  onSidebarResize: (size: { asPercentage: number }) => void;
+  width: number;
+  onSidebarResize: (size: { asPercentage: number; inPixels: number }) => void;
   explorerTarget: ExplorerTarget;
   // Tab list callbacks
   onSelect: (id: number) => void;
@@ -62,6 +63,7 @@ export const SidebarContent = React.memo(function SidebarContent({
   side,
   sidebarRef,
   activePanel,
+  width,
   onSidebarResize,
   explorerTarget,
   onSelect,
@@ -96,10 +98,12 @@ export const SidebarContent = React.memo(function SidebarContent({
       panelRef={sidebarRef}
       // Physically born at the size that matches the slot's starting
       // activePanel (see useSidebar.ts's `initialPanel`), instead of always
-      // starting at 225px and relying on an imperative .collapse() call to
+      // starting open and relying on an imperative .collapse() call to
       // shrink a slot that should start closed — that correction races the
       // resizable-panel group's own first layout pass and is unreliable.
-      defaultSize={activePanel === null ? "0px" : "225px"}
+      // `width` is useSidebar.ts's `initialWidth`/persisted-width guess,
+      // corrected post-hydration the same way `activePanel` is.
+      defaultSize={activePanel === null ? "0px" : `${width}px`}
       minSize="130px"
       maxSize="450px"
       collapsible

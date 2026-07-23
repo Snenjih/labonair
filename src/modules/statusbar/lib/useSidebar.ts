@@ -7,16 +7,31 @@ import {
   setSidebarOpen,
   setSidebarRightActivePanel,
   setSidebarRightOpen,
+  setSidebarRightWidth,
+  setSidebarWidth,
 } from "@/modules/settings/store";
 import type { SidebarPanel } from "../StatusBar";
-import { resolveResize, resolveToggle } from "./sidebarSlotLogic";
+import { isCollapsed, resolveResize, resolveToggle } from "./sidebarSlotLogic";
 
 export type SidebarSide = "left" | "right";
+
+/** Debounce for persisting a slot's dragged width — avoids writing on every
+ *  pointer-move tick of a drag (disk I/O + a round-trip back into
+ *  usePreferencesStore via onPreferencesChange, which would re-render every
+ *  subscriber on every tick). Group's onLayoutChanged already coalesces
+ *  pointer-driven drags to a single fire on release, but an OS-level window
+ *  resize still reflows (and fires onLayoutChanged) on every tick, so this
+ *  debounce is still needed as a safety net. */
+const WIDTH_PERSIST_DEBOUNCE_MS = 300;
 
 export interface SidebarSlotState {
   ref: React.RefObject<PanelImperativeHandle | null>;
   activePanel: SidebarPanel;
-  onResize: (size: { asPercentage: number }) => void;
+  /** Width (px) to physically mount the panel at — see SidebarContent's
+   *  defaultSize. A static mount-time guess, not reactive state; see
+   *  useSidebarSlot for why. */
+  width: number;
+  onResize: (size: { asPercentage: number; inPixels: number }) => void;
 }
 
 export interface SidebarReturn {
@@ -35,6 +50,9 @@ export interface SidebarReturn {
   /** Collapses/expands the primary (pre-dual-dock) slot — kept for the
    *  existing global "toggle sidebar" shortcut/menu item. */
   toggleSidebar: () => void;
+  /** Wire to the main ResizablePanelGroup's onLayoutChanged — notifies both
+   *  slots to (debounced-)persist their current width if open. */
+  onLayoutChanged: () => void;
 }
 
 type PersistablePanel = Exclude<SidebarPanel, null | "hosts">;
@@ -53,6 +71,13 @@ interface SlotOptions {
   storedPanel: PersistablePanel;
   persistOpen: (open: boolean) => Promise<void>;
   persistPanel: (panel: PersistablePanel) => Promise<void>;
+  /** Mount-time width guess (px) — same role as `initialPanel`, but width
+   *  doesn't affect the born-open-vs-closed bug `initialPanel` guards
+   *  against, since a closed slot always mounts at "0px" regardless of
+   *  width. Kept as a plain constant, not derived from `storedWidth`. */
+  initialWidth: number;
+  storedWidth: number;
+  persistWidth: (width: number) => Promise<void>;
   prefsHydrated: boolean;
   tabsLocation: "titlebar" | "sidebar";
 }
@@ -61,6 +86,17 @@ interface Slot extends SidebarSlotState {
   toggle: (panel: SidebarPanel) => void;
   move: (panel: SidebarPanel) => void;
   collapse: () => void;
+  /** Re-opens the panel at its last known open width. Deliberately does NOT
+   *  rely on the panel's own `.expand()` — react-resizable-panels only
+   *  remembers a pre-collapse size (`expandToSize`) as a side effect of its
+   *  own `.collapse()` being called, not when a slot is closed by dragging
+   *  the separator all the way shut (a real, common interaction). `.resize()`
+   *  applies a size unconditionally (still respecting min/max), so tracking
+   *  the width ourselves and resizing to it here works regardless of how the
+   *  slot got collapsed. */
+  expand: () => void;
+  /** Debounced width-persist trigger — call from the group's onLayoutChanged. */
+  notifyLayoutSettled: () => void;
 }
 
 /** One dual-dock slot's full state machine (restore-from-prefs, persist,
@@ -72,6 +108,9 @@ function useSidebarSlot({
   storedPanel,
   persistOpen,
   persistPanel,
+  initialWidth,
+  storedWidth,
+  persistWidth,
   prefsHydrated,
   tabsLocation,
 }: SlotOptions): Slot {
@@ -79,6 +118,18 @@ function useSidebarSlot({
   const [activePanel, setActivePanel] = useState<SidebarPanel>(initialPanel);
   const lastActivePanelRef = useRef<SidebarPanel>(initialPanel ?? "explorer");
   const restoredRef = useRef(false);
+  const widthPersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Our own record of "the width to reopen at", continuously kept fresh by
+  // onResize while the slot is open — the single source of truth `expand()`
+  // uses instead of the panel library's own (drag-collapse-fragile)
+  // pre-collapse-size memory. See the `expand` doc comment below for why.
+  const lastOpenWidthPxRef = useRef<number>(initialWidth);
+
+  useEffect(() => {
+    return () => {
+      if (widthPersistTimerRef.current) clearTimeout(widthPersistTimerRef.current);
+    };
+  }, []);
 
   // One-time restore once preferences are loaded — guards the persist effect
   // below from firing during this init phase.
@@ -102,9 +153,17 @@ function useSidebarSlot({
     // group has had a full layout pass, so collapse()/expand() are reliable.
     const p = ref.current;
     if (p) {
-      if (!storedOpen) p.collapse();
-      else p.expand();
+      if (!storedOpen) {
+        p.collapse();
+      } else {
+        p.expand();
+        if (storedWidth !== initialWidth) p.resize(storedWidth);
+      }
     }
+    // Seed our own "reopen at this width" record regardless of open/closed —
+    // this is what `expand()` below actually uses, not the panel's own
+    // .expand(), so it must be correct even for a slot that starts closed.
+    lastOpenWidthPxRef.current = storedWidth;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefsHydrated]);
 
@@ -128,32 +187,45 @@ function useSidebarSlot({
     }
   }, [activePanel, persistOpen, persistPanel]);
 
+  // See the `expand` doc comment on the `Slot` interface — deliberately
+  // resizes to our own tracked width instead of calling the panel's
+  // `.expand()`, which only reopens correctly if the slot was closed via
+  // its own `.collapse()` (not e.g. by dragging the separator shut).
+  const expand = useCallback(() => {
+    const p = ref.current;
+    if (!p) return;
+    p.resize(lastOpenWidthPxRef.current || initialWidth);
+  }, [initialWidth]);
+
   const toggle = useCallback(
     (panel: SidebarPanel) => {
       const p = ref.current;
       if (!p) return;
       const { nextPanel, action } = resolveToggle(activePanel, panel, p.getSize().asPercentage);
       if (panel) lastActivePanelRef.current = panel;
-      if (action === "expand") p.expand();
+      if (action === "expand") expand();
       else if (action === "collapse") p.collapse();
       setActivePanel(nextPanel);
     },
-    [activePanel],
+    [activePanel, expand],
   );
 
-  const move = useCallback((panel: SidebarPanel) => {
-    if (panel) lastActivePanelRef.current = panel;
-    setActivePanel(panel);
-    const p = ref.current;
-    if (p && p.getSize().asPercentage <= 0) p.expand();
-  }, []);
+  const move = useCallback(
+    (panel: SidebarPanel) => {
+      if (panel) lastActivePanelRef.current = panel;
+      setActivePanel(panel);
+      const p = ref.current;
+      if (p && p.getSize().asPercentage <= 0) expand();
+    },
+    [expand],
+  );
 
   const collapse = useCallback(() => {
     ref.current?.collapse();
     setActivePanel(null);
   }, []);
 
-  const onResize = useCallback((size: { asPercentage: number }) => {
+  const onResize = useCallback((size: { asPercentage: number; inPixels: number }) => {
     // Ignore resize events reported before the one-time prefs restore has
     // run — react-resizable-panels' ResizeObserver reports the panel's
     // initial physical layout on mount, which can still be nonzero for a
@@ -162,6 +234,13 @@ function useSidebarSlot({
     // open even though the slot is supposed to be closed. Real user drags
     // only ever happen after mount, well after restoredRef is set.
     if (!restoredRef.current) return;
+    // Keep our own "last open width" fresh on every real (open) resize tick
+    // — this is what `expand()` restores to, independent of the prefs
+    // debounce/persistence below and independent of the panel library's own
+    // (drag-collapse-fragile) pre-collapse-size memory.
+    if (!isCollapsed(size.asPercentage)) {
+      lastOpenWidthPxRef.current = size.inPixels;
+    }
     setActivePanel((current) => {
       const { nextPanel } = resolveResize(size.asPercentage, current, lastActivePanelRef.current);
       if (nextPanel) lastActivePanelRef.current = nextPanel;
@@ -169,7 +248,27 @@ function useSidebarSlot({
     });
   }, []);
 
-  return { ref, activePanel, onResize, toggle, move, collapse };
+  const notifyLayoutSettled = useCallback(() => {
+    // Same gate as the persist-on-activePanel-change effect above — don't
+    // write anything before the one-time restore has landed.
+    if (!restoredRef.current) return;
+    if (widthPersistTimerRef.current) clearTimeout(widthPersistTimerRef.current);
+    widthPersistTimerRef.current = setTimeout(() => {
+      widthPersistTimerRef.current = null;
+      const p = ref.current;
+      if (!p) return;
+      // Re-read fresh at fire time, not at schedule time — if several
+      // layout-changed events land inside the debounce window (e.g. an OS
+      // window-resize drag), only the final size is ever persisted, and if
+      // the slot got collapsed before the timer fired, this bails out
+      // instead of persisting a near-zero width.
+      const { asPercentage, inPixels } = p.getSize();
+      if (isCollapsed(asPercentage)) return;
+      void persistWidth(Math.round(inPixels));
+    }, WIDTH_PERSIST_DEBOUNCE_MS);
+  }, [persistWidth]);
+
+  return { ref, activePanel, width: initialWidth, onResize, toggle, move, collapse, expand, notifyLayoutSettled };
 }
 
 export function useSidebar(): SidebarReturn {
@@ -179,8 +278,10 @@ export function useSidebar(): SidebarReturn {
   const placements = usePreferencesStore((s) => s.barItemPlacements);
   const primaryStoredOpen = usePreferencesStore((s) => s.sidebarOpen);
   const primaryStoredPanel = usePreferencesStore((s) => s.sidebarActivePanel);
+  const primaryStoredWidth = usePreferencesStore((s) => s.sidebarWidth);
   const secondaryStoredOpen = usePreferencesStore((s) => s.sidebarRightOpen);
   const secondaryStoredPanel = usePreferencesStore((s) => s.sidebarRightActivePanel);
+  const secondaryStoredWidth = usePreferencesStore((s) => s.sidebarRightWidth);
 
   // "primary" is the pre-existing single sidebar slot (persisted under the
   // old sidebarOpen/sidebarActivePanel keys), still following the
@@ -188,12 +289,20 @@ export function useSidebar(): SidebarReturn {
   // keeps dual-dock a zero-visual-change addition for existing users.
   // "secondary" is the brand-new, independent slot, always the opposite
   // screen side, closed by default.
+  //
+  // Width is bound to primary/secondary here too, not to left/right (which
+  // are only derived below from sidebarPosition) — so flipping
+  // sidebarPosition carries each slot's width along with it to its new
+  // screen side instead of the two slots swapping widths.
   const primary = useSidebarSlot({
     initialPanel: "explorer",
     storedOpen: primaryStoredOpen,
     storedPanel: primaryStoredPanel,
     persistOpen: setSidebarOpen,
     persistPanel: setSidebarActivePanel,
+    initialWidth: 225,
+    storedWidth: primaryStoredWidth,
+    persistWidth: setSidebarWidth,
     prefsHydrated,
     tabsLocation,
   });
@@ -203,6 +312,9 @@ export function useSidebar(): SidebarReturn {
     storedPanel: secondaryStoredPanel,
     persistOpen: setSidebarRightOpen,
     persistPanel: setSidebarRightActivePanel,
+    initialWidth: 225,
+    storedWidth: secondaryStoredWidth,
+    persistWidth: setSidebarRightWidth,
     prefsHydrated,
     tabsLocation,
   });
@@ -253,16 +365,22 @@ export function useSidebar(): SidebarReturn {
   const toggleSidebar = useCallback(() => {
     const p = primary.ref.current;
     if (!p) return;
-    if (p.getSize().asPercentage <= 0) p.expand();
+    if (p.getSize().asPercentage <= 0) primary.expand();
     else p.collapse();
-  }, [primary.ref]);
+  }, [primary]);
+
+  const onLayoutChanged = useCallback(() => {
+    primary.notifyLayoutSettled();
+    secondary.notifyLayoutSettled();
+  }, [primary, secondary]);
 
   return {
-    left: { ref: left.ref, activePanel: left.activePanel, onResize: left.onResize },
-    right: { ref: right.ref, activePanel: right.activePanel, onResize: right.onResize },
+    left: { ref: left.ref, activePanel: left.activePanel, width: left.width, onResize: left.onResize },
+    right: { ref: right.ref, activePanel: right.activePanel, width: right.width, onResize: right.onResize },
     handlePanelToggle,
     openPanel,
     movePanel,
     toggleSidebar,
+    onLayoutChanged,
   };
 }

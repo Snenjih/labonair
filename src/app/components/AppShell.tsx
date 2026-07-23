@@ -258,11 +258,16 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
             )}
 
             <main className="flex min-h-0 flex-1 flex-col">
-              <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
+              <ResizablePanelGroup
+                orientation="horizontal"
+                className="min-h-0 flex-1"
+                onLayoutChanged={sidebar.onLayoutChanged}
+              >
                 <SidebarContent
                   side="left"
                   sidebarRef={sidebar.left.ref}
                   activePanel={sidebar.left.activePanel}
+                  width={sidebar.left.width}
                   onSidebarResize={sidebar.left.onResize}
                   {...sidebarPassthrough}
                 />
@@ -298,6 +303,7 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                   side="right"
                   sidebarRef={sidebar.right.ref}
                   activePanel={sidebar.right.activePanel}
+                  width={sidebar.right.width}
                   onSidebarResize={sidebar.right.onResize}
                   {...sidebarPassthrough}
                 />
