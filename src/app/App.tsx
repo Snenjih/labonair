@@ -62,7 +62,6 @@ export default function App() {
   const panelOpen = useChatStore((s) => s.panelOpen);
   const respondToApproval = useChatStore((s) => s.respondToApproval);
 
-  const sidebarPosition = usePreferencesStore((s) => s.sidebarPosition);
   const zenModeShowHeader = usePreferencesStore((s) => s.zenModeShowHeader);
   const zenModeShowStatusbar = usePreferencesStore((s) => s.zenModeShowStatusbar);
   const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
@@ -110,8 +109,7 @@ export default function App() {
     togglePanelAndFocus: ai.togglePanelAndFocus,
     askFromSelection: ai.askFromSelection,
     execSnippet: tabs.execSnippet,
-    setActivePanel: sidebar.setActivePanel,
-    sidebarRef: sidebar.sidebarRef,
+    openPanel: sidebar.openPanel,
     openShortcuts: () => setShortcutsOpen(true),
     openPreviewTab: tabs.openPreviewTab,
     terminalRefs: tabs.refs.terminalRefs,
@@ -169,7 +167,6 @@ export default function App() {
         setActiveId,
       }}
       prefs={{
-        sidebarPosition,
         zenModeShowHeader,
         zenModeShowStatusbar,
         reduceMotion,

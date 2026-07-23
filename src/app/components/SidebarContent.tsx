@@ -15,7 +15,6 @@ export interface SidebarContentProps {
   side: "left" | "right";
   sidebarRef: React.RefObject<PanelImperativeHandle | null>;
   activePanel: SidebarPanel;
-  setActivePanel: React.Dispatch<React.SetStateAction<SidebarPanel>>;
   onSidebarResize: (size: { asPercentage: number }) => void;
   explorerTarget: ExplorerTarget;
   // Tab list callbacks

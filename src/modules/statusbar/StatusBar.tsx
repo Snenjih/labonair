@@ -45,9 +45,10 @@ type Props = {
   /** When set, render a one-click "Open preview" chip pointing at this URL. */
   detectedPreviewUrl?: string | null;
   onOpenPreview?: () => void;
-  /** Active sidebar panel — drives the panel switcher button highlight */
-  activePanel?: SidebarPanel;
-  onPanelToggle?: (panel: SidebarPanel) => void;
+  /** Active panel in each dual-dock slot — drives the panel switcher button highlight */
+  leftActivePanel?: SidebarPanel;
+  rightActivePanel?: SidebarPanel;
+  onPanelToggle?: (panel: SidebarPanel, side?: "left" | "right") => void;
 };
 
 const PANEL_BUTTONS: Array<{
@@ -79,7 +80,8 @@ export const StatusBar = React.memo(function StatusBar({
   hasComposer,
   detectedPreviewUrl,
   onOpenPreview,
-  activePanel,
+  leftActivePanel,
+  rightActivePanel,
   onPanelToggle,
 }: Props) {
   const panelOpen = useChatStore((s) => s.panelOpen);
@@ -153,7 +155,7 @@ export const StatusBar = React.memo(function StatusBar({
                       onClick={() => onPanelToggle?.(panel)}
                       className={cn(
                         "flex h-5 w-5 items-center justify-center rounded transition-colors",
-                        activePanel === panel
+                        leftActivePanel === panel || rightActivePanel === panel
                           ? "bg-primary/20 text-foreground dark:text-primary"
                           : "text-muted-foreground hover:bg-accent hover:text-foreground",
                       )}
@@ -169,7 +171,7 @@ export const StatusBar = React.memo(function StatusBar({
                     onClick={() => onPanelToggle?.("tabs")}
                     className={cn(
                       "flex h-5 w-5 items-center justify-center rounded transition-colors",
-                      activePanel === "tabs"
+                      leftActivePanel === "tabs" || rightActivePanel === "tabs"
                         ? "bg-primary/20 text-foreground dark:text-primary"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground",
                     )}

@@ -158,7 +158,10 @@ export type Preferences = {
   // --- Sidebar ---
   sidebarPosition: "left" | "right";
   sidebarOpen: boolean;
-  sidebarActivePanel: "explorer" | "snippets" | "tabs";
+  sidebarActivePanel: "explorer" | "snippets" | "source-control" | "tabs";
+  // Dual-dock: independent second sidebar slot on the opposite screen side.
+  sidebarRightOpen: boolean;
+  sidebarRightActivePanel: "explorer" | "snippets" | "source-control" | "tabs";
   // --- Security ---
   credentialEncryption: boolean;
   // --- Updates ---
@@ -352,6 +355,8 @@ const KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY = "commandPaletteCloseOnOverlayClick"
 const KEY_SIDEBAR_POSITION = "sidebarPosition";
 const KEY_SIDEBAR_OPEN = "sidebarOpen";
 const KEY_SIDEBAR_ACTIVE_PANEL = "sidebarActivePanel";
+const KEY_SIDEBAR_RIGHT_OPEN = "sidebarRightOpen";
+const KEY_SIDEBAR_RIGHT_ACTIVE_PANEL = "sidebarRightActivePanel";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
@@ -518,6 +523,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sidebarPosition: "left",
   sidebarOpen: true,
   sidebarActivePanel: "explorer",
+  sidebarRightOpen: false,
+  sidebarRightActivePanel: "explorer",
   credentialEncryption: false,
   checkForUpdates: true,
 
@@ -801,9 +808,20 @@ export async function loadPreferences(): Promise<Preferences> {
     sidebarOpen: get<boolean>(KEY_SIDEBAR_OPEN) ?? DEFAULT_PREFERENCES.sidebarOpen,
     sidebarActivePanel: (() => {
       const raw = get<string>(KEY_SIDEBAR_ACTIVE_PANEL);
-      return (["explorer", "snippets", "tabs"] as const).includes(raw as "explorer" | "snippets" | "tabs")
-        ? (raw as "explorer" | "snippets" | "tabs")
+      return (["explorer", "snippets", "source-control", "tabs"] as const).includes(
+        raw as "explorer" | "snippets" | "source-control" | "tabs",
+      )
+        ? (raw as "explorer" | "snippets" | "source-control" | "tabs")
         : DEFAULT_PREFERENCES.sidebarActivePanel;
+    })(),
+    sidebarRightOpen: get<boolean>(KEY_SIDEBAR_RIGHT_OPEN) ?? DEFAULT_PREFERENCES.sidebarRightOpen,
+    sidebarRightActivePanel: (() => {
+      const raw = get<string>(KEY_SIDEBAR_RIGHT_ACTIVE_PANEL);
+      return (["explorer", "snippets", "source-control", "tabs"] as const).includes(
+        raw as "explorer" | "snippets" | "source-control" | "tabs",
+      )
+        ? (raw as "explorer" | "snippets" | "source-control" | "tabs")
+        : DEFAULT_PREFERENCES.sidebarRightActivePanel;
     })(),
     credentialEncryption: get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
     checkForUpdates: get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
@@ -1482,8 +1500,22 @@ export async function setSidebarOpen(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setSidebarActivePanel(value: "explorer" | "snippets" | "tabs"): Promise<void> {
+export async function setSidebarActivePanel(
+  value: "explorer" | "snippets" | "source-control" | "tabs",
+): Promise<void> {
   await (await getStore()).set(KEY_SIDEBAR_ACTIVE_PANEL, value);
+  await (await getStore()).save();
+}
+
+export async function setSidebarRightOpen(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_RIGHT_OPEN, value);
+  await (await getStore()).save();
+}
+
+export async function setSidebarRightActivePanel(
+  value: "explorer" | "snippets" | "source-control" | "tabs",
+): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_RIGHT_ACTIVE_PANEL, value);
   await (await getStore()).save();
 }
 
@@ -1852,6 +1884,8 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
     [KEY_SIDEBAR_OPEN]: "sidebarOpen",
     [KEY_SIDEBAR_ACTIVE_PANEL]: "sidebarActivePanel",
+    [KEY_SIDEBAR_RIGHT_OPEN]: "sidebarRightOpen",
+    [KEY_SIDEBAR_RIGHT_ACTIVE_PANEL]: "sidebarRightActivePanel",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_HOST_PING_INTERVAL]: "hostPingInterval",

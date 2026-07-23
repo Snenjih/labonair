@@ -60,7 +60,6 @@ export interface AppShellStoreActions {
 
 // ─── Prefs + dialog state ─────────────────────────────────────────────────────
 export interface AppShellPrefs {
-  sidebarPosition: "left" | "right" | "hidden";
   zenModeShowHeader: boolean;
   zenModeShowStatusbar: boolean;
   reduceMotion: boolean;
@@ -131,10 +130,6 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
   // closures got new identities — see review-fix-plan.md Workstream G.
   const sidebarPassthrough = useMemo(
     () => ({
-      sidebarRef: sidebar.sidebarRef,
-      activePanel: sidebar.activePanel,
-      setActivePanel: sidebar.setActivePanel,
-      onSidebarResize: sidebar.onSidebarResize,
       explorerTarget: ctrl.explorerTarget,
       onSelect: actions.setActiveId,
       onNew: tabs.openNewTab,
@@ -179,10 +174,6 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
       onNewGitGraph,
     }),
     [
-      sidebar.sidebarRef,
-      sidebar.activePanel,
-      sidebar.setActivePanel,
-      sidebar.onSidebarResize,
       ctrl.explorerTarget,
       actions.setActiveId,
       tabs.openNewTab,
@@ -213,12 +204,12 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
   // Shared by both Header (JumpHostDropdown's Explorer pill fallback) and
   // StatusBar (panel switcher buttons) so the "hosts" special-case only
   // lives in one place.
-  const handlePanelToggle = (panel: SidebarPanel) => {
+  const handlePanelToggle = (panel: SidebarPanel, side?: "left" | "right") => {
     if (panel === "hosts") {
       actions.openHomeTab();
       return;
     }
-    sidebar.handlePanelToggle(panel);
+    sidebar.handlePanelToggle(panel, side);
   };
 
   const shell = (
@@ -255,12 +246,14 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
 
             <main className="flex min-h-0 flex-1 flex-col">
               <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
-                {prefs.sidebarPosition !== "right" && (
-                  <>
-                    <SidebarContent side="left" {...sidebarPassthrough} />
-                    <ResizableHandle withHandle />
-                  </>
-                )}
+                <SidebarContent
+                  side="left"
+                  sidebarRef={sidebar.left.ref}
+                  activePanel={sidebar.left.activePanel}
+                  onSidebarResize={sidebar.left.onResize}
+                  {...sidebarPassthrough}
+                />
+                <ResizableHandle withHandle />
                 <ResizablePanel id="workspace" defaultSize="78%" minSize="30%">
                   <WorkspaceArea
                     workspacePaneRefs={tabs.refs.workspacePaneRefs}
@@ -287,12 +280,14 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                     onOpenGitGraphFile={tabs.handleOpenFile}
                   />
                 </ResizablePanel>
-                {prefs.sidebarPosition === "right" && (
-                  <>
-                    <ResizableHandle withHandle />
-                    <SidebarContent side="right" {...sidebarPassthrough} />
-                  </>
-                )}
+                <ResizableHandle withHandle />
+                <SidebarContent
+                  side="right"
+                  sidebarRef={sidebar.right.ref}
+                  activePanel={sidebar.right.activePanel}
+                  onSidebarResize={sidebar.right.onResize}
+                  {...sidebarPassthrough}
+                />
               </ResizablePanelGroup>
             </main>
 
@@ -328,7 +323,8 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
                 onOpenPreview={() => {
                   if (ctrl.detectedPreviewUrl) tabs.openPreviewTab(ctrl.detectedPreviewUrl);
                 }}
-                activePanel={sidebar.activePanel}
+                leftActivePanel={sidebar.left.activePanel}
+                rightActivePanel={sidebar.right.activePanel}
                 onPanelToggle={handlePanelToggle}
               />
             )}
