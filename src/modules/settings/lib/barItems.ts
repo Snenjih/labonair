@@ -41,7 +41,7 @@ export type BarItemId =
   | "ai";
 
 /** Stable registration order — bucket iteration uses this, not object-key order. */
-export const BAR_ITEM_ORDER: BarItemId[] = [
+const BAR_ITEM_ORDER: BarItemId[] = [
   "updater",
   "notifications",
   "jumpHosts",
@@ -66,16 +66,6 @@ export const PANEL_ITEM_TO_PANEL: Record<
   snippetsPanel: "snippets",
   sourceControlPanel: "source-control",
   tabsPanel: "tabs",
-};
-
-export const PANEL_TO_ITEM: Record<
-  Exclude<SidebarPanel, null | "hosts">,
-  keyof typeof PANEL_ITEM_TO_PANEL
-> = {
-  explorer: "explorerPanel",
-  snippets: "snippetsPanel",
-  "source-control": "sourceControlPanel",
-  tabs: "tabsPanel",
 };
 
 function make(

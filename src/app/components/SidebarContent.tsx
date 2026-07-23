@@ -8,8 +8,8 @@ import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets";
 import { SnippetsPanel } from "@/modules/snippets";
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SidebarPanel } from "@/modules/statusbar";
-import { SidebarTabList } from "@/modules/tabs";
 import type { Tab } from "@/modules/tabs";
+import { SidebarTabList } from "@/modules/tabs";
 
 export interface SidebarContentProps {
   side: "left" | "right";

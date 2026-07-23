@@ -266,17 +266,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Appearance ---
   {
-    id: "sidebarPosition",
-    label: "Sidebar position",
-    description: "Display the file explorer sidebar on the left or right side of the workspace.",
-    category: "Appearance",
-    controlType: "Select",
-    options: [
-      { value: "left", label: "Left" },
-      { value: "right", label: "Right" },
-    ],
-  },
-  {
     id: "appTheme",
     label: "Color theme",
     description:
@@ -366,19 +355,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     description: "Display the status bar at the bottom. Hide it to maximise vertical space.",
     category: "Appearance",
     controlType: "Switch",
-  },
-  {
-    id: "titlebarsIconsPosition",
-    label: "Titlebar icons position",
-    description:
-      "Follows platform conventions — right side on macOS (traffic lights occupy the left) and on Windows (before the window controls).",
-    category: "Appearance",
-    controlType: "Select",
-    options: [
-      { value: "auto", label: "Auto" },
-      { value: "left", label: "Left" },
-      { value: "right", label: "Right" },
-    ],
   },
   {
     id: "tabsLocation",
