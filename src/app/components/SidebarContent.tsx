@@ -92,7 +92,7 @@ export const SidebarContent = React.memo(function SidebarContent({
 }: SidebarContentProps) {
   return (
     <ResizablePanel
-      id="sidebar"
+      id={`sidebar-${side}`}
       panelRef={sidebarRef}
       defaultSize="225px"
       minSize="130px"
