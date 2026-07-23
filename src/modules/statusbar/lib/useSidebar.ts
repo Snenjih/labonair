@@ -136,6 +136,14 @@ function useSidebarSlot({
   }, []);
 
   const onResize = useCallback((size: { asPercentage: number }) => {
+    // Ignore resize events reported before the one-time prefs restore has
+    // run — react-resizable-panels' ResizeObserver reports the panel's
+    // initial physical layout on mount, which can still be nonzero for a
+    // slot the restore is about to (or just did) collapse imperatively.
+    // Treating that report as a real drag would "heal" activePanel back
+    // open even though the slot is supposed to be closed. Real user drags
+    // only ever happen after mount, well after restoredRef is set.
+    if (!restoredRef.current) return;
     setActivePanel((current) => {
       const { nextPanel } = resolveResize(size.asPercentage, current, lastActivePanelRef.current);
       if (nextPanel) lastActivePanelRef.current = nextPanel;

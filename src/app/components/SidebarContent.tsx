@@ -128,7 +128,7 @@ export const SidebarContent = React.memo(function SidebarContent({
           <SnippetsPanel onRun={onSnippetRun} />
         ) : activePanel === "source-control" ? (
           <SourceControlPanel target={explorerTarget} onOpenGitGraph={onOpenGitGraph} />
-        ) : (
+        ) : activePanel === "explorer" ? (
           <FileExplorer
             explorerTarget={explorerTarget}
             onOpenFile={onOpenFile}
@@ -141,7 +141,7 @@ export const SidebarContent = React.memo(function SidebarContent({
             onAttachToAgent={onAttachToAgent}
             onOpenSftpTab={onOpenSftpTab}
           />
-        )}
+        ) : null}
       </div>
     </ResizablePanel>
   );
