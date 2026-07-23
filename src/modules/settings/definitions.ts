@@ -1154,6 +1154,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     targetTab: "appearance",
     linkLabel: "Open Appearance",
   },
+  {
+    id: "badgesAlwaysVisible",
+    label: "Always show badges",
+    description:
+      "Keep Notifications, Transfers, Jump Hosts, and Agent Access visible even with nothing to show.",
+    category: "Appearance & Layout",
+    controlType: "Switch",
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [

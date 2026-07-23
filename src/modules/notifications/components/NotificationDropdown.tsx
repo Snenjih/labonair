@@ -99,8 +99,11 @@ function NotificationItem({ notif, onDismiss }: { notif: AppNotification; onDism
 export function NotificationDropdown() {
   const { notifications, removeNotification, clearAll } = useNotificationStore();
   const placement = usePreferencesStore((s) => s.barItemPlacements.notifications);
+  const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
   const { side, align } = getPopoverPlacement(placement.bar, placement.side);
   const compact = placement.bar === "statusbar";
+
+  if (!badgesAlwaysVisible && notifications.length === 0) return null;
 
   const hasErrors = notifications.some((n) => n.type === "error");
 

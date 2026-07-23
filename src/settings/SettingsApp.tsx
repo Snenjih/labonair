@@ -494,6 +494,9 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "bookmarksShowBadge":
       void store.setBookmarksShowBadge(value as boolean);
       break;
+    case "badgesAlwaysVisible":
+      void store.setBadgesAlwaysVisible(value as boolean);
+      break;
   }
 }
 

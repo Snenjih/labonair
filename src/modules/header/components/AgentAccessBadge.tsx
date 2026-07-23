@@ -10,15 +10,17 @@ import { setAgentAccessGrant, useAgentAccessStore, useTabsStore } from "@/module
 /** Header badge listing SSH tabs the user has granted MCP agent access to
  *  (see `TabBar.tsx`'s "Grant AI Agent Access" checkbox and
  *  `agentAccessStore.ts`) — lets the user see, jump to, and revoke access at
- *  a glance, mirroring `JumpHostDropdown`'s layout. Hidden entirely only when
- *  the MCP agent bridge feature itself is off — an empty grant list still
- *  shows the button with an empty state, same as `TransferDropdown`. */
+ *  a glance, mirroring `JumpHostDropdown`'s layout. Hidden entirely when the
+ *  MCP agent bridge feature itself is off, or (depending on the
+ *  `badgesAlwaysVisible` preference) when there's nothing granted yet. */
 export function AgentAccessBadge() {
   const bridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
   const entries = useAgentAccessStore((s) => s.entries);
   const placement = usePreferencesStore((s) => s.barItemPlacements.agentAccess);
+  const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
   const list = Object.values(entries);
   if (!bridgeEnabled) return null;
+  if (!badgesAlwaysVisible && list.length === 0) return null;
 
   const { side, align } = getPopoverPlacement(placement.bar, placement.side);
   const compact = placement.bar === "statusbar";

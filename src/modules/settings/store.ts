@@ -173,6 +173,9 @@ export type Preferences = {
   /** One-time migration gate from the old sidebarPosition/titlebarsIconsPosition/
    *  statusBarShowXXX prefs into barItemPlacements. */
   barLayoutMigrated: boolean;
+  /** Whether Notifications/Transfers/Jump Hosts/Agent Access stay visible at
+   *  count 0, or hide themselves until they have at least one item. */
+  badgesAlwaysVisible: boolean;
   // --- Security ---
   credentialEncryption: boolean;
   // --- Updates ---
@@ -370,6 +373,7 @@ const KEY_SIDEBAR_RIGHT_OPEN = "sidebarRightOpen";
 const KEY_SIDEBAR_RIGHT_ACTIVE_PANEL = "sidebarRightActivePanel";
 const KEY_BAR_ITEM_PLACEMENTS = "barItemPlacements";
 const KEY_BAR_LAYOUT_MIGRATED = "barLayoutMigrated";
+const KEY_BADGES_ALWAYS_VISIBLE = "badgesAlwaysVisible";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
@@ -540,6 +544,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sidebarRightActivePanel: "explorer",
   barItemPlacements: DEFAULT_BAR_ITEM_PLACEMENTS,
   barLayoutMigrated: false,
+  badgesAlwaysVisible: true,
   credentialEncryption: false,
   checkForUpdates: true,
 
@@ -841,6 +846,7 @@ export async function loadPreferences(): Promise<Preferences> {
     barItemPlacements:
       get<Preferences["barItemPlacements"]>(KEY_BAR_ITEM_PLACEMENTS) ?? DEFAULT_PREFERENCES.barItemPlacements,
     barLayoutMigrated: get<boolean>(KEY_BAR_LAYOUT_MIGRATED) ?? DEFAULT_PREFERENCES.barLayoutMigrated,
+    badgesAlwaysVisible: get<boolean>(KEY_BADGES_ALWAYS_VISIBLE) ?? DEFAULT_PREFERENCES.badgesAlwaysVisible,
     credentialEncryption: get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
     checkForUpdates: get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
 
@@ -1562,6 +1568,11 @@ export async function setBarLayoutMigrated(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
+export async function setBadgesAlwaysVisible(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BADGES_ALWAYS_VISIBLE, value);
+  await (await getStore()).save();
+}
+
 export async function setCredentialEncryption(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_CREDENTIAL_ENCRYPTION, value);
   await (await getStore()).save();
@@ -1931,6 +1942,7 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SIDEBAR_RIGHT_ACTIVE_PANEL]: "sidebarRightActivePanel",
     [KEY_BAR_ITEM_PLACEMENTS]: "barItemPlacements",
     [KEY_BAR_LAYOUT_MIGRATED]: "barLayoutMigrated",
+    [KEY_BADGES_ALWAYS_VISIBLE]: "badgesAlwaysVisible",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_HOST_PING_INTERVAL]: "hostPingInterval",

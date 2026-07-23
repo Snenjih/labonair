@@ -172,8 +172,12 @@ function HostGroupRow({
 export function JumpHostDropdown({ onPanelToggle }: { onPanelToggle?: (panel: SidebarPanel) => void }) {
   const groups = useJumpHostGroups();
   const placement = usePreferencesStore((s) => s.barItemPlacements.jumpHosts);
+  const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
   const { side: popoverSide, align } = getPopoverPlacement(placement.bar, placement.side);
   const compact = placement.bar === "statusbar";
+
+  if (!badgesAlwaysVisible && groups.length === 0) return null;
+
   const hasError = groups.some((g) => g.hasError);
 
   return (

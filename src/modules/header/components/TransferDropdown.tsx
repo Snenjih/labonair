@@ -13,8 +13,11 @@ import { type TransferJob, type TransferStatus, useTransferStore } from "@/modul
 export function TransferDropdown() {
   const { jobs, clearCompleted, cancelJob, resolveConflict } = useTransferStore();
   const placement = usePreferencesStore((s) => s.barItemPlacements.transfers);
+  const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
   const { side, align } = getPopoverPlacement(placement.bar, placement.side);
   const compact = placement.bar === "statusbar";
+
+  if (!badgesAlwaysVisible && jobs.length === 0) return null;
 
   const activeCount = jobs.filter((j) => j.status === "queued" || j.status === "running").length;
   const hasConflicts = jobs.some(

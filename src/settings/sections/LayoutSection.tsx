@@ -21,7 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { type BarId, type BarItemId, DEFAULT_BAR_ITEM_PLACEMENTS } from "@/modules/settings/lib/barItems";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setBarItemPlacement, setBarItemPlacements } from "@/modules/settings/store";
+import { setBadgesAlwaysVisible, setBarItemPlacement, setBarItemPlacements } from "@/modules/settings/store";
 import { SettingRow } from "../components/SettingRow";
 
 type ItemConfig = { id: BarItemId; label: string; description: string; icon: typeof Download01Icon };
@@ -125,6 +125,8 @@ const AI_ITEMS: ItemConfig[] = [
  * escape hatch to bring hidden items back or manage everything at once.
  */
 export function BarItemLayoutSettings() {
+  const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -144,6 +146,13 @@ export function BarItemLayoutSettings() {
         Right-click any titlebar or statusbar item to reposition or hide it — use the switches below to bring
         hidden items back.
       </p>
+
+      <SettingRow
+        title="Always show badges"
+        description="Keep Notifications, Transfers, Jump Hosts, and Agent Access visible even with nothing to show. Turn off to hide each until it has at least one entry."
+      >
+        <Switch checked={badgesAlwaysVisible} onCheckedChange={(v) => void setBadgesAlwaysVisible(v)} />
+      </SettingRow>
 
       <Group label="Badges" items={BADGE_ITEMS} />
       <Group label="Panels" items={PANEL_ITEMS} />
