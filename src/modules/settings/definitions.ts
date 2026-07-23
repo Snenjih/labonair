@@ -2,8 +2,7 @@ import type { PrefKey } from "./store";
 
 export type SettingCategory =
   | "General"
-  | "Appearance"
-  | "Layout & Panels"
+  | "Appearance & Layout"
   | "Terminal"
   | "Editor"
   | "Command Palette"
@@ -136,7 +135,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "confirmQuitWithSsh",
     label: "Confirm quit with active SSH connections",
     description: "Show a confirmation dialog before closing the app when SSH sessions are open.",
-    category: "General",
+    category: "Appearance & Layout",
     controlType: "Switch",
   },
   {
@@ -144,14 +143,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "New tab inherits current directory",
     description:
       "Open new terminal tabs in the working directory of the active tab instead of the home directory.",
-    category: "General",
+    category: "Appearance & Layout",
     controlType: "Switch",
   },
   {
     id: "confirmCloseTerminalTab",
     label: "Confirm before closing terminal tab",
     description: "Show a confirmation dialog when closing a terminal tab with a running shell.",
-    category: "General",
+    category: "Appearance & Layout",
     controlType: "Switch",
   },
   {
@@ -174,14 +173,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "appCornerRadius",
     label: "Corner radius",
     description: "Border radius for buttons, cards, and inputs (0–20 px).",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "appDensity",
     label: "Density",
     description: "Adjust the vertical spacing of UI elements.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Select",
     options: [
       { value: "compact", label: "Compact" },
@@ -270,7 +269,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Color theme",
     description:
       "Choose or import a JSON color theme for the application. Each theme bundles both a light and a dark variant.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Custom",
   },
   {
@@ -278,7 +277,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Color scheme",
     description:
       "Switch between light, dark, or system-default appearance. This also selects which variant of the active color theme is shown.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Select",
     options: [
       { value: "system", label: "System" },
@@ -290,77 +289,77 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "appFontFamily",
     label: "UI font family",
     description: "The font used for all application UI text.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Input",
   },
   {
     id: "appFontSize",
     label: "UI font size",
     description: "Base font size for the application interface (in px).",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "appLineHeight",
     label: "UI line height",
     description: "Line height multiplier for the application interface.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "backgroundImage",
     label: "Background image",
     description: "The wallpaper image displayed behind the app UI.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Input",
   },
   {
     id: "backgroundOpacity",
     label: "Wallpaper opacity",
     description: "Higher values reveal more of the background.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "backgroundBlur",
     label: "Image blur",
     description: "Gaussian blur applied to the wallpaper.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "backgroundTintColor",
     label: "Tint color",
     description: "Pick the overlay color.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Input",
   },
   {
     id: "backgroundTintOpacity",
     label: "Color tint",
     description: "Overlay color blended on top of the background image.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "zenModeShowHeader",
     label: "Show header bar",
     description: "Display the header bar with tabs and window controls. Hide it to maximise vertical space.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Switch",
   },
   {
     id: "zenModeShowStatusbar",
     label: "Show status bar",
     description: "Display the status bar at the bottom. Hide it to maximise vertical space.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Switch",
   },
   {
     id: "tabsLocation",
     label: "Tab bar location",
     description: "Display the tab bar in the titlebar or move it into the sidebar panel.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Select",
     options: [
       { value: "titlebar", label: "Titlebar" },
@@ -1150,17 +1149,16 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Customize titlebar, statusbar & panel layout",
     description:
       "Reposition or hide badges, panels, and info items across the titlebar and statusbar, or reset to defaults.",
-    category: "Layout & Panels",
+    category: "Appearance & Layout",
     controlType: "Custom",
-    targetTab: "layout",
-    linkLabel: "Open Layout & Panels",
+    targetTab: "appearance",
+    linkLabel: "Open Appearance",
   },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [
   "General",
-  "Appearance",
-  "Layout & Panels",
+  "Appearance & Layout",
   "Terminal",
   "Editor",
   "Command Palette",

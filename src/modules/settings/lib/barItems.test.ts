@@ -70,13 +70,19 @@ describe("visibleItemsFor", () => {
     expect(items).toContain("updater");
   });
 
-  it("includes sidebar panel items in the statusbar bucket (their toggle button always lives there)", () => {
+  it("includes panel toggle items in the statusbar bucket by default", () => {
     const items = visibleItemsFor(DEFAULT_BAR_ITEM_PLACEMENTS, "statusbar", "left");
     expect(items).toEqual(["explorerPanel", "snippetsPanel", "sourceControlPanel", "tabsPanel", "cwdBreadcrumb"]);
   });
 
-  it("never includes sidebar panel items in the titlebar bucket", () => {
-    const items = visibleItemsFor(DEFAULT_BAR_ITEM_PLACEMENTS, "titlebar", "left");
-    expect(items).not.toContain("explorerPanel");
+  it("moves a panel toggle item into the titlebar bucket when its bar is reassigned (full universality)", () => {
+    const placements = {
+      ...DEFAULT_BAR_ITEM_PLACEMENTS,
+      explorerPanel: { ...DEFAULT_BAR_ITEM_PLACEMENTS.explorerPanel, bar: "titlebar" as const, side: "left" as const },
+    };
+    const titlebarItems = visibleItemsFor(placements, "titlebar", "left");
+    const statusbarItems = visibleItemsFor(placements, "statusbar", "left");
+    expect(titlebarItems).toContain("explorerPanel");
+    expect(statusbarItems).not.toContain("explorerPanel");
   });
 });

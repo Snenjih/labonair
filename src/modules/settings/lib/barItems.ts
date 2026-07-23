@@ -1,17 +1,19 @@
 import type { Preferences } from "@/modules/settings/store";
 import type { SidebarPanel } from "@/modules/statusbar";
 
-export type BarId = "titlebar" | "statusbar" | "sidebar";
+export type BarId = "titlebar" | "statusbar";
 export type BarSide = "left" | "right";
 
 export interface BarItemPlacement {
   itemId: BarItemId;
-  /** For panel items (`bar: "sidebar"`), this is metadata only — the
-   *  statusbar toggle button still renders in the statusbar; "sidebar" just
-   *  marks that `side` means "which dock slot", not "which bar". */
+  /** Which bar the trigger button itself renders in. Fully general for every
+   *  item, including panel toggles — a panel's button can live in either bar
+   *  just like a badge can. */
   bar: BarId;
-  /** For titlebar/statusbar items: which end of that bar. For sidebar panel
-   *  items: which dual-dock slot (left/right) the panel opens into. */
+  /** Which end of that bar the button sits at. For panel items, `side` is
+   *  also what the dual-dock (see useSidebar/useBarPanelSync) uses to decide
+   *  which sidebar slot the panel content opens into — independent of which
+   *  bar its own toggle button happens to live in. */
   side: BarSide;
   /** Hides the trigger button. Never disables the underlying feature,
    *  keyboard shortcut, or command-palette command. */
@@ -28,7 +30,7 @@ export type BarItemId =
   | "agentAccess"
   | "transfers"
   | "bookmarks"
-  // Sidebar dock panels (side = which dock slot)
+  // Sidebar dock panel toggles
   | "explorerPanel"
   | "snippetsPanel"
   | "sourceControlPanel"
@@ -39,6 +41,28 @@ export type BarItemId =
   | "previewUrl"
   // AI cluster (one entry, renders both the status pill and open/controls together)
   | "ai";
+
+/** Groups items for divider placement: a divider only ever appears between
+ *  two *different* categories, never between two items of the same one
+ *  (e.g. never between two badges, even if they're adjacent in a bucket). */
+export type BarItemCategory = "badge" | "panel" | "info" | "ai";
+
+export const BAR_ITEM_CATEGORY: Record<BarItemId, BarItemCategory> = {
+  updater: "badge",
+  notifications: "badge",
+  jumpHosts: "badge",
+  agentAccess: "badge",
+  transfers: "badge",
+  bookmarks: "badge",
+  explorerPanel: "panel",
+  snippetsPanel: "panel",
+  sourceControlPanel: "panel",
+  tabsPanel: "panel",
+  cwdBreadcrumb: "info",
+  cursorPosition: "info",
+  previewUrl: "info",
+  ai: "ai",
+};
 
 /** Stable registration order — bucket iteration uses this, not object-key order. */
 const BAR_ITEM_ORDER: BarItemId[] = [
@@ -86,10 +110,10 @@ export const DEFAULT_BAR_ITEM_PLACEMENTS: Record<BarItemId, BarItemPlacement> = 
   agentAccess: make("agentAccess", "titlebar", "right", false),
   transfers: make("transfers", "titlebar", "right", false),
   bookmarks: make("bookmarks", "titlebar", "right", false),
-  explorerPanel: make("explorerPanel", "sidebar", "left", false),
-  snippetsPanel: make("snippetsPanel", "sidebar", "left", false),
-  sourceControlPanel: make("sourceControlPanel", "sidebar", "left", false),
-  tabsPanel: make("tabsPanel", "sidebar", "left", false),
+  explorerPanel: make("explorerPanel", "statusbar", "left", false),
+  snippetsPanel: make("snippetsPanel", "statusbar", "left", false),
+  sourceControlPanel: make("sourceControlPanel", "statusbar", "left", false),
+  tabsPanel: make("tabsPanel", "statusbar", "left", false),
   cwdBreadcrumb: make("cwdBreadcrumb", "statusbar", "left", false),
   cursorPosition: make("cursorPosition", "statusbar", "right", false),
   previewUrl: make("previewUrl", "statusbar", "right", false),
@@ -128,15 +152,15 @@ export function migrateBarItemPlacements(
     agentAccess: make("agentAccess", "titlebar", titlebarSide, false),
     transfers: make("transfers", "titlebar", titlebarSide, false),
     bookmarks: make("bookmarks", "titlebar", titlebarSide, false),
-    explorerPanel: make("explorerPanel", "sidebar", panelSide, !old.statusBarShowExplorerButton),
-    snippetsPanel: make("snippetsPanel", "sidebar", panelSide, !old.statusBarShowSnippetsButton),
+    explorerPanel: make("explorerPanel", "statusbar", panelSide, !old.statusBarShowExplorerButton),
+    snippetsPanel: make("snippetsPanel", "statusbar", panelSide, !old.statusBarShowSnippetsButton),
     sourceControlPanel: make(
       "sourceControlPanel",
-      "sidebar",
+      "statusbar",
       panelSide,
       !old.statusBarShowSourceControlButton,
     ),
-    tabsPanel: make("tabsPanel", "sidebar", panelSide, !old.statusBarShowTabsButton),
+    tabsPanel: make("tabsPanel", "statusbar", panelSide, !old.statusBarShowTabsButton),
     cwdBreadcrumb: make("cwdBreadcrumb", "statusbar", "left", !old.statusBarShowCwdBreadcrumb),
     cursorPosition: make("cursorPosition", "statusbar", "right", !old.editorShowCursorPosition),
     previewUrl: make("previewUrl", "statusbar", "right", !old.statusBarShowPreviewUrl),
@@ -144,14 +168,7 @@ export function migrateBarItemPlacements(
   };
 }
 
-/**
- * Visible items for a given (bar, side) bucket, in stable registration order.
- * Sidebar panel items (`bar: "sidebar"`) always render their toggle button in
- * the statusbar — they have no titlebar variant — so querying the
- * "statusbar" bucket also matches them (their `side` still means "which
- * dock slot", doing double duty as "which half of the statusbar the toggle
- * button sits in").
- */
+/** Visible items for a given (bar, side) bucket, in stable registration order. */
 export function visibleItemsFor(
   placements: Record<BarItemId, BarItemPlacement>,
   bar: BarId,
@@ -159,8 +176,6 @@ export function visibleItemsFor(
 ): BarItemId[] {
   return BAR_ITEM_ORDER.filter((id) => {
     const p = placements[id];
-    if (!p || p.side !== side || p.hidden) return false;
-    if (bar === "statusbar") return p.bar === "statusbar" || p.bar === "sidebar";
-    return p.bar === bar;
+    return p && p.bar === bar && p.side === side && !p.hidden;
   });
 }

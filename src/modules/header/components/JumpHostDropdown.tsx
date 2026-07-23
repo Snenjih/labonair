@@ -173,6 +173,7 @@ export function JumpHostDropdown({ onPanelToggle }: { onPanelToggle?: (panel: Si
   const groups = useJumpHostGroups();
   const placement = usePreferencesStore((s) => s.barItemPlacements.jumpHosts);
   const { side: popoverSide, align } = getPopoverPlacement(placement.bar, placement.side);
+  const compact = placement.bar === "statusbar";
   const hasError = groups.some((g) => g.hasError);
 
   return (
@@ -181,14 +182,20 @@ export function JumpHostDropdown({ onPanelToggle }: { onPanelToggle?: (panel: Si
         <Button
           variant="ghost"
           size="icon"
-          className="relative size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className={cn(
+            "relative shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground",
+            compact ? "size-5" : "size-7",
+          )}
           title="Jump Host Connections"
         >
-          <HugeiconsIcon icon={Route01Icon} size={16} strokeWidth={1.75} />
+          <HugeiconsIcon icon={Route01Icon} size={compact ? 12 : 16} strokeWidth={1.75} />
           {groups.length > 0 && (
             <span
               className={cn(
-                "absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white",
+                "absolute flex items-center justify-center rounded-full font-bold text-white",
+                compact
+                  ? "-right-0.5 -top-0.5 h-2.5 min-w-[10px] px-0.5 text-[7px]"
+                  : "-right-0.5 -top-0.5 h-3.5 min-w-[14px] px-0.5 text-[9px]",
                 hasError ? "bg-destructive animate-pulse" : "bg-primary",
               )}
             >

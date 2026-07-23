@@ -100,6 +100,7 @@ export function NotificationDropdown() {
   const { notifications, removeNotification, clearAll } = useNotificationStore();
   const placement = usePreferencesStore((s) => s.barItemPlacements.notifications);
   const { side, align } = getPopoverPlacement(placement.bar, placement.side);
+  const compact = placement.bar === "statusbar";
 
   const hasErrors = notifications.some((n) => n.type === "error");
 
@@ -109,14 +110,20 @@ export function NotificationDropdown() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className={cn(
+            "relative shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground",
+            compact ? "size-5" : "size-7",
+          )}
           title="Notifications"
         >
-          <HugeiconsIcon icon={Notification03Icon} size={16} strokeWidth={1.75} />
+          <HugeiconsIcon icon={Notification03Icon} size={compact ? 12 : 16} strokeWidth={1.75} />
           {notifications.length > 0 && (
             <span
               className={cn(
-                "absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-0.5 text-[9px] font-bold text-white",
+                "absolute flex items-center justify-center rounded-full font-bold text-white",
+                compact
+                  ? "-right-0.5 -top-0.5 h-2.5 min-w-[10px] px-0.5 text-[7px]"
+                  : "-right-0.5 -top-0.5 h-3.5 min-w-[14px] px-0.5 text-[9px]",
                 hasErrors ? "animate-pulse bg-destructive" : "bg-primary",
               )}
             >

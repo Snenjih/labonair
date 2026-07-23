@@ -18,16 +18,28 @@ describe("withDividers", () => {
   });
 
   it("renders a single cluster with no divider", () => {
-    const nodes = withDividers([{ key: "a", node: <span>A</span> }], "divider");
+    const nodes = withDividers([{ key: "a", node: <span>A</span>, category: "badge" }], "divider");
     expect(nodes).toHaveLength(1);
     expect(countDividers(nodes, "divider")).toBe(0);
   });
 
-  it("inserts exactly one divider between two visible clusters", () => {
+  it("does NOT insert a divider between two clusters of the same category", () => {
     const nodes = withDividers(
       [
-        { key: "a", node: <span>A</span> },
-        { key: "b", node: <span>B</span> },
+        { key: "a", node: <span>A</span>, category: "badge" },
+        { key: "b", node: <span>B</span>, category: "badge" },
+      ],
+      "divider",
+    );
+    expect(nodes).toHaveLength(2); // cluster, cluster — no divider
+    expect(countDividers(nodes, "divider")).toBe(0);
+  });
+
+  it("inserts exactly one divider between two clusters of different categories", () => {
+    const nodes = withDividers(
+      [
+        { key: "a", node: <span>A</span>, category: "panel" },
+        { key: "b", node: <span>B</span>, category: "badge" },
       ],
       "divider",
     );
@@ -35,15 +47,17 @@ describe("withDividers", () => {
     expect(countDividers(nodes, "divider")).toBe(1);
   });
 
-  it("inserts n-1 dividers for n clusters", () => {
+  it("only dividers at category boundaries across a longer run", () => {
     const nodes = withDividers(
       [
-        { key: "a", node: <span>A</span> },
-        { key: "b", node: <span>B</span> },
-        { key: "c", node: <span>C</span> },
+        { key: "a", node: <span>A</span>, category: "badge" },
+        { key: "b", node: <span>B</span>, category: "badge" },
+        { key: "c", node: <span>C</span>, category: "panel" },
+        { key: "d", node: <span>D</span>, category: "ai" },
       ],
       "divider",
     );
+    // badge-badge (no divider), badge-panel (divider), panel-ai (divider)
     expect(countDividers(nodes, "divider")).toBe(2);
   });
 });

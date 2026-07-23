@@ -21,6 +21,7 @@ export function AgentAccessBadge() {
   if (!bridgeEnabled) return null;
 
   const { side, align } = getPopoverPlacement(placement.bar, placement.side);
+  const compact = placement.bar === "statusbar";
 
   return (
     <Popover>
@@ -28,15 +29,20 @@ export function AgentAccessBadge() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className={cn(
+            "relative shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground",
+            compact ? "size-5" : "size-7",
+          )}
           title="AI Agent Access"
         >
-          <HugeiconsIcon icon={ShieldUserIcon} size={16} strokeWidth={1.75} />
+          <HugeiconsIcon icon={ShieldUserIcon} size={compact ? 12 : 16} strokeWidth={1.75} />
           {list.length > 0 && (
             <span
               className={cn(
-                "absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold",
-                "flex items-center justify-center text-white bg-primary",
+                "absolute flex items-center justify-center rounded-full font-bold text-white bg-primary",
+                compact
+                  ? "-right-0.5 -top-0.5 h-2.5 min-w-[10px] px-0.5 text-[7px]"
+                  : "-right-0.5 -top-0.5 h-3.5 min-w-[14px] px-0.5 text-[9px]",
               )}
             >
               {list.length}

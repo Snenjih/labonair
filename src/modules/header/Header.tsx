@@ -1,9 +1,7 @@
 import { EyeIcon, Key01Icon, KeyboardIcon, Menu01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import type { ReactNode } from "react";
 import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,20 +12,16 @@ import {
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { BookmarksDropdown } from "@/modules/bookmarks";
-import { NotificationDropdown } from "@/modules/notifications/components/NotificationDropdown";
-import { BarItemContextMenu } from "@/modules/settings/components/BarItemContextMenu";
-import { withDividers } from "@/modules/settings/lib/barItemLayout";
-import type { BarItemId } from "@/modules/settings/lib/barItems";
-import { visibleItemsFor } from "@/modules/settings/lib/barItems";
+import { useChatStore } from "@/modules/ai";
+import { useEditorCursorStore } from "@/modules/editor/lib/cursorStore";
+import { useLazyExplorerSession } from "@/modules/explorer/lib/useLazyExplorerSession";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SidebarPanel } from "@/modules/statusbar";
+import { buildBarBucket } from "@/modules/statusbar/lib/renderBarItem";
 import type { Tab } from "@/modules/tabs";
 import { TabBar } from "@/modules/tabs";
-import { AgentAccessBadge } from "./components/AgentAccessBadge";
-import { JumpHostDropdown } from "./components/JumpHostDropdown";
-import { TransferDropdown } from "./components/TransferDropdown";
-import { UpdaterButton } from "./components/UpdaterButton";
+import { useTabsStore } from "@/modules/tabs/store/tabsStore";
+import type { WorkspaceTab } from "@/modules/tabs/types";
 
 type Props = {
   onSelect: (id: number) => void;
@@ -50,6 +44,16 @@ type Props = {
   onNewGitGraph?: () => void;
   onPanelToggle?: (panel: SidebarPanel, side?: "left" | "right") => void;
   sendCd: (path: string) => void;
+  /** Threaded down so titlebar-repositioned info/AI items (breadcrumb,
+   *  cursor position, preview chip, AI cluster) render identically to how
+   *  they'd look in the statusbar — see StatusBar.tsx for the counterparts. */
+  home: string | null;
+  onCd: (path: string) => void;
+  onCdInNewTab?: (path: string) => void;
+  onOpenMini: () => void;
+  hasComposer: boolean;
+  detectedPreviewUrl?: string | null;
+  onOpenPreview?: () => void;
 };
 
 export const Header = React.memo(function Header({
@@ -73,55 +77,75 @@ export const Header = React.memo(function Header({
   onNewGitGraph,
   onPanelToggle,
   sendCd,
+  home,
+  onCd,
+  onCdInNewTab,
+  onOpenMini,
+  hasComposer,
+  detectedPreviewUrl,
+  onOpenPreview,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
   const bookmarksEnabled = usePreferencesStore((s) => s.bookmarksEnabled);
   const placements = usePreferencesStore((s) => s.barItemPlacements);
+  const panelOpen = useChatStore((s) => s.panelOpen);
+  const openAiPanel = useChatStore((s) => s.openPanel);
+  const aiEnabled = usePreferencesStore((s) => s.aiEnabled);
+  const cursorLine = useEditorCursorStore((s) => s.line);
+  const cursorCol = useEditorCursorStore((s) => s.col);
 
-  function renderBadge(id: BarItemId): ReactNode {
-    switch (id) {
-      case "updater":
-        return <UpdaterButton />;
-      case "notifications":
-        return <NotificationDropdown />;
-      case "jumpHosts":
-        return <JumpHostDropdown onPanelToggle={onPanelToggle} />;
-      case "agentAccess":
-        return <AgentAccessBadge />;
-      case "transfers":
-        return <TransferDropdown />;
-      case "bookmarks":
-        return bookmarksEnabled ? <BookmarksDropdown sendCd={sendCd} /> : null;
-      default:
-        return null;
-    }
-  }
+  const cwd = useTabsStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    if (tab?.kind !== "workspace") return null;
+    const wt = tab as WorkspaceTab;
+    const session = wt.sessions[wt.activePaneId];
+    if (session?.kind === "local") return session.cwd ?? null;
+    if (session?.kind === "ssh") return session.cwd ?? null;
+    return null;
+  });
+  const sshHostId = useTabsStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    if (tab?.kind !== "workspace") return null;
+    const wt = tab as WorkspaceTab;
+    const session = wt.sessions[wt.activePaneId];
+    return session?.kind === "ssh" ? (session.hostId ?? null) : null;
+  });
+  const lazySession = useLazyExplorerSession(sshHostId);
+  const remoteTarget =
+    sshHostId && lazySession ? { hostId: sshHostId, sessionId: lazySession.sessionId } : null;
+  const filePath = useTabsStore((s) => {
+    const tab = s.tabs.find((t) => t.id === s.activeId);
+    if (tab?.kind !== "editor") return null;
+    const et = tab as { isUntitled: boolean; path: string };
+    return et.isUntitled ? (et.path.split("/").pop() ?? "untitled.txt") : et.path;
+  });
 
-  function renderBucket(side: "left" | "right") {
-    const ids = visibleItemsFor(placements, "titlebar", side);
-    const clusters = ids
-      .map((id) => {
-        const content = renderBadge(id);
-        if (content === null) return null;
-        return {
-          key: id,
-          node: (
-            <ContextMenu key={id}>
-              <ContextMenuTrigger asChild>
-                <div className="flex shrink-0 items-center">{content}</div>
-              </ContextMenuTrigger>
-              <BarItemContextMenu itemId={id} />
-            </ContextMenu>
-          ),
-        };
-      })
-      .filter((c): c is NonNullable<typeof c> => c !== null);
-    return withDividers(clusters, "mx-0.5 h-5 w-px shrink-0 bg-border/60");
-  }
+  const ctx = {
+    placements,
+    onPanelToggle,
+    tabsLocation,
+    bookmarksEnabled,
+    sendCd,
+    home,
+    cwd,
+    filePath,
+    remoteTarget,
+    onCd,
+    onCdInNewTab,
+    cursorLine,
+    cursorCol,
+    detectedPreviewUrl,
+    onOpenPreview,
+    aiEnabled,
+    panelOpen,
+    hasComposer,
+    onOpenMini,
+    openAiPanel,
+  };
 
-  const titlebarLeft = renderBucket("left");
-  const titlebarRight = renderBucket("right");
+  const titlebarLeft = buildBarBucket("titlebar", "left", ctx, "mx-0.5 h-5 w-px shrink-0 bg-border/60");
+  const titlebarRight = buildBarBucket("titlebar", "right", ctx, "mx-0.5 h-5 w-px shrink-0 bg-border/60");
 
   const sideButtons = (
     <DropdownMenu>

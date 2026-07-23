@@ -28,7 +28,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useNotificationStore } from "@/modules/notifications/store/useNotificationStore";
-import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { ThemePref } from "@/modules/settings/store";
 import {
@@ -42,7 +41,10 @@ import {
   setBackgroundOpacity,
   setBackgroundTintColor,
   setBackgroundTintOpacity,
+  setConfirmCloseTerminalTab,
+  setConfirmQuitWithSsh,
   setHmCardScale,
+  setNewTabInheritsCwd,
   setTabsLocation,
   setZenModeShowHeader,
   setZenModeShowStatusbar,
@@ -50,6 +52,7 @@ import {
 import { useTheme } from "@/modules/theme";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
+import { BarItemLayoutSettings } from "./LayoutSection";
 
 const APPEARANCE: {
   id: ThemePref;
@@ -75,6 +78,9 @@ export function AppearanceSection() {
   const appFontSize = usePreferencesStore((s) => s.appFontSize);
   const appLineHeight = usePreferencesStore((s) => s.appLineHeight);
   const tabsLocation = usePreferencesStore((s) => s.tabsLocation);
+  const newTabInheritsCwd = usePreferencesStore((s) => s.newTabInheritsCwd);
+  const confirmCloseTerminalTab = usePreferencesStore((s) => s.confirmCloseTerminalTab);
+  const confirmQuitWithSsh = usePreferencesStore((s) => s.confirmQuitWithSsh);
   const zenModeShowHeader = usePreferencesStore((s) => s.zenModeShowHeader);
   const zenModeShowStatusbar = usePreferencesStore((s) => s.zenModeShowStatusbar);
   const backgroundImage = usePreferencesStore((s) => s.backgroundImage);
@@ -506,6 +512,27 @@ export function AppearanceSection() {
           </Select>
         </SettingRow>
         <SettingRow
+          title="New tab inherits current directory"
+          description="Open new terminal tabs in the working directory of the active tab instead of the home directory."
+        >
+          <Switch checked={newTabInheritsCwd} onCheckedChange={(v) => void setNewTabInheritsCwd(v)} />
+        </SettingRow>
+        <SettingRow
+          title="Confirm before closing terminal tab"
+          description="Show a confirmation dialog when closing a terminal tab with a running shell."
+        >
+          <Switch
+            checked={confirmCloseTerminalTab}
+            onCheckedChange={(v) => void setConfirmCloseTerminalTab(v)}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Confirm quit with active SSH connections"
+          description="Show a confirmation dialog before closing the app when SSH sessions are open."
+        >
+          <Switch checked={confirmQuitWithSsh} onCheckedChange={(v) => void setConfirmQuitWithSsh(v)} />
+        </SettingRow>
+        <SettingRow
           title="Show header bar"
           description="Display the header bar with tabs and window controls. Hide it to maximise vertical space."
         >
@@ -517,19 +544,9 @@ export function AppearanceSection() {
         >
           <Switch checked={zenModeShowStatusbar} onCheckedChange={(v) => void setZenModeShowStatusbar(v)} />
         </SettingRow>
-        <SettingRow
-          title="Titlebar & statusbar items"
-          description="Panel positions, badges, and info items moved to their own section — right-click any item to reposition or hide it, or manage everything at once there."
-        >
-          <button
-            type="button"
-            onClick={() => void openSettingsWindow("layout")}
-            className="h-7 rounded-md border border-border/60 px-3 text-[11.5px] text-foreground transition-colors hover:bg-accent"
-          >
-            Open Layout & Panels
-          </button>
-        </SettingRow>
       </div>
+
+      <BarItemLayoutSettings />
 
       <div className="flex flex-col gap-2">
         <Label>Typography</Label>

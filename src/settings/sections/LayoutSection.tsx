@@ -22,7 +22,6 @@ import { cn } from "@/lib/utils";
 import { type BarId, type BarItemId, DEFAULT_BAR_ITEM_PLACEMENTS } from "@/modules/settings/lib/barItems";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { setBarItemPlacement, setBarItemPlacements } from "@/modules/settings/store";
-import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
 type ItemConfig = { id: BarItemId; label: string; description: string; icon: typeof Download01Icon };
@@ -118,33 +117,37 @@ const AI_ITEMS: ItemConfig[] = [
   },
 ];
 
-export function LayoutSection() {
+/**
+ * Titlebar/statusbar item positioning — a subsection embedded inside
+ * Appearance rather than its own top-level settings page, since it's just
+ * another facet of "how the app looks." Right-click any titlebar or
+ * statusbar item to reposition or hide it directly; this subsection is the
+ * escape hatch to bring hidden items back or manage everything at once.
+ */
+export function BarItemLayoutSettings() {
   return (
-    <div className="flex flex-col gap-6">
-      <SectionHeader
-        title="Layout & Panels"
-        description="Right-click any titlebar or statusbar item to reposition or hide it — this page is the escape hatch to bring hidden items back."
-      />
-
-      <SettingRow
-        title="Reset layout"
-        description="Restore every item's bar, side, and visibility to its default."
-      >
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-medium tracking-tight text-muted-foreground">
+          Titlebar & Statusbar Items
+        </span>
         <button
           type="button"
           onClick={() => void resetBarLayout()}
-          className="h-7 rounded-md border border-border/60 px-3 text-[11.5px] text-foreground transition-colors hover:bg-accent"
+          className="flex items-center gap-1.5 rounded-md border border-border/60 px-2 py-1 text-[10.5px] text-foreground transition-colors hover:bg-accent"
         >
-          <span className="flex items-center gap-1.5">
-            <HugeiconsIcon icon={RefreshIcon} size={13} strokeWidth={1.75} />
-            Reset to defaults
-          </span>
+          <HugeiconsIcon icon={RefreshIcon} size={12} strokeWidth={1.75} />
+          Reset to defaults
         </button>
-      </SettingRow>
+      </div>
+      <p className="text-[10.5px] leading-relaxed text-muted-foreground">
+        Right-click any titlebar or statusbar item to reposition or hide it — use the switches below to bring
+        hidden items back.
+      </p>
 
-      <Group label="Badges (Titlebar / Statusbar)" items={BADGE_ITEMS} />
-      <Group label="Panels (Sidebar dock)" items={PANEL_ITEMS} />
-      <Group label="Statusbar Info" items={INFO_ITEMS} />
+      <Group label="Badges" items={BADGE_ITEMS} />
+      <Group label="Panels" items={PANEL_ITEMS} />
+      <Group label="Info" items={INFO_ITEMS} />
       <Group label="AI" items={AI_ITEMS} />
     </div>
   );
@@ -170,7 +173,6 @@ function Group({ label, items }: { label: string; items: ItemConfig[] }) {
 function BarItemRow({ id, label, description, icon }: ItemConfig) {
   const placement = usePreferencesStore((s) => s.barItemPlacements[id]);
   if (!placement) return null;
-  const isPanelItem = placement.bar === "sidebar";
   const shown = !placement.hidden;
   const surfaceMode = (placement.extra?.surfaceMode as "panel" | "mini" | undefined) ?? "panel";
 
@@ -178,7 +180,7 @@ function BarItemRow({ id, label, description, icon }: ItemConfig) {
     <SettingRow title={label} description={description} className={cn(!shown && "opacity-60")}>
       <div className="flex items-center gap-2">
         <HugeiconsIcon icon={icon} size={14} strokeWidth={1.75} className="shrink-0 text-muted-foreground" />
-        {shown && !isPanelItem && (
+        {shown && (
           <Select
             value={placement.bar}
             onValueChange={(v) => void setBarItemPlacement(id, { bar: v as BarId })}
@@ -199,8 +201,8 @@ function BarItemRow({ id, label, description, icon }: ItemConfig) {
         {shown && (
           <SideToggle
             value={placement.side}
-            leftLabel={isPanelItem ? "Left" : "Left"}
-            rightLabel={isPanelItem ? "Right" : "Right"}
+            leftLabel="Left"
+            rightLabel="Right"
             onChange={(side) => void setBarItemPlacement(id, { side })}
           />
         )}

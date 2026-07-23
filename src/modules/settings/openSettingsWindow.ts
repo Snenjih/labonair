@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 export type SettingsTab =
   | "general"
   | "appearance"
-  | "layout"
   | "themes"
   | "terminal"
   | "file-manager"

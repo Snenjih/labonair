@@ -4,7 +4,6 @@ import {
   Folder01Icon,
   GridViewIcon,
   KeyboardIcon,
-  LayoutTopIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
   PlugSocketIcon,
@@ -46,7 +45,6 @@ import { EditorSection } from "./sections/EditorSection";
 import { FileManagerSection } from "./sections/FileManagerSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { KeyboardShortcutsSection } from "./sections/KeyboardShortcutsSection";
-import { LayoutSection } from "./sections/LayoutSection";
 import { ModelsSection } from "./sections/ModelsSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemeMarketplace } from "./sections/ThemeMarketplace";
@@ -61,8 +59,7 @@ type SidebarItem = {
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "general", category: "General", label: "General", icon: Settings01Icon },
-  { id: "appearance", category: "Appearance", label: "Appearance", icon: PaintBoardIcon },
-  { id: "layout", category: "Layout & Panels", label: "Layout & Panels", icon: LayoutTopIcon },
+  { id: "appearance", category: "Appearance & Layout", label: "Appearance & Layout", icon: PaintBoardIcon },
   { id: "themes", category: null, label: "Themes", icon: PaintBrush01Icon },
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
@@ -81,6 +78,7 @@ function readInitialTab(): SettingsTab {
   const t = url.searchParams.get("tab");
   if (t === "models" || t === "agents" || t === "connections" || t === "directives") return "ai";
   if (t === "bookmarks" || t === "command-palette" || t === "source-control") return "workspace";
+  if (t === "layout") return "appearance";
   if (t && (VALID_TABS as string[]).includes(t)) return t as SettingsTab;
   return "general";
 }
@@ -107,6 +105,10 @@ export function SettingsApp() {
       }
       if (detail === "bookmarks" || detail === "command-palette" || detail === "source-control") {
         setActive("workspace");
+        return;
+      }
+      if (detail === "layout") {
+        setActive("appearance");
         return;
       }
       if ((VALID_TABS as string[]).includes(detail)) {
@@ -213,7 +215,6 @@ export function SettingsApp() {
               <>
                 {active === "general" && <GeneralSection />}
                 {active === "appearance" && <AppearanceSection />}
-                {active === "layout" && <LayoutSection />}
                 {active === "themes" && <ThemeMarketplace />}
                 {active === "terminal" && <TerminalSection />}
                 {active === "editor" && <EditorSection />}
