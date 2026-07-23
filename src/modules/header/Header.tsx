@@ -190,12 +190,7 @@ export const Header = React.memo(function Header({
         IS_MAC ? "pr-2 pl-20" : "pr-0 pl-2",
       )}
     >
-      {!IS_MAC && (
-        <>
-          {sideButtons}
-          <span className="mx-1 h-5 w-px shrink-0 bg-border" />
-        </>
-      )}
+      {!IS_MAC && sideButtons}
 
       {IS_MAC && <span className="mr-1 h-full w-px shrink-0 bg-border" />}
 
@@ -236,19 +231,9 @@ export const Header = React.memo(function Header({
         </>
       )}
 
-      {IS_MAC && (
-        <>
-          <span className="mx-1 h-5 w-px shrink-0 bg-border" />
-          {sideButtons}
-        </>
-      )}
+      {IS_MAC && sideButtons}
 
-      {USE_CUSTOM_WINDOW_CONTROLS && (
-        <>
-          <span className="ml-1 h-5 w-px shrink-0 bg-border" />
-          <WindowControls />
-        </>
-      )}
+      {USE_CUSTOM_WINDOW_CONTROLS && <WindowControls />}
     </div>
   );
 });

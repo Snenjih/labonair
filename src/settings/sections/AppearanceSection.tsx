@@ -546,8 +546,6 @@ export function AppearanceSection() {
         </SettingRow>
       </div>
 
-      <BarItemLayoutSettings />
-
       <div className="flex flex-col gap-2">
         <Label>Typography</Label>
         <div className="flex flex-col gap-2">
@@ -585,6 +583,8 @@ export function AppearanceSection() {
           </SettingRow>
         </div>
       </div>
+
+      <BarItemLayoutSettings />
     </div>
   );
 }
