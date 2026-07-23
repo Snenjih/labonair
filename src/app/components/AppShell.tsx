@@ -16,7 +16,7 @@ import { ShortcutsDialog } from "@/modules/shortcuts";
 import { SnippetHostPickerDialog, SnippetLogDrawer, SnippetVariablePromptDialog } from "@/modules/snippets";
 import { useSourceControlStore } from "@/modules/source-control/store/sourceControlStore";
 import type { SidebarPanel, SidebarReturn } from "@/modules/statusbar";
-import { StatusBar } from "@/modules/statusbar";
+import { StatusBar, useBarPanelSync } from "@/modules/statusbar";
 import {
   type AiDiffStatus,
   selectActiveTabKind,
@@ -211,6 +211,8 @@ export function AppShell({ actions, prefs, ctrl, tabs, sidebar, ai, palette }: A
     }
     sidebar.handlePanelToggle(panel, side);
   };
+
+  useBarPanelSync(sidebar);
 
   const shell = (
     <MotionConfig reducedMotion={prefs.reduceMotion ? "always" : "user"}>

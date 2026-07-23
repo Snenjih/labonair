@@ -1,15 +1,19 @@
+import { ArrowDown01Icon, ArrowUpDownIcon, Cancel01Icon, Copy01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { getPopoverPlacement } from "@/modules/settings/lib/getPopoverPlacement";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { type TransferJob, type TransferStatus, useTransferStore } from "@/modules/sftp/store/transferStore";
-import { Cancel01Icon, ArrowUpDownIcon, Copy01Icon, ArrowDown01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 
 export function TransferDropdown() {
   const { jobs, clearCompleted, cancelJob, resolveConflict } = useTransferStore();
+  const placement = usePreferencesStore((s) => s.barItemPlacements.transfers);
+  const { side, align } = getPopoverPlacement(placement.bar, placement.side);
 
   const activeCount = jobs.filter((j) => j.status === "queued" || j.status === "running").length;
   const hasConflicts = jobs.some(
@@ -42,7 +46,7 @@ export function TransferDropdown() {
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-[405px] p-0 max-h-[540px] flex flex-col">
+        <PopoverContent side={side} align={align} className="w-[405px] p-0 max-h-[540px] flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
             <span className="text-sm font-semibold">Transfers</span>
             <button

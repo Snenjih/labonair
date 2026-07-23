@@ -4,6 +4,7 @@ import {
   Folder01Icon,
   GridViewIcon,
   KeyboardIcon,
+  LayoutTopIcon,
   PaintBoardIcon,
   PaintBrush01Icon,
   PlugSocketIcon,
@@ -45,6 +46,7 @@ import { EditorSection } from "./sections/EditorSection";
 import { FileManagerSection } from "./sections/FileManagerSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { KeyboardShortcutsSection } from "./sections/KeyboardShortcutsSection";
+import { LayoutSection } from "./sections/LayoutSection";
 import { ModelsSection } from "./sections/ModelsSection";
 import { TerminalSection } from "./sections/TerminalSection";
 import { ThemeMarketplace } from "./sections/ThemeMarketplace";
@@ -60,6 +62,7 @@ type SidebarItem = {
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "general", category: "General", label: "General", icon: Settings01Icon },
   { id: "appearance", category: "Appearance", label: "Appearance", icon: PaintBoardIcon },
+  { id: "layout", category: "Layout & Panels", label: "Layout & Panels", icon: LayoutTopIcon },
   { id: "themes", category: null, label: "Themes", icon: PaintBrush01Icon },
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
@@ -201,8 +204,8 @@ export function SettingsApp() {
               <SearchResults
                 query={trimmed}
                 results={searchResults}
-                onNavigateToThemes={() => {
-                  setActive("themes");
+                onNavigateToTab={(tab) => {
+                  setActive(tab);
                   setSearchQuery("");
                 }}
               />
@@ -210,6 +213,7 @@ export function SettingsApp() {
               <>
                 {active === "general" && <GeneralSection />}
                 {active === "appearance" && <AppearanceSection />}
+                {active === "layout" && <LayoutSection />}
                 {active === "themes" && <ThemeMarketplace />}
                 {active === "terminal" && <TerminalSection />}
                 {active === "editor" && <EditorSection />}
@@ -495,11 +499,11 @@ function applySettingChange(id: PrefKey, value: unknown): void {
 function SearchResults({
   query,
   results,
-  onNavigateToThemes,
+  onNavigateToTab,
 }: {
   query: string;
   results: ReturnType<typeof SETTING_DEFINITIONS.filter>;
-  onNavigateToThemes: () => void;
+  onNavigateToTab: (tab: SettingsTab) => void;
 }) {
   const prefs = usePrefs();
 
@@ -560,10 +564,10 @@ function SearchResults({
                   <SettingRow key={def.id} title={def.label} description={def.description}>
                     <button
                       type="button"
-                      onClick={onNavigateToThemes}
+                      onClick={() => onNavigateToTab(def.targetTab ?? "themes")}
                       className="text-[11.5px] text-foreground underline underline-offset-2 hover:text-muted-foreground"
                     >
-                      Open in Themes
+                      {def.linkLabel ?? "Open in Themes"}
                     </button>
                   </SettingRow>
                 );

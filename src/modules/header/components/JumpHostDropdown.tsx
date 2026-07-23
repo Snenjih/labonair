@@ -11,6 +11,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { useLazySessionStore } from "@/modules/explorer/lib/useLazyExplorerSession";
 import { type ConnectionEntry, useConnectionStatusStore, useHostsStore } from "@/modules/hosts";
+import { getPopoverPlacement } from "@/modules/settings/lib/getPopoverPlacement";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { SidebarPanel } from "@/modules/statusbar";
 import { useTabsStore } from "@/modules/tabs/store/tabsStore";
 import { buildHostGroups, type HostGroup } from "../lib/jumpHostGroups";
@@ -169,8 +171,8 @@ function HostGroupRow({
 
 export function JumpHostDropdown({ onPanelToggle }: { onPanelToggle?: (panel: SidebarPanel) => void }) {
   const groups = useJumpHostGroups();
-  if (groups.length === 0) return null;
-
+  const placement = usePreferencesStore((s) => s.barItemPlacements.jumpHosts);
+  const { side: popoverSide, align } = getPopoverPlacement(placement.bar, placement.side);
   const hasError = groups.some((g) => g.hasError);
 
   return (
@@ -183,25 +185,33 @@ export function JumpHostDropdown({ onPanelToggle }: { onPanelToggle?: (panel: Si
           title="Jump Host Connections"
         >
           <HugeiconsIcon icon={Route01Icon} size={16} strokeWidth={1.75} />
-          <span
-            className={cn(
-              "absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white",
-              hasError ? "bg-destructive animate-pulse" : "bg-primary",
-            )}
-          >
-            {groups.length}
-          </span>
+          {groups.length > 0 && (
+            <span
+              className={cn(
+                "absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white",
+                hasError ? "bg-destructive animate-pulse" : "bg-primary",
+              )}
+            >
+              {groups.length}
+            </span>
+          )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[360px] p-0 max-h-[480px] flex flex-col">
+      <PopoverContent side={popoverSide} align={align} className="w-[360px] p-0 max-h-[480px] flex flex-col">
         <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
           <span className="text-sm font-semibold">Jump Host Connections</span>
         </div>
-        <div className="flex-1 overflow-y-auto divide-y divide-border/40">
-          {groups.map((group) => (
-            <HostGroupRow key={group.hostId} group={group} onPanelToggle={onPanelToggle} />
-          ))}
-        </div>
+        {groups.length === 0 ? (
+          <div className="flex items-center justify-center h-20 text-sm text-muted-foreground select-none">
+            No jump host connections
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto divide-y divide-border/40">
+            {groups.map((group) => (
+              <HostGroupRow key={group.hostId} group={group} onPanelToggle={onPanelToggle} />
+            ))}
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

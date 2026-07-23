@@ -1,3 +1,16 @@
+import { type UIMessage, useChat } from "@ai-sdk/react";
+import {
+  Add01Icon,
+  AlertCircleIcon,
+  ArrowDown01Icon,
+  Cancel01Icon,
+  Delete02Icon,
+  FilterIcon,
+  TerminalIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { motion } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
 import appIcon from "@/assets/app-icon.png";
 import {
   Context,
@@ -17,19 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { useChat, type UIMessage } from "@ai-sdk/react";
-import {
-  Add01Icon,
-  AlertCircleIcon,
-  ArrowDown01Icon,
-  Cancel01Icon,
-  Delete02Icon,
-  FilterIcon,
-  TerminalIcon,
-} from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { getModelContextLimit } from "../config";
 import type { SessionMeta } from "../lib/sessions";
 import { useAgentsStore } from "../store/agentsStore";
@@ -38,8 +39,8 @@ import { usePlanStore } from "../store/planStore";
 import { AgentSwitcher } from "./AgentSwitcher";
 import { AiChatView } from "./AiChat";
 import { PlanDiffReview } from "./PlanDiffReview";
-import { TodoStrip } from "./TodoStrip";
 import { QueueStrip } from "./QueueStrip";
+import { TodoStrip } from "./TodoStrip";
 
 const SUGGESTIONS = [
   {
@@ -96,7 +97,13 @@ export function AiMiniWindow() {
   const closeMini = useChatStore((s) => s.closeMini);
   const sessionId = useChatStore((s) => s.activeSessionId);
   const openPanel = useChatStore((s) => s.openPanel);
+  const aiPlacement = usePreferencesStore((s) => s.barItemPlacements.ai);
+  // Self-positions near wherever the "ai" bar item currently lives: bottom
+  // of the workspace input bar when it's in the statusbar (today's default),
+  // or near the top of the window when moved to the titlebar.
+  const anchoredToTop = aiPlacement.bar === "titlebar";
   const bottomOffset = useInputBarBottom();
+  const horizontalClass = aiPlacement.side === "left" ? "left-4" : "right-4";
   const expandToPanel = () => {
     closeMini();
     openPanel();
@@ -122,9 +129,13 @@ export function AiMiniWindow() {
       exit={{ opacity: 0, y: 12, scale: 0.98 }}
       transition={{ type: "spring", stiffness: 320, damping: 32 }}
       data-ai-mini-window
-      style={{ willChange: "transform, opacity", bottom: bottomOffset }}
+      style={{
+        willChange: "transform, opacity",
+        ...(anchoredToTop ? { top: 48 } : { bottom: bottomOffset }),
+      }}
       className={cn(
-        "no-scrollbar-deep fixed right-4 z-40 flex h-[42rem] w-[34rem] flex-col overflow-hidden",
+        "no-scrollbar-deep fixed z-40 flex h-[42rem] w-[34rem] flex-col overflow-hidden",
+        horizontalClass,
         "rounded-2xl border border-border/40 bg-card shadow-2xl ring-1 ring-black/5 dark:ring-white/5",
         "text-[12px]",
       )}

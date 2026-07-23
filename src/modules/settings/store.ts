@@ -11,6 +11,11 @@ import {
   OLLAMA_DEFAULT_BASE_URL,
   OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
 } from "@/modules/ai/config";
+import {
+  type BarItemId,
+  type BarItemPlacement,
+  DEFAULT_BAR_ITEM_PLACEMENTS,
+} from "@/modules/settings/lib/barItems";
 
 export type ThemePref = "system" | "light" | "dark";
 
@@ -162,6 +167,12 @@ export type Preferences = {
   // Dual-dock: independent second sidebar slot on the opposite screen side.
   sidebarRightOpen: boolean;
   sidebarRightActivePanel: "explorer" | "snippets" | "source-control" | "tabs";
+
+  // --- Bar Item Registry (per-item titlebar/statusbar/sidebar positioning) ---
+  barItemPlacements: Record<BarItemId, BarItemPlacement>;
+  /** One-time migration gate from the old sidebarPosition/titlebarsIconsPosition/
+   *  statusBarShowXXX prefs into barItemPlacements. */
+  barLayoutMigrated: boolean;
   // --- Security ---
   credentialEncryption: boolean;
   // --- Updates ---
@@ -357,6 +368,8 @@ const KEY_SIDEBAR_OPEN = "sidebarOpen";
 const KEY_SIDEBAR_ACTIVE_PANEL = "sidebarActivePanel";
 const KEY_SIDEBAR_RIGHT_OPEN = "sidebarRightOpen";
 const KEY_SIDEBAR_RIGHT_ACTIVE_PANEL = "sidebarRightActivePanel";
+const KEY_BAR_ITEM_PLACEMENTS = "barItemPlacements";
+const KEY_BAR_LAYOUT_MIGRATED = "barLayoutMigrated";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
@@ -525,6 +538,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sidebarActivePanel: "explorer",
   sidebarRightOpen: false,
   sidebarRightActivePanel: "explorer",
+  barItemPlacements: DEFAULT_BAR_ITEM_PLACEMENTS,
+  barLayoutMigrated: false,
   credentialEncryption: false,
   checkForUpdates: true,
 
@@ -823,6 +838,9 @@ export async function loadPreferences(): Promise<Preferences> {
         ? (raw as "explorer" | "snippets" | "source-control" | "tabs")
         : DEFAULT_PREFERENCES.sidebarRightActivePanel;
     })(),
+    barItemPlacements:
+      get<Preferences["barItemPlacements"]>(KEY_BAR_ITEM_PLACEMENTS) ?? DEFAULT_PREFERENCES.barItemPlacements,
+    barLayoutMigrated: get<boolean>(KEY_BAR_LAYOUT_MIGRATED) ?? DEFAULT_PREFERENCES.barLayoutMigrated,
     credentialEncryption: get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
     checkForUpdates: get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
 
@@ -1519,6 +1537,31 @@ export async function setSidebarRightActivePanel(
   await (await getStore()).save();
 }
 
+export async function setBarItemPlacements(value: Record<BarItemId, BarItemPlacement>): Promise<void> {
+  await (await getStore()).set(KEY_BAR_ITEM_PLACEMENTS, value);
+  await (await getStore()).save();
+}
+
+/** Merge-updates a single item's placement (used by the right-click position
+ *  menu and the Layout & Panels settings rows) without clobbering the rest. */
+export async function setBarItemPlacement(
+  itemId: BarItemId,
+  patch: Partial<BarItemPlacement>,
+): Promise<void> {
+  const store = await getStore();
+  const current =
+    (await store.get<Preferences["barItemPlacements"]>(KEY_BAR_ITEM_PLACEMENTS)) ??
+    DEFAULT_PREFERENCES.barItemPlacements;
+  const next = { ...current, [itemId]: { ...current[itemId], ...patch, itemId } };
+  await store.set(KEY_BAR_ITEM_PLACEMENTS, next);
+  await store.save();
+}
+
+export async function setBarLayoutMigrated(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BAR_LAYOUT_MIGRATED, value);
+  await (await getStore()).save();
+}
+
 export async function setCredentialEncryption(value: boolean): Promise<void> {
   await (await getStore()).set(KEY_CREDENTIAL_ENCRYPTION, value);
   await (await getStore()).save();
@@ -1886,6 +1929,8 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SIDEBAR_ACTIVE_PANEL]: "sidebarActivePanel",
     [KEY_SIDEBAR_RIGHT_OPEN]: "sidebarRightOpen",
     [KEY_SIDEBAR_RIGHT_ACTIVE_PANEL]: "sidebarRightActivePanel",
+    [KEY_BAR_ITEM_PLACEMENTS]: "barItemPlacements",
+    [KEY_BAR_LAYOUT_MIGRATED]: "barLayoutMigrated",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_HOST_PING_INTERVAL]: "hostPingInterval",

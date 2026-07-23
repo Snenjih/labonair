@@ -3,6 +3,7 @@ import type { PrefKey } from "./store";
 export type SettingCategory =
   | "General"
   | "Appearance"
+  | "Layout & Panels"
   | "Terminal"
   | "Editor"
   | "Command Palette"
@@ -25,6 +26,12 @@ export type SettingDefinition = {
   category: SettingCategory;
   controlType: ControlType;
   options?: SelectOption[];
+  /** For `controlType: "Custom"` — which settings tab the link navigates to
+   *  (defaults to "themes" for backward compatibility with the original
+   *  Themes-only Custom entries). */
+  targetTab?: import("./openSettingsWindow").SettingsTab;
+  /** For `controlType: "Custom"` — the link button's label (defaults to "Open in Themes"). */
+  linkLabel?: string;
 };
 
 export const SETTING_DEFINITIONS: SettingDefinition[] = [
@@ -1162,11 +1169,22 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "Bookmarks",
     controlType: "Switch",
   },
+  {
+    id: "barItemPlacements",
+    label: "Customize titlebar, statusbar & panel layout",
+    description:
+      "Reposition or hide badges, panels, and info items across the titlebar and statusbar, or reset to defaults.",
+    category: "Layout & Panels",
+    controlType: "Custom",
+    targetTab: "layout",
+    linkLabel: "Open Layout & Panels",
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [
   "General",
   "Appearance",
+  "Layout & Panels",
   "Terminal",
   "Editor",
   "Command Palette",

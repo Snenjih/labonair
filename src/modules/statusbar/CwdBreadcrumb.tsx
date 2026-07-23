@@ -29,6 +29,7 @@ import { usePathBookmarksStore } from "@/modules/bookmarks/store/pathBookmarksSt
 import type { FsProvider } from "@/modules/explorer/lib/fsProvider";
 import { createLocalFsProvider } from "@/modules/explorer/lib/providers/localFsProvider";
 import { createRemoteFsProvider } from "@/modules/explorer/lib/providers/remoteFsProvider";
+import { BarItemContextMenu } from "@/modules/settings/components/BarItemContextMenu";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import type { Segment } from "./lib/pathUtils";
 import { relativePath, segmentsFromCwd } from "./lib/pathUtils";
@@ -69,7 +70,27 @@ function basename(path: string): string {
   return i === -1 ? path : path.slice(i + 1);
 }
 
-export function CwdBreadcrumb({ cwd, filePath, home, remoteTarget, onCd, onCdInNewTab }: Props) {
+/**
+ * Outer wrapper adding a container-level right-click menu (reposition/hide,
+ * via the shared bar-item registry) around the breadcrumb. Right-clicking a
+ * specific segment still hits that segment's own inner context menu first
+ * (path actions below) — this outer one only catches clicks on the
+ * breadcrumb's empty padding/gaps, not already claimed by a segment.
+ */
+export function CwdBreadcrumb(props: Props) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="contents">
+          <CwdBreadcrumbInner {...props} />
+        </div>
+      </ContextMenuTrigger>
+      <BarItemContextMenu itemId="cwdBreadcrumb" />
+    </ContextMenu>
+  );
+}
+
+function CwdBreadcrumbInner({ cwd, filePath, home, remoteTarget, onCd, onCdInNewTab }: Props) {
   // File mode: dir segments navigate; filename is the terminal leaf.
   if (filePath) {
     const dir = dirname(filePath);
