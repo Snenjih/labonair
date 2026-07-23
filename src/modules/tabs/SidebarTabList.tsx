@@ -1,31 +1,19 @@
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { Cancel01Icon, PencilEdit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
-import { useShallow } from "zustand/react/shallow";
-import { selectRenderStableTabs, useTabsStore } from "./store/tabsStore";
-import { TabIconFor, labelFor, pluralLabelFor, NewTabDropdownItems } from "./lib/tabUtils";
-import type { Tab } from "./types";
+import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { NonWorkspaceTabContextMenuContent } from "./components/NonWorkspaceTabContextMenuContent";
+import { WorkspaceTabContextMenuContent } from "./components/WorkspaceTabContextMenuContent";
+import { labelFor, NewTabDropdownItems, TabIconFor } from "./lib/tabUtils";
+import { shouldMiddleClickClose, useTabList } from "./lib/useTabList";
+import type { Tab, WorkspaceTab } from "./types";
 
 type Props = {
   onSelect: (id: number) => void;
@@ -60,22 +48,9 @@ export function SidebarTabList({
   onRename,
   onNewGitGraph,
 }: Props) {
-  const tabs = useTabsStore(useShallow(selectRenderStableTabs));
-  const activeId = useTabsStore((s) => s.activeId);
-  const reorderTabs = useTabsStore((s) => s.reorderTabs);
+  const { tabs, activeId, sensors, handleDragEnd, isNewTab, editingId, startEditing, finishEditing } =
+    useTabList();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
-      reorderTabs(Number(active.id), Number(over.id));
-    },
-    [reorderTabs],
-  );
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -83,25 +58,6 @@ export function SidebarTabList({
     const active = el.querySelector<HTMLElement>(`[data-tab-id="${activeId}"]`);
     active?.scrollIntoView({ block: "nearest" });
   }, [activeId, tabs.length]);
-
-  // Clear editing state if the tab being renamed is closed externally.
-  useEffect(() => {
-    if (editingId !== null && !tabs.find((t) => t.id === editingId)) {
-      setEditingId(null);
-    }
-  }, [tabs, editingId]);
-
-  // Tab enter animation — seed seen set on first render so restored tabs don't animate.
-  const seenRef = useRef<Set<number> | null>(null);
-  const firstRender = seenRef.current === null;
-  let seen = seenRef.current;
-  if (seen === null) {
-    seen = new Set(tabs.map((t) => t.id));
-    seenRef.current = seen;
-  }
-  useEffect(() => {
-    seenRef.current = new Set(tabs.map((t) => t.id));
-  }, [tabs]);
 
   return (
     <div className="flex h-full flex-col">
@@ -113,7 +69,7 @@ export function SidebarTabList({
           <SortableContext items={tabs.map((t) => t.id)} strategy={verticalListSortingStrategy}>
             {tabs.map((t) => {
               const isActive = t.id === activeId;
-              const isNew = !firstRender && !seen!.has(t.id);
+              const isNew = isNewTab(t.id);
 
               // Render a non-button cell while renaming (input can't be inside button).
               if (editingId === t.id && t.kind === "workspace") {
@@ -130,9 +86,9 @@ export function SidebarTabList({
                         initial={labelFor(t)}
                         onCommit={(value) => {
                           onRename(t.id, value);
-                          setEditingId(null);
+                          finishEditing();
                         }}
-                        onCancel={() => setEditingId(null)}
+                        onCancel={finishEditing}
                       />
                     </div>
                   </SortableSidebarTabWrapper>
@@ -144,6 +100,16 @@ export function SidebarTabList({
                   type="button"
                   data-tab-id={t.id}
                   onClick={() => onSelect(t.id)}
+                  onAuxClick={(e) => {
+                    if (shouldMiddleClickClose(e.button, tabs.length, t.kind)) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onClose(t.id);
+                    }
+                  }}
+                  onMouseDown={(e) => {
+                    if (e.button === 1) e.preventDefault();
+                  }}
                   className={cn(
                     "group flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs transition-colors",
                     isNew && "labonair-tab-in",
@@ -180,52 +146,28 @@ export function SidebarTabList({
                 </button>
               );
 
-              if (t.kind === "workspace") {
-                return (
-                  <SortableSidebarTabWrapper key={t.id} id={t.id} disabled={false}>
-                    <ContextMenu>
-                      <ContextMenuTrigger asChild>{btn}</ContextMenuTrigger>
-                      <ContextMenuContent className="min-w-36" onCloseAutoFocus={(e) => e.preventDefault()}>
-                        <ContextMenuItem onSelect={() => setEditingId(t.id)}>
-                          <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.75} />
-                          <span className="flex-1">Rename</span>
-                        </ContextMenuItem>
-                        {tabs.length > 1 && (
-                          <>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem onSelect={() => onClose(t.id)}>
-                              <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.75} />
-                              <span className="flex-1">Close</span>
-                            </ContextMenuItem>
-                            <ContextMenuItem onSelect={() => onCloseByKind(t.kind)}>
-                              <span className="flex-1">Close All {pluralLabelFor(t.kind)}</span>
-                            </ContextMenuItem>
-                          </>
-                        )}
-                      </ContextMenuContent>
-                    </ContextMenu>
-                  </SortableSidebarTabWrapper>
-                );
-              }
-
               return (
                 <SortableSidebarTabWrapper key={t.id} id={t.id} disabled={false}>
                   <ContextMenu>
                     <ContextMenuTrigger asChild>{btn}</ContextMenuTrigger>
-                    <ContextMenuContent>
-                      {t.kind !== "home" && (
-                        <>
-                          <ContextMenuItem onSelect={() => onClose(t.id)}>Close Tab</ContextMenuItem>
-                          <ContextMenuItem onSelect={() => onDuplicate(t.id)}>Duplicate Tab</ContextMenuItem>
-                          <ContextMenuSeparator />
-                        </>
-                      )}
-                      <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>Close Others</ContextMenuItem>
-                      <ContextMenuItem onSelect={onCloseAll}>Close All</ContextMenuItem>
-                      <ContextMenuItem onSelect={() => onCloseByKind(t.kind)}>
-                        Close All {pluralLabelFor(t.kind)}
-                      </ContextMenuItem>
-                    </ContextMenuContent>
+                    {t.kind === "workspace" ? (
+                      <WorkspaceTabContextMenuContent
+                        tab={t as WorkspaceTab}
+                        tabsLength={tabs.length}
+                        onStartRename={() => startEditing(t.id)}
+                        onClose={onClose}
+                        onCloseByKind={onCloseByKind}
+                      />
+                    ) : (
+                      <NonWorkspaceTabContextMenuContent
+                        tab={t}
+                        onClose={onClose}
+                        onDuplicate={onDuplicate}
+                        onCloseOthers={onCloseOthers}
+                        onCloseAll={onCloseAll}
+                        onCloseByKind={onCloseByKind}
+                      />
+                    )}
                   </ContextMenu>
                 </SortableSidebarTabWrapper>
               );
