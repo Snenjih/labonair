@@ -21,6 +21,10 @@ describe("resolveToggle", () => {
   it("switches away from a null (closed) slot", () => {
     expect(resolveToggle(null, "source-control", 0)).toEqual({ nextPanel: "source-control", action: "expand" });
   });
+
+  it("treats a sub-1% noise reading as still collapsed when toggling the same panel", () => {
+    expect(resolveToggle("explorer", "explorer", 0.03)).toEqual({ nextPanel: "explorer", action: "expand" });
+  });
 });
 
 describe("resolveResize", () => {
@@ -42,5 +46,14 @@ describe("resolveResize", () => {
 
   it("falls back to explorer when dragged open with no prior panel at all", () => {
     expect(resolveResize(15, null, null)).toEqual({ nextPanel: "explorer" });
+  });
+
+  it("treats a sub-1% noise reading as still collapsed, not a genuine open (regression: spurious opens from ResizeObserver rounding)", () => {
+    expect(resolveResize(0.03, null, "explorer")).toEqual({ nextPanel: null });
+    expect(resolveResize(0.9, null, "explorer")).toEqual({ nextPanel: null });
+  });
+
+  it("still treats 1% and above as a genuine open", () => {
+    expect(resolveResize(1, null, "explorer")).toEqual({ nextPanel: "explorer" });
   });
 });
