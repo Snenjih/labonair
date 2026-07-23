@@ -40,6 +40,15 @@ export interface SidebarReturn {
 type PersistablePanel = Exclude<SidebarPanel, null | "hosts">;
 
 interface SlotOptions {
+  /** Starting `activePanel` before the async prefs restore lands — must
+   *  match what `SidebarContent`'s `defaultSize` assumes for this slot
+   *  (non-null → 225px, null → 0px), so the panel is physically born at the
+   *  right width instead of relying on an imperative correction. Calling
+   *  `.collapse()` on a panel immediately after mount (before the resizable
+   *  panel group's first layout pass) is unreliable — see useSidebar.ts's
+   *  restore effect for the follow-up correction this still needs for the
+   *  case where persisted state disagrees with this initial guess. */
+  initialPanel: SidebarPanel;
   storedOpen: boolean;
   storedPanel: PersistablePanel;
   persistOpen: (open: boolean) => Promise<void>;
@@ -58,6 +67,7 @@ interface Slot extends SidebarSlotState {
  *  toggle, resize-sync). Both the left and right slot are just two instances
  *  of this, called unconditionally so hook order stays stable. */
 function useSidebarSlot({
+  initialPanel,
   storedOpen,
   storedPanel,
   persistOpen,
@@ -66,8 +76,8 @@ function useSidebarSlot({
   tabsLocation,
 }: SlotOptions): Slot {
   const ref = useRef<PanelImperativeHandle | null>(null);
-  const [activePanel, setActivePanel] = useState<SidebarPanel>("explorer");
-  const lastActivePanelRef = useRef<SidebarPanel>("explorer");
+  const [activePanel, setActivePanel] = useState<SidebarPanel>(initialPanel);
+  const lastActivePanelRef = useRef<SidebarPanel>(initialPanel ?? "explorer");
   const restoredRef = useRef(false);
 
   // One-time restore once preferences are loaded — guards the persist effect
@@ -85,8 +95,16 @@ function useSidebarSlot({
     setActivePanel(resolvedPanel);
     lastActivePanelRef.current = resolvedPanel ?? "explorer";
 
+    // Correct the physical panel size only when persisted state disagrees
+    // with `initialPanel`'s guess — the common case (agreement) needs no
+    // imperative call at all, since `SidebarContent`'s `defaultSize` already
+    // matches. By now (post-hydration, not mount-synchronous) the panel
+    // group has had a full layout pass, so collapse()/expand() are reliable.
     const p = ref.current;
-    if (p && !storedOpen) p.collapse();
+    if (p) {
+      if (!storedOpen) p.collapse();
+      else p.expand();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefsHydrated]);
 
@@ -171,6 +189,7 @@ export function useSidebar(): SidebarReturn {
   // "secondary" is the brand-new, independent slot, always the opposite
   // screen side, closed by default.
   const primary = useSidebarSlot({
+    initialPanel: "explorer",
     storedOpen: primaryStoredOpen,
     storedPanel: primaryStoredPanel,
     persistOpen: setSidebarOpen,
@@ -179,6 +198,7 @@ export function useSidebar(): SidebarReturn {
     tabsLocation,
   });
   const secondary = useSidebarSlot({
+    initialPanel: null,
     storedOpen: secondaryStoredOpen,
     storedPanel: secondaryStoredPanel,
     persistOpen: setSidebarRightOpen,

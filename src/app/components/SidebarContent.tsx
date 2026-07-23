@@ -94,7 +94,12 @@ export const SidebarContent = React.memo(function SidebarContent({
     <ResizablePanel
       id={`sidebar-${side}`}
       panelRef={sidebarRef}
-      defaultSize="225px"
+      // Physically born at the size that matches the slot's starting
+      // activePanel (see useSidebar.ts's `initialPanel`), instead of always
+      // starting at 225px and relying on an imperative .collapse() call to
+      // shrink a slot that should start closed — that correction races the
+      // resizable-panel group's own first layout pass and is unreliable.
+      defaultSize={activePanel === null ? "0px" : "225px"}
       minSize="130px"
       maxSize="450px"
       collapsible
