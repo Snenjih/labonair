@@ -1,15 +1,24 @@
+import { ArrowDown01Icon, ArrowUpDownIcon, Cancel01Icon, Copy01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { getPopoverPlacement } from "@/modules/settings/lib/getPopoverPlacement";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 import { type TransferJob, type TransferStatus, useTransferStore } from "@/modules/sftp/store/transferStore";
-import { Cancel01Icon, ArrowUpDownIcon, Copy01Icon, ArrowDown01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 
 export function TransferDropdown() {
   const { jobs, clearCompleted, cancelJob, resolveConflict } = useTransferStore();
+  const placement = usePreferencesStore((s) => s.barItemPlacements.transfers);
+  const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
+  if (!placement) return null;
+  if (!badgesAlwaysVisible && jobs.length === 0) return null;
+
+  const { side, align } = getPopoverPlacement(placement.bar, placement.side);
+  const compact = placement.bar === "statusbar";
 
   const activeCount = jobs.filter((j) => j.status === "queued" || j.status === "running").length;
   const hasConflicts = jobs.some(
@@ -26,14 +35,20 @@ export function TransferDropdown() {
           <Button
             variant="ghost"
             size="icon"
-            className="relative size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            className={cn(
+              "relative shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground",
+              compact ? "size-5" : "size-7",
+            )}
             title="Transfers"
           >
-            <HugeiconsIcon icon={ArrowUpDownIcon} size={16} strokeWidth={1.75} />
+            <HugeiconsIcon icon={ArrowUpDownIcon} size={compact ? 12 : 16} strokeWidth={1.75} />
             {activeCount > 0 && (
               <span
                 className={cn(
-                  "absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white",
+                  "absolute flex items-center justify-center rounded-full font-bold text-white",
+                  compact
+                    ? "-right-0.5 -top-0.5 h-2.5 min-w-[10px] px-0.5 text-[7px]"
+                    : "-right-0.5 -top-0.5 h-3.5 min-w-[14px] px-0.5 text-[9px]",
                   hasConflicts ? "bg-destructive animate-pulse" : "bg-primary",
                 )}
               >
@@ -42,7 +57,7 @@ export function TransferDropdown() {
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-[405px] p-0 max-h-[540px] flex flex-col">
+        <PopoverContent side={side} align={align} className="w-[405px] p-0 max-h-[540px] flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
             <span className="text-sm font-semibold">Transfers</span>
             <button

@@ -1,35 +1,32 @@
+import { AlertDiamondIcon, GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { getName, getVersion } from "@tauri-apps/api/app";
+import { invoke } from "@tauri-apps/api/core";
+import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { arch, platform } from "@tauri-apps/plugin-os";
+import { useEffect, useState } from "react";
 import appIcon from "@/assets/app-icon.png";
-import { handleApiError } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { handleApiError } from "@/lib/errors";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import {
   setAutostart,
   setCheckForUpdates,
   setCredentialEncryption,
   setDefaultStartupTab,
+  setNotifyOnErrors,
+  setReduceMotion,
   setRestoreWindowState,
+  setScrollbackMaxSizeMb,
+  setScrollbackRetentionDays,
   setSessionRestore,
   setSessionScrollbackLines,
   setStartupTerminalCount,
-  setReduceMotion,
-  setNewTabInheritsCwd,
-  setConfirmCloseTerminalTab,
-  setConfirmQuitWithSsh,
-  setNotifyOnErrors,
-  setScrollbackMaxSizeMb,
-  setScrollbackRetentionDays,
 } from "@/modules/settings/store";
 import { useUpdater } from "@/modules/updater";
-import { AlertDiamondIcon, GithubIcon, Globe02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { getName, getVersion } from "@tauri-apps/api/app";
-import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { invoke } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
-import { arch, platform } from "@tauri-apps/plugin-os";
-import { useEffect, useState } from "react";
 import { NumInput } from "../components/NumInput";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
@@ -89,9 +86,6 @@ export function GeneralSection() {
   const startupTerminalCount = usePreferencesStore((s) => s.startupTerminalCount);
   const credentialEncryption = usePreferencesStore((s) => s.credentialEncryption);
   const reduceMotion = usePreferencesStore((s) => s.reduceMotion);
-  const newTabInheritsCwd = usePreferencesStore((s) => s.newTabInheritsCwd);
-  const confirmCloseTerminalTab = usePreferencesStore((s) => s.confirmCloseTerminalTab);
-  const confirmQuitWithSsh = usePreferencesStore((s) => s.confirmQuitWithSsh);
   const notifyOnErrors = usePreferencesStore((s) => s.notifyOnErrors);
 
   const { status, check, install } = useUpdater({ autoCheck: false });
@@ -364,31 +358,6 @@ export function GeneralSection() {
             checked={credentialEncryption}
             onCheckedChange={handleEncryptionToggle}
             disabled={pendingEncryption}
-          />
-        </SettingRow>
-        <SettingRow
-          title="Confirm quit with active SSH connections"
-          description="Show a confirmation dialog before closing the app when SSH sessions are open."
-        >
-          <Switch checked={confirmQuitWithSsh} onCheckedChange={(v) => void setConfirmQuitWithSsh(v)} />
-        </SettingRow>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>Tabs</Label>
-        <SettingRow
-          title="New tab inherits current directory"
-          description="Open new terminal tabs in the working directory of the active tab instead of the home directory."
-        >
-          <Switch checked={newTabInheritsCwd} onCheckedChange={(v) => void setNewTabInheritsCwd(v)} />
-        </SettingRow>
-        <SettingRow
-          title="Confirm before closing terminal tab"
-          description="Show a confirmation dialog when closing a terminal tab with a running shell."
-        >
-          <Switch
-            checked={confirmCloseTerminalTab}
-            onCheckedChange={(v) => void setConfirmCloseTerminalTab(v)}
           />
         </SettingRow>
       </div>

@@ -2,7 +2,7 @@ mod modules;
 
 use modules::{
     fs::{self, paths},
-    git, pty, secrets, shell,
+    git, pty, secrets, settings, shell,
     hosts::{HostsDb, db::{initialize_db, hosts_get_all, hosts_create, hosts_update, hosts_delete, hosts_duplicate, hosts_reorder, get_sudo_password, groups_get_all, groups_create, groups_delete, groups_update}},
     credentials::{credentials_get_all, credentials_create, credentials_update, credentials_delete, credentials_get_hosts_using, credential_generate_keypair},
     mcp::{
@@ -508,6 +508,7 @@ pub fn run() {
         .manage(SnippetRunState::default())
         .manage(secrets::SecretsState::default())
         .manage(fs::watcher::WatcherState::default())
+        .manage(settings::BarItemPlacementLock::default())
         .invoke_handler(tauri::generate_handler![
             pty::pty_open,
             pty::pty_write,
@@ -635,6 +636,7 @@ pub fn run() {
             themes_get_dir,
             ping_host,
             fs::paths::get_storage_paths,
+            settings::settings_set_bar_item_placement,
             backgrounds_list,
             background_import,
             background_delete,

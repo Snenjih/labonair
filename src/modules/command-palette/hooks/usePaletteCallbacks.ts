@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type React from "react";
 import { useMemo } from "react";
-import type { PanelImperativeHandle } from "react-resizable-panels";
 import { useChatStore } from "@/modules/ai";
 import type { RegistryCallbacks } from "@/modules/command-palette";
 import type { EditorPaneHandle } from "@/modules/editor";
@@ -19,8 +18,7 @@ export interface UsePaletteCallbacksOptions {
   togglePanelAndFocus: () => void;
   askFromSelection: () => void;
   execSnippet: (snippet: CommandSnippet, mode?: SnippetExecMode) => void;
-  setActivePanel: React.Dispatch<React.SetStateAction<SidebarPanel>>;
-  sidebarRef: React.RefObject<PanelImperativeHandle | null>;
+  openPanel: (panel: SidebarPanel) => void;
   openShortcuts: () => void;
   openPreviewTab: (url: string) => number;
   terminalRefs: React.MutableRefObject<Map<string, TerminalPaneHandle>>;
@@ -38,8 +36,7 @@ export function usePaletteCallbacks({
   togglePanelAndFocus,
   askFromSelection,
   execSnippet,
-  setActivePanel,
-  sidebarRef,
+  openPanel,
   openShortcuts,
   terminalRefs,
   editorRefs,
@@ -113,8 +110,7 @@ export function usePaletteCallbacks({
       },
       runSnippet: (snippet, mode) => void execSnippet(snippet, mode),
       openSnippetsPanel: () => {
-        setActivePanel("snippets");
-        sidebarRef.current?.expand();
+        openPanel("snippets");
       },
       newAiSession: () => {
         useChatStore.getState().newSession();
@@ -178,8 +174,7 @@ export function usePaletteCallbacks({
         openGitGraphTab(path, currentBranch || "HEAD", hostId ?? undefined, sessionId ?? undefined);
       },
       focusSourceControl: () => {
-        setActivePanel("source-control");
-        sidebarRef.current?.expand();
+        openPanel("source-control");
       },
     };
   }, [
@@ -190,8 +185,7 @@ export function usePaletteCallbacks({
     editorRefs,
     togglePanelAndFocus,
     askFromSelection,
-    setActivePanel,
-    sidebarRef,
+    openPanel,
     setSelectedHost,
     openShortcuts,
   ]);

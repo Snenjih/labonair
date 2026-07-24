@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/modules/hosts";
+import { getPopoverPlacement } from "@/modules/settings/lib/getPopoverPlacement";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { useSftpStore } from "@/modules/sftp/store/sftpStore";
 import { selectActiveTab, useTabsStore } from "@/modules/tabs";
@@ -72,6 +73,9 @@ export function BookmarksDropdown({ sendCd }: Props) {
   };
   const primaryClickBehavior = usePreferencesStore((s) => s.bookmarksPrimaryClickBehavior);
   const showBadge = usePreferencesStore((s) => s.bookmarksShowBadge);
+  const placement = usePreferencesStore((s) => s.barItemPlacements.bookmarks);
+  const { side: popoverSide, align } = getPopoverPlacement(placement.bar, placement.side);
+  const compact = placement.bar === "statusbar";
 
   const result = filterBookmarksForContext(activeTab, bookmarks, hosts);
 
@@ -198,15 +202,20 @@ export function BookmarksDropdown({ sendCd }: Props) {
         <Button
           variant="ghost"
           size="icon"
-          className="relative size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className={cn(
+            "relative shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground",
+            compact ? "size-5" : "size-7",
+          )}
           title="Bookmarks"
         >
-          <HugeiconsIcon icon={Bookmark02Icon} size={16} strokeWidth={1.75} />
+          <HugeiconsIcon icon={Bookmark02Icon} size={compact ? 12 : 16} strokeWidth={1.75} />
           {showBadge && totalShown > 0 && (
             <span
               className={cn(
-                "absolute -top-0.5 -right-0.5 min-w-[14px] h-3.5 px-0.5 rounded-full text-[9px] font-bold",
-                "flex items-center justify-center text-white bg-primary",
+                "absolute flex items-center justify-center rounded-full font-bold text-white bg-primary",
+                compact
+                  ? "-right-0.5 -top-0.5 h-2.5 min-w-[10px] px-0.5 text-[7px]"
+                  : "-right-0.5 -top-0.5 h-3.5 min-w-[14px] px-0.5 text-[9px]",
               )}
             >
               {totalShown}
@@ -215,7 +224,8 @@ export function BookmarksDropdown({ sendCd }: Props) {
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        align="end"
+        side={popoverSide}
+        align={align}
         className="w-80 max-h-96 overflow-y-auto p-1.5"
         // Radix otherwise auto-focuses the first focusable button on open,
         // which paints its native focus-visible ring immediately — we drive

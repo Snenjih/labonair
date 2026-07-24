@@ -1,5 +1,21 @@
 import { vi } from "vitest";
 
+// jsdom doesn't implement matchMedia — modules/settings/preferences.ts reads
+// it at import time (for the initial system-dark-mode check), so any test
+// that transitively imports it needs this polyfilled before that runs.
+if (typeof window !== "undefined" && !window.matchMedia) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
   Channel: vi.fn(),

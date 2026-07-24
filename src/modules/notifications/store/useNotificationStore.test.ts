@@ -93,6 +93,16 @@ describe("addNotification", () => {
     expect(useNotificationStore.getState().notifications).toHaveLength(2);
   });
 
+  it("spam guard: does not block different titles with the same message+type", () => {
+    const now = 1000000;
+    vi.spyOn(Date, "now").mockReturnValue(now);
+
+    useNotificationStore.getState().addNotification({ ...baseNotif, title: "Push Failed" });
+    useNotificationStore.getState().addNotification({ ...baseNotif, title: "Stash Apply Failed" });
+
+    expect(useNotificationStore.getState().notifications).toHaveLength(2);
+  });
+
   it("limits to 100 notifications", () => {
     for (let i = 0; i < 105; i++) {
       useNotificationStore.getState().addNotification({ ...baseNotif, message: `msg-${i}` });
@@ -137,5 +147,30 @@ describe("notifyOnErrors gating", () => {
     usePreferencesStore.setState({ notifyOnErrors: true });
     useNotificationStore.getState().addNotification({ ...baseNotif, type: "error" });
     expect(useNotificationStore.getState().notifications).toHaveLength(1);
+  });
+});
+
+describe("addActionResultNotification", () => {
+  it("bypasses the notifyOnErrors gate for error-type action results", () => {
+    usePreferencesStore.setState({ notifyOnErrors: false });
+    useNotificationStore.getState().addActionResultNotification({ ...baseNotif, type: "error" });
+    expect(useNotificationStore.getState().notifications).toHaveLength(1);
+  });
+
+  it("still applies the spam guard", () => {
+    const now = 1000000;
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    usePreferencesStore.setState({ notifyOnErrors: false });
+    useNotificationStore.getState().addActionResultNotification({ ...baseNotif, type: "error" });
+    useNotificationStore.getState().addActionResultNotification({ ...baseNotif, type: "error" });
+    expect(useNotificationStore.getState().notifications).toHaveLength(1);
+  });
+
+  it("does not affect the regular notifyOnErrors-gated addNotification path", () => {
+    usePreferencesStore.setState({ notifyOnErrors: false });
+    useNotificationStore.getState().addActionResultNotification({ ...baseNotif, type: "error" });
+    useNotificationStore.getState().addNotification({ ...baseNotif, type: "error", message: "Other" });
+    expect(useNotificationStore.getState().notifications).toHaveLength(1);
+    expect(useNotificationStore.getState().notifications[0].message).toBe("Hello");
   });
 });

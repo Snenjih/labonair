@@ -1,12 +1,3 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import {
-  type AppNotification,
-  type NotificationType,
-  useNotificationStore,
-} from "@/modules/notifications/store/useNotificationStore";
 import {
   Alert02Icon,
   AlertCircleIcon,
@@ -18,6 +9,17 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AnimatePresence, motion } from "motion/react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import {
+  type AppNotification,
+  type NotificationType,
+  useNotificationStore,
+} from "@/modules/notifications/store/useNotificationStore";
+import { getPopoverPlacement } from "@/modules/settings/lib/getPopoverPlacement";
+import { usePreferencesStore } from "@/modules/settings/preferences";
 
 function relativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -96,8 +98,13 @@ function NotificationItem({ notif, onDismiss }: { notif: AppNotification; onDism
 
 export function NotificationDropdown() {
   const { notifications, removeNotification, clearAll } = useNotificationStore();
+  const placement = usePreferencesStore((s) => s.barItemPlacements.notifications);
+  const badgesAlwaysVisible = usePreferencesStore((s) => s.badgesAlwaysVisible);
+  if (!placement) return null;
+  if (!badgesAlwaysVisible && notifications.length === 0) return null;
 
-  if (notifications.length === 0) return null;
+  const { side, align } = getPopoverPlacement(placement.bar, placement.side);
+  const compact = placement.bar === "statusbar";
 
   const hasErrors = notifications.some((n) => n.type === "error");
 
@@ -107,21 +114,29 @@ export function NotificationDropdown() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative size-7 shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+          className={cn(
+            "relative shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground",
+            compact ? "size-5" : "size-7",
+          )}
           title="Notifications"
         >
-          <HugeiconsIcon icon={Notification03Icon} size={16} strokeWidth={1.75} />
-          <span
-            className={cn(
-              "absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full px-0.5 text-[9px] font-bold text-white",
-              hasErrors ? "animate-pulse bg-destructive" : "bg-primary",
-            )}
-          >
-            {notifications.length}
-          </span>
+          <HugeiconsIcon icon={Notification03Icon} size={compact ? 12 : 16} strokeWidth={1.75} />
+          {notifications.length > 0 && (
+            <span
+              className={cn(
+                "absolute flex items-center justify-center rounded-full font-bold text-white",
+                compact
+                  ? "-right-0.5 -top-0.5 h-2.5 min-w-[10px] px-0.5 text-[7px]"
+                  : "-right-0.5 -top-0.5 h-3.5 min-w-[14px] px-0.5 text-[9px]",
+                hasErrors ? "animate-pulse bg-destructive" : "bg-primary",
+              )}
+            >
+              {notifications.length}
+            </span>
+          )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="z-[100] flex max-h-[80vh] w-[380px] flex-col p-0">
+      <PopoverContent side={side} align={align} className="z-[100] flex max-h-[80vh] w-[380px] flex-col p-0">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
           <span className="text-sm font-semibold">Notifications</span>
           <button
@@ -131,13 +146,23 @@ export function NotificationDropdown() {
             Clear all
           </button>
         </div>
-        <div className="flex-1 divide-y divide-border/40 overflow-y-auto">
-          <AnimatePresence initial={false}>
-            {notifications.map((notif) => (
-              <NotificationItem key={notif.id} notif={notif} onDismiss={() => removeNotification(notif.id)} />
-            ))}
-          </AnimatePresence>
-        </div>
+        {notifications.length === 0 ? (
+          <div className="flex items-center justify-center h-20 text-sm text-muted-foreground select-none">
+            No notifications
+          </div>
+        ) : (
+          <div className="flex-1 divide-y divide-border/40 overflow-y-auto">
+            <AnimatePresence initial={false}>
+              {notifications.map((notif) => (
+                <NotificationItem
+                  key={notif.id}
+                  notif={notif}
+                  onDismiss={() => removeNotification(notif.id)}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

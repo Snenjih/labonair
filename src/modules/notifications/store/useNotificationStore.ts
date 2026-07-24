@@ -15,8 +15,44 @@ export interface AppNotification {
 interface NotificationState {
   notifications: AppNotification[];
   addNotification: (notif: Omit<AppNotification, "id" | "timestamp">) => void;
+  /** Like `addNotification`, but bypasses the `notifyOnErrors` gate — for
+   *  direct, user-initiated action results (a button was just clicked and
+   *  the action succeeded/failed) rather than passive/background errors,
+   *  which is what that preference is meant to govern. Without this,
+   *  action-result errors would be silently invisible for the majority of
+   *  users, since `notifyOnErrors` defaults to off. */
+  addActionResultNotification: (notif: Omit<AppNotification, "id" | "timestamp">) => void;
   removeNotification: (id: string) => void;
   clearAll: () => void;
+}
+
+function pushNotification(
+  set: (fn: (s: NotificationState) => Partial<NotificationState>) => void,
+  get: () => NotificationState,
+  notif: Omit<AppNotification, "id" | "timestamp">,
+): void {
+  const { notifications } = get();
+  // Spam guard: ignore if newest notification has same title+message+type
+  // within 2s. `title` must be part of the key — otherwise two *different*
+  // actions failing with the same underlying error text (e.g. a shared dead
+  // SSH session) within the window would silently drop one of them, even
+  // though they're unrelated failures the user needs to see both of.
+  const newest = notifications[0];
+  if (
+    newest &&
+    newest.title === notif.title &&
+    newest.message === notif.message &&
+    newest.type === notif.type &&
+    Date.now() - newest.timestamp < 2000
+  ) {
+    return;
+  }
+  set((s) => ({
+    notifications: [{ ...notif, id: crypto.randomUUID(), timestamp: Date.now() }, ...s.notifications].slice(
+      0,
+      100,
+    ),
+  }));
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -25,23 +61,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     if (notif.type === "error" && !usePreferencesStore.getState().notifyOnErrors) {
       return;
     }
-    const { notifications } = get();
-    // Spam guard: ignore if newest notification has same message+type within 2s
-    const newest = notifications[0];
-    if (
-      newest &&
-      newest.message === notif.message &&
-      newest.type === notif.type &&
-      Date.now() - newest.timestamp < 2000
-    ) {
-      return;
-    }
-    set((s) => ({
-      notifications: [{ ...notif, id: crypto.randomUUID(), timestamp: Date.now() }, ...s.notifications].slice(
-        0,
-        100,
-      ),
-    }));
+    pushNotification(set, get, notif);
+  },
+  addActionResultNotification: (notif) => {
+    pushNotification(set, get, notif);
   },
   removeNotification: (id) =>
     set((s) => ({

@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { LazyStore } from "@tauri-apps/plugin-store";
 import { getStoragePaths } from "@/lib/paths";
@@ -11,6 +12,11 @@ import {
   OLLAMA_DEFAULT_BASE_URL,
   OPENAI_COMPATIBLE_DEFAULT_BASE_URL,
 } from "@/modules/ai/config";
+import {
+  type BarItemId,
+  type BarItemPlacement,
+  DEFAULT_BAR_ITEM_PLACEMENTS,
+} from "@/modules/settings/lib/barItems";
 
 export type ThemePref = "system" | "light" | "dark";
 
@@ -158,7 +164,23 @@ export type Preferences = {
   // --- Sidebar ---
   sidebarPosition: "left" | "right";
   sidebarOpen: boolean;
-  sidebarActivePanel: "explorer" | "snippets" | "tabs";
+  sidebarActivePanel: "explorer" | "snippets" | "source-control" | "tabs";
+  // Dual-dock: independent second sidebar slot on the opposite screen side.
+  sidebarRightOpen: boolean;
+  sidebarRightActivePanel: "explorer" | "snippets" | "source-control" | "tabs";
+  // Persisted panel width in px, per slot. Must stay within SidebarContent's
+  // minSize/maxSize (130/450) — see the clamp in loadPreferences().
+  sidebarWidth: number;
+  sidebarRightWidth: number;
+
+  // --- Bar Item Registry (per-item titlebar/statusbar/sidebar positioning) ---
+  barItemPlacements: Record<BarItemId, BarItemPlacement>;
+  /** One-time migration gate from the old sidebarPosition/titlebarsIconsPosition/
+   *  statusBarShowXXX prefs into barItemPlacements. */
+  barLayoutMigrated: boolean;
+  /** Whether Notifications/Transfers/Jump Hosts/Agent Access stay visible at
+   *  count 0, or hide themselves until they have at least one item. */
+  badgesAlwaysVisible: boolean;
   // --- Security ---
   credentialEncryption: boolean;
   // --- Updates ---
@@ -352,6 +374,13 @@ const KEY_COMMAND_PALETTE_CLOSE_ON_OVERLAY = "commandPaletteCloseOnOverlayClick"
 const KEY_SIDEBAR_POSITION = "sidebarPosition";
 const KEY_SIDEBAR_OPEN = "sidebarOpen";
 const KEY_SIDEBAR_ACTIVE_PANEL = "sidebarActivePanel";
+const KEY_SIDEBAR_RIGHT_OPEN = "sidebarRightOpen";
+const KEY_SIDEBAR_RIGHT_ACTIVE_PANEL = "sidebarRightActivePanel";
+const KEY_SIDEBAR_WIDTH = "sidebarWidth";
+const KEY_SIDEBAR_RIGHT_WIDTH = "sidebarRightWidth";
+const KEY_BAR_ITEM_PLACEMENTS = "barItemPlacements";
+const KEY_BAR_LAYOUT_MIGRATED = "barLayoutMigrated";
+const KEY_BADGES_ALWAYS_VISIBLE = "badgesAlwaysVisible";
 
 const KEY_CREDENTIAL_ENCRYPTION = "credentialEncryption";
 const KEY_CHECK_FOR_UPDATES = "checkForUpdates";
@@ -518,6 +547,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sidebarPosition: "left",
   sidebarOpen: true,
   sidebarActivePanel: "explorer",
+  sidebarRightOpen: false,
+  sidebarRightActivePanel: "explorer",
+  sidebarWidth: 225,
+  sidebarRightWidth: 225,
+  barItemPlacements: DEFAULT_BAR_ITEM_PLACEMENTS,
+  barLayoutMigrated: false,
+  badgesAlwaysVisible: true,
   credentialEncryption: false,
   checkForUpdates: true,
 
@@ -801,10 +837,35 @@ export async function loadPreferences(): Promise<Preferences> {
     sidebarOpen: get<boolean>(KEY_SIDEBAR_OPEN) ?? DEFAULT_PREFERENCES.sidebarOpen,
     sidebarActivePanel: (() => {
       const raw = get<string>(KEY_SIDEBAR_ACTIVE_PANEL);
-      return (["explorer", "snippets", "tabs"] as const).includes(raw as "explorer" | "snippets" | "tabs")
-        ? (raw as "explorer" | "snippets" | "tabs")
+      return (["explorer", "snippets", "source-control", "tabs"] as const).includes(
+        raw as "explorer" | "snippets" | "source-control" | "tabs",
+      )
+        ? (raw as "explorer" | "snippets" | "source-control" | "tabs")
         : DEFAULT_PREFERENCES.sidebarActivePanel;
     })(),
+    sidebarRightOpen: get<boolean>(KEY_SIDEBAR_RIGHT_OPEN) ?? DEFAULT_PREFERENCES.sidebarRightOpen,
+    sidebarRightActivePanel: (() => {
+      const raw = get<string>(KEY_SIDEBAR_RIGHT_ACTIVE_PANEL);
+      return (["explorer", "snippets", "source-control", "tabs"] as const).includes(
+        raw as "explorer" | "snippets" | "source-control" | "tabs",
+      )
+        ? (raw as "explorer" | "snippets" | "source-control" | "tabs")
+        : DEFAULT_PREFERENCES.sidebarRightActivePanel;
+    })(),
+    // Bounds mirror SidebarContent's minSize="130px"/maxSize="450px" — keep
+    // these two literals in sync if those constraints ever change.
+    sidebarWidth: Math.min(
+      450,
+      Math.max(130, get<number>(KEY_SIDEBAR_WIDTH) ?? DEFAULT_PREFERENCES.sidebarWidth),
+    ),
+    sidebarRightWidth: Math.min(
+      450,
+      Math.max(130, get<number>(KEY_SIDEBAR_RIGHT_WIDTH) ?? DEFAULT_PREFERENCES.sidebarRightWidth),
+    ),
+    barItemPlacements:
+      get<Preferences["barItemPlacements"]>(KEY_BAR_ITEM_PLACEMENTS) ?? DEFAULT_PREFERENCES.barItemPlacements,
+    barLayoutMigrated: get<boolean>(KEY_BAR_LAYOUT_MIGRATED) ?? DEFAULT_PREFERENCES.barLayoutMigrated,
+    badgesAlwaysVisible: get<boolean>(KEY_BADGES_ALWAYS_VISIBLE) ?? DEFAULT_PREFERENCES.badgesAlwaysVisible,
     credentialEncryption: get<boolean>(KEY_CREDENTIAL_ENCRYPTION) ?? DEFAULT_PREFERENCES.credentialEncryption,
     checkForUpdates: get<boolean>(KEY_CHECK_FOR_UPDATES) ?? DEFAULT_PREFERENCES.checkForUpdates,
 
@@ -1482,8 +1543,60 @@ export async function setSidebarOpen(value: boolean): Promise<void> {
   await (await getStore()).save();
 }
 
-export async function setSidebarActivePanel(value: "explorer" | "snippets" | "tabs"): Promise<void> {
+export async function setSidebarActivePanel(
+  value: "explorer" | "snippets" | "source-control" | "tabs",
+): Promise<void> {
   await (await getStore()).set(KEY_SIDEBAR_ACTIVE_PANEL, value);
+  await (await getStore()).save();
+}
+
+export async function setSidebarRightOpen(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_RIGHT_OPEN, value);
+  await (await getStore()).save();
+}
+
+export async function setSidebarRightActivePanel(
+  value: "explorer" | "snippets" | "source-control" | "tabs",
+): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_RIGHT_ACTIVE_PANEL, value);
+  await (await getStore()).save();
+}
+
+export async function setSidebarWidth(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_WIDTH, value);
+  await (await getStore()).save();
+}
+
+export async function setSidebarRightWidth(value: number): Promise<void> {
+  await (await getStore()).set(KEY_SIDEBAR_RIGHT_WIDTH, value);
+  await (await getStore()).save();
+}
+
+export async function setBarItemPlacements(value: Record<BarItemId, BarItemPlacement>): Promise<void> {
+  await (await getStore()).set(KEY_BAR_ITEM_PLACEMENTS, value);
+  await (await getStore()).save();
+}
+
+/** Merge-updates a single item's placement (used by the right-click position
+ *  menu and the Layout & Panels settings rows) without clobbering the rest.
+ *  Delegates the read-merge-write to a Rust command guarded by a
+ *  process-wide mutex — the main window and the separate Settings window
+ *  are independent JS runtimes that can call this concurrently, so the
+ *  merge has to happen somewhere both share, not here. */
+export async function setBarItemPlacement(
+  itemId: BarItemId,
+  patch: Partial<BarItemPlacement>,
+): Promise<void> {
+  await invoke("settings_set_bar_item_placement", { itemId, patch });
+}
+
+export async function setBarLayoutMigrated(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BAR_LAYOUT_MIGRATED, value);
+  await (await getStore()).save();
+}
+
+export async function setBadgesAlwaysVisible(value: boolean): Promise<void> {
+  await (await getStore()).set(KEY_BADGES_ALWAYS_VISIBLE, value);
   await (await getStore()).save();
 }
 
@@ -1852,6 +1965,13 @@ export async function onPreferencesChange(cb: (key: PrefKey, value: unknown) => 
     [KEY_SIDEBAR_POSITION]: "sidebarPosition",
     [KEY_SIDEBAR_OPEN]: "sidebarOpen",
     [KEY_SIDEBAR_ACTIVE_PANEL]: "sidebarActivePanel",
+    [KEY_SIDEBAR_RIGHT_OPEN]: "sidebarRightOpen",
+    [KEY_SIDEBAR_RIGHT_ACTIVE_PANEL]: "sidebarRightActivePanel",
+    [KEY_SIDEBAR_WIDTH]: "sidebarWidth",
+    [KEY_SIDEBAR_RIGHT_WIDTH]: "sidebarRightWidth",
+    [KEY_BAR_ITEM_PLACEMENTS]: "barItemPlacements",
+    [KEY_BAR_LAYOUT_MIGRATED]: "barLayoutMigrated",
+    [KEY_BADGES_ALWAYS_VISIBLE]: "badgesAlwaysVisible",
     [KEY_CREDENTIAL_ENCRYPTION]: "credentialEncryption",
     [KEY_CHECK_FOR_UPDATES]: "checkForUpdates",
     [KEY_HOST_PING_INTERVAL]: "hostPingInterval",

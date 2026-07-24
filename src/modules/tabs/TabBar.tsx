@@ -1,36 +1,20 @@
+import { closestCenter, DndContext } from "@dnd-kit/core";
+import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Cancel01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  ContextMenu,
-  ContextMenuCheckboxItem,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Cancel01Icon, PencilEdit02Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { SortableContext, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
-import { useShallow } from "zustand/react/shallow";
-import { useHostsStore } from "@/modules/hosts/store/hostsStore";
-import { getLocalPtyId } from "@/modules/terminal/lib/terminalSessionRegistry";
-import { setAgentAccessGrant, useAgentAccessStore } from "./store/agentAccessStore";
-import { selectRenderStableTabs, useTabsStore } from "./store/tabsStore";
-import { TabIconFor, labelFor, pluralLabelFor, NewTabDropdownItems } from "./lib/tabUtils";
-import type { Tab } from "./types";
+import { NonWorkspaceTabContextMenuContent } from "./components/NonWorkspaceTabContextMenuContent";
+import { WorkspaceTabContextMenuContent } from "./components/WorkspaceTabContextMenuContent";
+import { labelFor, NewTabDropdownItems, TabIconFor } from "./lib/tabUtils";
+import { shouldMiddleClickClose, useTabList } from "./lib/useTabList";
+import type { Tab, WorkspaceTab } from "./types";
 
 type Props = {
   onSelect: (id: number) => void;
@@ -67,26 +51,10 @@ export function TabBar({
   onNewGitGraph,
   compact,
 }: Props) {
-  const tabs = useTabsStore(useShallow(selectRenderStableTabs));
-  const activeId = useTabsStore((s) => s.activeId);
-  const reorderTabs = useTabsStore((s) => s.reorderTabs);
-  const agentAccessEntries = useAgentAccessStore((s) => s.entries);
-  const agentBridgeEnabled = useAgentAccessStore((s) => s.bridgeEnabled);
-  const hosts = useHostsStore((s) => s.hosts);
+  const { tabs, activeId, sensors, handleDragEnd, isNewTab, editingId, startEditing, finishEditing } =
+    useTabList();
   const scrollRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
-      reorderTabs(Number(active.id), Number(over.id));
-    },
-    [reorderTabs],
-  );
 
   // ── Sliding pill ────────────────────────────────────────────────────────────
   const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
@@ -117,19 +85,6 @@ export function TabBar({
     }
   }, [pill, pillReady]);
 
-  // ── Tab enter animation ─────────────────────────────────────────────────────
-  // Seed with all current IDs on first render so restored tabs don't animate.
-  const seenRef = useRef<Set<number> | null>(null);
-  const firstRender = seenRef.current === null;
-  let seen = seenRef.current;
-  if (seen === null) {
-    seen = new Set(tabs.map((t) => t.id));
-    seenRef.current = seen;
-  }
-  useEffect(() => {
-    seenRef.current = new Set(tabs.map((t) => t.id));
-  }, [tabs]);
-
   // ── Wheel scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
     const el = scrollRef.current;
@@ -151,13 +106,6 @@ export function TabBar({
     const active = el.querySelector<HTMLElement>(`[data-tab-id="${activeId}"]`);
     active?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeId, tabs.length]);
-
-  // Clear editing state if the tab being renamed is closed externally.
-  useEffect(() => {
-    if (editingId !== null && !tabs.find((t) => t.id === editingId)) {
-      setEditingId(null);
-    }
-  }, [tabs, editingId]);
 
   return (
     <div
@@ -189,7 +137,7 @@ export function TabBar({
               <SortableContext items={tabs.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
                 {tabs.map((t) => {
                   const isActive = t.id === activeId;
-                  const isNew = !firstRender && !seen!.has(t.id);
+                  const isNew = isNewTab(t.id);
 
                   // Render a non-button cell while renaming so <input> isn't nested
                   // inside <button> (invalid HTML; WebKit blocks focus/selection).
@@ -208,9 +156,9 @@ export function TabBar({
                             initial={labelFor(t)}
                             onCommit={(value) => {
                               onRename(t.id, value);
-                              setEditingId(null);
+                              finishEditing();
                             }}
-                            onCancel={() => setEditingId(null)}
+                            onCancel={finishEditing}
                           />
                         </div>
                       </SortableTabWrapper>
@@ -223,7 +171,7 @@ export function TabBar({
                       data-tab-id={t.id}
                       data-tab-active={isActive ? "true" : undefined}
                       onAuxClick={(e) => {
-                        if (e.button === 1 && tabs.length > 1 && t.kind !== "home") {
+                        if (shouldMiddleClickClose(e.button, tabs.length, t.kind)) {
                           e.preventDefault();
                           e.stopPropagation();
                           onClose(t.id);
@@ -275,93 +223,28 @@ export function TabBar({
                     </TabsTrigger>
                   );
 
-                  // Workspace tabs get a rename-focused context menu.
-                  // All other types keep the original menu (duplicate, close others, close all).
-                  if (t.kind === "workspace") {
-                    const activeSession = t.sessions[t.activePaneId];
-                    const isSsh = activeSession?.kind === "ssh";
-                    const isLocal = activeSession?.kind === "local";
-                    const isGranted = Boolean(agentAccessEntries[t.id]);
-                    const sessionHost = isSsh ? hosts.find((h) => h.id === activeSession?.hostId) : undefined;
-                    const hostBlocked = isSsh && sessionHost?.block_agent_access === true;
-                    return (
-                      <SortableTabWrapper key={t.id} id={t.id} disabled={false}>
-                        <ContextMenu>
-                          <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
-                          <ContextMenuContent
-                            className="min-w-36"
-                            onCloseAutoFocus={(e) => e.preventDefault()}
-                          >
-                            <ContextMenuItem onSelect={() => setEditingId(t.id)}>
-                              <HugeiconsIcon icon={PencilEdit02Icon} size={14} strokeWidth={1.75} />
-                              <span className="flex-1">Rename</span>
-                            </ContextMenuItem>
-                            {(isSsh || isLocal) && activeSession && agentBridgeEnabled && (
-                              <>
-                                <ContextMenuSeparator />
-                                <ContextMenuCheckboxItem
-                                  checked={isGranted}
-                                  disabled={hostBlocked}
-                                  title={
-                                    hostBlocked
-                                      ? "This host has AI agent access blocked in its settings"
-                                      : undefined
-                                  }
-                                  onCheckedChange={(checked) =>
-                                    void setAgentAccessGrant(
-                                      t.id,
-                                      activeSession.id,
-                                      checked,
-                                      labelFor(t),
-                                      isSsh ? "ssh" : "local",
-                                      isSsh
-                                        ? { hostId: activeSession.hostId }
-                                        : { localPtyId: getLocalPtyId(activeSession.id) },
-                                    )
-                                  }
-                                >
-                                  Grant AI Agent Access
-                                </ContextMenuCheckboxItem>
-                              </>
-                            )}
-                            {tabs.length > 1 && (
-                              <>
-                                <ContextMenuSeparator />
-                                <ContextMenuItem onSelect={() => onClose(t.id)}>
-                                  <HugeiconsIcon icon={Cancel01Icon} size={14} strokeWidth={1.75} />
-                                  <span className="flex-1">Close</span>
-                                </ContextMenuItem>
-                                <ContextMenuItem onSelect={() => onCloseByKind(t.kind)}>
-                                  <span className="flex-1">Close All {pluralLabelFor(t.kind)}</span>
-                                </ContextMenuItem>
-                              </>
-                            )}
-                          </ContextMenuContent>
-                        </ContextMenu>
-                      </SortableTabWrapper>
-                    );
-                  }
-
                   return (
                     <SortableTabWrapper key={t.id} id={t.id} disabled={false}>
                       <ContextMenu>
                         <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
-                        <ContextMenuContent>
-                          {t.kind !== "home" && (
-                            <>
-                              <ContextMenuItem onSelect={() => onClose(t.id)}>Close Tab</ContextMenuItem>
-                              <ContextMenuItem onSelect={() => onDuplicate(t.id)}>
-                                Duplicate Tab
-                              </ContextMenuItem>
-                              <ContextMenuSeparator />
-                            </>
-                          )}
-                          <ContextMenuItem onSelect={() => onCloseOthers(t.id)}>Close Others</ContextMenuItem>
-                          <ContextMenuItem onSelect={onCloseAll}>Close All</ContextMenuItem>
-                          <ContextMenuItem onSelect={() => onCloseByKind(t.kind)}>
-                            Close All {pluralLabelFor(t.kind)}
-                          </ContextMenuItem>
-                        </ContextMenuContent>
+                        {t.kind === "workspace" ? (
+                          <WorkspaceTabContextMenuContent
+                            tab={t as WorkspaceTab}
+                            tabsLength={tabs.length}
+                            onStartRename={() => startEditing(t.id)}
+                            onClose={onClose}
+                            onCloseByKind={onCloseByKind}
+                          />
+                        ) : (
+                          <NonWorkspaceTabContextMenuContent
+                            tab={t}
+                            onClose={onClose}
+                            onDuplicate={onDuplicate}
+                            onCloseOthers={onCloseOthers}
+                            onCloseAll={onCloseAll}
+                            onCloseByKind={onCloseByKind}
+                          />
+                        )}
                       </ContextMenu>
                     </SortableTabWrapper>
                   );

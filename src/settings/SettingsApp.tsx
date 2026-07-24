@@ -59,7 +59,7 @@ type SidebarItem = {
 
 const SIDEBAR_ITEMS: SidebarItem[] = [
   { id: "general", category: "General", label: "General", icon: Settings01Icon },
-  { id: "appearance", category: "Appearance", label: "Appearance", icon: PaintBoardIcon },
+  { id: "appearance", category: "Appearance & Layout", label: "Appearance & Layout", icon: PaintBoardIcon },
   { id: "themes", category: null, label: "Themes", icon: PaintBrush01Icon },
   { id: "terminal", category: "Terminal", label: "Terminal", icon: TerminalIcon },
   { id: "editor", category: "Editor", label: "Editor", icon: SourceCodeIcon },
@@ -78,6 +78,7 @@ function readInitialTab(): SettingsTab {
   const t = url.searchParams.get("tab");
   if (t === "models" || t === "agents" || t === "connections" || t === "directives") return "ai";
   if (t === "bookmarks" || t === "command-palette" || t === "source-control") return "workspace";
+  if (t === "layout") return "appearance";
   if (t && (VALID_TABS as string[]).includes(t)) return t as SettingsTab;
   return "general";
 }
@@ -104,6 +105,10 @@ export function SettingsApp() {
       }
       if (detail === "bookmarks" || detail === "command-palette" || detail === "source-control") {
         setActive("workspace");
+        return;
+      }
+      if (detail === "layout") {
+        setActive("appearance");
         return;
       }
       if ((VALID_TABS as string[]).includes(detail)) {
@@ -201,8 +206,8 @@ export function SettingsApp() {
               <SearchResults
                 query={trimmed}
                 results={searchResults}
-                onNavigateToThemes={() => {
-                  setActive("themes");
+                onNavigateToTab={(tab) => {
+                  setActive(tab);
                   setSearchQuery("");
                 }}
               />
@@ -489,17 +494,20 @@ function applySettingChange(id: PrefKey, value: unknown): void {
     case "bookmarksShowBadge":
       void store.setBookmarksShowBadge(value as boolean);
       break;
+    case "badgesAlwaysVisible":
+      void store.setBadgesAlwaysVisible(value as boolean);
+      break;
   }
 }
 
 function SearchResults({
   query,
   results,
-  onNavigateToThemes,
+  onNavigateToTab,
 }: {
   query: string;
   results: ReturnType<typeof SETTING_DEFINITIONS.filter>;
-  onNavigateToThemes: () => void;
+  onNavigateToTab: (tab: SettingsTab) => void;
 }) {
   const prefs = usePrefs();
 
@@ -560,10 +568,10 @@ function SearchResults({
                   <SettingRow key={def.id} title={def.label} description={def.description}>
                     <button
                       type="button"
-                      onClick={onNavigateToThemes}
+                      onClick={() => onNavigateToTab(def.targetTab ?? "themes")}
                       className="text-[11.5px] text-foreground underline underline-offset-2 hover:text-muted-foreground"
                     >
-                      Open in Themes
+                      {def.linkLabel ?? "Open in Themes"}
                     </button>
                   </SettingRow>
                 );

@@ -8,15 +8,15 @@ import type { CommandSnippet, SnippetExecMode } from "@/modules/snippets";
 import { SnippetsPanel } from "@/modules/snippets";
 import { SourceControlPanel } from "@/modules/source-control";
 import type { SidebarPanel } from "@/modules/statusbar";
-import { SidebarTabList } from "@/modules/tabs";
 import type { Tab } from "@/modules/tabs";
+import { SidebarTabList } from "@/modules/tabs";
 
 export interface SidebarContentProps {
   side: "left" | "right";
   sidebarRef: React.RefObject<PanelImperativeHandle | null>;
   activePanel: SidebarPanel;
-  setActivePanel: React.Dispatch<React.SetStateAction<SidebarPanel>>;
-  onSidebarResize: (size: { asPercentage: number }) => void;
+  width: number;
+  onSidebarResize: (size: { asPercentage: number; inPixels: number }) => void;
   explorerTarget: ExplorerTarget;
   // Tab list callbacks
   onSelect: (id: number) => void;
@@ -63,6 +63,7 @@ export const SidebarContent = React.memo(function SidebarContent({
   side,
   sidebarRef,
   activePanel,
+  width,
   onSidebarResize,
   explorerTarget,
   onSelect,
@@ -93,9 +94,16 @@ export const SidebarContent = React.memo(function SidebarContent({
 }: SidebarContentProps) {
   return (
     <ResizablePanel
-      id="sidebar"
+      id={`sidebar-${side}`}
       panelRef={sidebarRef}
-      defaultSize="225px"
+      // Physically born at the size that matches the slot's starting
+      // activePanel (see useSidebar.ts's `initialPanel`), instead of always
+      // starting open and relying on an imperative .collapse() call to
+      // shrink a slot that should start closed — that correction races the
+      // resizable-panel group's own first layout pass and is unreliable.
+      // `width` is useSidebar.ts's `initialWidth`/persisted-width guess,
+      // corrected post-hydration the same way `activePanel` is.
+      defaultSize={activePanel === null ? "0px" : `${width}px`}
       minSize="130px"
       maxSize="450px"
       collapsible
@@ -129,7 +137,7 @@ export const SidebarContent = React.memo(function SidebarContent({
           <SnippetsPanel onRun={onSnippetRun} />
         ) : activePanel === "source-control" ? (
           <SourceControlPanel target={explorerTarget} onOpenGitGraph={onOpenGitGraph} />
-        ) : (
+        ) : activePanel === "explorer" ? (
           <FileExplorer
             explorerTarget={explorerTarget}
             onOpenFile={onOpenFile}
@@ -142,7 +150,7 @@ export const SidebarContent = React.memo(function SidebarContent({
             onAttachToAgent={onAttachToAgent}
             onOpenSftpTab={onOpenSftpTab}
           />
-        )}
+        ) : null}
       </div>
     </ResizablePanel>
   );

@@ -1,9 +1,12 @@
 import { create } from "zustand";
+import { migrateBarItemPlacements } from "./lib/barItems";
 import {
   DEFAULT_PREFERENCES,
   loadPreferences,
   onPreferencesChange,
   type Preferences,
+  setBarItemPlacements,
+  setBarLayoutMigrated,
   setSftpShowHiddenFiles,
   type ThemePref,
 } from "./store";
@@ -40,6 +43,19 @@ export const usePreferencesStore = create<State>((set, get) => ({
     initialized = true;
     const prefs = await _earlyPrefsP;
     const applied = prefs ?? DEFAULT_PREFERENCES;
+
+    // One-time migration from the old sidebarPosition/titlebarsIconsPosition/
+    // statusBarShowXXX prefs into the unified bar-item registry. Runs before
+    // the first paint of any bar-item-consuming component (this is
+    // synchronous, in-memory — the persisted write below happens in the
+    // background) and never re-runs once `barLayoutMigrated` is true.
+    if (!applied.barLayoutMigrated) {
+      applied.barItemPlacements = migrateBarItemPlacements(applied);
+      applied.barLayoutMigrated = true;
+      void setBarItemPlacements(applied.barItemPlacements);
+      void setBarLayoutMigrated(true);
+    }
+
     set({ ...applied, hydrated: true, resolvedMode: resolveMode(applied.theme) });
 
     void onPreferencesChange((key, value) => {

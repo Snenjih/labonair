@@ -2,7 +2,7 @@ import type { PrefKey } from "./store";
 
 export type SettingCategory =
   | "General"
-  | "Appearance"
+  | "Appearance & Layout"
   | "Terminal"
   | "Editor"
   | "Command Palette"
@@ -25,6 +25,12 @@ export type SettingDefinition = {
   category: SettingCategory;
   controlType: ControlType;
   options?: SelectOption[];
+  /** For `controlType: "Custom"` — which settings tab the link navigates to
+   *  (defaults to "themes" for backward compatibility with the original
+   *  Themes-only Custom entries). */
+  targetTab?: import("./openSettingsWindow").SettingsTab;
+  /** For `controlType: "Custom"` — the link button's label (defaults to "Open in Themes"). */
+  linkLabel?: string;
 };
 
 export const SETTING_DEFINITIONS: SettingDefinition[] = [
@@ -129,7 +135,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "confirmQuitWithSsh",
     label: "Confirm quit with active SSH connections",
     description: "Show a confirmation dialog before closing the app when SSH sessions are open.",
-    category: "General",
+    category: "Appearance & Layout",
     controlType: "Switch",
   },
   {
@@ -137,14 +143,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "New tab inherits current directory",
     description:
       "Open new terminal tabs in the working directory of the active tab instead of the home directory.",
-    category: "General",
+    category: "Appearance & Layout",
     controlType: "Switch",
   },
   {
     id: "confirmCloseTerminalTab",
     label: "Confirm before closing terminal tab",
     description: "Show a confirmation dialog when closing a terminal tab with a running shell.",
-    category: "General",
+    category: "Appearance & Layout",
     controlType: "Switch",
   },
   {
@@ -167,14 +173,14 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "appCornerRadius",
     label: "Corner radius",
     description: "Border radius for buttons, cards, and inputs (0–20 px).",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "appDensity",
     label: "Density",
     description: "Adjust the vertical spacing of UI elements.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Select",
     options: [
       { value: "compact", label: "Compact" },
@@ -259,22 +265,11 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
 
   // --- Appearance ---
   {
-    id: "sidebarPosition",
-    label: "Sidebar position",
-    description: "Display the file explorer sidebar on the left or right side of the workspace.",
-    category: "Appearance",
-    controlType: "Select",
-    options: [
-      { value: "left", label: "Left" },
-      { value: "right", label: "Right" },
-    ],
-  },
-  {
     id: "appTheme",
     label: "Color theme",
     description:
       "Choose or import a JSON color theme for the application. Each theme bundles both a light and a dark variant.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Custom",
   },
   {
@@ -282,7 +277,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     label: "Color scheme",
     description:
       "Switch between light, dark, or system-default appearance. This also selects which variant of the active color theme is shown.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Select",
     options: [
       { value: "system", label: "System" },
@@ -294,90 +289,77 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     id: "appFontFamily",
     label: "UI font family",
     description: "The font used for all application UI text.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Input",
   },
   {
     id: "appFontSize",
     label: "UI font size",
     description: "Base font size for the application interface (in px).",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "appLineHeight",
     label: "UI line height",
     description: "Line height multiplier for the application interface.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "backgroundImage",
     label: "Background image",
     description: "The wallpaper image displayed behind the app UI.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Input",
   },
   {
     id: "backgroundOpacity",
     label: "Wallpaper opacity",
     description: "Higher values reveal more of the background.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "backgroundBlur",
     label: "Image blur",
     description: "Gaussian blur applied to the wallpaper.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "backgroundTintColor",
     label: "Tint color",
     description: "Pick the overlay color.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Input",
   },
   {
     id: "backgroundTintOpacity",
     label: "Color tint",
     description: "Overlay color blended on top of the background image.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "NumberInput",
   },
   {
     id: "zenModeShowHeader",
     label: "Show header bar",
     description: "Display the header bar with tabs and window controls. Hide it to maximise vertical space.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Switch",
   },
   {
     id: "zenModeShowStatusbar",
     label: "Show status bar",
     description: "Display the status bar at the bottom. Hide it to maximise vertical space.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Switch",
-  },
-  {
-    id: "titlebarsIconsPosition",
-    label: "Titlebar icons position",
-    description:
-      "Follows platform conventions — right side on macOS (traffic lights occupy the left) and on Windows (before the window controls).",
-    category: "Appearance",
-    controlType: "Select",
-    options: [
-      { value: "auto", label: "Auto" },
-      { value: "left", label: "Left" },
-      { value: "right", label: "Right" },
-    ],
   },
   {
     id: "tabsLocation",
     label: "Tab bar location",
     description: "Display the tab bar in the titlebar or move it into the sidebar panel.",
-    category: "Appearance",
+    category: "Appearance & Layout",
     controlType: "Select",
     options: [
       { value: "titlebar", label: "Titlebar" },
@@ -1162,11 +1144,29 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     category: "Bookmarks",
     controlType: "Switch",
   },
+  {
+    id: "barItemPlacements",
+    label: "Customize titlebar, statusbar & panel layout",
+    description:
+      "Reposition or hide badges, panels, and info items across the titlebar and statusbar, or reset to defaults.",
+    category: "Appearance & Layout",
+    controlType: "Custom",
+    targetTab: "appearance",
+    linkLabel: "Open Appearance",
+  },
+  {
+    id: "badgesAlwaysVisible",
+    label: "Always show badges",
+    description:
+      "Keep Notifications, Transfers, Jump Hosts, and Agent Access visible even with nothing to show.",
+    category: "Appearance & Layout",
+    controlType: "Switch",
+  },
 ];
 
 export const SETTING_CATEGORIES: SettingCategory[] = [
   "General",
-  "Appearance",
+  "Appearance & Layout",
   "Terminal",
   "Editor",
   "Command Palette",
